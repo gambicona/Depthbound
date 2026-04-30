@@ -1,5 +1,5 @@
 (() => {
-const { gridSize, feetPerSquare, tokenSlideMs, templates } = window.DungeonConfig;
+const { gridSize, feetPerSquare, tileSizePx, tokenSlideMs, templates } = window.DungeonConfig;
 const { rollDie, rollDice, abilityLabel } = window.DungeonDice;
 const { distance, isAdjacent, positionKey, findPath, reachableTiles } = window.DungeonGrid;
 
@@ -269,6 +269,8 @@ function runMonsterAi(monster) {
 
 function buildRoom() {
   els.room.innerHTML = "";
+  els.room.style.setProperty("--grid-size", gridSize);
+  els.room.style.setProperty("--tile-size", `${tileSizePx}px`);
 
   const tileLayer = document.createElement("div");
   tileLayer.className = "tile-layer";

@@ -1,6 +1,7 @@
 window.DungeonConfig = {
   gridSize: 7,
   feetPerSquare: 5,
+  tileSizePx: 54,
   tokenSlideMs: 320,
   templates: {
     hero: {
