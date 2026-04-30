@@ -293,6 +293,8 @@ function isKnownTile(position) {
   const tileKey = positionKey(position);
   if (currentOpenedKeys().has(tileKey)) return true;
   if (doorAt(position)) {
+    const door = doorAt(position);
+    if (currentDiscoveredRoomIds().has(door.roomId)) return true;
     return adjacentCells(position).some((cell) => currentOpenedKeys().has(positionKey(cell)));
   }
   return (state.dungeon?.rooms ?? []).some((room) => currentDiscoveredRoomIds().has(room.id) && roomHasCell(room, position));
@@ -312,6 +314,7 @@ function visibleWalkable() {
   for (const room of state.dungeon?.rooms ?? []) {
     if (currentDiscoveredRoomIds().has(room.id)) {
       room.cells.forEach((cell) => known.add(positionKey(cell)));
+      room.doors.forEach((door) => known.add(positionKey(door)));
     }
   }
   currentOpenedKeys().forEach((tileKey) => known.add(tileKey));
@@ -418,7 +421,6 @@ function canOpenDoor(position) {
   const hero = state.fighters.hero;
   const door = doorAt(position);
   if (!door || !isKnownTile(position)) return null;
-  if (state.mode === "exploration" && visibleMonsters().length > 0) return null;
   const heroRoom = roomForPosition(hero.position);
   if (heroRoom && monstersInRoom(heroRoom.id).length > 0) return null;
   return distance(hero.position, position) <= 1 ? door : null;
@@ -591,15 +593,16 @@ function moveFighter(fighter, destination, silent = false) {
 function handleTileClick(position) {
   const hero = state.fighters.hero;
   if (state.mode === "combat" && (activeFighter()?.id !== "hero" || combatMonsters().length === 0)) return;
-  if (state.mode === "exploration" && threatPresent()) {
-    addLog("A hostile creature is present. Roll initiative before moving.");
-    render();
-    return;
-  }
 
   const door = canOpenDoor(position);
   if (door) {
     openDoor(door);
+    return;
+  }
+
+  if (state.mode === "exploration" && threatPresent()) {
+    addLog("A hostile creature is present. Roll initiative before moving.");
+    render();
     return;
   }
 
