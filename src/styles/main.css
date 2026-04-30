@@ -148,6 +148,59 @@ h1 {
   gap: 10px;
 }
 
+.save-slots {
+  display: grid;
+  gap: 10px;
+}
+
+.save-slot {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.save-slot.active {
+  border-color: rgba(216, 174, 85, 0.68);
+  box-shadow: inset 3px 0 0 var(--gold);
+}
+
+.save-slot-main {
+  display: grid;
+  gap: 6px;
+}
+
+.save-slot-main label {
+  color: var(--gold);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.save-slot-main input {
+  background: rgba(16, 19, 15, 0.78);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  min-height: 40px;
+  padding: 0 10px;
+}
+
+.save-slot-main span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.save-slot-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
 .save-status {
   color: var(--muted);
   font-size: 0.9rem;

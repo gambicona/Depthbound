@@ -2,12 +2,13 @@
 const { gridSize, feetPerSquare, tileSizePx, tokenSlideMs, templates } = window.DungeonConfig;
 const { rollDie, rollDice, abilityLabel } = window.DungeonDice;
 const { distance, isAdjacent, positionKey, findPath, reachableTiles } = window.DungeonGrid;
-const { hasSave, save, load } = window.DungeonSave;
+const { getSlots, save, load } = window.DungeonSave;
 
 let state = createInitialState();
 let roomIsBuilt = false;
 let monsterTurnTimer = null;
 let gameHasStarted = false;
+let activeSaveSlot = 1;
 const fighterStatsOpen = {
   hero: true,
   monster: true,
@@ -16,7 +17,7 @@ const fighterStatsOpen = {
 const els = {
   mainMenu: document.querySelector("#main-menu"),
   startAdventure: document.querySelector("#start-adventure"),
-  loadAdventure: document.querySelector("#load-adventure"),
+  saveSlots: document.querySelector("#save-slots"),
   saveStatus: document.querySelector("#save-status"),
   room: document.querySelector("#room"),
   heroCard: document.querySelector("#hero-card"),
@@ -107,12 +108,50 @@ function normalizeLoadedState(loadedState) {
 }
 
 function updateSaveStatus(message = "") {
-  els.loadAdventure.disabled = !hasSave();
+  renderSaveSlots();
   if (message) {
     els.saveStatus.textContent = message;
   } else {
-    els.saveStatus.textContent = hasSave() ? "A saved adventure is available." : "No saved adventure found.";
+    const savedCount = getSlots().filter((slot) => slot.hasSave).length;
+    els.saveStatus.textContent = savedCount > 0 ? `${savedCount} save slot${savedCount === 1 ? "" : "s"} available.` : "No saved adventure found.";
   }
+}
+
+function escapeAttribute(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function renderSaveSlots() {
+  els.saveSlots.innerHTML = getSlots()
+    .map((slot) => {
+      const savedAt = slot.savedAt ? new Date(slot.savedAt).toLocaleString() : "Empty";
+      const activeClass = slot.id === activeSaveSlot ? " active" : "";
+      return `
+        <div class="save-slot${activeClass}" data-slot="${slot.id}">
+          <div class="save-slot-main">
+            <label for="save-slot-name-${slot.id}">Slot ${slot.id}</label>
+            <input id="save-slot-name-${slot.id}" type="text" value="${escapeAttribute(slot.name)}" maxlength="32" />
+            <span>${savedAt}</span>
+          </div>
+          <div class="save-slot-actions">
+            <button type="button" data-action="save-slot" data-slot="${slot.id}">Save</button>
+            <button type="button" data-action="load-slot" data-slot="${slot.id}" ${slot.hasSave ? "" : "disabled"}>Load</button>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
 }
 
 function showMainMenu(message = "") {
@@ -137,19 +176,20 @@ function startNewAdventure() {
   render();
 }
 
-function loadAdventure() {
+function loadAdventure(slotId) {
   try {
-    const payload = load();
+    const payload = load(slotId);
     if (!payload) {
       updateSaveStatus("No saved adventure found.");
       return;
     }
 
     window.clearTimeout(monsterTurnTimer);
+    activeSaveSlot = slotId;
     state = normalizeLoadedState(payload.state);
     roomIsBuilt = false;
     hideMainMenu();
-    addLog("Adventure loaded.", "important");
+    addLog(`Loaded "${payload.name}".`, "important");
     render();
     maybeRunMonsterTurn();
   } catch (error) {
@@ -157,12 +197,16 @@ function loadAdventure() {
   }
 }
 
-function saveAdventure() {
+function saveAdventure(slotId = activeSaveSlot) {
+  const nameInput = els.saveSlots.querySelector(`#save-slot-name-${slotId}`);
+  const slot = getSlots().find((entry) => entry.id === slotId);
+  const slotName = nameInput?.value.trim() || slot?.name || `Save Slot ${slotId}`;
   const savedAt = new Date().toLocaleString();
-  addLog(`Adventure saved at ${savedAt}.`, "important");
-  const payload = save(state);
+  activeSaveSlot = slotId;
+  addLog(`Saved "${slotName}" at ${savedAt}.`, "important");
+  const payload = save(slotId, slotName, state);
   render();
-  updateSaveStatus(`Saved ${new Date(payload.savedAt).toLocaleString()}.`);
+  updateSaveStatus(`Saved "${payload.name}" at ${new Date(payload.savedAt).toLocaleString()}.`);
 }
 
 function addLog(text, type = "") {
@@ -491,7 +535,7 @@ function renderInitiative() {
 
 function renderLog() {
   els.log.innerHTML = state.log
-    .map((entry) => `<li class="${entry.type}">${entry.text}</li>`)
+    .map((entry) => `<li class="${entry.type}">${escapeHtml(entry.text)}</li>`)
     .join("");
   els.log.scrollTop = els.log.scrollHeight;
 }
@@ -532,9 +576,20 @@ els.endTurn.addEventListener("click", endTurn);
 els.newGame.addEventListener("click", () => {
   showMainMenu();
 });
-els.saveGame.addEventListener("click", saveAdventure);
+els.saveGame.addEventListener("click", () => saveAdventure(activeSaveSlot));
 els.startAdventure.addEventListener("click", startNewAdventure);
-els.loadAdventure.addEventListener("click", loadAdventure);
+els.saveSlots.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+
+  const slotId = Number(button.dataset.slot);
+  if (button.dataset.action === "save-slot") {
+    saveAdventure(slotId);
+  }
+  if (button.dataset.action === "load-slot") {
+    loadAdventure(slotId);
+  }
+});
 els.clearLog.addEventListener("click", () => {
   state.log = [];
   renderLog();
