@@ -15,6 +15,8 @@
   --dock-height: 76px;
   --grid-size: 7;
   --tile-size: 54px;
+  --room-size: 378px;
+  --token-size: 33px;
 }
 
 * {
@@ -144,10 +146,11 @@ h1 {
   aspect-ratio: 1;
   background: #20251f;
   border: 8px solid #4d4737;
+  box-sizing: content-box;
   box-shadow: inset 0 0 0 2px #171a15, 0 20px 50px rgba(0, 0, 0, 0.45);
   flex: 0 0 auto;
   position: relative;
-  width: calc(var(--grid-size) * var(--tile-size));
+  width: var(--room-size);
 }
 
 .tile-layer,
@@ -224,12 +227,12 @@ h1 {
   display: flex;
   font-size: 1.05rem;
   font-weight: 900;
-  height: calc(var(--tile-size) * 0.62);
+  height: var(--token-size);
   justify-content: center;
   position: absolute;
   transform: translate(-50%, -50%);
   transition: left 320ms ease, top 320ms ease, opacity 200ms ease, filter 200ms ease;
-  width: calc(var(--tile-size) * 0.62);
+  width: var(--token-size);
   z-index: 2;
 }
 

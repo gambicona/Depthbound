@@ -269,8 +269,12 @@ function runMonsterAi(monster) {
 
 function buildRoom() {
   els.room.innerHTML = "";
+  const roomSizePx = gridSize * tileSizePx;
+  const tokenSizePx = Math.round(tileSizePx * 0.62);
   els.room.style.setProperty("--grid-size", gridSize);
   els.room.style.setProperty("--tile-size", `${tileSizePx}px`);
+  els.room.style.setProperty("--room-size", `${roomSizePx}px`);
+  els.room.style.setProperty("--token-size", `${tokenSizePx}px`);
 
   const tileLayer = document.createElement("div");
   tileLayer.className = "tile-layer";
@@ -307,8 +311,8 @@ function placeToken(fighter) {
   const token = els.room.querySelector(`[data-fighter="${fighter.id}"]`);
   if (!token) return;
 
-  token.style.left = `${((fighter.position.x + 0.5) / gridSize) * 100}%`;
-  token.style.top = `${((fighter.position.y + 0.5) / gridSize) * 100}%`;
+  token.style.left = `${(fighter.position.x + 0.5) * tileSizePx}px`;
+  token.style.top = `${(fighter.position.y + 0.5) * tileSizePx}px`;
   token.classList.toggle("defeated", !fighter.alive);
 }
 
