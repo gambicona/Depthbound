@@ -7,6 +7,18 @@
     <link rel="stylesheet" href="src/styles/main.css" />
   </head>
   <body>
+    <section id="main-menu" class="main-menu" aria-label="Main menu">
+      <div class="menu-panel">
+        <p class="eyebrow">Dungeon crawler</p>
+        <h1>Old Guardroom</h1>
+        <div class="menu-actions">
+          <button id="start-adventure" type="button">Start New Adventure</button>
+          <button id="load-adventure" type="button">Load Adventure</button>
+        </div>
+        <p id="save-status" class="save-status"></p>
+      </div>
+    </section>
+
     <main class="app-shell">
       <section class="arena" aria-label="Dungeon room">
         <div class="topbar">
@@ -14,7 +26,10 @@
             <p class="eyebrow">D&D-like crawler prototype</p>
             <h1>Old Guardroom</h1>
           </div>
-          <button id="new-game" class="ghost-button" type="button">New Encounter</button>
+          <div class="top-actions">
+            <button id="save-game" class="ghost-button" type="button">Save</button>
+            <button id="new-game" class="ghost-button" type="button">Main Menu</button>
+          </div>
         </div>
         <div class="room-scroll">
           <div class="room-wrap">
@@ -56,6 +71,7 @@
     <script src="src/scripts/config.js" defer></script>
     <script src="src/scripts/dice.js" defer></script>
     <script src="src/scripts/grid.js" defer></script>
+    <script src="src/scripts/save.js" defer></script>
     <script src="src/scripts/app.js" defer></script>
   </body>
 </html>

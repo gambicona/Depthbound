@@ -2,16 +2,22 @@
 const { gridSize, feetPerSquare, tileSizePx, tokenSlideMs, templates } = window.DungeonConfig;
 const { rollDie, rollDice, abilityLabel } = window.DungeonDice;
 const { distance, isAdjacent, positionKey, findPath, reachableTiles } = window.DungeonGrid;
+const { hasSave, save, load } = window.DungeonSave;
 
 let state = createInitialState();
 let roomIsBuilt = false;
 let monsterTurnTimer = null;
+let gameHasStarted = false;
 const fighterStatsOpen = {
   hero: true,
   monster: true,
 };
 
 const els = {
+  mainMenu: document.querySelector("#main-menu"),
+  startAdventure: document.querySelector("#start-adventure"),
+  loadAdventure: document.querySelector("#load-adventure"),
+  saveStatus: document.querySelector("#save-status"),
   room: document.querySelector("#room"),
   heroCard: document.querySelector("#hero-card"),
   monsterCard: document.querySelector("#monster-card"),
@@ -23,6 +29,7 @@ const els = {
   attack: document.querySelector("#attack"),
   endTurn: document.querySelector("#end-turn"),
   newGame: document.querySelector("#new-game"),
+  saveGame: document.querySelector("#save-game"),
   clearLog: document.querySelector("#clear-log"),
 };
 
@@ -32,6 +39,12 @@ function createInitialState() {
     round: 0,
     activeIndex: 0,
     initiative: [],
+    room: {
+      id: "old-guardroom",
+      name: "Old Guardroom",
+      gridSize,
+      tileSizePx,
+    },
     fighters: {
       hero: createFighter(templates.hero),
       monster: createFighter(templates.monster),
@@ -62,7 +75,94 @@ function aliveFighters() {
 }
 
 function activeFighter() {
-  return state.initiative[state.activeIndex]?.fighter;
+  const entry = state.initiative[state.activeIndex];
+  return entry ? state.fighters[entry.fighterId] : null;
+}
+
+function normalizeLoadedState(loadedState) {
+  const normalized = {
+    ...createInitialState(),
+    ...loadedState,
+    fighters: {
+      ...createInitialState().fighters,
+      ...loadedState.fighters,
+    },
+    log: Array.isArray(loadedState.log) ? loadedState.log : [],
+    initiative: Array.isArray(loadedState.initiative) ? loadedState.initiative : [],
+  };
+
+  normalized.initiative = normalized.initiative
+    .map((entry) => ({
+      fighterId: entry.fighterId ?? entry.fighter?.id,
+      roll: entry.roll,
+      total: entry.total,
+    }))
+    .filter((entry) => entry.fighterId && normalized.fighters[entry.fighterId]);
+
+  if (normalized.activeIndex >= normalized.initiative.length) {
+    normalized.activeIndex = 0;
+  }
+
+  return normalized;
+}
+
+function updateSaveStatus(message = "") {
+  els.loadAdventure.disabled = !hasSave();
+  if (message) {
+    els.saveStatus.textContent = message;
+  } else {
+    els.saveStatus.textContent = hasSave() ? "A saved adventure is available." : "No saved adventure found.";
+  }
+}
+
+function showMainMenu(message = "") {
+  gameHasStarted = false;
+  window.clearTimeout(monsterTurnTimer);
+  els.mainMenu.classList.remove("hidden");
+  updateSaveStatus(message);
+  renderControls();
+}
+
+function hideMainMenu() {
+  gameHasStarted = true;
+  els.mainMenu.classList.add("hidden");
+  renderControls();
+}
+
+function startNewAdventure() {
+  window.clearTimeout(monsterTurnTimer);
+  state = createInitialState();
+  roomIsBuilt = false;
+  hideMainMenu();
+  render();
+}
+
+function loadAdventure() {
+  try {
+    const payload = load();
+    if (!payload) {
+      updateSaveStatus("No saved adventure found.");
+      return;
+    }
+
+    window.clearTimeout(monsterTurnTimer);
+    state = normalizeLoadedState(payload.state);
+    roomIsBuilt = false;
+    hideMainMenu();
+    addLog("Adventure loaded.", "important");
+    render();
+    maybeRunMonsterTurn();
+  } catch (error) {
+    updateSaveStatus("Could not load the saved adventure.");
+  }
+}
+
+function saveAdventure() {
+  const savedAt = new Date().toLocaleString();
+  addLog(`Adventure saved at ${savedAt}.`, "important");
+  const payload = save(state);
+  render();
+  updateSaveStatus(`Saved ${new Date(payload.savedAt).toLocaleString()}.`);
 }
 
 function addLog(text, type = "") {
@@ -85,16 +185,16 @@ function rollInitiative() {
 
   state.initiative = [
     {
-      fighter: state.fighters.hero,
+      fighterId: "hero",
       roll: heroRoll,
       total: heroRoll + state.fighters.hero.initiativeBonus,
     },
     {
-      fighter: state.fighters.monster,
+      fighterId: "monster",
       roll: monsterRoll,
       total: monsterRoll + state.fighters.monster.initiativeBonus,
     },
-  ].sort((a, b) => b.total - a.total || (a.fighter.id === "hero" ? -1 : 1));
+  ].sort((a, b) => b.total - a.total || (a.fighterId === "hero" ? -1 : 1));
 
   state.combatStarted = true;
   state.round = 1;
@@ -377,10 +477,11 @@ function renderInitiative() {
 
   els.initiativeList.innerHTML = state.initiative
     .map((entry, index) => {
+      const fighter = state.fighters[entry.fighterId];
       const activeClass = index === state.activeIndex ? " active" : "";
       return `
         <div class="initiative-item${activeClass}">
-          <span>${entry.fighter.name}</span>
+          <span>${fighter.name}</span>
           <strong>${entry.total}</strong>
         </div>
       `;
@@ -404,6 +505,7 @@ function renderControls() {
   els.rollInitiative.disabled = state.combatStarted;
   els.attack.disabled = !heroCanAttack;
   els.endTurn.disabled = !heroTurn;
+  els.saveGame.disabled = !gameHasStarted;
   els.roundLabel.textContent = `Round ${state.round}`;
 
   if (!state.combatStarted) {
@@ -428,15 +530,16 @@ els.rollInitiative.addEventListener("click", rollInitiative);
 els.attack.addEventListener("click", () => makeAttack(state.fighters.hero, state.fighters.monster));
 els.endTurn.addEventListener("click", endTurn);
 els.newGame.addEventListener("click", () => {
-  window.clearTimeout(monsterTurnTimer);
-  state = createInitialState();
-  roomIsBuilt = false;
-  render();
+  showMainMenu();
 });
+els.saveGame.addEventListener("click", saveAdventure);
+els.startAdventure.addEventListener("click", startNewAdventure);
+els.loadAdventure.addEventListener("click", loadAdventure);
 els.clearLog.addEventListener("click", () => {
   state.log = [];
   renderLog();
 });
 
 render();
+showMainMenu();
 })();
