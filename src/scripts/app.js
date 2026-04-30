@@ -47,6 +47,7 @@ function createInitialState() {
 
   return {
     combatStarted: false,
+    mode: "exploration",
     round: 0,
     activeIndex: 0,
     initiative: [],
@@ -57,6 +58,11 @@ function createInitialState() {
       tileSizePx,
     },
     dungeon,
+    exploration: {
+      discoveredRoomIds: [dungeon.entranceRoomId],
+      openedDoorKeys: [],
+      openedCorridorKeys: [],
+    },
     fighters: {
       hero,
       monster,
@@ -96,11 +102,16 @@ function normalizeLoadedState(loadedState) {
   const normalized = {
     ...freshState,
     ...loadedState,
+    mode: loadedState.mode ?? (loadedState.combatStarted ? "combat" : "exploration"),
     fighters: {
       ...freshState.fighters,
       ...loadedState.fighters,
     },
     dungeon: loadedState.dungeon ?? freshState.dungeon,
+    exploration: {
+      ...freshState.exploration,
+      ...loadedState.exploration,
+    },
     log: Array.isArray(loadedState.log) ? loadedState.log : [],
     initiative: Array.isArray(loadedState.initiative) ? loadedState.initiative : [],
   };
@@ -244,10 +255,102 @@ function currentWalkable() {
   return new Set((state.dungeon?.walkable ?? []).map(positionKey));
 }
 
+function currentOpenedKeys() {
+  return new Set([...(state.exploration?.openedDoorKeys ?? []), ...(state.exploration?.openedCorridorKeys ?? [])]);
+}
+
+function currentDiscoveredRoomIds() {
+  return new Set(state.exploration?.discoveredRoomIds ?? []);
+}
+
 function isKnownTile(position) {
   if (showDungeonLayout) return true;
-  const entranceRoom = state.dungeon?.rooms.find((room) => room.id === state.dungeon.entranceRoomId);
-  return entranceRoom ? roomHasCell(entranceRoom, position) : true;
+  const tileKey = positionKey(position);
+  if (currentOpenedKeys().has(tileKey)) return true;
+  return (state.dungeon?.rooms ?? []).some((room) => currentDiscoveredRoomIds().has(room.id) && roomHasCell(room, position));
+}
+
+function visibleWalkable() {
+  const known = new Set();
+  for (const room of state.dungeon?.rooms ?? []) {
+    if (currentDiscoveredRoomIds().has(room.id)) {
+      room.cells.forEach((cell) => known.add(positionKey(cell)));
+    }
+  }
+  currentOpenedKeys().forEach((tileKey) => known.add(tileKey));
+  return known;
+}
+
+function doorAt(position) {
+  const tileKey = positionKey(position);
+  return (state.dungeon?.doors ?? []).find((door) => positionKey(door) === tileKey) ?? null;
+}
+
+function reciprocalDoor(door) {
+  const targetRoom = (state.dungeon?.rooms ?? []).find((room) => room.id === door.to);
+  return targetRoom?.doors.find((targetDoor) => targetDoor.to === door.roomId) ?? null;
+}
+
+function corridorPathBetweenDoors(door, targetDoor) {
+  if (!door?.corridor || !targetDoor?.corridor) return [];
+  const corridorKeys = new Set((state.dungeon?.corridors ?? []).map(positionKey));
+  const queue = [{ position: door.corridor, path: [door.corridor] }];
+  const visited = new Set([positionKey(door.corridor)]);
+  const goalKey = positionKey(targetDoor.corridor);
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (positionKey(current.position) === goalKey) return current.path;
+
+    for (const next of [
+      { x: current.position.x, y: current.position.y - 1 },
+      { x: current.position.x + 1, y: current.position.y },
+      { x: current.position.x, y: current.position.y + 1 },
+      { x: current.position.x - 1, y: current.position.y },
+    ]) {
+      const nextKey = positionKey(next);
+      if (visited.has(nextKey) || !corridorKeys.has(nextKey)) continue;
+      visited.add(nextKey);
+      queue.push({ position: next, path: [...current.path, next] });
+    }
+  }
+
+  return [door.corridor, targetDoor.corridor];
+}
+
+function openDoor(door) {
+  const targetRoom = (state.dungeon?.rooms ?? []).find((room) => room.id === door.to);
+  const targetDoor = reciprocalDoor(door);
+  if (!targetRoom || !targetDoor) return false;
+
+  const discovered = currentDiscoveredRoomIds();
+  const openedDoorKeys = new Set(state.exploration.openedDoorKeys);
+  const openedCorridorKeys = new Set(state.exploration.openedCorridorKeys);
+
+  discovered.add(targetRoom.id);
+  openedDoorKeys.add(positionKey(door));
+  openedDoorKeys.add(positionKey(targetDoor));
+  corridorPathBetweenDoors(door, targetDoor).forEach((cell) => openedCorridorKeys.add(positionKey(cell)));
+
+  state.exploration.discoveredRoomIds = Array.from(discovered);
+  state.exploration.openedDoorKeys = Array.from(openedDoorKeys);
+  state.exploration.openedCorridorKeys = Array.from(openedCorridorKeys);
+  addLog(`${state.fighters.hero.name} opens the door to ${targetRoom.name}.`, "important");
+  render();
+  return true;
+}
+
+function canOpenDoor(position) {
+  const hero = state.fighters.hero;
+  const door = doorAt(position);
+  if (!door || !isKnownTile(position)) return null;
+  return distance(hero.position, position) <= 1 ? door : null;
+}
+
+function threatPresent() {
+  return Object.values(state.fighters).some(
+    (fighter) => fighter.id !== "hero" && fighter.alive && isKnownTile(fighter.position),
+  );
 }
 
 function rollInitiative() {
@@ -270,6 +373,7 @@ function rollInitiative() {
   ].sort((a, b) => b.total - a.total || (a.fighterId === "hero" ? -1 : 1));
 
   state.combatStarted = true;
+  state.mode = "combat";
   state.round = 1;
   state.activeIndex = 0;
   resetTurnResources(activeFighter());
@@ -331,6 +435,14 @@ function makeAttack(attacker, defender) {
 
   if (!defender.alive) {
     addLog(`${defender.name} drops to 0 HP. ${attacker.id === "hero" ? "Victory." : "Defeat."}`, "important");
+    if (attacker.id === "hero") {
+      state.combatStarted = false;
+      state.mode = "exploration";
+      state.initiative = [];
+      state.activeIndex = 0;
+      resetTurnResources(state.fighters.hero);
+      addLog("The room falls quiet. Exploration resumes.", "important");
+    }
   }
 
   render();
@@ -368,19 +480,24 @@ function maybeRunMonsterTurn() {
 }
 
 function moveFighter(fighter, destination, silent = false) {
-  if (!fighter.alive || fighter.movementLeft <= 0) return false;
+  if (!fighter.alive || (state.mode === "combat" && fighter.movementLeft <= 0)) return false;
 
+  const moveLimit = state.mode === "combat" ? fighter.movementLeft : Infinity;
+  const knownWalkable = state.mode === "combat" ? currentWalkable() : visibleWalkable();
   const path = findPath(fighter.position, destination, fighter, state.fighters, {
     gridSize: currentGridSize(),
-    walkable: currentWalkable(),
+    walkable: knownWalkable,
   });
-  if (!path || path.length === 0 || path.length > fighter.movementLeft) return false;
+  if (!path || path.length === 0 || path.length > moveLimit) return false;
 
   fighter.position = { ...destination };
-  fighter.movementLeft -= path.length;
+  if (state.mode === "combat") {
+    fighter.movementLeft -= path.length;
+  }
 
   if (!silent) {
-    addLog(`${fighter.name} moves ${path.length * feetPerSquare} ft. ${fighter.movementLeft * feetPerSquare} ft remains.`);
+    const suffix = state.mode === "combat" ? ` ${fighter.movementLeft * feetPerSquare} ft remains.` : "";
+    addLog(`${fighter.name} moves ${path.length * feetPerSquare} ft.${suffix}`);
   }
 
   render();
@@ -389,11 +506,22 @@ function moveFighter(fighter, destination, silent = false) {
 
 function handleTileClick(position) {
   const hero = state.fighters.hero;
-  if (!state.combatStarted || activeFighter()?.id !== "hero" || aliveFighters().length < 2) return;
+  if (state.mode === "combat" && (activeFighter()?.id !== "hero" || aliveFighters().length < 2)) return;
+  if (state.mode === "exploration" && threatPresent()) {
+    addLog("A hostile creature is present. Roll initiative before moving.");
+    render();
+    return;
+  }
+
+  const door = canOpenDoor(position);
+  if (door) {
+    openDoor(door);
+    return;
+  }
 
   if (hero.position.x === position.x && hero.position.y === position.y) return;
   if (!moveFighter(hero, position)) {
-    addLog("That square is out of reach or blocked.");
+    addLog(state.mode === "combat" ? "That square is out of reach or blocked." : "That square is blocked or not discovered yet.");
     render();
   }
 }
@@ -502,15 +630,22 @@ function renderRoom() {
   if (!roomIsBuilt) buildRoom();
 
   const hero = state.fighters.hero;
-  const heroTurn = state.combatStarted && activeFighter()?.id === "hero" && aliveFighters().length === 2;
+  const heroTurn = state.mode === "combat" && activeFighter()?.id === "hero" && aliveFighters().length === 2;
   const walkable = currentWalkable();
   const doorKeys = new Set((state.dungeon?.doors ?? []).map(positionKey));
+  const openedDoorKeys = new Set(state.exploration?.openedDoorKeys ?? []);
   const reachable = heroTurn
-    ? reachableTiles(hero, state.fighters, {
-        gridSize: currentGridSize(),
-        walkable,
-      })
-    : new Map();
+      ? reachableTiles(hero, state.fighters, {
+          gridSize: currentGridSize(),
+          walkable,
+        })
+      : state.mode === "exploration"
+        ? reachableTiles(hero, state.fighters, {
+            gridSize: currentGridSize(),
+            walkable: visibleWalkable(),
+            maxCost: currentGridSize() * currentGridSize(),
+          })
+        : new Map();
 
   els.room.querySelectorAll(".tile").forEach((tile) => {
     const position = { x: Number(tile.dataset.x), y: Number(tile.dataset.y) };
@@ -522,9 +657,12 @@ function renderRoom() {
     tile.classList.toggle("walkable", isWalkable && isKnown);
     tile.classList.toggle("hidden-tile", !isKnown);
     tile.classList.toggle("door", isDoor && isKnown);
+    tile.classList.toggle("open-door", openedDoorKeys.has(key));
     tile.classList.toggle("reachable", isReachable);
-    tile.disabled = !isReachable || !isKnown;
-    tile.title = isReachable ? `${reachable.get(key) * feetPerSquare} ft` : "";
+    const openableDoor = Boolean(canOpenDoor(position));
+    tile.classList.toggle("openable-door", openableDoor);
+    tile.disabled = (!isReachable && !openableDoor) || !isKnown;
+    tile.title = openableDoor ? "Open door" : isReachable ? `${reachable.get(key) * feetPerSquare} ft` : "";
   });
 
   Object.values(state.fighters).forEach(placeToken);
@@ -565,7 +703,7 @@ function renderFighterCard(element, fighter) {
 }
 
 function renderInitiative() {
-  if (!state.combatStarted) {
+  if (state.mode !== "combat") {
     els.initiativeList.innerHTML = "";
     return;
   }
@@ -593,20 +731,20 @@ function renderLog() {
 
 function renderControls() {
   const fighter = activeFighter();
-  const heroTurn = state.combatStarted && fighter?.id === "hero" && aliveFighters().length === 2;
+  const heroTurn = state.mode === "combat" && fighter?.id === "hero" && aliveFighters().length === 2;
   const heroCanAttack =
     heroTurn && state.fighters.hero.hasAction && isAdjacent(state.fighters.hero, state.fighters.monster);
 
-  els.rollInitiative.disabled = state.combatStarted;
+  els.rollInitiative.disabled = state.mode === "combat" || !threatPresent();
   els.attack.disabled = !heroCanAttack;
   els.endTurn.disabled = !heroTurn;
   els.saveGame.disabled = !gameHasStarted;
   els.toggleLayout.textContent = showDungeonLayout ? "Hide Dungeon Layout" : "Show Dungeon Layout";
   els.toggleLayout.disabled = !gameHasStarted;
-  els.roundLabel.textContent = `Round ${state.round}`;
+  els.roundLabel.textContent = state.mode === "combat" ? `Round ${state.round}` : "Out of turn order";
 
-  if (!state.combatStarted) {
-    els.turnLabel.textContent = "Roll initiative to begin";
+  if (state.mode !== "combat") {
+    els.turnLabel.textContent = threatPresent() ? "Danger present" : "Exploration";
   } else if (aliveFighters().length < 2) {
     els.turnLabel.textContent = state.fighters.hero.alive ? "Encounter won" : "Encounter lost";
   } else {

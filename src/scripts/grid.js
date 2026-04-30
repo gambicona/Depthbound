@@ -67,6 +67,7 @@ window.DungeonGrid = {
   reachableTiles(fighter, fighters, options = {}) {
     const gridSize = options.gridSize ?? defaultGridSize;
     const walkable = options.walkable ?? null;
+    const maxCost = options.maxCost ?? fighter.movementLeft;
     const reachable = new Map();
     const queue = [{ position: fighter.position, cost: 0 }];
     const visited = new Set([window.DungeonGrid.positionKey(fighter.position)]);
@@ -80,7 +81,7 @@ window.DungeonGrid = {
         if (
           visited.has(key) ||
           (walkable && !walkable.has(key)) ||
-          nextCost > fighter.movementLeft ||
+          nextCost > maxCost ||
           window.DungeonGrid.isOccupied(next, fighters, fighter)
         ) {
           continue;

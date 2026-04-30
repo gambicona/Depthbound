@@ -338,6 +338,11 @@ h1 {
   inset: 28%;
 }
 
+.tile.open-door::after {
+  background: rgba(120, 152, 173, 0.4);
+  border-color: rgba(200, 215, 223, 0.42);
+}
+
 .tile.reachable {
   cursor: pointer;
 }
@@ -354,6 +359,16 @@ h1 {
 
 .tile.reachable:hover {
   background: #4a3731;
+}
+
+.tile.openable-door::before {
+  background: rgba(215, 168, 79, 0.2);
+  border: 1px solid rgba(215, 168, 79, 0.7);
+  border-radius: 2px;
+  content: "";
+  height: 58%;
+  position: absolute;
+  width: 58%;
 }
 
 .token-layer {
