@@ -150,6 +150,27 @@ function pathCutsThroughRoom(path, rooms) {
   return path.some((cell) => roomCells.has(key(cell)));
 }
 
+function hasCorridorExit(door, corridorKeys) {
+  return adjacentCells(door).some((cell) => corridorKeys.has(key(cell)));
+}
+
+function pruneDanglingDoors(rooms, corridors) {
+  const roomById = new Map(rooms.map((room) => [room.id, room]));
+  const corridorKeys = new Set(corridors.map(key));
+
+  for (const room of rooms) {
+    room.doors = room.doors.filter((door) => {
+      const target = roomById.get(door.to);
+      if (!target || !hasCorridorExit(door, corridorKeys)) return false;
+
+      return target.doors.some(
+        (targetDoor) => targetDoor.to === room.id && hasCorridorExit(targetDoor, corridorKeys),
+      );
+    });
+    room.connections = room.doors.map((door) => door.to);
+  }
+}
+
 function connectRooms(a, b, corridors, rooms) {
   const aConnection = nearestBoundaryDoor(a, center(b));
   const bConnection = nearestBoundaryDoor(b, center(a));
@@ -159,8 +180,8 @@ function connectRooms(a, b, corridors, rooms) {
   if (pathCutsThroughRoom(corridor, rooms)) return false;
 
   corridors.push(...corridor);
-  a.doors.push({ ...aConnection.door, to: b.id });
-  b.doors.push({ ...bConnection.door, to: a.id });
+  a.doors.push({ ...aConnection.door, corridor: { ...aConnection.outside }, to: b.id });
+  b.doors.push({ ...bConnection.door, corridor: { ...bConnection.outside }, to: a.id });
   a.connections.push(b.id);
   b.connections.push(a.id);
   return true;
@@ -213,6 +234,8 @@ function generateDungeon(options = {}) {
       connectRooms(a, b, corridors, rooms);
     }
   }
+
+  pruneDanglingDoors(rooms, corridors);
 
   const walkable = new Set();
   const doors = [];
