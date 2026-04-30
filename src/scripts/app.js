@@ -41,6 +41,7 @@ function createInitialState() {
   const dungeon = generateDungeon(window.DungeonConfig.dungeon);
   const hero = createFighter(templates.hero);
   hero.position = { ...dungeon.startPosition };
+  const firstRoom = dungeon.rooms.find((room) => room.id === dungeon.entranceRoomId) ?? dungeon.rooms[0];
   const monsters = createDungeonMonsters(dungeon, hero.position);
 
   return {
