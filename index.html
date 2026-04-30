@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dungeon Room Prototype</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="arena" aria-label="Dungeon room">
+        <div class="topbar">
+          <div>
+            <p class="eyebrow">D&D-like crawler prototype</p>
+            <h1>Old Guardroom</h1>
+          </div>
+          <button id="new-game" class="ghost-button" type="button">New Encounter</button>
+        </div>
+
+        <div class="room-wrap">
+          <div id="room" class="room" aria-label="Tactical grid"></div>
+        </div>
+
+        <div class="action-row" aria-label="Combat actions">
+          <button id="roll-initiative" type="button">Roll Initiative</button>
+          <button id="attack" type="button" disabled>Attack</button>
+          <button id="end-turn" type="button" disabled>End Turn</button>
+        </div>
+      </section>
+
+      <aside class="side-panel" aria-label="Character and combat state">
+        <section class="status-panel">
+          <div class="combat-state">
+            <span id="round-label">Round 0</span>
+            <strong id="turn-label">Roll initiative to begin</strong>
+          </div>
+          <div id="initiative-list" class="initiative-list"></div>
+        </section>
+
+        <section class="fighters">
+          <article id="hero-card" class="fighter-card"></article>
+          <article id="monster-card" class="fighter-card"></article>
+        </section>
+
+        <section class="log-panel">
+          <div class="panel-heading">
+            <h2>Combat Log</h2>
+            <button id="clear-log" class="icon-button" type="button" title="Clear log" aria-label="Clear log">x</button>
+          </div>
+          <ol id="combat-log" class="combat-log" aria-live="polite"></ol>
+        </section>
+      </aside>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

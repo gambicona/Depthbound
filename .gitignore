@@ -1,0 +1,15 @@
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Dependencies/build output for future app tooling
+node_modules/
+dist/
+build/
+
+# Logs and local env files
+*.log
+.env
+.env.*
