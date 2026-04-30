@@ -345,7 +345,35 @@ h1 {
   background: rgba(215, 168, 79, 0.38);
   border: 1px solid rgba(246, 234, 216, 0.24);
   box-shadow: 0 0 8px rgba(215, 168, 79, 0.22);
-  inset: 28%;
+  inset: auto;
+}
+
+.tile.door-north::after {
+  height: 4px;
+  left: 18%;
+  right: 18%;
+  top: -2px;
+}
+
+.tile.door-east::after {
+  bottom: 18%;
+  right: -2px;
+  top: 18%;
+  width: 4px;
+}
+
+.tile.door-south::after {
+  bottom: -2px;
+  height: 4px;
+  left: 18%;
+  right: 18%;
+}
+
+.tile.door-west::after {
+  bottom: 18%;
+  left: -2px;
+  top: 18%;
+  width: 4px;
 }
 
 .tile.open-door::after {
@@ -374,11 +402,11 @@ h1 {
 .tile.openable-door::before {
   background: rgba(215, 168, 79, 0.2);
   border: 1px solid rgba(215, 168, 79, 0.7);
-  border-radius: 2px;
+  border-radius: 999px;
   content: "";
-  height: 58%;
+  height: 42%;
   position: absolute;
-  width: 58%;
+  width: 42%;
 }
 
 .token-layer {

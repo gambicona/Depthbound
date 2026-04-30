@@ -427,11 +427,17 @@ function openDoor(door) {
 
 function canOpenDoor(position) {
   const hero = state.fighters.hero;
-  const door = doorAt(position);
-  if (!door || !isKnownTile(position)) return null;
+  const door =
+    doorAt(position) ??
+    (position.x === hero.position.x && position.y === hero.position.y
+      ? adjacentCells(hero.position).map(doorAt).filter(Boolean)[0]
+      : null);
+  if (!door || !isKnownTile(position) || !isKnownTile(door)) return null;
   const heroRoom = roomForPosition(hero.position);
-  if (heroRoom && monstersInRoom(heroRoom.id).length > 0) return null;
-  return distance(hero.position, position) <= 1 ? door : null;
+  if (heroRoom && currentDiscoveredRoomIds().has(heroRoom.id) && monstersInRoom(heroRoom.id).length > 0) {
+    return null;
+  }
+  return distance(hero.position, door) <= 1 ? door : null;
 }
 
 function threatPresent() {
@@ -769,11 +775,16 @@ function renderRoom() {
     const key = positionKey(position);
     const isReachable = reachable.has(key);
     const isWalkable = walkable.has(key);
+    const door = doorAt(position);
     const isDoor = doorKeys.has(key);
     const isKnown = isKnownTile(position);
     tile.classList.toggle("walkable", isWalkable && isKnown);
     tile.classList.toggle("hidden-tile", !isKnown);
     tile.classList.toggle("door", isDoor && isKnown);
+    tile.classList.toggle("door-north", isDoor && door?.corridor?.y < position.y);
+    tile.classList.toggle("door-east", isDoor && door?.corridor?.x > position.x);
+    tile.classList.toggle("door-south", isDoor && door?.corridor?.y > position.y);
+    tile.classList.toggle("door-west", isDoor && door?.corridor?.x < position.x);
     tile.classList.toggle("open-door", openedDoorKeys.has(key));
     tile.classList.toggle("reachable", isReachable);
     const openableDoor = Boolean(canOpenDoor(position));
