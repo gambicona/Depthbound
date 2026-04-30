@@ -1,4 +1,5 @@
 const gridSize = 7;
+const feetPerSquare = 5;
 
 const templates = {
   hero: {
@@ -10,6 +11,7 @@ const templates = {
     attackBonus: 5,
     damage: { count: 1, sides: 8, bonus: 3, label: "1d8 + 3" },
     initiativeBonus: 2,
+    speedFeet: 30,
     position: { x: 2, y: 4 },
     token: "M",
   },
@@ -22,6 +24,8 @@ const templates = {
     attackBonus: 4,
     damage: { count: 1, sides: 6, bonus: 2, label: "1d6 + 2" },
     initiativeBonus: 2,
+    speedFeet: 30,
+    behavior: "melee",
     position: { x: 4, y: 2 },
     token: "C",
   },
@@ -51,8 +55,8 @@ function createInitialState() {
     activeIndex: 0,
     initiative: [],
     fighters: {
-      hero: { ...templates.hero, hp: templates.hero.maxHp, alive: true },
-      monster: { ...templates.monster, hp: templates.monster.maxHp, alive: true },
+      hero: createFighter(templates.hero),
+      monster: createFighter(templates.monster),
     },
     log: [
       {
@@ -60,6 +64,18 @@ function createInitialState() {
         type: "important",
       },
     ],
+  };
+}
+
+function createFighter(template) {
+  return {
+    ...template,
+    damage: { ...template.damage },
+    position: { ...template.position },
+    hp: template.maxHp,
+    alive: true,
+    movementLeft: Math.floor(template.speedFeet / feetPerSquare),
+    hasAction: true,
   };
 }
 
@@ -91,6 +107,91 @@ function enemyOf(fighter) {
   return fighter.id === "hero" ? state.fighters.monster : state.fighters.hero;
 }
 
+function distance(a, b) {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
+function isAdjacent(a, b) {
+  return distance(a.position, b.position) === 1;
+}
+
+function isInsideGrid(position) {
+  return position.x >= 0 && position.x < gridSize && position.y >= 0 && position.y < gridSize;
+}
+
+function isOccupied(position, ignoredFighter = null) {
+  return Object.values(state.fighters).some(
+    (fighter) =>
+      fighter.alive &&
+      fighter.id !== ignoredFighter?.id &&
+      fighter.position.x === position.x &&
+      fighter.position.y === position.y,
+  );
+}
+
+function positionKey(position) {
+  return `${position.x},${position.y}`;
+}
+
+function neighbors(position) {
+  return [
+    { x: position.x, y: position.y - 1 },
+    { x: position.x + 1, y: position.y },
+    { x: position.x, y: position.y + 1 },
+    { x: position.x - 1, y: position.y },
+  ].filter(isInsideGrid);
+}
+
+function findPath(start, goal, mover) {
+  if (isOccupied(goal, mover)) return null;
+
+  const queue = [{ position: start, path: [] }];
+  const visited = new Set([positionKey(start)]);
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current.position.x === goal.x && current.position.y === goal.y) {
+      return current.path;
+    }
+
+    for (const next of neighbors(current.position)) {
+      const key = positionKey(next);
+      if (visited.has(key) || isOccupied(next, mover)) continue;
+      visited.add(key);
+      queue.push({ position: next, path: [...current.path, next] });
+    }
+  }
+
+  return null;
+}
+
+function reachableTiles(fighter) {
+  const reachable = new Map();
+  const queue = [{ position: fighter.position, cost: 0 }];
+  const visited = new Set([positionKey(fighter.position)]);
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+
+    for (const next of neighbors(current.position)) {
+      const nextCost = current.cost + 1;
+      const key = positionKey(next);
+      if (visited.has(key) || nextCost > fighter.movementLeft || isOccupied(next, fighter)) continue;
+
+      visited.add(key);
+      reachable.set(key, nextCost);
+      queue.push({ position: next, cost: nextCost });
+    }
+  }
+
+  return reachable;
+}
+
+function resetTurnResources(fighter) {
+  fighter.movementLeft = Math.floor(fighter.speedFeet / feetPerSquare);
+  fighter.hasAction = true;
+}
+
 function addLog(text, type = "") {
   state.log.push({ text, type });
   if (state.log.length > 80) {
@@ -120,6 +221,7 @@ function rollInitiative() {
   state.combatStarted = true;
   state.round = 1;
   state.activeIndex = 0;
+  resetTurnResources(activeFighter());
 
   addLog(
     `Initiative: Mira rolls ${heroRoll} ${abilityLabel(state.fighters.hero.initiativeBonus)} = ${
@@ -136,7 +238,15 @@ function rollInitiative() {
 }
 
 function makeAttack(attacker, defender) {
-  if (!attacker.alive || !defender.alive) return;
+  if (!attacker.alive || !defender.alive || !attacker.hasAction) return;
+
+  if (!isAdjacent(attacker, defender)) {
+    addLog(`${attacker.name} is too far away to attack ${defender.name}. Move adjacent first.`);
+    render();
+    return;
+  }
+
+  attacker.hasAction = false;
 
   const attackRoll = rollDie(20);
   const totalAttack = attackRoll + attacker.attackBonus;
@@ -151,7 +261,7 @@ function makeAttack(attacker, defender) {
 
   if (isMiss) {
     addLog(attackRoll === 1 ? "Natural 1. The attack misses badly." : `${defender.name} avoids the blow.`);
-    endTurn();
+    render();
     return;
   }
 
@@ -174,7 +284,7 @@ function makeAttack(attacker, defender) {
     return;
   }
 
-  endTurn();
+  render();
 }
 
 function endTurn() {
@@ -188,6 +298,7 @@ function endTurn() {
     state.round += 1;
     addLog(`Round ${state.round} begins.`, "important");
   }
+  resetTurnResources(activeFighter());
 
   render();
   maybeRunMonsterTurn();
@@ -201,18 +312,101 @@ function maybeRunMonsterTurn() {
   els.endTurn.disabled = true;
   setTimeout(() => {
     if (activeFighter()?.id === "monster") {
-      makeAttack(state.fighters.monster, state.fighters.hero);
+      runMonsterAi(state.fighters.monster);
     }
   }, 650);
 }
 
+function moveFighter(fighter, destination, silent = false) {
+  if (!fighter.alive || fighter.movementLeft <= 0) return false;
+
+  const path = findPath(fighter.position, destination, fighter);
+  if (!path || path.length === 0 || path.length > fighter.movementLeft) return false;
+
+  fighter.position = { ...destination };
+  fighter.movementLeft -= path.length;
+
+  if (!silent) {
+    addLog(`${fighter.name} moves ${path.length * feetPerSquare} ft. ${fighter.movementLeft * feetPerSquare} ft remains.`);
+  }
+
+  render();
+  return true;
+}
+
+function handleTileClick(position) {
+  const hero = state.fighters.hero;
+  if (!state.combatStarted || activeFighter()?.id !== "hero" || aliveFighters().length < 2) return;
+
+  if (hero.position.x === position.x && hero.position.y === position.y) return;
+  if (!moveFighter(hero, position)) {
+    addLog("That square is out of reach or blocked.");
+    render();
+  }
+}
+
+function bestStepToward(mover, target) {
+  const reachable = Array.from(reachableTiles(mover).entries()).map(([key, cost]) => {
+    const [x, y] = key.split(",").map(Number);
+    return { position: { x, y }, cost };
+  });
+
+  if (reachable.length === 0) return null;
+
+  reachable.sort((a, b) => {
+    const distanceDifference = distance(a.position, target.position) - distance(b.position, target.position);
+    return distanceDifference || b.cost - a.cost;
+  });
+
+  return reachable[0].position;
+}
+
+function runMonsterAi(monster) {
+  const target = state.fighters.hero;
+  if (!monster.alive || !target.alive) return;
+
+  if (monster.behavior === "melee") {
+    if (!isAdjacent(monster, target)) {
+      const destination = bestStepToward(monster, target);
+      if (destination) {
+        const before = { ...monster.position };
+        moveFighter(monster, destination, true);
+        const movedSquares = distance(before, monster.position);
+        addLog(`${monster.name} advances ${movedSquares * feetPerSquare} ft toward ${target.name}.`);
+      }
+    }
+
+    if (isAdjacent(monster, target) && monster.hasAction) {
+      makeAttack(monster, target);
+    }
+  }
+
+  setTimeout(() => {
+    if (activeFighter()?.id === "monster" && aliveFighters().length === 2) {
+      endTurn();
+    }
+  }, 500);
+}
+
 function renderRoom() {
   els.room.innerHTML = "";
+  const hero = state.fighters.hero;
+  const heroTurn = state.combatStarted && activeFighter()?.id === "hero" && aliveFighters().length === 2;
+  const reachable = heroTurn ? reachableTiles(hero) : new Map();
 
   for (let y = 0; y < gridSize; y += 1) {
     for (let x = 0; x < gridSize; x += 1) {
       const tile = document.createElement("div");
       tile.className = "tile";
+      tile.dataset.x = x;
+      tile.dataset.y = y;
+      const key = positionKey({ x, y });
+      if (reachable.has(key)) {
+        tile.classList.add("reachable");
+        tile.title = `${reachable.get(key) * feetPerSquare} ft`;
+      }
+      tile.addEventListener("click", () => handleTileClick({ x, y }));
+
       const occupant = Object.values(state.fighters).find(
         (fighter) => fighter.position.x === x && fighter.position.y === y,
       );
@@ -247,7 +441,10 @@ function renderFighterCard(element, fighter) {
     <div class="stat-grid">
       <div class="stat-pill"><b>${abilityLabel(fighter.attackBonus)}</b><span>Attack</span></div>
       <div class="stat-pill"><b>${fighter.damage.label}</b><span>Damage</span></div>
+      <div class="stat-pill"><b>${fighter.speedFeet} ft</b><span>Speed</span></div>
+      <div class="stat-pill"><b>${fighter.movementLeft * feetPerSquare} ft</b><span>Move Left</span></div>
       <div class="stat-pill"><b>${abilityLabel(fighter.initiativeBonus)}</b><span>Init</span></div>
+      <div class="stat-pill"><b>${fighter.hasAction ? "Yes" : "No"}</b><span>Action</span></div>
     </div>
   `;
 }
@@ -282,9 +479,11 @@ function renderLog() {
 function renderControls() {
   const fighter = activeFighter();
   const heroTurn = state.combatStarted && fighter?.id === "hero" && aliveFighters().length === 2;
+  const heroCanAttack =
+    heroTurn && state.fighters.hero.hasAction && isAdjacent(state.fighters.hero, state.fighters.monster);
 
   els.rollInitiative.disabled = state.combatStarted;
-  els.attack.disabled = !heroTurn;
+  els.attack.disabled = !heroCanAttack;
   els.endTurn.disabled = !heroTurn;
   els.roundLabel.textContent = `Round ${state.round}`;
 

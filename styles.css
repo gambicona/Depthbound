@@ -152,6 +152,24 @@ h1 {
   position: relative;
 }
 
+.tile.reachable {
+  cursor: pointer;
+}
+
+.tile.reachable::before {
+  background: rgba(216, 174, 85, 0.18);
+  border: 1px solid rgba(216, 174, 85, 0.42);
+  border-radius: 50%;
+  content: "";
+  height: 32%;
+  position: absolute;
+  width: 32%;
+}
+
+.tile.reachable:hover {
+  background: #46533d;
+}
+
 .tile:nth-child(2n) {
   background: var(--floor-alt);
 }
