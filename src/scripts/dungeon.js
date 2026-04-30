@@ -62,6 +62,23 @@ function roomHasCell(room, position) {
   return room.cells.some((cell) => cell.x === position.x && cell.y === position.y);
 }
 
+function roomCellSet(room) {
+  return new Set(room.cells.map(key));
+}
+
+function adjacentCells(position) {
+  return [
+    { x: position.x, y: position.y - 1 },
+    { x: position.x + 1, y: position.y },
+    { x: position.x, y: position.y + 1 },
+    { x: position.x - 1, y: position.y },
+  ];
+}
+
+function manhattan(a, b) {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
 function overlaps(room, rooms, padding = 2) {
   const occupied = new Set();
   for (const existing of rooms) {
@@ -70,6 +87,19 @@ function overlaps(room, rooms, padding = 2) {
         for (let x = cell.x - padding; x <= cell.x + padding; x += 1) {
           occupied.add(key({ x, y }));
         }
+      }
+    }
+  }
+
+  return room.cells.some((cell) => occupied.has(key(cell)));
+}
+
+function overlapsCorridors(room, corridors, padding = 1) {
+  const occupied = new Set();
+  for (const cell of corridors) {
+    for (let y = cell.y - padding; y <= cell.y + padding; y += 1) {
+      for (let x = cell.x - padding; x <= cell.x + padding; x += 1) {
+        occupied.add(key({ x, y }));
       }
     }
   }
@@ -100,21 +130,40 @@ function carvePath(start, end) {
   return cells;
 }
 
-function nearestCell(room, target) {
-  return room.cells
-    .slice()
-    .sort((a, b) => Math.abs(a.x - target.x) + Math.abs(a.y - target.y) - (Math.abs(b.x - target.x) + Math.abs(b.y - target.y)))[0];
+function nearestBoundaryDoor(room, target) {
+  const cells = roomCellSet(room);
+  const candidates = [];
+
+  for (const cell of room.cells) {
+    for (const outside of adjacentCells(cell)) {
+      if (!cells.has(key(outside))) {
+        candidates.push({ door: cell, outside });
+      }
+    }
+  }
+
+  return candidates.sort((a, b) => manhattan(a.outside, target) - manhattan(b.outside, target))[0];
 }
 
-function connectRooms(a, b, corridors) {
-  const aDoor = nearestCell(a, center(b));
-  const bDoor = nearestCell(b, center(a));
-  const corridor = carvePath(aDoor, bDoor);
+function pathCutsThroughRoom(path, rooms) {
+  const roomCells = new Set(rooms.flatMap((room) => room.cells.map(key)));
+  return path.some((cell) => roomCells.has(key(cell)));
+}
+
+function connectRooms(a, b, corridors, rooms) {
+  const aConnection = nearestBoundaryDoor(a, center(b));
+  const bConnection = nearestBoundaryDoor(b, center(a));
+  if (!aConnection || !bConnection) return false;
+
+  const corridor = carvePath(aConnection.outside, bConnection.outside);
+  if (pathCutsThroughRoom(corridor, rooms)) return false;
+
   corridors.push(...corridor);
-  a.doors.push({ ...aDoor, to: b.id });
-  b.doors.push({ ...bDoor, to: a.id });
+  a.doors.push({ ...aConnection.door, to: b.id });
+  b.doors.push({ ...bConnection.door, to: a.id });
   a.connections.push(b.id);
   b.connections.push(a.id);
+  return true;
 }
 
 function roomStartPosition(room) {
@@ -150,8 +199,10 @@ function generateDungeon(options = {}) {
       parentCenter.y + direction.y * (gap + randomInt(6, 10)) - randomInt(2, 5),
     );
 
-    if (!isInBounds(candidate, gridSize) || overlaps(candidate, rooms)) continue;
-    connectRooms(parent, candidate, corridors);
+    if (!isInBounds(candidate, gridSize) || overlaps(candidate, rooms) || overlapsCorridors(candidate, corridors)) {
+      continue;
+    }
+    if (!connectRooms(parent, candidate, corridors, [...rooms, candidate])) continue;
     rooms.push(candidate);
   }
 
@@ -159,7 +210,7 @@ function generateDungeon(options = {}) {
     const a = rooms[randomInt(0, rooms.length - 1)];
     const b = rooms[randomInt(0, rooms.length - 1)];
     if (a.id !== b.id && !a.connections.includes(b.id)) {
-      connectRooms(a, b, corridors);
+      connectRooms(a, b, corridors, rooms);
     }
   }
 
