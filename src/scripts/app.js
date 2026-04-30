@@ -311,13 +311,19 @@ function adjacentCells(position) {
 
 function visibleWalkable() {
   const known = new Set();
+  const openedKeys = currentOpenedKeys();
   for (const room of state.dungeon?.rooms ?? []) {
     if (currentDiscoveredRoomIds().has(room.id)) {
       room.cells.forEach((cell) => known.add(positionKey(cell)));
       room.doors.forEach((door) => known.add(positionKey(door)));
     }
   }
-  currentOpenedKeys().forEach((tileKey) => known.add(tileKey));
+  openedKeys.forEach((tileKey) => known.add(tileKey));
+  for (const door of state.dungeon?.doors ?? []) {
+    if (adjacentCells(door).some((cell) => openedKeys.has(positionKey(cell)))) {
+      known.add(positionKey(door));
+    }
+  }
   return known;
 }
 
