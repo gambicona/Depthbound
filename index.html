@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dungeon Room Prototype</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="src/styles/main.css" />
   </head>
   <body>
     <main class="app-shell">
@@ -16,15 +16,10 @@
           </div>
           <button id="new-game" class="ghost-button" type="button">New Encounter</button>
         </div>
-
-        <div class="room-wrap">
-          <div id="room" class="room" aria-label="Tactical grid"></div>
-        </div>
-
-        <div class="action-row" aria-label="Combat actions">
-          <button id="roll-initiative" type="button">Roll Initiative</button>
-          <button id="attack" type="button" disabled>Attack</button>
-          <button id="end-turn" type="button" disabled>End Turn</button>
+        <div class="room-scroll">
+          <div class="room-wrap">
+            <div id="room" class="room" aria-label="Tactical grid"></div>
+          </div>
         </div>
       </section>
 
@@ -52,6 +47,15 @@
       </aside>
     </main>
 
-    <script src="app.js"></script>
+    <nav class="action-dock" aria-label="Combat actions">
+      <button id="roll-initiative" type="button">Roll Initiative</button>
+      <button id="attack" type="button" disabled>Attack</button>
+      <button id="end-turn" type="button" disabled>End Turn</button>
+    </nav>
+
+    <script src="src/scripts/config.js" defer></script>
+    <script src="src/scripts/dice.js" defer></script>
+    <script src="src/scripts/grid.js" defer></script>
+    <script src="src/scripts/app.js" defer></script>
   </body>
 </html>

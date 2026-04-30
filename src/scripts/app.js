@@ -1,37 +1,10 @@
-const gridSize = 7;
-const feetPerSquare = 5;
-
-const templates = {
-  hero: {
-    id: "hero",
-    name: "Mira Vale",
-    role: "Level 1 Fighter",
-    maxHp: 14,
-    ac: 16,
-    attackBonus: 5,
-    damage: { count: 1, sides: 8, bonus: 3, label: "1d8 + 3" },
-    initiativeBonus: 2,
-    speedFeet: 30,
-    position: { x: 2, y: 4 },
-    token: "M",
-  },
-  monster: {
-    id: "monster",
-    name: "Crypt Guard",
-    role: "Armored skeleton",
-    maxHp: 13,
-    ac: 13,
-    attackBonus: 4,
-    damage: { count: 1, sides: 6, bonus: 2, label: "1d6 + 2" },
-    initiativeBonus: 2,
-    speedFeet: 30,
-    behavior: "melee",
-    position: { x: 4, y: 2 },
-    token: "C",
-  },
-};
+const { gridSize, feetPerSquare, tokenSlideMs, templates } = window.DungeonConfig;
+const { rollDie, rollDice, abilityLabel } = window.DungeonDice;
+const { distance, isAdjacent, positionKey, findPath, reachableTiles } = window.DungeonGrid;
 
 let state = createInitialState();
+let roomIsBuilt = false;
+let monsterTurnTimer = null;
 
 const els = {
   room: document.querySelector("#room"),
@@ -79,22 +52,6 @@ function createFighter(template) {
   };
 }
 
-function rollDie(sides) {
-  return Math.floor(Math.random() * sides) + 1;
-}
-
-function rollDice(count, sides) {
-  const rolls = Array.from({ length: count }, () => rollDie(sides));
-  return {
-    rolls,
-    total: rolls.reduce((sum, roll) => sum + roll, 0),
-  };
-}
-
-function abilityLabel(value) {
-  return value >= 0 ? `+${value}` : `${value}`;
-}
-
 function aliveFighters() {
   return Object.values(state.fighters).filter((fighter) => fighter.alive);
 }
@@ -103,100 +60,16 @@ function activeFighter() {
   return state.initiative[state.activeIndex]?.fighter;
 }
 
-function enemyOf(fighter) {
-  return fighter.id === "hero" ? state.fighters.monster : state.fighters.hero;
-}
-
-function distance(a, b) {
-  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-}
-
-function isAdjacent(a, b) {
-  return distance(a.position, b.position) === 1;
-}
-
-function isInsideGrid(position) {
-  return position.x >= 0 && position.x < gridSize && position.y >= 0 && position.y < gridSize;
-}
-
-function isOccupied(position, ignoredFighter = null) {
-  return Object.values(state.fighters).some(
-    (fighter) =>
-      fighter.alive &&
-      fighter.id !== ignoredFighter?.id &&
-      fighter.position.x === position.x &&
-      fighter.position.y === position.y,
-  );
-}
-
-function positionKey(position) {
-  return `${position.x},${position.y}`;
-}
-
-function neighbors(position) {
-  return [
-    { x: position.x, y: position.y - 1 },
-    { x: position.x + 1, y: position.y },
-    { x: position.x, y: position.y + 1 },
-    { x: position.x - 1, y: position.y },
-  ].filter(isInsideGrid);
-}
-
-function findPath(start, goal, mover) {
-  if (isOccupied(goal, mover)) return null;
-
-  const queue = [{ position: start, path: [] }];
-  const visited = new Set([positionKey(start)]);
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (current.position.x === goal.x && current.position.y === goal.y) {
-      return current.path;
-    }
-
-    for (const next of neighbors(current.position)) {
-      const key = positionKey(next);
-      if (visited.has(key) || isOccupied(next, mover)) continue;
-      visited.add(key);
-      queue.push({ position: next, path: [...current.path, next] });
-    }
-  }
-
-  return null;
-}
-
-function reachableTiles(fighter) {
-  const reachable = new Map();
-  const queue = [{ position: fighter.position, cost: 0 }];
-  const visited = new Set([positionKey(fighter.position)]);
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-
-    for (const next of neighbors(current.position)) {
-      const nextCost = current.cost + 1;
-      const key = positionKey(next);
-      if (visited.has(key) || nextCost > fighter.movementLeft || isOccupied(next, fighter)) continue;
-
-      visited.add(key);
-      reachable.set(key, nextCost);
-      queue.push({ position: next, cost: nextCost });
-    }
-  }
-
-  return reachable;
-}
-
-function resetTurnResources(fighter) {
-  fighter.movementLeft = Math.floor(fighter.speedFeet / feetPerSquare);
-  fighter.hasAction = true;
-}
-
 function addLog(text, type = "") {
   state.log.push({ text, type });
   if (state.log.length > 80) {
     state.log.shift();
   }
+}
+
+function resetTurnResources(fighter) {
+  fighter.movementLeft = Math.floor(fighter.speedFeet / feetPerSquare);
+  fighter.hasAction = true;
 }
 
 function rollInitiative() {
@@ -280,8 +153,6 @@ function makeAttack(attacker, defender) {
 
   if (!defender.alive) {
     addLog(`${defender.name} drops to 0 HP. ${attacker.id === "hero" ? "Victory." : "Defeat."}`, "important");
-    render();
-    return;
   }
 
   render();
@@ -310,17 +181,18 @@ function maybeRunMonsterTurn() {
 
   els.attack.disabled = true;
   els.endTurn.disabled = true;
-  setTimeout(() => {
+  window.clearTimeout(monsterTurnTimer);
+  monsterTurnTimer = window.setTimeout(() => {
     if (activeFighter()?.id === "monster") {
       runMonsterAi(state.fighters.monster);
     }
-  }, 650);
+  }, tokenSlideMs);
 }
 
 function moveFighter(fighter, destination, silent = false) {
   if (!fighter.alive || fighter.movementLeft <= 0) return false;
 
-  const path = findPath(fighter.position, destination, fighter);
+  const path = findPath(fighter.position, destination, fighter, state.fighters);
   if (!path || path.length === 0 || path.length > fighter.movementLeft) return false;
 
   fighter.position = { ...destination };
@@ -346,7 +218,7 @@ function handleTileClick(position) {
 }
 
 function bestStepToward(mover, target) {
-  const reachable = Array.from(reachableTiles(mover).entries()).map(([key, cost]) => {
+  const reachable = Array.from(reachableTiles(mover, state.fighters).entries()).map(([key, cost]) => {
     const [x, y] = key.split(",").map(Number);
     return { position: { x, y }, cost };
   });
@@ -376,52 +248,80 @@ function runMonsterAi(monster) {
       }
     }
 
-    if (isAdjacent(monster, target) && monster.hasAction) {
-      makeAttack(monster, target);
-    }
-  }
+    window.setTimeout(() => {
+      if (activeFighter()?.id === "monster" && isAdjacent(monster, target) && monster.hasAction) {
+        makeAttack(monster, target);
+      }
 
-  setTimeout(() => {
-    if (activeFighter()?.id === "monster" && aliveFighters().length === 2) {
-      endTurn();
-    }
-  }, 500);
+      window.setTimeout(() => {
+        if (activeFighter()?.id === "monster" && aliveFighters().length === 2) {
+          endTurn();
+        }
+      }, tokenSlideMs);
+    }, tokenSlideMs);
+  }
 }
 
-function renderRoom() {
+function buildRoom() {
   els.room.innerHTML = "";
-  const hero = state.fighters.hero;
-  const heroTurn = state.combatStarted && activeFighter()?.id === "hero" && aliveFighters().length === 2;
-  const reachable = heroTurn ? reachableTiles(hero) : new Map();
+
+  const tileLayer = document.createElement("div");
+  tileLayer.className = "tile-layer";
 
   for (let y = 0; y < gridSize; y += 1) {
     for (let x = 0; x < gridSize; x += 1) {
-      const tile = document.createElement("div");
+      const tile = document.createElement("button");
       tile.className = "tile";
+      tile.type = "button";
       tile.dataset.x = x;
       tile.dataset.y = y;
-      const key = positionKey({ x, y });
-      if (reachable.has(key)) {
-        tile.classList.add("reachable");
-        tile.title = `${reachable.get(key) * feetPerSquare} ft`;
-      }
       tile.addEventListener("click", () => handleTileClick({ x, y }));
-
-      const occupant = Object.values(state.fighters).find(
-        (fighter) => fighter.position.x === x && fighter.position.y === y,
-      );
-
-      if (occupant) {
-        const token = document.createElement("div");
-        token.className = `token ${occupant.id}`;
-        token.textContent = occupant.token;
-        token.title = occupant.name;
-        tile.append(token);
-      }
-
-      els.room.append(tile);
+      tileLayer.append(tile);
     }
   }
+
+  const tokenLayer = document.createElement("div");
+  tokenLayer.className = "token-layer";
+
+  for (const fighter of Object.values(state.fighters)) {
+    const token = document.createElement("div");
+    token.className = `token ${fighter.id}`;
+    token.dataset.fighter = fighter.id;
+    token.textContent = fighter.token;
+    token.title = fighter.name;
+    tokenLayer.append(token);
+  }
+
+  els.room.append(tileLayer, tokenLayer);
+  roomIsBuilt = true;
+}
+
+function placeToken(fighter) {
+  const token = els.room.querySelector(`[data-fighter="${fighter.id}"]`);
+  if (!token) return;
+
+  token.style.left = `${((fighter.position.x + 0.5) / gridSize) * 100}%`;
+  token.style.top = `${((fighter.position.y + 0.5) / gridSize) * 100}%`;
+  token.classList.toggle("defeated", !fighter.alive);
+}
+
+function renderRoom() {
+  if (!roomIsBuilt) buildRoom();
+
+  const hero = state.fighters.hero;
+  const heroTurn = state.combatStarted && activeFighter()?.id === "hero" && aliveFighters().length === 2;
+  const reachable = heroTurn ? reachableTiles(hero, state.fighters) : new Map();
+
+  els.room.querySelectorAll(".tile").forEach((tile) => {
+    const position = { x: Number(tile.dataset.x), y: Number(tile.dataset.y) };
+    const key = positionKey(position);
+    const isReachable = reachable.has(key);
+    tile.classList.toggle("reachable", isReachable);
+    tile.disabled = !isReachable;
+    tile.title = isReachable ? `${reachable.get(key) * feetPerSquare} ft` : "";
+  });
+
+  Object.values(state.fighters).forEach(placeToken);
 }
 
 function renderFighterCard(element, fighter) {
@@ -509,7 +409,9 @@ els.rollInitiative.addEventListener("click", rollInitiative);
 els.attack.addEventListener("click", () => makeAttack(state.fighters.hero, state.fighters.monster));
 els.endTurn.addEventListener("click", endTurn);
 els.newGame.addEventListener("click", () => {
+  window.clearTimeout(monsterTurnTimer);
   state = createInitialState();
+  roomIsBuilt = false;
   render();
 });
 els.clearLog.addEventListener("click", () => {
