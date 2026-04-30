@@ -34,6 +34,7 @@ const els = {
   newGame: document.querySelector("#new-game"),
   saveGame: document.querySelector("#save-game"),
   toggleLayout: document.querySelector("#toggle-layout"),
+  debugKill: document.querySelector("#debug-kill"),
   clearLog: document.querySelector("#clear-log"),
 };
 
@@ -437,6 +438,31 @@ function threatPresent() {
   return visibleMonsters().length > 0;
 }
 
+function endCurrentEncounter() {
+  state.combatStarted = false;
+  state.mode = "exploration";
+  state.initiative = [];
+  state.activeIndex = 0;
+  resetTurnResources(state.fighters.hero);
+}
+
+function debugKillVisibleMonsters() {
+  const targets = visibleMonsters();
+  if (targets.length === 0) {
+    addLog("Debug: no visible monsters to kill.");
+    render();
+    return;
+  }
+
+  targets.forEach((monster) => {
+    monster.hp = 0;
+    monster.alive = false;
+  });
+  endCurrentEncounter();
+  addLog(`Debug: removed ${targets.length} visible monster${targets.length === 1 ? "" : "s"}.`, "important");
+  render();
+}
+
 function rollInitiative() {
   if (state.combatStarted) return;
 
@@ -526,11 +552,7 @@ function makeAttack(attacker, defender) {
   if (!defender.alive) {
     addLog(`${defender.name} drops to 0 HP. ${attacker.id === "hero" ? "Victory." : "Defeat."}`, "important");
     if (attacker.id === "hero" && combatMonsters().length === 0) {
-      state.combatStarted = false;
-      state.mode = "exploration";
-      state.initiative = [];
-      state.activeIndex = 0;
-      resetTurnResources(state.fighters.hero);
+      endCurrentEncounter();
       addLog("The room falls quiet. Exploration resumes.", "important");
     }
   }
@@ -849,6 +871,7 @@ function renderControls() {
   els.saveGame.disabled = !gameHasStarted;
   els.toggleLayout.textContent = showDungeonLayout ? "Hide Dungeon Layout" : "Show Dungeon Layout";
   els.toggleLayout.disabled = !gameHasStarted;
+  els.debugKill.disabled = !gameHasStarted || visibleMonsters().length === 0;
   els.roundLabel.textContent = state.mode === "combat" ? `Round ${state.round}` : "Out of turn order";
 
   if (state.mode !== "combat") {
@@ -882,6 +905,7 @@ els.toggleLayout.addEventListener("click", () => {
   showDungeonLayout = !showDungeonLayout;
   render();
 });
+els.debugKill.addEventListener("click", debugKillVisibleMonsters);
 els.saveGame.addEventListener("click", () => saveAdventure(activeSaveSlot));
 els.startAdventure.addEventListener("click", startNewAdventure);
 els.saveSlots.addEventListener("click", (event) => {

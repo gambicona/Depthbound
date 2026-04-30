@@ -231,6 +231,16 @@ h1 {
   border-color: var(--line);
 }
 
+.debug-button {
+  border-color: rgba(214, 93, 74, 0.58);
+  color: #ffd0c8;
+}
+
+.debug-button:hover:not(:disabled) {
+  background: linear-gradient(180deg, #8e423a, #5e2428);
+  border-color: var(--red);
+}
+
 .icon-button {
   align-items: center;
   display: inline-flex;
