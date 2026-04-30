@@ -371,10 +371,9 @@ function renderInitiative() {
 
 function renderLog() {
   els.log.innerHTML = state.log
-    .slice()
-    .reverse()
     .map((entry) => `<li class="${entry.type}">${entry.text}</li>`)
     .join("");
+  els.log.scrollTop = els.log.scrollHeight;
 }
 
 function renderControls() {
