@@ -1,3 +1,4 @@
+(() => {
 const { gridSize, feetPerSquare, tokenSlideMs, templates } = window.DungeonConfig;
 const { rollDie, rollDice, abilityLabel } = window.DungeonDice;
 const { distance, isAdjacent, positionKey, findPath, reachableTiles } = window.DungeonGrid;
@@ -420,3 +421,4 @@ els.clearLog.addEventListener("click", () => {
 });
 
 render();
+})();

@@ -1,3 +1,4 @@
+(() => {
 const { gridSize } = window.DungeonConfig;
 
 window.DungeonGrid = {
@@ -87,3 +88,4 @@ window.DungeonGrid = {
     return reachable;
   },
 };
+})();
