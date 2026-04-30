@@ -6,6 +6,10 @@ const { distance, isAdjacent, positionKey, findPath, reachableTiles } = window.D
 let state = createInitialState();
 let roomIsBuilt = false;
 let monsterTurnTimer = null;
+const fighterStatsOpen = {
+  hero: true,
+  monster: true,
+};
 
 const els = {
   room: document.querySelector("#room"),
@@ -327,6 +331,7 @@ function renderRoom() {
 
 function renderFighterCard(element, fighter) {
   const hpPercent = Math.max(0, Math.round((fighter.hp / fighter.maxHp) * 100));
+  const isOpen = fighterStatsOpen[fighter.id];
   element.innerHTML = `
     <div class="fighter-top">
       <div>
@@ -339,15 +344,23 @@ function renderFighterCard(element, fighter) {
       <div class="hp-text"><span>HP</span><span>${fighter.hp} / ${fighter.maxHp}</span></div>
       <div class="hp-bar"><div class="hp-fill" style="width: ${hpPercent}%"></div></div>
     </div>
-    <div class="stat-grid">
-      <div class="stat-pill"><b>${abilityLabel(fighter.attackBonus)}</b><span>Attack</span></div>
-      <div class="stat-pill"><b>${fighter.damage.label}</b><span>Damage</span></div>
-      <div class="stat-pill"><b>${fighter.speedFeet} ft</b><span>Speed</span></div>
-      <div class="stat-pill"><b>${fighter.movementLeft * feetPerSquare} ft</b><span>Move Left</span></div>
-      <div class="stat-pill"><b>${abilityLabel(fighter.initiativeBonus)}</b><span>Init</span></div>
-      <div class="stat-pill"><b>${fighter.hasAction ? "Yes" : "No"}</b><span>Action</span></div>
-    </div>
+    <details class="stats-details" ${isOpen ? "open" : ""}>
+      <summary>Stats</summary>
+      <div class="stat-grid">
+        <div class="stat-pill"><b>${abilityLabel(fighter.attackBonus)}</b><span>Attack</span></div>
+        <div class="stat-pill"><b>${fighter.damage.label}</b><span>Damage</span></div>
+        <div class="stat-pill"><b>${fighter.speedFeet} ft</b><span>Speed</span></div>
+        <div class="stat-pill"><b>${fighter.movementLeft * feetPerSquare} ft</b><span>Move Left</span></div>
+        <div class="stat-pill"><b>${abilityLabel(fighter.initiativeBonus)}</b><span>Init</span></div>
+        <div class="stat-pill"><b>${fighter.hasAction ? "Yes" : "No"}</b><span>Action</span></div>
+      </div>
+    </details>
   `;
+
+  const details = element.querySelector(".stats-details");
+  details.addEventListener("toggle", () => {
+    fighterStatsOpen[fighter.id] = details.open;
+  });
 }
 
 function renderInitiative() {

@@ -402,6 +402,44 @@ h1 {
   grid-template-columns: repeat(3, 1fr);
 }
 
+.stats-details {
+  display: grid;
+  gap: 10px;
+}
+
+.stats-details summary {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 900;
+  justify-content: space-between;
+  list-style: none;
+  padding: 8px 10px;
+  text-transform: uppercase;
+}
+
+.stats-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.stats-details summary::after {
+  content: "+";
+  color: var(--gold);
+  font-size: 1rem;
+}
+
+.stats-details[open] summary::after {
+  content: "-";
+}
+
+.stats-details[open] .stat-grid {
+  margin-top: 10px;
+}
+
 .log-panel {
   display: flex;
   flex-direction: column;
