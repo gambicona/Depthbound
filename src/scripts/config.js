@@ -1,8 +1,12 @@
 window.DungeonConfig = {
-  gridSize: 7,
+  gridSize: 72,
   feetPerSquare: 5,
-  tileSizePx: 54,
+  tileSizePx: 24,
   tokenSlideMs: 320,
+  dungeon: {
+    roomCount: 20,
+    gridSize: 72,
+  },
   templates: {
     hero: {
       id: "hero",
@@ -14,7 +18,7 @@ window.DungeonConfig = {
       damage: { count: 1, sides: 8, bonus: 3, label: "1d8 + 3" },
       initiativeBonus: 2,
       speedFeet: 30,
-      position: { x: 2, y: 4 },
+      position: { x: 0, y: 0 },
       token: "M",
     },
     monster: {
@@ -28,7 +32,7 @@ window.DungeonConfig = {
       initiativeBonus: 2,
       speedFeet: 30,
       behavior: "melee",
-      position: { x: 4, y: 2 },
+      position: { x: 0, y: 0 },
       token: "C",
     },
   },

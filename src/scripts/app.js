@@ -2,6 +2,7 @@
 const { gridSize, feetPerSquare, tileSizePx, tokenSlideMs, templates } = window.DungeonConfig;
 const { rollDie, rollDice, abilityLabel } = window.DungeonDice;
 const { distance, isAdjacent, positionKey, findPath, reachableTiles } = window.DungeonGrid;
+const { generateDungeon, roomHasCell } = window.DungeonGenerator;
 const { getSlots, save, load } = window.DungeonSave;
 
 let state = createInitialState();
@@ -9,6 +10,7 @@ let roomIsBuilt = false;
 let monsterTurnTimer = null;
 let gameHasStarted = false;
 let activeSaveSlot = 1;
+let showDungeonLayout = false;
 const fighterStatsOpen = {
   hero: true,
   monster: true,
@@ -31,28 +33,37 @@ const els = {
   endTurn: document.querySelector("#end-turn"),
   newGame: document.querySelector("#new-game"),
   saveGame: document.querySelector("#save-game"),
+  toggleLayout: document.querySelector("#toggle-layout"),
   clearLog: document.querySelector("#clear-log"),
 };
 
 function createInitialState() {
+  const dungeon = generateDungeon(window.DungeonConfig.dungeon);
+  const hero = createFighter(templates.hero);
+  const monster = createFighter(templates.monster);
+  hero.position = { ...dungeon.startPosition };
+  const firstRoom = dungeon.rooms[0];
+  monster.position = firstRoom.cells.find((cell) => distance(cell, hero.position) >= 4) ?? firstRoom.cells[firstRoom.cells.length - 1];
+
   return {
     combatStarted: false,
     round: 0,
     activeIndex: 0,
     initiative: [],
     room: {
-      id: "old-guardroom",
-      name: "Old Guardroom",
-      gridSize,
+      id: dungeon.id,
+      name: "Generated Dungeon",
+      gridSize: dungeon.gridSize,
       tileSizePx,
     },
+    dungeon,
     fighters: {
-      hero: createFighter(templates.hero),
-      monster: createFighter(templates.monster),
+      hero,
+      monster,
     },
     log: [
       {
-        text: "A crypt guard scrapes its blade across the stones. Roll initiative when ready.",
+        text: `Generated ${dungeon.roomCount} rooms. Mira starts at the entrance of ${firstRoom.name}.`,
         type: "important",
       },
     ],
@@ -81,13 +92,15 @@ function activeFighter() {
 }
 
 function normalizeLoadedState(loadedState) {
+  const freshState = createInitialState();
   const normalized = {
-    ...createInitialState(),
+    ...freshState,
     ...loadedState,
     fighters: {
-      ...createInitialState().fighters,
+      ...freshState.fighters,
       ...loadedState.fighters,
     },
+    dungeon: loadedState.dungeon ?? freshState.dungeon,
     log: Array.isArray(loadedState.log) ? loadedState.log : [],
     initiative: Array.isArray(loadedState.initiative) ? loadedState.initiative : [],
   };
@@ -170,6 +183,7 @@ function hideMainMenu() {
 
 function startNewAdventure() {
   window.clearTimeout(monsterTurnTimer);
+  showDungeonLayout = false;
   state = createInitialState();
   roomIsBuilt = false;
   hideMainMenu();
@@ -187,6 +201,7 @@ function loadAdventure(slotId) {
     window.clearTimeout(monsterTurnTimer);
     activeSaveSlot = slotId;
     state = normalizeLoadedState(payload.state);
+    showDungeonLayout = false;
     roomIsBuilt = false;
     hideMainMenu();
     addLog(`Loaded "${payload.name}".`, "important");
@@ -219,6 +234,20 @@ function addLog(text, type = "") {
 function resetTurnResources(fighter) {
   fighter.movementLeft = Math.floor(fighter.speedFeet / feetPerSquare);
   fighter.hasAction = true;
+}
+
+function currentGridSize() {
+  return state.dungeon?.gridSize ?? gridSize;
+}
+
+function currentWalkable() {
+  return new Set((state.dungeon?.walkable ?? []).map(positionKey));
+}
+
+function isKnownTile(position) {
+  if (showDungeonLayout) return true;
+  const entranceRoom = state.dungeon?.rooms.find((room) => room.id === state.dungeon.entranceRoomId);
+  return entranceRoom ? roomHasCell(entranceRoom, position) : true;
 }
 
 function rollInitiative() {
@@ -341,7 +370,10 @@ function maybeRunMonsterTurn() {
 function moveFighter(fighter, destination, silent = false) {
   if (!fighter.alive || fighter.movementLeft <= 0) return false;
 
-  const path = findPath(fighter.position, destination, fighter, state.fighters);
+  const path = findPath(fighter.position, destination, fighter, state.fighters, {
+    gridSize: currentGridSize(),
+    walkable: currentWalkable(),
+  });
   if (!path || path.length === 0 || path.length > fighter.movementLeft) return false;
 
   fighter.position = { ...destination };
@@ -367,7 +399,12 @@ function handleTileClick(position) {
 }
 
 function bestStepToward(mover, target) {
-  const reachable = Array.from(reachableTiles(mover, state.fighters).entries()).map(([key, cost]) => {
+  const reachable = Array.from(
+    reachableTiles(mover, state.fighters, {
+      gridSize: currentGridSize(),
+      walkable: currentWalkable(),
+    }).entries(),
+  ).map(([key, cost]) => {
     const [x, y] = key.split(",").map(Number);
     return { position: { x, y }, cost };
   });
@@ -413,9 +450,10 @@ function runMonsterAi(monster) {
 
 function buildRoom() {
   els.room.innerHTML = "";
-  const roomSizePx = gridSize * tileSizePx;
+  const mapGridSize = currentGridSize();
+  const roomSizePx = mapGridSize * tileSizePx;
   const tokenSizePx = Math.round(tileSizePx * 0.62);
-  els.room.style.setProperty("--grid-size", gridSize);
+  els.room.style.setProperty("--grid-size", mapGridSize);
   els.room.style.setProperty("--tile-size", `${tileSizePx}px`);
   els.room.style.setProperty("--room-size", `${roomSizePx}px`);
   els.room.style.setProperty("--token-size", `${tokenSizePx}px`);
@@ -423,8 +461,8 @@ function buildRoom() {
   const tileLayer = document.createElement("div");
   tileLayer.className = "tile-layer";
 
-  for (let y = 0; y < gridSize; y += 1) {
-    for (let x = 0; x < gridSize; x += 1) {
+  for (let y = 0; y < mapGridSize; y += 1) {
+    for (let x = 0; x < mapGridSize; x += 1) {
       const tile = document.createElement("button");
       tile.className = "tile";
       tile.type = "button";
@@ -465,14 +503,27 @@ function renderRoom() {
 
   const hero = state.fighters.hero;
   const heroTurn = state.combatStarted && activeFighter()?.id === "hero" && aliveFighters().length === 2;
-  const reachable = heroTurn ? reachableTiles(hero, state.fighters) : new Map();
+  const walkable = currentWalkable();
+  const doorKeys = new Set((state.dungeon?.doors ?? []).map(positionKey));
+  const reachable = heroTurn
+    ? reachableTiles(hero, state.fighters, {
+        gridSize: currentGridSize(),
+        walkable,
+      })
+    : new Map();
 
   els.room.querySelectorAll(".tile").forEach((tile) => {
     const position = { x: Number(tile.dataset.x), y: Number(tile.dataset.y) };
     const key = positionKey(position);
     const isReachable = reachable.has(key);
+    const isWalkable = walkable.has(key);
+    const isDoor = doorKeys.has(key);
+    const isKnown = isKnownTile(position);
+    tile.classList.toggle("walkable", isWalkable && isKnown);
+    tile.classList.toggle("hidden-tile", !isKnown);
+    tile.classList.toggle("door", isDoor && isKnown);
     tile.classList.toggle("reachable", isReachable);
-    tile.disabled = !isReachable;
+    tile.disabled = !isReachable || !isKnown;
     tile.title = isReachable ? `${reachable.get(key) * feetPerSquare} ft` : "";
   });
 
@@ -550,6 +601,8 @@ function renderControls() {
   els.attack.disabled = !heroCanAttack;
   els.endTurn.disabled = !heroTurn;
   els.saveGame.disabled = !gameHasStarted;
+  els.toggleLayout.textContent = showDungeonLayout ? "Hide Dungeon Layout" : "Show Dungeon Layout";
+  els.toggleLayout.disabled = !gameHasStarted;
   els.roundLabel.textContent = `Round ${state.round}`;
 
   if (!state.combatStarted) {
@@ -575,6 +628,10 @@ els.attack.addEventListener("click", () => makeAttack(state.fighters.hero, state
 els.endTurn.addEventListener("click", endTurn);
 els.newGame.addEventListener("click", () => {
   showMainMenu();
+});
+els.toggleLayout.addEventListener("click", () => {
+  showDungeonLayout = !showDungeonLayout;
+  render();
 });
 els.saveGame.addEventListener("click", () => saveAdventure(activeSaveSlot));
 els.startAdventure.addEventListener("click", startNewAdventure);

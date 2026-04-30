@@ -1,5 +1,5 @@
 (() => {
-const { gridSize } = window.DungeonConfig;
+const { gridSize: defaultGridSize } = window.DungeonConfig;
 
 window.DungeonGrid = {
   distance(a, b) {
@@ -10,7 +10,7 @@ window.DungeonGrid = {
     return window.DungeonGrid.distance(a.position, b.position) === 1;
   },
 
-  isInsideGrid(position) {
+  isInsideGrid(position, gridSize = defaultGridSize) {
     return position.x >= 0 && position.x < gridSize && position.y >= 0 && position.y < gridSize;
   },
 
@@ -28,17 +28,20 @@ window.DungeonGrid = {
     return `${position.x},${position.y}`;
   },
 
-  neighbors(position) {
+  neighbors(position, gridSize = defaultGridSize) {
     return [
       { x: position.x, y: position.y - 1 },
       { x: position.x + 1, y: position.y },
       { x: position.x, y: position.y + 1 },
       { x: position.x - 1, y: position.y },
-    ].filter(window.DungeonGrid.isInsideGrid);
+    ].filter((next) => window.DungeonGrid.isInsideGrid(next, gridSize));
   },
 
-  findPath(start, goal, mover, fighters) {
+  findPath(start, goal, mover, fighters, options = {}) {
+    const gridSize = options.gridSize ?? defaultGridSize;
+    const walkable = options.walkable ?? null;
     if (window.DungeonGrid.isOccupied(goal, fighters, mover)) return null;
+    if (walkable && !walkable.has(window.DungeonGrid.positionKey(goal))) return null;
 
     const queue = [{ position: start, path: [] }];
     const visited = new Set([window.DungeonGrid.positionKey(start)]);
@@ -49,8 +52,9 @@ window.DungeonGrid = {
         return current.path;
       }
 
-      for (const next of window.DungeonGrid.neighbors(current.position)) {
+      for (const next of window.DungeonGrid.neighbors(current.position, gridSize)) {
         const key = window.DungeonGrid.positionKey(next);
+        if (walkable && !walkable.has(key)) continue;
         if (visited.has(key) || window.DungeonGrid.isOccupied(next, fighters, mover)) continue;
         visited.add(key);
         queue.push({ position: next, path: [...current.path, next] });
@@ -60,7 +64,9 @@ window.DungeonGrid = {
     return null;
   },
 
-  reachableTiles(fighter, fighters) {
+  reachableTiles(fighter, fighters, options = {}) {
+    const gridSize = options.gridSize ?? defaultGridSize;
+    const walkable = options.walkable ?? null;
     const reachable = new Map();
     const queue = [{ position: fighter.position, cost: 0 }];
     const visited = new Set([window.DungeonGrid.positionKey(fighter.position)]);
@@ -68,11 +74,12 @@ window.DungeonGrid = {
     while (queue.length > 0) {
       const current = queue.shift();
 
-      for (const next of window.DungeonGrid.neighbors(current.position)) {
+      for (const next of window.DungeonGrid.neighbors(current.position, gridSize)) {
         const nextCost = current.cost + 1;
         const key = window.DungeonGrid.positionKey(next);
         if (
           visited.has(key) ||
+          (walkable && !walkable.has(key)) ||
           nextCost > fighter.movementLeft ||
           window.DungeonGrid.isOccupied(next, fighters, fighter)
         ) {
