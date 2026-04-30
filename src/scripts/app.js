@@ -394,14 +394,15 @@ function corridorPathBetweenDoors(door, targetDoor) {
 
 function openDoor(door) {
   const targetRoom = (state.dungeon?.rooms ?? []).find((room) => room.id === door.to);
+  const doorRoom = (state.dungeon?.rooms ?? []).find((room) => room.id === door.roomId);
   const targetDoor = reciprocalDoor(door);
-  if (!targetRoom || !targetDoor) return false;
+  if (!targetRoom || !doorRoom || !targetDoor) return false;
 
   const discovered = currentDiscoveredRoomIds();
   const openedDoorKeys = new Set(state.exploration.openedDoorKeys);
   const openedCorridorKeys = new Set(state.exploration.openedCorridorKeys);
   const openingFromDiscoveredRoom = discovered.has(door.roomId);
-  const roomToReveal = openingFromDiscoveredRoom ? null : targetRoom;
+  const roomToReveal = openingFromDiscoveredRoom ? null : doorRoom;
 
   openedDoorKeys.add(positionKey(door));
   corridorPathBetweenDoors(door, targetDoor).forEach((cell) => openedCorridorKeys.add(positionKey(cell)));
