@@ -1,0 +1,60 @@
+(() => {
+window.DungeonContent.register("classes", "fighter", {
+  name: "Mira Vale",
+  role: "Level 1 Fighter",
+  level: 1,
+  xp: 0,
+  hitDie: 10,
+  maxHp: 14,
+  abilityMods: { str: 3, dex: 2 },
+  baseAc: 10,
+  attackBonus: 5,
+  damage: { count: 1, sides: 4, bonus: 3, type: "bludgeoning", label: "1d4 + 3 bludgeoning" },
+  initiativeBonus: 2,
+  speedFeet: 30,
+  token: "M",
+  abilities: [
+    {
+      id: "secondWind",
+      name: "Second Wind",
+      level: 1,
+      refresh: "shortRest",
+      uses: 1,
+      resource: "bonusAction",
+      description: "Heal 1d10 + fighter level HP.",
+    },
+    {
+      id: "actionSurge",
+      name: "Action Surge",
+      level: 2,
+      refresh: "shortRest",
+      uses: 1,
+      usesByLevel: [
+        { level: 17, uses: 2 },
+      ],
+      resource: "none",
+      description: "Refresh your action.",
+    },
+  ],
+  equipment: {
+    mainHand: "longsword",
+    offHand: null,
+    head: null,
+    torso: "chain-mail",
+    boots: null,
+    cloak: null,
+    bracers: null,
+    gauntlets: null,
+    ring1: null,
+    ring2: null,
+    amulet: null,
+  },
+  inventory: {
+    money: { cp: 0, sp: 0, gp: 0 },
+    items: [
+      "longsword",
+      "chain-mail",
+    ],
+  },
+});
+})();

@@ -1,0 +1,33 @@
+(() => {
+window.DungeonContent.register("themes", "oldGuardroom", {
+  name: "Old Guardroom",
+  monsterIds: [
+  "boneRecruit",
+  "cryptGuard",
+  "skeletonArcher",
+  "skeletalSpearman",
+  "rustedShieldbearer",
+  "guardroomHound",
+  "barricadeCrossbowman",
+  "armoryHaunt",
+  "restlessJailer",
+  "gravePikeman",
+  "hollowMarksman",
+  "rustedHalberdier",
+  "ashBarracksVeteran",
+  "boneLockbreaker",
+  "towerShieldRemnant",
+  "blackArrowSentry",
+  "cryptExecutioner",
+  "lanternWraith",
+  "oathboundJailer",
+  "graveplateSentinel",
+  "ruinArbalester",
+  "oathscarDuelist",
+  "boneMaulBrute",
+  "lanternHexguard",
+],
+  bossMonsterIds: ["guardroomCommander", "oldSergeant", "bannerKnight", "wardenOfTheOldWatch", "graveBannerCastellan"],
+  lootTableIds: ["basicDungeon"],
+});
+})();
