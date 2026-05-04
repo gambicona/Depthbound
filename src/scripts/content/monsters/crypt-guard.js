@@ -8,9 +8,12 @@ window.DungeonContent.register("monsters", "cryptGuard", {
   ac: 13,
   attackBonus: 4,
   damage: { count: 1, sides: 6, bonus: 2, type: "piercing", label: "1d6 + 2 piercing" },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 2,
   speedFeet: 25,
   behavior: "melee",
   token: "C",
+  tokenArt: "assets/tokens/crypt-guard.png",
 });
 })();

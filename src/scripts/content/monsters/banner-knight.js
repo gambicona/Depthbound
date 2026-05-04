@@ -8,10 +8,13 @@ window.DungeonContent.register("monsters", "bannerKnight", {
   ac: 15,
   attackBonus: 5,
   damage: { count: 1, sides: 8, bonus: 3, type: "slashing", label: "1d8 + 3 slashing" },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 2,
   speedFeet: 30,
   behavior: "melee",
   token: "B",
+  tokenArt: "assets/tokens/banner-knight.png",
   equipment: {
     mainHand: "longsword",
     offHand: "shield",

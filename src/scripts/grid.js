@@ -28,23 +28,35 @@ window.DungeonGrid = {
     return `${position.x},${position.y}`;
   },
 
-  neighbors(position, gridSize = defaultGridSize) {
-    return [
+  neighbors(position, gridSize = defaultGridSize, includeDiagonals = false) {
+    const cardinal = [
       { x: position.x, y: position.y - 1 },
       { x: position.x + 1, y: position.y },
       { x: position.x, y: position.y + 1 },
       { x: position.x - 1, y: position.y },
-    ].filter((next) => window.DungeonGrid.isInsideGrid(next, gridSize));
+    ];
+    const diagonal = [
+      { x: position.x - 1, y: position.y - 1 },
+      { x: position.x + 1, y: position.y - 1 },
+      { x: position.x + 1, y: position.y + 1 },
+      { x: position.x - 1, y: position.y + 1 },
+    ];
+    return (includeDiagonals ? [...cardinal, ...diagonal] : cardinal).filter((next) =>
+      window.DungeonGrid.isInsideGrid(next, gridSize),
+    );
   },
 
   findPath(start, goal, mover, fighters, options = {}) {
     const gridSize = options.gridSize ?? defaultGridSize;
     const walkable = options.walkable ?? null;
+    const canTraverse = options.canTraverse ?? (() => true);
+    const includeDiagonals = options.includeDiagonals ?? false;
+    const stateKey = options.stateKey ?? ((position) => window.DungeonGrid.positionKey(position));
     if (window.DungeonGrid.isOccupied(goal, fighters, mover)) return null;
     if (walkable && !walkable.has(window.DungeonGrid.positionKey(goal))) return null;
 
     const queue = [{ position: start, path: [] }];
-    const visited = new Set([window.DungeonGrid.positionKey(start)]);
+    const visited = new Set([stateKey(start, [])]);
 
     while (queue.length > 0) {
       const current = queue.shift();
@@ -52,12 +64,15 @@ window.DungeonGrid = {
         return current.path;
       }
 
-      for (const next of window.DungeonGrid.neighbors(current.position, gridSize)) {
+      for (const next of window.DungeonGrid.neighbors(current.position, gridSize, includeDiagonals)) {
         const key = window.DungeonGrid.positionKey(next);
         if (walkable && !walkable.has(key)) continue;
-        if (visited.has(key) || window.DungeonGrid.isOccupied(next, fighters, mover)) continue;
-        visited.add(key);
-        queue.push({ position: next, path: [...current.path, next] });
+        if (!canTraverse(current.position, next, current.path)) continue;
+        const nextPath = [...current.path, next];
+        const nextStateKey = stateKey(next, nextPath);
+        if (visited.has(nextStateKey) || window.DungeonGrid.isOccupied(next, fighters, mover)) continue;
+        visited.add(nextStateKey);
+        queue.push({ position: next, path: nextPath });
       }
     }
 
@@ -68,28 +83,35 @@ window.DungeonGrid = {
     const gridSize = options.gridSize ?? defaultGridSize;
     const walkable = options.walkable ?? null;
     const maxCost = options.maxCost ?? fighter.movementLeft;
+    const canTraverse = options.canTraverse ?? (() => true);
+    const includeDiagonals = options.includeDiagonals ?? false;
+    const stateKey = options.stateKey ?? ((position) => window.DungeonGrid.positionKey(position));
     const reachable = new Map();
-    const queue = [{ position: fighter.position, cost: 0 }];
-    const visited = new Set([window.DungeonGrid.positionKey(fighter.position)]);
+    const queue = [{ position: fighter.position, cost: 0, path: [] }];
+    const visited = new Set([stateKey(fighter.position, [])]);
 
     while (queue.length > 0) {
       const current = queue.shift();
 
-      for (const next of window.DungeonGrid.neighbors(current.position, gridSize)) {
+      for (const next of window.DungeonGrid.neighbors(current.position, gridSize, includeDiagonals)) {
         const nextCost = current.cost + 1;
         const key = window.DungeonGrid.positionKey(next);
         if (
-          visited.has(key) ||
           (walkable && !walkable.has(key)) ||
+          !canTraverse(current.position, next, current.path) ||
           nextCost > maxCost ||
           window.DungeonGrid.isOccupied(next, fighters, fighter)
         ) {
           continue;
         }
 
-        visited.add(key);
-        reachable.set(key, nextCost);
-        queue.push({ position: next, cost: nextCost });
+        const nextPath = [...current.path, next];
+        const nextStateKey = stateKey(next, nextPath);
+        if (visited.has(nextStateKey)) continue;
+
+        visited.add(nextStateKey);
+        reachable.set(key, Math.min(reachable.get(key) ?? nextCost, nextCost));
+        queue.push({ position: next, cost: nextCost, path: nextPath });
       }
     }
 

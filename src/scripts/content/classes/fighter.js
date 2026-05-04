@@ -56,5 +56,69 @@ window.DungeonContent.register("classes", "fighter", {
       "chain-mail",
     ],
   },
+  startingGear: {
+    armorChoices: [
+      {
+        value: "chain-mail",
+        label: "Chain Mail",
+        equipment: { torso: "chain-mail" },
+        inventory: ["chain-mail"],
+      },
+      {
+        value: "leather-longbow",
+        label: "Leather Armor, Longbow, and 20 Arrows",
+        equipment: { torso: "leather", quiver: "arrows-20" },
+        inventory: ["leather", "longbow", "arrows-20"],
+      },
+    ],
+    weaponChoices: [
+      {
+        value: "weapon-shield",
+        label: "One martial weapon and a shield",
+        equipment: { offHand: "shield" },
+      },
+      {
+        value: "two-weapons",
+        label: "Two martial weapons",
+      },
+    ],
+    martialWeapons: [
+      "battleaxe",
+      "flail",
+      "glaive",
+      "greataxe",
+      "greatsword",
+      "halberd",
+      "lance",
+      "longsword",
+      "maul",
+      "morningstar",
+      "pike",
+      "rapier",
+      "scimitar",
+      "shortsword",
+      "trident",
+      "war-pick",
+      "warhammer",
+      "whip",
+      "blowgun",
+      "crossbow-hand",
+      "crossbow-heavy",
+      "longbow",
+    ],
+    secondaryChoices: [
+      {
+        value: "light-crossbow",
+        label: "Light Crossbow and 20 Bolts",
+        inventory: ["crossbow-light", "bolts-20"],
+        quiver: "bolts-20",
+      },
+      {
+        value: "handaxes",
+        label: "Two Handaxes",
+        inventory: ["handaxe", "handaxe"],
+      },
+    ],
+  },
 });
 })();

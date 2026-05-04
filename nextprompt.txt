@@ -1,0 +1,24 @@
+Fix saving everytime to state 1
+
+weapon stuff: thrown weapons and pick them up again, off hand attack
+add selection who to target with attack if multiple available
+toggleable admin mode, buttons otherwise hidden
+add extra attack for fighter and rework fighter class object
+add role selection for character (tank, dd, heal)
+add more monster behaviour (already according to role and int)
+Give type to monsters (undead etc)
+make furniture jumpable (for pits etc)
+add loot category (equipment that can not be bought but sold, can have magical properties such as +1 or extra dmg)
+add treasure category (valuables that can only be sold, but for full value)
+instructions to add: new loot and treasure, new furniture
+
+token artwork (Heros)
+Monster Compendium to collect
+Cleric class
+races
+build base
+NPCs with (random) quests
+make it possible to go back to lower level dungeons to redo them and gain items from bosses for quests for example
+Sort which furniture in which theme is generating
+predefined dungeons and dungeon creator
+ressource points to get ressources (stone pit, con check, get stone, farmable, as configurable file, spawnable in dungeons at walls)

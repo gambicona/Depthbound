@@ -8,10 +8,13 @@ window.DungeonContent.register("monsters", "barricadeCrossbowman", {
   ac: 14,
   attackBonus: 4,
   damage: { count: 1, sides: 8, bonus: 1, type: "piercing", label: "1d8 + 1 piercing", range: { kind: "ranged", normal: 80, long: 320, feet: 80 } },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 1,
   speedFeet: 25,
   behavior: "rangedKiter",
   token: "X",
+  tokenArt: "assets/tokens/barricade-crossbowman.png",
   equipment: {
     mainHand: "light-crossbow",
     offHand: null,

@@ -8,10 +8,13 @@ window.DungeonContent.register("monsters", "towerShieldRemnant", {
   ac: 16,
   attackBonus: 4,
   damage: { count: 1, sides: 6, bonus: 2, type: "bludgeoning", label: "1d6 + 2 bludgeoning" },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 0,
   speedFeet: 20,
   behavior: "melee",
   token: "T",
+  tokenArt: "assets/tokens/tower-shield-remnant.png",
   equipment: {
     mainHand: "mace",
     offHand: "tower-shield",

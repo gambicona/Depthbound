@@ -1,5 +1,6 @@
 (() => {
 const storagePrefix = "dungeonCrawler.saveSlot.v1.";
+const quickstartKey = "dungeonCrawler.quickstart.v1";
 const slotCount = 4;
 
 function clone(value) {
@@ -24,6 +25,33 @@ window.DungeonSave = {
 
   hasSave(slotId) {
     return Boolean(window.localStorage.getItem(`${storagePrefix}${slotId}`));
+  },
+
+  remove(slotId) {
+    window.localStorage.removeItem(`${storagePrefix}${slotId}`);
+  },
+
+  saveQuickstart(state) {
+    const payload = {
+      version: 1,
+      name: "Dungeon Restart",
+      savedAt: new Date().toISOString(),
+      state: clone(state),
+    };
+    window.localStorage.setItem(quickstartKey, JSON.stringify(payload));
+    return payload;
+  },
+
+  loadQuickstart() {
+    const raw = window.localStorage.getItem(quickstartKey);
+    if (!raw) return null;
+
+    const payload = JSON.parse(raw);
+    if (payload.version !== 1 || !payload.state) {
+      throw new Error("Unsupported quickstart save.");
+    }
+
+    return payload;
   },
 
   save(slotId, name, state) {

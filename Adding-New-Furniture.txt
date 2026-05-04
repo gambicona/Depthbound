@@ -1,0 +1,46 @@
+How to add new furniture or dungeon objects
+
+Dungeon object templates live in src/scripts/app.js in the dungeonObjectTemplates object.
+
+Each template can define:
+
+name: Display name.
+kind: furniture, trap, container, or another short category.
+width and height: Size in grid squares.
+blocksMovement: true if heroes and monsters must path around it.
+interactable: true if it should have actions later.
+description: Text shown in the right-click info panel.
+
+Example:
+
+myStatue: {
+  name: "Stone Statue",
+  kind: "furniture",
+  width: 1,
+  height: 1,
+  blocksMovement: true,
+  interactable: false,
+  description: "A cracked stone statue. It blocks movement.",
+}
+
+To make it spawn, update createDungeonObjects in src/scripts/app.js.
+
+Common placement rules already used:
+
+Tables:
+2x1, placed near the room center, never on doors, blocks movement.
+
+Chests:
+1x1, placed next to room walls, blocks movement, has an inventory.
+
+Traps:
+1x1, can spawn in rooms and hallways, does not block movement, triggers when stepped on.
+
+Important helpers:
+
+objectCells(object): returns all grid cells occupied by the object.
+blockingObjectKeys(): collects movement-blocking object cells.
+objectAt(position): finds the object on a tile.
+showDungeonObjectInfo(object): controls the right-click info panel.
+
+After adding a new blocking object type, make sure it has blocksMovement: true so pathfinding routes around it automatically.

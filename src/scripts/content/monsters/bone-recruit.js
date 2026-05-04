@@ -14,9 +14,12 @@ window.DungeonContent.register("monsters", "boneRecruit", {
     type: "bludgeoning",
     label: "1d4 + 1 bludgeoning"
   },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 1,
   speedFeet: 30,
   behavior: "melee",
   token: "R",
+  tokenArt: "assets/tokens/bone-recruit.png",
 });
 })();

@@ -8,10 +8,13 @@ window.DungeonContent.register("monsters", "rustedHalberdier", {
   ac: 14,
   attackBonus: 4,
   damage: { count: 1, sides: 10, bonus: 1, type: "slashing", label: "1d10 + 1 slashing", range: { kind: "melee", feet: 10 } },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 0,
   speedFeet: 25,
   behavior: "melee",
   token: "H",
+  tokenArt: "assets/tokens/rusted-halberdier.png",
   equipment: {
     mainHand: "halberd",
     offHand: null,

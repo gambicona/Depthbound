@@ -8,10 +8,13 @@ window.DungeonContent.register("monsters", "boneMaulBrute", {
   ac: 14,
   attackBonus: 5,
   damage: { count: 1, sides: 12, bonus: 4, type: "bludgeoning", label: "1d12 + 4 bludgeoning" },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 0,
   speedFeet: 25,
   behavior: "melee",
   token: "M",
+  tokenArt: "assets/tokens/bone-maul-brute.png",
   equipment: {
     mainHand: "maul",
     offHand: null,

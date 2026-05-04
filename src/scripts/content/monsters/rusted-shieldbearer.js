@@ -14,10 +14,13 @@ window.DungeonContent.register("monsters", "rustedShieldbearer", {
     type: "bludgeoning",
     label: "1d4 + 1 bludgeoning"
   },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 0,
   speedFeet: 20,
   behavior: "melee",
   token: "S",
+  tokenArt: "assets/tokens/rusted-shieldbearer.png",
   equipment: {
     mainHand: "mace",
     offHand: "shield",

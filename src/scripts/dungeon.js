@@ -130,6 +130,23 @@ function carvePath(start, end) {
   return cells;
 }
 
+function edgeKey(a, b) {
+  return [key(a), key(b)].sort().join("|");
+}
+
+function makeCorridorPassage(id, cells) {
+  const edges = [];
+  for (let index = 1; index < cells.length; index += 1) {
+    edges.push(edgeKey(cells[index - 1], cells[index]));
+  }
+
+  return {
+    id: `corridor-${id}`,
+    cells: cells.map((cell) => ({ ...cell })),
+    edges,
+  };
+}
+
 function nearestBoundaryDoor(room, target) {
   const cells = roomCellSet(room);
   const candidates = [];
@@ -179,7 +196,9 @@ function connectRooms(a, b, corridors, rooms) {
   const corridor = carvePath(aConnection.outside, bConnection.outside);
   if (pathCutsThroughRoom(corridor, rooms)) return false;
 
-  corridors.push(...corridor);
+  const passage = makeCorridorPassage(corridors.passages.length, corridor);
+  corridors.cells.push(...corridor);
+  corridors.passages.push(passage);
   a.doors.push({ ...aConnection.door, corridor: { ...aConnection.outside }, to: b.id });
   b.doors.push({ ...bConnection.door, corridor: { ...bConnection.outside }, to: a.id });
   a.connections.push(b.id);
@@ -200,7 +219,7 @@ function generateDungeon(options = {}) {
   const gridSize = options.gridSize ?? 72;
   const roomCount = options.roomCount ?? 20;
   const rooms = [makeRoom(0, Math.floor(gridSize / 2) - 4, Math.floor(gridSize / 2) - 3, "rectangle")];
-  const corridors = [];
+  const corridors = { cells: [], passages: [] };
   let attempts = 0;
 
   while (rooms.length < roomCount && attempts < 900) {
@@ -220,7 +239,7 @@ function generateDungeon(options = {}) {
       parentCenter.y + direction.y * (gap + randomInt(6, 10)) - randomInt(2, 5),
     );
 
-    if (!isInBounds(candidate, gridSize) || overlaps(candidate, rooms) || overlapsCorridors(candidate, corridors)) {
+    if (!isInBounds(candidate, gridSize) || overlaps(candidate, rooms) || overlapsCorridors(candidate, corridors.cells)) {
       continue;
     }
     if (!connectRooms(parent, candidate, corridors, [...rooms, candidate])) continue;
@@ -235,7 +254,7 @@ function generateDungeon(options = {}) {
     }
   }
 
-  pruneDanglingDoors(rooms, corridors);
+  pruneDanglingDoors(rooms, corridors.cells);
 
   const walkable = new Set();
   const doors = [];
@@ -246,7 +265,7 @@ function generateDungeon(options = {}) {
       doors.push({ ...door, roomId: room.id });
     });
   }
-  corridors.forEach((cell) => walkable.add(key(cell)));
+  corridors.cells.forEach((cell) => walkable.add(key(cell)));
 
   const entranceRoom = rooms[0];
   const entranceDoor = entranceRoom.doors[0] ?? center(entranceRoom);
@@ -256,7 +275,8 @@ function generateDungeon(options = {}) {
     gridSize,
     roomCount: rooms.length,
     rooms,
-    corridors,
+    corridors: corridors.cells,
+    corridorPassages: corridors.passages,
     doors,
     entranceRoomId: entranceRoom.id,
     entranceDoor,

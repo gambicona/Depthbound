@@ -8,10 +8,13 @@ window.DungeonContent.register("monsters", "skeletalSpearman", {
   ac: 13,
   attackBonus: 4,
   damage: { count: 1, sides: 6, bonus: 2, type: "piercing", label: "1d6 + 2 piercing", range: { kind: "melee", feet: 10 } },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 1,
   speedFeet: 30,
   behavior: "melee",
   token: "P",
+  tokenArt: "assets/tokens/skeletal-spearman.png",
   equipment: {
     mainHand: "spear",
     offHand: null,

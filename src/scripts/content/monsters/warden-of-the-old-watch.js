@@ -8,10 +8,13 @@ window.DungeonContent.register("monsters", "wardenOfTheOldWatch", {
   ac: 15,
   attackBonus: 5,
   damage: { count: 1, sides: 8, bonus: 3, type: "slashing", label: "1d8 + 3 slashing" },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 2,
   speedFeet: 30,
   behavior: "melee",
   token: "W",
+  tokenArt: "assets/tokens/warden-of-the-old-watch.png",
   equipment: {
     mainHand: "battleaxe",
     offHand: "shield",

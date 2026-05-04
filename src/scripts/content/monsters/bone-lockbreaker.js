@@ -8,10 +8,13 @@ window.DungeonContent.register("monsters", "boneLockbreaker", {
   ac: 14,
   attackBonus: 5,
   damage: { count: 1, sides: 6, bonus: 3, type: "piercing", label: "1d6 + 3 piercing" },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 3,
   speedFeet: 35,
   behavior: "melee",
   token: "K",
+  tokenArt: "assets/tokens/bone-lockbreaker.png",
   equipment: {
     mainHand: "shortsword",
     offHand: null,

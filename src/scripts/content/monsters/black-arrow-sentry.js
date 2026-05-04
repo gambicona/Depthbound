@@ -8,10 +8,13 @@ window.DungeonContent.register("monsters", "blackArrowSentry", {
   ac: 14,
   attackBonus: 5,
   damage: { count: 1, sides: 8, bonus: 2, type: "piercing", label: "1d8 + 2 piercing", range: { kind: "ranged", normal: 100, long: 400, feet: 100 } },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 3,
   speedFeet: 30,
   behavior: "rangedKiter",
   token: "N",
+  tokenArt: "assets/tokens/black-arrow-sentry.png",
   abilityMods: { dex: 3, str: 0 },
   equipment: {
     mainHand: "longbow",

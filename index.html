@@ -10,7 +10,7 @@
     <section id="main-menu" class="main-menu" aria-label="Main menu">
       <div class="menu-panel">
         <p class="eyebrow">Dungeon crawler</p>
-        <h1>Old Guardroom</h1>
+        <h1>Dungeon Room Prototype</h1>
         <div class="menu-actions">
           <button id="start-adventure" type="button">Start New Adventure</button>
         </div>
@@ -24,13 +24,19 @@
         <div class="topbar">
           <div>
             <p class="eyebrow">D&D-like crawler prototype</p>
-            <h1>Old Guardroom</h1>
+            <h1 id="room-title">Old Guardroom</h1>
           </div>
           <div class="top-actions">
-            <button id="toggle-layout" class="ghost-button" type="button">Show Dungeon Layout</button>
+            <div class="zoom-controls" aria-label="Dungeon zoom controls">
+              <button id="zoom-out" class="icon-button ghost-button" type="button" title="Zoom out" aria-label="Zoom out">-</button>
+              <span id="zoom-label">100%</span>
+              <button id="zoom-in" class="icon-button ghost-button" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+            </div>
+            <button id="toggle-layout" class="ghost-button debug-button" type="button">Show Dungeon Layout</button>
             <button id="debug-kill" class="ghost-button debug-button" type="button">Debug Kill Monsters</button>
             <button id="save-game" class="ghost-button" type="button">Save</button>
             <button id="new-game" class="ghost-button" type="button">Main Menu</button>
+            <button id="tutorial" class="ghost-button" type="button">Tutorial</button>
           </div>
         </div>
         <div class="room-scroll">
@@ -51,7 +57,10 @@
 
         <section class="fighters">
           <article id="hero-card" class="fighter-card"></article>
-          <article id="monster-card" class="fighter-card"></article>
+        </section>
+
+        <section class="level-panel">
+          <button id="level-up" type="button" disabled>Level Up</button>
         </section>
 
         <section class="log-panel">
@@ -65,12 +74,151 @@
     </main>
 
     <nav class="action-dock" aria-label="Combat actions">
-      <button id="roll-initiative" type="button">Roll Initiative</button>
-      <button id="attack" type="button" disabled>Attack</button>
-      <button id="end-turn" type="button" disabled>End Turn</button>
+      <button id="roll-initiative" type="button">Roll Initiative [R]</button>
+      <div class="dock-action">
+        <button id="attack" type="button" disabled>
+          <span>Attack [A]</span>
+          <small id="attack-note">No target</small>
+        </button>
+      </div>
+      <div class="dock-action">
+        <button id="action-button" type="button" disabled>Action</button>
+      </div>
+      <button id="use-item" type="button" disabled>Use Item</button>
+      <button id="abilities" type="button" disabled>Abilities</button>
+      <button id="short-rest" type="button" disabled>Short Rest</button>
+      <button id="return-home" type="button" disabled>Return Home</button>
+      <button id="end-turn" type="button" disabled>End Turn [E]</button>
     </nav>
 
+    <div id="fighter-info" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="fighter-info-name">
+      <div class="fighter-info-panel">
+        <div class="panel-heading">
+          <h2 id="fighter-info-name">Fighter</h2>
+          <button id="close-fighter-info" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div id="fighter-info-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+
+    <div id="inventory-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="inventory-title">
+      <div class="fighter-info-panel inventory-panel">
+        <div class="panel-heading">
+          <h2 id="inventory-title">Inventory</h2>
+          <button id="close-inventory" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div id="inventory-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+
+    <div id="use-item-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="use-item-title">
+      <div class="fighter-info-panel">
+        <div class="panel-heading">
+          <h2 id="use-item-title">Use Item</h2>
+          <button id="close-use-item" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div id="use-item-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+
+    <div id="action-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="action-menu-title">
+      <div class="fighter-info-panel">
+        <div class="panel-heading">
+          <h2 id="action-menu-title">Action</h2>
+          <button id="close-action-menu" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div id="action-menu-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+
+    <div id="abilities-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="abilities-title">
+      <div class="fighter-info-panel">
+        <div class="panel-heading">
+          <h2 id="abilities-title">Abilities</h2>
+          <button id="close-abilities" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div id="abilities-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+
+    <div id="home-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="home-menu-title">
+      <div class="fighter-info-panel">
+        <div class="panel-heading">
+          <h2 id="home-menu-title">Home Door</h2>
+          <button id="close-home-menu" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div class="fighter-info-body home-actions">
+          <button id="go-store" type="button">Store</button>
+          <button id="go-new-dungeon" type="button">New Dungeon</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="store-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="store-title">
+      <div class="fighter-info-panel store-panel">
+        <div class="panel-heading">
+          <h2 id="store-title">Store</h2>
+          <button id="close-store" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div id="store-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+
+    <div id="game-dialog" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="game-dialog-title">
+      <form id="game-dialog-form" class="fighter-info-panel dialog-panel">
+        <div class="panel-heading">
+          <h2 id="game-dialog-title">Dialog</h2>
+        </div>
+        <div class="fighter-info-body">
+          <p id="game-dialog-message" class="dialog-message"></p>
+          <label id="game-dialog-field" class="dialog-field hidden">
+            <span id="game-dialog-label">Name</span>
+            <input id="game-dialog-input" type="text" autocomplete="off" />
+          </label>
+          <div id="game-dialog-actions" class="dialog-actions"></div>
+        </div>
+      </form>
+    </div>
+
     <script src="src/scripts/config.js" defer></script>
+    <script src="src/scripts/content/registry.js" defer></script>
+    <script src="src/scripts/content/items/equipment.js" defer></script>
+    <script src="src/scripts/content/classes/fighter.js" defer></script>
+    <script src="src/scripts/content/monsters/crypt-guard.js" defer></script>
+    <script src="src/scripts/content/monsters/skeleton-archer.js" defer></script>
+	<script src="src/scripts/content/monsters/bone-recruit.js" defer></script>
+	<script src="src/scripts/content/monsters/skeletal-spearman.js" defer></script>
+	<script src="src/scripts/content/monsters/rusted-shieldbearer.js" defer></script>
+	<script src="src/scripts/content/monsters/guardroom-hound.js" defer></script>
+	<script src="src/scripts/content/monsters/barricade-crossbowman.js" defer></script>
+	<script src="src/scripts/content/monsters/armory-haunt.js" defer></script>
+	<script src="src/scripts/content/monsters/restless-jailer.js" defer></script>
+	<script src="src/scripts/content/monsters/old-sergeant.js" defer></script>
+    <script src="src/scripts/content/monsters/guardroom-commander.js" defer></script>
+    <script src="src/scripts/content/monsters/grave-pikeman.js" defer></script>
+    <script src="src/scripts/content/monsters/hollow-marksman.js" defer></script>
+    <script src="src/scripts/content/monsters/rusted-halberdier.js" defer></script>
+    <script src="src/scripts/content/monsters/ash-barracks-veteran.js" defer></script>
+    <script src="src/scripts/content/monsters/bone-lockbreaker.js" defer></script>
+    <script src="src/scripts/content/monsters/tower-shield-remnant.js" defer></script>
+    <script src="src/scripts/content/monsters/black-arrow-sentry.js" defer></script>
+    <script src="src/scripts/content/monsters/crypt-executioner.js" defer></script>
+    <script src="src/scripts/content/monsters/lantern-wraith.js" defer></script>
+    <script src="src/scripts/content/monsters/oathbound-jailer.js" defer></script>
+    <script src="src/scripts/content/monsters/banner-knight.js" defer></script>
+    <script src="src/scripts/content/monsters/warden-of-the-old-watch.js" defer></script>
+	<script src="src/scripts/content/monsters/graveplate-sentinel.js" defer></script>
+	<script src="src/scripts/content/monsters/ruin-arbalester.js" defer></script>
+	<script src="src/scripts/content/monsters/oathscar-duelist.js" defer></script>
+	<script src="src/scripts/content/monsters/bone-maul-brute.js" defer></script>
+	<script src="src/scripts/content/monsters/lantern-hexguard.js" defer></script>
+	<script src="src/scripts/content/monsters/grave-banner-castellan.js" defer></script>
+	<script src="src/scripts/content/monsters/zombie-undead-pack.js" defer></script>
+  <script src="src/scripts/utils/monster-filters.js" defer></script>
+    <script src="src/scripts/content/traps/chest-traps.js" defer></script>
+    <script src="src/scripts/content/dungeons/generated-old-guardroom.js" defer></script>
+    <script src="src/scripts/content/loot/basic-dungeon.js" defer></script>
+    <script src="src/scripts/content/themes/old-guardroom.js" defer></script>
     <script src="src/scripts/dice.js" defer></script>
     <script src="src/scripts/grid.js" defer></script>
     <script src="src/scripts/dungeon.js" defer></script>

@@ -8,9 +8,12 @@ window.DungeonContent.register("monsters", "guardroomHound", {
   ac: 13,
   attackBonus: 5,
   damage: { count: 1, sides: 6, bonus: 2, type: "piercing", label: "1d6 + 2 piercing" },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 3,
   speedFeet: 40,
   behavior: "melee",
   token: "H",
+  tokenArt: "assets/tokens/guardroom-hound.png",
 });
 })();

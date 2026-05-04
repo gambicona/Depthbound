@@ -8,10 +8,13 @@ window.DungeonContent.register("monsters", "graveplateSentinel", {
   ac: 16,
   attackBonus: 6,
   damage: { count: 1, sides: 10, bonus: 3, type: "slashing", label: "1d10 + 3 slashing" },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 1,
   speedFeet: 25,
   behavior: "melee",
   token: "S",
+  tokenArt: "assets/tokens/graveplate-sentinel.png",
   equipment: {
     mainHand: "greatsword",
     offHand: null,

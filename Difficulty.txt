@@ -1,0 +1,55 @@
+Difficulty:
+Cases:
+
+Higher Level:
+We will group monsters into categories:
+Player level 1-2: CatI (Categorie 1)
+3-4: CatII
+5-6: CatIII
+7-8: CatIV
+9-10: CatV
+later more
+
+If the player is of a higher level, the monster of the corresponding Cat can spawn. Also all previous Categories as well if number of different monsters is too low, but these needs to by buffed (+X% maxHP for example)
+
+Selected Difficulty:
+Easy - -20% HP for monster, less loot
+Normal - keep everything as is.
+Hard - +20% hp, more loot
+Nightmare - +50% hp, better loot
+Crazy - +100% hp, more and better loot
+
+Partysize (for later):
+More then 1 monster per room
+
+Monster AI:
+melee
+moves towards character
+int 1 target random
+int 2-9 target the last one to damage the monster
+int 10-14 target the closest one
+int 15 target lowest current hp, but avoid opportunity attacks
+int 18+ target healer first, but avoid opportunity attacks
+
+rangedkiter
+moves away from character, values shoot more then avoiding opp attacks, try not to shoot from disadvantage
+int 1 target random
+int 2-9 target the last one to damage the monster
+int 10-14 target the closest one
+int 15 target lowest current hp, but avoid opportunity attacks
+int 18+ target healer first, but avoid opportunity attacks
+
+ranged
+stay in place normally, avoids opp attacks over shooting, if in melee shoot
+int 1 target random
+int 2-9 target the last one to damage the monster
+int 10-14 target the closest one
+int 15 target lowest current hp, but avoid opportunity attacks
+int 18+ target healer first, but avoid opportunity attacks
+
+selfhealer
+
+otherhealer
+
+tank
+moves close to other enemies

@@ -1,0 +1,504 @@
+Goal:
+Build a flexible material, profession, and crafting foundation for the dungeon crawler. The system should allow future NPCs with jobs/proficiencies, similar to D&D tool proficiencies, to craft, refine, repair, upgrade, or trade items for the player when the player provides the required materials.
+
+This system should stay generic and modular. It should not be hardcoded around one NPC, one quest, or one item type. It should support herbs, monster parts, metals, wood, relics, alchemy ingredients, magical reagents, trophies, junk, treasure, and future crafting materials.
+
+Core Design:
+Items should be matched by tags and metadata, not only by exact item IDs.
+
+An item can belong to several logical groups at once. For example:
+Green Vines can be:
+- component
+- nature
+- plant
+- herb
+- alchemy
+
+Bone Dust can be:
+- component
+- monster-part
+- undead
+- skeleton
+- bone
+- dust
+- alchemy
+- crafting
+
+Iron Scrap can be:
+- component
+- building-material
+- metal
+- iron
+- crafting
+- repair-material
+
+Do not treat “quest item” as a strict item type. “Quest item” should be a tag or purpose. The same item may be usable for quests, crafting, alchemy, selling, and NPC jobs.
+
+Required Item Categories:
+Add or support broad item categories for non-equipment resources:
+
+- herb
+- monster part
+- building material
+- metal
+- wood
+- stone
+- cloth
+- leather
+- bone
+- alchemy reagent
+- arcane reagent
+- relic
+- trophy
+- junk
+- treasure
+- food ingredient
+- repair material
+- upgrade material
+
+These categories are mainly for inventory grouping, sorting, display, and basic filtering.
+
+Required Item Type:
+Use a generic item type for materials and resources:
+
+- component
+
+The type “component” should cover herbs, monster parts, wood, iron, bone dust, alchemy ingredients, building materials, and other crafting resources.
+
+Equipment, consumables, treasure, magic items, and accessories should keep their own existing item types.
+
+Required Tags:
+Use lowercase kebab-case tags consistently.
+
+Important purpose tags:
+- component
+- crafting
+- alchemy
+- building
+- repair
+- upgrade
+- quest-item
+- monster-part
+- trade-good
+- treasure
+- junk
+- trophy
+- food
+- healing
+- magic-reagent
+- arcane-reagent
+
+Important origin tags:
+- nature
+- monster
+- undead
+- skeleton
+- beast
+- humanoid
+- construct
+- dungeon
+- old-guardroom
+- crypt
+- armory
+- barracks
+- forage
+- chest
+- furniture
+- boss
+
+Important material/form tags:
+- plant
+- herb
+- vine
+- root
+- flower
+- mushroom
+- bone
+- dust
+- fang
+- claw
+- hide
+- blood
+- ash
+- iron
+- steel
+- wood
+- stone
+- cloth
+- leather
+- crystal
+- wax
+- oil
+- poison
+
+Important value/rarity tags:
+- rarity:common
+- rarity:uncommon
+- rarity:rare
+- rarity:very-rare
+- rarity:legendary
+
+Important quest/NPC tags:
+- old-lady
+- quest:old-lady
+- quest:green-vines
+- quest:black-briar-root
+
+The tag system should allow broad matching. For example, a quest should be able to ask for any item tagged “skeleton” and “monster-part”, not only one exact item ID.
+
+Item Metadata:
+Component items should include structured metadata beyond tags.
+
+Each component should be able to define:
+- kind: herb, monster part, building material, relic, reagent, etc.
+- material: plant, bone, iron, wood, stone, cloth, etc.
+- form: dust, shard, bundle, root, vial, scrap, plate, powder, etc.
+- rarity
+- quality
+- source
+- source tags
+- crafting value
+- optional quest key
+- optional profession relevance
+- optional biome/theme relevance
+
+This metadata should be used for crafting, quest matching, NPC services, sorting, and future balancing.
+
+Stacking:
+All component items should support generic stacking.
+
+The system should not only stack ammunition. It should stack all stackable items, such as:
+- Green Vines x3
+- Bone Dust x17
+- Iron Scrap x12
+- Wood Bundle x8
+- Grave Wax x4
+
+Stacked items should still be usable for quest turn-ins, crafting recipes, NPC services, and selling.
+
+Inventory Sorting:
+Inventory should group items by practical gameplay purpose.
+
+Suggested groups:
+- Equipment
+- Magic Items
+- Consumables
+- Materials
+- Monster Parts
+- Alchemy
+- Building Materials
+- Quest Items
+- Treasure
+- Junk
+
+Items should be sortable by:
+- inventory group
+- category
+- rarity
+- value
+- name
+- quantity
+
+Quest Matching:
+Quest objectives should support flexible item matching.
+
+A quest should be able to request:
+- an exact item
+- any item with a specific tag
+- any item with all required tags
+- any item with at least one of several tags
+- items of a certain type
+- items of a certain category
+- items of a certain material
+- items of a certain rarity
+- treasure above a certain value
+- monster parts from a certain monster family
+
+Example goals the system must support:
+- Bring 3 Green Vines.
+- Bring 10 Bone Dust.
+- Bring 5 skeleton monster parts.
+- Bring 20 building materials.
+- Bring one treasure worth at least 100 gp.
+- Bring any rare alchemy reagent.
+- Bring any relic from the Old Guardroom.
+
+Quest turn-ins should be able to consume the required items. When consuming broad matching items, the system should prefer consuming cheaper/common items before expensive/rare ones.
+
+Monster Drops:
+Monsters should support extra material drops.
+
+A monster should be able to drop:
+- guaranteed items
+- chance-based items
+- quantity-based items
+- dice-based quantities
+- items based on monster family tags
+
+Examples:
+Skeleton enemies may drop Bone Dust, Cracked Rib Bones, Skull Fragments, or Grave Wax.
+Beasts may drop Hide, Claws, Fangs, Blood, or Meat.
+Constructs may drop Iron Scrap, Arcane Gears, Crystal Shards, or Broken Plates.
+Bosses may drop unique trophies, rare reagents, or named relics.
+
+Monster drops should use the same item registry as everything else.
+
+Loot Tables:
+Loot tables should support both explicit item lists and tag/category-based matching.
+
+This is important because future content files may add many items. A loot table should not automatically include every registered item unless explicitly intended.
+
+A loot table should be able to say:
+- only components
+- only old-guardroom components
+- only common monster parts
+- only treasure
+- only herbs
+- only rare alchemy reagents
+- exclude unique items
+- exclude quest-locked items
+- exclude store-only items
+
+NPC Professions:
+NPCs should be able to have jobs or proficiencies. These are not combat classes. They define what services the NPC can perform.
+
+Suggested NPC professions:
+- alchemist
+- herbalist
+- blacksmith
+- armorer
+- weaponsmith
+- carpenter
+- mason
+- leatherworker
+- tailor
+- jeweler
+- enchanter
+- scribe
+- cook
+- healer
+- tinker
+- trapmaker
+- relic scholar
+
+Each profession should define:
+- display name
+- service types
+- accepted material tags
+- preferred material categories
+- recipe groups
+- price multiplier or service fee
+- minimum relationship or unlock flag if needed
+- dialogue hooks
+- optional quality bonus
+
+NPC Services:
+NPCs should be able to offer services rather than only sell items.
+
+Possible service types:
+- craft item
+- brew potion
+- cook food
+- refine material
+- repair equipment
+- upgrade equipment
+- dismantle item
+- identify relic
+- cleanse cursed item
+- transmute material
+- convert monster parts into reagents
+- create building components
+- craft quest-specific objects
+
+The service should check:
+- whether the NPC has the required profession
+- whether the recipe is unlocked
+- whether the player has the required materials
+- whether the player has enough money if a fee is needed
+- whether any quest flag or relationship requirement is met
+
+Recipes:
+Recipes should be data-driven and modular.
+
+A recipe should define:
+- recipe id
+- display name
+- profession required
+- service type
+- output item
+- output quantity
+- required materials
+- required tags or categories
+- required money fee if any
+- required NPC relationship or quest flag if any
+- rarity or tier
+- unlock conditions
+- description
+- crafting time if later needed
+
+Recipes should be able to require exact items or flexible materials.
+
+Examples of supported recipe logic:
+- Brew a healing potion from any herb plus a vial.
+- Brew poison from monster venom and alcohol.
+- Make hearty soup from Green Vines and food ingredients.
+- Craft arrows from wood and iron.
+- Repair armor with iron scrap.
+- Upgrade a sword with iron, monster bone, and gold.
+- Craft a fire-resistance potion from fire beetle glands and rare herbs.
+- Create a quest charm from a relic, bone dust, and grave wax.
+
+Do not hardcode recipes into NPC behavior. NPCs should reference recipe groups or profession abilities.
+
+Alchemy:
+Alchemy should be a major future category.
+
+Alchemy items should use tags like:
+- alchemy
+- reagent
+- herb
+- mushroom
+- poison
+- venom
+- blood
+- dust
+- ash
+- oil
+- essence
+- extract
+- crystal
+- monster-part
+- magic-reagent
+
+Alchemy recipes should allow:
+- healing potions
+- resistance potions
+- poisons
+- weapon oils
+- antidotes
+- bombs
+- elixirs
+- temporary stat boosts
+- quest brews
+- monster-part conversions
+
+Alchemy should support both exact ingredients and flexible ingredient families. For example:
+A recipe may require “any common herb” plus “any monster blood”, instead of only one exact item.
+
+Crafting Quality:
+The system should allow quality later, even if not fully implemented now.
+
+Potential quality values:
+- poor
+- rough
+- standard
+- fine
+- pristine
+- rare
+- corrupted
+- blessed
+
+Quality can affect:
+- sale value
+- crafting output
+- recipe eligibility
+- NPC dialogue
+- quest acceptance
+- upgrade strength
+
+This does not need to be deeply mechanical now. It just needs to be present in item metadata.
+
+Selling:
+Selling rules should be explicit per item.
+
+Treasure should sell at full value.
+Normal equipment may sell at half value.
+Junk may sell for low value.
+Quest-locked items may be unsellable.
+Components should usually be sellable unless marked otherwise.
+
+Use item store metadata rather than relying only on item type.
+
+Important store metadata:
+- buyable
+- sellable
+- sell rate
+- reason if blocked
+- price override if needed
+
+Unlocks and Progression:
+NPC recipes and services should support unlocks.
+
+Unlock conditions may include:
+- completed quest
+- quest flag
+- player level
+- NPC relationship level
+- dungeon tier reached
+- discovered recipe
+- special item delivered
+
+This allows an Old Lady to start with soup and broth, then later brew stronger food, charms, or herbal remedies once the player helps her.
+
+Relationship:
+NPCs may have a relationship value or trust level.
+
+Higher relationship can unlock:
+- better recipes
+- cheaper services
+- unique quest rewards
+- rare material conversions
+- special dialogue
+- unique craftable items
+
+This should be optional and data-driven.
+
+Important Implementation Principle:
+Do not build a separate system for every use case.
+
+The same foundation should support:
+- quest item collection
+- monster part drops
+- crafting materials
+- alchemy ingredients
+- NPC services
+- inventory sorting
+- loot tables
+- selling
+- recipe unlocks
+- future building/upgrading systems
+
+The foundation is:
+- item type
+- category
+- tags
+- component metadata
+- stack quantity
+- matcher logic
+- recipe/service requirements
+- NPC professions
+- unlock flags
+
+Priority Order:
+1. Generic stackable component items.
+2. Flexible item matcher using IDs, type, category, tags, value, rarity, and metadata.
+3. Quest objectives using that matcher.
+4. Inventory grouping and sorting.
+5. Monster material drops.
+6. Loot tables using matchers.
+7. NPC profession data.
+8. Recipe data.
+9. NPC service UI.
+10. Crafting/alchemy execution.
+11. Unlocks, relationship, and advanced recipe quality.
+
+End Result:
+After this system exists, adding new content should be easy.
+
+A new herb should only need an item file.
+A new monster part should only need an item file and monster drop entry.
+A new quest should only need objectives using item matchers.
+A new NPC should only need profession/service/recipe data.
+A new recipe should only need ingredient matchers and an output.
+
+The game should not need custom code every time a new quest asks for Green Vines, Bone Dust, monster fangs, iron scrap, treasure, or alchemy reagents.

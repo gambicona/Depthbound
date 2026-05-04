@@ -8,10 +8,13 @@ window.DungeonContent.register("monsters", "hollowMarksman", {
   ac: 13,
   attackBonus: 5,
   damage: { count: 1, sides: 8, bonus: 1, type: "piercing", label: "1d8 + 1 piercing", range: { kind: "ranged", normal: 80, long: 320, feet: 80 } },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 2,
   speedFeet: 30,
   behavior: "rangedKiter",
   token: "M",
+  tokenArt: "assets/tokens/hollow-marksman.png",
   abilityMods: { dex: 2, str: 0 },
   equipment: {
     mainHand: "longbow",

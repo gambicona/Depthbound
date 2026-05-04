@@ -1,0 +1,44 @@
+How to add a new enemy and make it spawn
+
+1. Create a monster content file in:
+   src/scripts/content/monsters/
+
+2. Use this shape:
+
+(() => {
+window.DungeonContent.register("monsters", "myMonsterId", {
+  name: "My Monster",
+  role: "Short description",
+  maxHp: 12,
+  category: 1,
+  xp: 50,
+  ac: 13,
+  attackBonus: 4,
+  damage: { count: 1, sides: 6, bonus: 2, type: "piercing", label: "1d6 + 2 piercing" },
+  initiativeBonus: 2,
+  speedFeet: 30,
+  behavior: "melee",
+  token: "M",
+});
+})();
+
+3. Add the script tag to index.html after the other monster files:
+
+<script src="src/scripts/content/monsters/my-monster.js" defer></script>
+
+4. Add the monster id to the active theme spawn pool:
+   src/scripts/content/themes/old-guardroom.js
+
+monsterIds: ["cryptGuard", "skeletonArcher", "myMonsterId"]
+
+5. Categories control when it can spawn:
+   category 1: hero levels 1-2
+   category 2: hero levels 3-4
+   category 3: hero levels 5-6
+   and so on.
+
+6. Behaviors currently supported:
+   melee: moves toward the hero and attacks in melee.
+   rangedKiter: stays in its room and tries to keep distance while staying in normal range.
+
+7. To make a boss, add its id to bossMonsterIds in the theme. Bosses spawn in the exit room when the hero starts the dungeon at the higher level of a category band, such as level 2, 4, 6, or 8.

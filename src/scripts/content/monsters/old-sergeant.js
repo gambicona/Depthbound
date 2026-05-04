@@ -8,10 +8,13 @@ window.DungeonContent.register("monsters", "oldSergeant", {
   ac: 15,
   attackBonus: 5,
   damage: { count: 1, sides: 8, bonus: 2, type: "slashing", label: "1d8 + 2 slashing" },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 1,
   speedFeet: 25,
   behavior: "melee",
   token: "G",
+  tokenArt: "assets/tokens/old-sergeant.png",
   equipment: {
     mainHand: "longsword",
     offHand: "shield",

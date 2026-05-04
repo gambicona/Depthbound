@@ -8,10 +8,13 @@ window.DungeonContent.register("monsters", "graveBannerCastellan", {
   ac: 16,
   attackBonus: 7,
   damage: { count: 1, sides: 10, bonus: 5, type: "slashing", label: "1d10 + 5 slashing" },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 2,
   speedFeet: 30,
   behavior: "melee",
   token: "K",
+  tokenArt: "assets/tokens/grave-banner-castellan.png",
   equipment: {
     mainHand: "greatsword",
     offHand: null,

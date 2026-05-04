@@ -8,9 +8,11 @@ window.DungeonContent.register("monsters", "armoryHaunt", {
   ac: 15,
   attackBonus: 5,
   damage: { count: 1, sides: 6, bonus: 2, type: "slashing", label: "1d6 + 2 slashing" },
+  damageImmunities: ["poison", "psychic"],
   initiativeBonus: 3,
   speedFeet: 30,
   behavior: "melee",
   token: "W",
+  tokenArt: "assets/tokens/armory-haunt.png",
 });
 })();

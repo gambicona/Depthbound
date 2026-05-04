@@ -1,0 +1,224 @@
+OLD LADY MARA — QUESTCHAIN
+The Old Lady's Errands
+
+NPC:
+Old Lady Mara
+Title: Keeper of the Hearth
+Role: Static questgiver NPC
+
+Theme:
+A small, stubborn old woman gives practical but dangerous errands connected to the Old Guardroom. Her quests begin with gathering herbs and slowly turn into laying old soldiers, skeletons, and finally the Guardroom Commander to rest.
+
+
+============================================================
+QUEST 1 — GREEN VINES FOR THE POT
+============================================================
+
+Unlock:
+Available immediately when Old Lady Mara is available.
+
+Objective:
+Bring 3 Green Vines.
+
+Item requirement:
+- green-vines
+- or any item tagged: green-vines
+
+Notes:
+Green Vines do not need to exist yet. They are placeholder quest items you can add later.
+
+Rewards:
+- 15 gp
+- 1x Old Lady's Restorative Broth
+- 1x Old Lady's Hearty Soup
+
+Reward item effects:
+Old Lady's Restorative Broth:
+- Consumable
+- Heals 2d4 + 2 HP
+- Used like a potion
+
+Old Lady's Hearty Soup:
+- Consumable
+- Fully heals the hero to max HP
+- Used like a potion
+
+Flags set:
+- flag.oldLady.knowsYou
+- flag.oldLady.greenVinesDone
+
+
+============================================================
+QUEST 2 — THE ONES AT THE DOOR
+============================================================
+
+Unlock:
+Unlocked after completing Quest 1.
+
+Objective:
+Kill 5 Crypt Guards.
+
+Monster requirement:
+- cryptGuard
+- or any monster tagged: crypt-guard
+
+Rewards:
+- 30 gp
+- 1x Old Lady's Hearty Soup
+
+Flags set:
+- flag.oldLady.cryptguardsDone
+
+
+============================================================
+QUEST 3 — BUTTONS FOR THE DEAD
+============================================================
+
+Unlock:
+Unlocked after completing Quest 2.
+
+Objective:
+Bring 5 Old Guardroom Relics.
+
+Item requirement:
+Any item tagged:
+- old-guardroom-relic
+
+Example future items:
+- rusted-button
+- broken-watch-badge
+- barracks-nameplate
+
+Notes:
+These are placeholder relics. Later you can add small junk/treasure items with the tag old-guardroom-relic.
+
+Rewards:
+- 45 gp
+- 1x Old Lady's Hearth Amulet
+
+Reward item effect:
+Old Lady's Hearth Amulet:
+- Accessory
+- Slot: Amulet
+- Grants +5 max HP
+- Whenever the hero receives healing, they heal +2 additional HP
+- This needs accessory passive effect support before it works mechanically
+
+Flags set:
+- flag.oldLady.relicsDone
+- flag.oldLady.gaveHearthAmulet
+
+
+============================================================
+QUEST 4 — BONES AND BOWSTRINGS
+============================================================
+
+Unlock:
+Unlocked after completing Quest 3.
+
+Objectives:
+Kill 6 Bone Recruits.
+Kill 4 Skeleton Archers.
+
+Monster requirements:
+- boneRecruit
+- or any monster tagged: bone-recruit
+
+and
+
+- skeletonArcher
+- or any monster tagged: skeleton-archer
+
+Rewards:
+- 75 gp
+- 2x Old Lady's Hearty Soup
+- 2x Old Lady's Restorative Broth
+
+Flags set:
+- flag.oldLady.bonesAndBowsDone
+
+
+============================================================
+QUEST 5 — BITTER ROOT FOR BITTER DREAMS
+============================================================
+
+Unlock:
+Unlocked after completing Quest 4.
+
+Objectives:
+Bring 1 Black Briar Root.
+Kill 1 Old Sergeant.
+
+Item requirement:
+- black-briar-root
+- or any item tagged: black-briar-root
+
+Monster requirement:
+- oldSergeant
+- or any monster tagged: old-sergeant
+
+Notes:
+Black Briar Root does not need to exist yet. It is a placeholder rare herb item you can add later.
+
+Rewards:
+- 120 gp
+- 3x Old Lady's Hearty Soup
+
+Flags set:
+- flag.oldLady.bitterRootDone
+
+
+============================================================
+QUEST 6 — THE LAST WATCHMAN
+============================================================
+
+Unlock:
+Unlocked after completing Quest 5.
+
+Objective:
+Defeat the Guardroom Commander.
+
+Monster requirement:
+- guardroomCommander
+- or any monster tagged: guardroom-commander
+
+Rewards:
+- 250 gp
+- 1x Widow's Locket of the Last Hearth
+- 3x Old Lady's Hearty Soup
+
+Reward item effect:
+Widow's Locket of the Last Hearth:
+- Accessory
+- Slot: Amulet
+- Grants +10 max HP
+- Grants resistance to necrotic damage
+- This needs accessory passive effect support before it works mechanically
+
+Flags set:
+- flag.oldLady.lastWatchmanDone
+- flag.oldLady.questChainComplete
+
+
+============================================================
+TOTAL QUESTCHAIN REWARDS
+============================================================
+
+Coin:
+- 535 gp total
+
+Consumables:
+- 11x Old Lady's Hearty Soup
+- 3x Old Lady's Restorative Broth
+
+Magic/Accessory Rewards:
+- 1x Old Lady's Hearth Amulet
+- 1x Widow's Locket of the Last Hearth
+
+Unlock progression:
+1. Green Vines for the Pot
+2. The Ones at the Door
+3. Buttons for the Dead
+4. Bones and Bowstrings
+5. Bitter Root for Bitter Dreams
+6. The Last Watchman

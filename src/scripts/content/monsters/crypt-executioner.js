@@ -8,10 +8,13 @@ window.DungeonContent.register("monsters", "cryptExecutioner", {
   ac: 13,
   attackBonus: 4,
   damage: { count: 1, sides: 10, bonus: 2, type: "slashing", label: "1d10 + 2 slashing" },
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
   initiativeBonus: 0,
   speedFeet: 25,
   behavior: "melee",
   token: "E",
+  tokenArt: "assets/tokens/crypt-executioner.png",
   equipment: {
     mainHand: "greataxe",
     offHand: null,
