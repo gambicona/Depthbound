@@ -29,6 +29,7 @@ window.DungeonContent.register("monsters", "forestWolf", {
   speedFeet: 40,
   behavior: "melee",
   token: "W",
+  tokenArt: "assets/tokens/forest-wolf.png",
 });
 
 window.DungeonContent.register("monsters", "brambleBoar", {
@@ -55,6 +56,7 @@ window.DungeonContent.register("monsters", "brambleBoar", {
   speedFeet: 35,
   behavior: "melee",
   token: "B",
+  tokenArt: "assets/tokens/bramble-boar.png",
 });
 
 window.DungeonContent.register("monsters", "gloomwebSpider", {
@@ -82,6 +84,7 @@ window.DungeonContent.register("monsters", "gloomwebSpider", {
   speedFeet: 30,
   behavior: "melee",
   token: "S",
+  tokenArt: "assets/tokens/gloomweb-spider.png",
 });
 
 window.DungeonContent.register("monsters", "thornbackHare", {
@@ -105,6 +108,7 @@ window.DungeonContent.register("monsters", "thornbackHare", {
   speedFeet: 40,
   behavior: "melee",
   token: "H",
+  tokenArt: "assets/tokens/thornback-hare.png",
 });
 
 window.DungeonContent.register("monsters", "oldTuskBoar", {
@@ -132,6 +136,7 @@ window.DungeonContent.register("monsters", "oldTuskBoar", {
   speedFeet: 35,
   behavior: "melee",
   token: "O",
+  tokenArt: "assets/tokens/old-tusk-boar.png",
   extraLoot: [
     {
       kind: "randomEquipment",
@@ -169,6 +174,7 @@ window.DungeonContent.register("monsters", "direForestWolf", {
   speedFeet: 40,
   behavior: "melee",
   token: "D",
+  tokenArt: "assets/tokens/dire-forest-wolf.png",
 });
 
 window.DungeonContent.register("monsters", "mossbackBear", {
@@ -192,6 +198,7 @@ window.DungeonContent.register("monsters", "mossbackBear", {
   speedFeet: 35,
   behavior: "melee",
   token: "M",
+  tokenArt: "assets/tokens/mossback-bear.png",
 });
 
 window.DungeonContent.register("monsters", "razorbeakRaptor", {
@@ -218,6 +225,7 @@ window.DungeonContent.register("monsters", "razorbeakRaptor", {
   speedFeet: 45,
   behavior: "melee",
   token: "R",
+  tokenArt: "assets/tokens/razorbeak-raptor.png",
 });
 
 window.DungeonContent.register("monsters", "venomrootStalker", {
@@ -245,6 +253,7 @@ window.DungeonContent.register("monsters", "venomrootStalker", {
   speedFeet: 35,
   behavior: "melee",
   token: "V",
+  tokenArt: "assets/tokens/venomroot-stalker.png",
 });
 
 window.DungeonContent.register("monsters", "thornhideBear", {
@@ -273,6 +282,7 @@ window.DungeonContent.register("monsters", "thornhideBear", {
   speedFeet: 35,
   behavior: "melee",
   token: "T",
+  tokenArt: "assets/tokens/thornhide-bear.png",
   extraLoot: [
     {
       kind: "randomEquipment",
@@ -310,6 +320,7 @@ window.DungeonContent.register("monsters", "elderDireWolf", {
   speedFeet: 45,
   behavior: "melee",
   token: "E",
+  tokenArt: "assets/tokens/elder-dire-wolf.png",
 });
 
 window.DungeonContent.register("monsters", "giantGloomwebSpider", {
@@ -338,6 +349,7 @@ window.DungeonContent.register("monsters", "giantGloomwebSpider", {
   speedFeet: 35,
   behavior: "melee",
   token: "S",
+  tokenArt: "assets/tokens/giant-gloomweb-spider.png",
 });
 
 window.DungeonContent.register("monsters", "ironbarkGorger", {
@@ -362,6 +374,7 @@ window.DungeonContent.register("monsters", "ironbarkGorger", {
   speedFeet: 30,
   behavior: "melee",
   token: "I",
+  tokenArt: "assets/tokens/ironbark-gorger.png",
 });
 
 window.DungeonContent.register("monsters", "stormhornStag", {
@@ -390,6 +403,7 @@ window.DungeonContent.register("monsters", "stormhornStag", {
   speedFeet: 50,
   behavior: "melee",
   token: "H",
+  tokenArt: "assets/tokens/stormhorn-stag.png",
 });
 
 window.DungeonContent.register("monsters", "ancientBriarBear", {
@@ -419,6 +433,7 @@ window.DungeonContent.register("monsters", "ancientBriarBear", {
   speedFeet: 35,
   behavior: "melee",
   token: "A",
+  tokenArt: "assets/tokens/ancient-briar-bear.png",
   extraLoot: [
     {
       kind: "randomEquipment",

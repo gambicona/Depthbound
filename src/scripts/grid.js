@@ -52,6 +52,11 @@ window.DungeonGrid = {
     const canTraverse = options.canTraverse ?? (() => true);
     const includeDiagonals = options.includeDiagonals ?? false;
     const stateKey = options.stateKey ?? ((position) => window.DungeonGrid.positionKey(position));
+    const neighborsFor = options.neighborsFor ?? ((position, path) =>
+       window.DungeonGrid.neighbors(position, gridSize, includeDiagonals)
+        );
+
+    const moveCost = options.moveCost ?? (() => 1);
     if (window.DungeonGrid.isOccupied(goal, fighters, mover)) return null;
     if (walkable && !walkable.has(window.DungeonGrid.positionKey(goal))) return null;
 
@@ -64,7 +69,7 @@ window.DungeonGrid = {
         return current.path;
       }
 
-      for (const next of window.DungeonGrid.neighbors(current.position, gridSize, includeDiagonals)) {
+      for (const next of neighborsFor(current.position, current.path)) {
         const key = window.DungeonGrid.positionKey(next);
         if (walkable && !walkable.has(key)) continue;
         if (!canTraverse(current.position, next, current.path)) continue;
@@ -89,12 +94,19 @@ window.DungeonGrid = {
     const reachable = new Map();
     const queue = [{ position: fighter.position, cost: 0, path: [] }];
     const visited = new Set([stateKey(fighter.position, [])]);
+    const neighborsFor = options.neighborsFor ?? ((position, path) =>
+      window.DungeonGrid.neighbors(position, gridSize, includeDiagonals)
+    );
+
+    const moveCost = options.moveCost ?? (() => 1);
+
 
     while (queue.length > 0) {
       const current = queue.shift();
 
       for (const next of window.DungeonGrid.neighbors(current.position, gridSize, includeDiagonals)) {
-        const nextCost = current.cost + 1;
+        const stepCost = moveCost(current.position, next, current.path);
+      const nextCost = current.cost + stepCost;
         const key = window.DungeonGrid.positionKey(next);
         if (
           (walkable && !walkable.has(key)) ||

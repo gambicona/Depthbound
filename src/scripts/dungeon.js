@@ -31,9 +31,20 @@ function makeShapeCells(shape, width, height) {
   return cells;
 }
 
-function makeRoom(id, x, y, shape = shapeTypes[randomInt(0, shapeTypes.length - 1)]) {
-  const width = shape === "square" ? randomInt(5, 8) : randomInt(5, 11);
-  const height = shape === "square" ? width : randomInt(5, 10);
+function rangeValue(range, fallbackMin, fallbackMax) {
+  const min = range?.min ?? fallbackMin;
+  const max = range?.max ?? fallbackMax;
+  return randomInt(min, max);
+}
+
+function pick(values, fallback) {
+  if (!Array.isArray(values) || values.length === 0) return fallback;
+  return values[randomInt(0, values.length - 1)];
+}
+
+function makeRoom(id, x, y, options = {}, shape = pick(options.roomShapes, shapeTypes[randomInt(0, shapeTypes.length - 1)])) {
+  const width = shape === "square" ? rangeValue(options.squareSize, 5, 8) : rangeValue(options.roomWidth, 5, 11);
+  const height = shape === "square" ? width : rangeValue(options.roomHeight, 5, 10);
   const cells = makeShapeCells(shape, width, height).map((cell) => ({ x: x + cell.x, y: y + cell.y }));
 
   return {
@@ -111,23 +122,48 @@ function isInBounds(room, gridSize) {
   return room.cells.every((cell) => cell.x > 1 && cell.y > 1 && cell.x < gridSize - 2 && cell.y < gridSize - 2);
 }
 
-function carvePath(start, end) {
+function carvePath(start, end, style = "horizontal-first") {
   const cells = [];
   let x = start.x;
   let y = start.y;
+  const horizontalFirst = style === "random-bend" ? Math.random() < 0.5 : style !== "vertical-first";
 
-  while (x !== end.x) {
-    cells.push({ x, y });
-    x += Math.sign(end.x - x);
-  }
+  const stepX = () => {
+    while (x !== end.x) {
+      cells.push({ x, y });
+      x += Math.sign(end.x - x);
+    }
+  };
+  const stepY = () => {
+    while (y !== end.y) {
+      cells.push({ x, y });
+      y += Math.sign(end.y - y);
+    }
+  };
 
-  while (y !== end.y) {
-    cells.push({ x, y });
-    y += Math.sign(end.y - y);
+  if (horizontalFirst) {
+    stepX();
+    stepY();
+  } else {
+    stepY();
+    stepX();
   }
 
   cells.push({ x, y });
   return cells;
+}
+
+function widenPath(cells, width = 1) {
+  const radius = Math.max(0, Math.floor((width - 1) / 2));
+  const widened = new Map();
+  for (const cell of cells) {
+    for (let y = cell.y - radius; y <= cell.y + radius; y += 1) {
+      for (let x = cell.x - radius; x <= cell.x + radius; x += 1) {
+        widened.set(key({ x, y }), { x, y });
+      }
+    }
+  }
+  return Array.from(widened.values());
 }
 
 function edgeKey(a, b) {
@@ -188,12 +224,15 @@ function pruneDanglingDoors(rooms, corridors) {
   }
 }
 
-function connectRooms(a, b, corridors, rooms) {
+function connectRooms(a, b, corridors, rooms, options = {}) {
   const aConnection = nearestBoundaryDoor(a, center(b));
   const bConnection = nearestBoundaryDoor(b, center(a));
   if (!aConnection || !bConnection) return false;
 
-  const corridor = carvePath(aConnection.outside, bConnection.outside);
+  const corridor = widenPath(
+    carvePath(aConnection.outside, bConnection.outside, options.corridorStyle ?? "horizontal-first"),
+    options.corridorWidth ?? 1,
+  );
   if (pathCutsThroughRoom(corridor, rooms)) return false;
 
   const passage = makeCorridorPassage(corridors.passages.length, corridor);
@@ -218,13 +257,15 @@ function roomStartPosition(room) {
 function generateDungeon(options = {}) {
   const gridSize = options.gridSize ?? 72;
   const roomCount = options.roomCount ?? 20;
-  const rooms = [makeRoom(0, Math.floor(gridSize / 2) - 4, Math.floor(gridSize / 2) - 3, "rectangle")];
+  const layout = options.layout ?? "branching";
+  const entranceShape = options.entranceShape ?? "rectangle";
+  const rooms = [makeRoom(0, Math.floor(gridSize / 2) - 4, Math.floor(gridSize / 2) - 3, options, entranceShape)];
   const corridors = { cells: [], passages: [] };
   let attempts = 0;
 
-  while (rooms.length < roomCount && attempts < 900) {
+  while (rooms.length < roomCount && attempts < (options.maxAttempts ?? 900)) {
     attempts += 1;
-    const parent = rooms[randomInt(0, rooms.length - 1)];
+    const parent = layout === "linear" ? rooms[rooms.length - 1] : rooms[randomInt(0, rooms.length - 1)];
     const parentCenter = center(parent);
     const direction = [
       { x: 0, y: -1 },
@@ -232,25 +273,35 @@ function generateDungeon(options = {}) {
       { x: 0, y: 1 },
       { x: -1, y: 0 },
     ][randomInt(0, 3)];
-    const gap = randomInt(4, 8);
+    const gap = rangeValue(options.corridorLength, 4, 8);
+    const offsetMin = options.roomOffset?.min ?? 6;
+    const offsetMax = options.roomOffset?.max ?? 10;
+    const jitterX = options.roomJitter?.x ?? [2, 6];
+    const jitterY = options.roomJitter?.y ?? [2, 5];
     const candidate = makeRoom(
       rooms.length,
-      parentCenter.x + direction.x * (gap + randomInt(6, 10)) - randomInt(2, 6),
-      parentCenter.y + direction.y * (gap + randomInt(6, 10)) - randomInt(2, 5),
+      parentCenter.x + direction.x * (gap + randomInt(offsetMin, offsetMax)) - randomInt(jitterX[0], jitterX[1]),
+      parentCenter.y + direction.y * (gap + randomInt(offsetMin, offsetMax)) - randomInt(jitterY[0], jitterY[1]),
+      options,
     );
 
-    if (!isInBounds(candidate, gridSize) || overlaps(candidate, rooms) || overlapsCorridors(candidate, corridors.cells)) {
+    if (
+      !isInBounds(candidate, gridSize) ||
+      overlaps(candidate, rooms, options.roomPadding ?? 2) ||
+      overlapsCorridors(candidate, corridors.cells, options.corridorPadding ?? 1)
+    ) {
       continue;
     }
-    if (!connectRooms(parent, candidate, corridors, [...rooms, candidate])) continue;
+    if (!connectRooms(parent, candidate, corridors, [...rooms, candidate], options)) continue;
     rooms.push(candidate);
   }
 
-  for (let i = 0; i < Math.floor(roomCount * 0.35); i += 1) {
+  const extraConnections = layout === "linear" ? 0 : Math.floor(roomCount * (options.extraConnectionRatio ?? 0.35));
+  for (let i = 0; i < extraConnections; i += 1) {
     const a = rooms[randomInt(0, rooms.length - 1)];
     const b = rooms[randomInt(0, rooms.length - 1)];
     if (a.id !== b.id && !a.connections.includes(b.id)) {
-      connectRooms(a, b, corridors, rooms);
+      connectRooms(a, b, corridors, rooms, options);
     }
   }
 

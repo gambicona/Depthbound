@@ -1,4 +1,20 @@
 Fix saving everytime to state 1
+fix calculation of initiative bonus for character
+add back buttons in character creation
+Inventory on press I
+arrow or wsad movement of character (remap attack then)
+Make disarm traps give small xp.
+make walls visible kinda like doors in between the grid boxes
+make short rest dialogue better explained
+make the exit right click description
+restless jailers attack range is 10 ft but displayed as 5ft, has no weapon in description even though it has a chain
+make chests lootable in combat (only while standing next to it)
+chest and table spawned diagonally blocking part of the room.
+sling needs ammo, pebbles as item
+add faster movement for long distances (faster after x steps)
+unify home chests menus (add deposit and withdraw all to chest menu)
+rename button is broken (get into the select a martial weapon menu)
+remove debug combat log of not spotted trap
 
 weapon stuff: thrown weapons and pick them up again, off hand attack
 add selection who to target with attack if multiple available
@@ -22,3 +38,4 @@ make it possible to go back to lower level dungeons to redo them and gain items 
 Sort which furniture in which theme is generating
 predefined dungeons and dungeon creator
 ressource points to get ressources (stone pit, con check, get stone, farmable, as configurable file, spawnable in dungeons at walls)
+packs to find (Medizin Pack Proviant Pack, etc) that can either be sold to merchants or even factions for points or be opened to gain whatever is inside

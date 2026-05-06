@@ -33,6 +33,7 @@ window.DungeonContent.register("monsters", "shamblingCorpse", {
   speedFeet: 20,
   behavior: "melee",
   token: "Z",
+  tokenArt: "assets/tokens/shambling-corpse.png",
 });
 
 window.DungeonContent.register("monsters", "bloatedRotter", {
@@ -63,6 +64,7 @@ window.DungeonContent.register("monsters", "bloatedRotter", {
   speedFeet: 20,
   behavior: "melee",
   token: "R",
+  tokenArt: "assets/tokens/bloated-rotter.png",
 });
 
 window.DungeonContent.register("monsters", "graveGhoul", {
@@ -93,6 +95,7 @@ window.DungeonContent.register("monsters", "graveGhoul", {
   speedFeet: 30,
   behavior: "melee",
   token: "G",
+  tokenArt: "assets/tokens/grave-ghoul.png",
 });
 
 window.DungeonContent.register("monsters", "corpseCandleAcolyte", {
@@ -124,6 +127,7 @@ window.DungeonContent.register("monsters", "corpseCandleAcolyte", {
   speedFeet: 25,
   behavior: "rangedKiter",
   token: "C",
+  tokenArt: "assets/tokens/corpse-candle-acolyte.png",
 });
 
 window.DungeonContent.register("monsters", "corpseHeapBrute", {
@@ -155,6 +159,7 @@ window.DungeonContent.register("monsters", "corpseHeapBrute", {
   speedFeet: 25,
   behavior: "melee",
   token: "B",
+  tokenArt: "assets/tokens/corpse-heap-brute.png",
   extraLoot: [
     {
       kind: "randomEquipment",
@@ -196,6 +201,7 @@ window.DungeonContent.register("monsters", "plagueGhast", {
   speedFeet: 35,
   behavior: "melee",
   token: "P",
+  tokenArt: "assets/tokens/plague-ghast.png",
 });
 
 window.DungeonContent.register("monsters", "graveMireCrawler", {
@@ -226,6 +232,7 @@ window.DungeonContent.register("monsters", "graveMireCrawler", {
   speedFeet: 25,
   behavior: "melee",
   token: "M",
+  tokenArt: "assets/tokens/grave-mire-crawler.png",
 });
 
 window.DungeonContent.register("monsters", "vomitousDead", {
@@ -257,6 +264,7 @@ window.DungeonContent.register("monsters", "vomitousDead", {
   speedFeet: 25,
   behavior: "rangedKiter",
   token: "V",
+  tokenArt: "assets/tokens/vomitous-dead.png",
 });
 
 window.DungeonContent.register("monsters", "corpsefireInvoker", {
@@ -288,6 +296,7 @@ window.DungeonContent.register("monsters", "corpsefireInvoker", {
   speedFeet: 30,
   behavior: "rangedKiter",
   token: "F",
+  tokenArt: "assets/tokens/corpsefire-invoker.png",
 });
 
 window.DungeonContent.register("monsters", "rotCrownedGhoul", {
@@ -319,6 +328,7 @@ window.DungeonContent.register("monsters", "rotCrownedGhoul", {
   speedFeet: 30,
   behavior: "melee",
   token: "R",
+  tokenArt: "assets/tokens/rot-crowned-ghoul.png",
   extraLoot: [
     {
       kind: "randomEquipment",
@@ -360,6 +370,7 @@ window.DungeonContent.register("monsters", "corpseStitchedGoliath", {
   speedFeet: 25,
   behavior: "melee",
   token: "G",
+  tokenArt: "assets/tokens/corpse-stitched-goliath.png",
 });
 
 window.DungeonContent.register("monsters", "drownedGhoul", {
@@ -390,6 +401,7 @@ window.DungeonContent.register("monsters", "drownedGhoul", {
   speedFeet: 35,
   behavior: "melee",
   token: "D",
+  tokenArt: "assets/tokens/drowned-ghoul.png",
 });
 
 window.DungeonContent.register("monsters", "blightbelcher", {
@@ -421,6 +433,7 @@ window.DungeonContent.register("monsters", "blightbelcher", {
   speedFeet: 25,
   behavior: "rangedKiter",
   token: "B",
+  tokenArt: "assets/tokens/blightbelcher.png",
 });
 
 window.DungeonContent.register("monsters", "graveflameWarlock", {
@@ -453,6 +466,7 @@ window.DungeonContent.register("monsters", "graveflameWarlock", {
   speedFeet: 30,
   behavior: "rangedKiter",
   token: "W",
+  tokenArt: "assets/tokens/graveflame-warlock.png",
 });
 
 window.DungeonContent.register("monsters", "plagueGraveTitan", {
@@ -485,6 +499,7 @@ window.DungeonContent.register("monsters", "plagueGraveTitan", {
   speedFeet: 25,
   behavior: "melee",
   token: "T",
+  tokenArt: "assets/tokens/plague-grave-titan.png",
   extraLoot: [
     {
       kind: "randomEquipment",

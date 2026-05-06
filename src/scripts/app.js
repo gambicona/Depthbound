@@ -3,7 +3,7 @@ const { gridSize, feetPerSquare, tileSizePx, tokenSlideMs, templates, defaultCon
 const { rollDie, rollDice, abilityLabel } = window.DungeonDice;
 const { distance, isAdjacent, positionKey, findPath, reachableTiles } = window.DungeonGrid;
 const { generateDungeon, roomHasCell } = window.DungeonGenerator;
-const { getSlots, save, load, remove, saveQuickstart, loadQuickstart } = window.DungeonSave;
+const { slotCount, getSlots, save, load, remove, saveQuickstart, loadQuickstart } = window.DungeonSave;
 
 let state = null;
 let roomIsBuilt = false;
@@ -26,11 +26,6 @@ let activeDialogCancel = null;
 let trapDetectionDebugLog = true;
 let currentMusicKey = "";
 let currentMusic = null;
-const fighterStatsOpen = {
-  hero: true,
-  monster: true,
-};
-
 const soundAssetRoot = "assets/sounds";
 const soundEffects = {
   characterDamage: `${soundAssetRoot}/effects/character-damage.wav`,
@@ -72,66 +67,6 @@ const abilities = ["str", "dex", "con", "int", "wis", "cha"];
 const standardArray = [15, 14, 13, 12, 10, 8];
 const pregeneratedAbilityScores = { str: 15, con: 14, dex: 13, wis: 12, int: 10, cha: 8 };
 const fighterAbilityScoreImprovementLevels = new Set([4, 6, 8, 12, 14, 16, 19]);
-
-const dungeonObjectTemplates = {
-  table: {
-    name: "Table",
-    kind: "furniture",
-    width: 2,
-    height: 1,
-    blocksMovement: true,
-    blocksLineOfSight: false,
-    interactable: false,
-    description: "A heavy wooden table. Nothing special, right?",
-  },
- bigRock: {
-    name: "Big Rock",
-    kind: "obstacle",
-    width: 1,
-    height: 1,
-    blocksMovement: true,
-    blocksLineOfSight: true,
-    interactable: false,
-    description: "A large chunk of stone. You have to go around it.",
-  },
-
-  trap: {
-    name: "Spike Trap",
-    kind: "trap",
-    width: 1,
-    height: 1,
-    blocksMovement: false,
-    blocksLineOfSight: false,
-    interactable: false,
-    damage: { count: 1, sides: 4, type: "piercing" },
-    spotDcs: [
-      { label: "Easy", dc: 10 },
-      { label: "Normal", dc: 12 },
-      { label: "Hard", dc: 15 },
-    ],
-    description: "A concealed spike trap. It deals 1d4 piercing damage when a creature steps on it.",
-  },
-  chest: {
-    name: "Dungeon Chest",
-    kind: "container",
-    width: 1,
-    height: 1,
-    blocksMovement: true,
-    blocksLineOfSight: false,
-    interactable: true,
-    description: "A sturdy dungeon chest placed beside a wall. It can hold treasure.",
-  },
-  portal: {
-    name: "Paired Portal",
-    kind: "portal",
-    width: 1,
-    height: 1,
-    blocksMovement: false,
-    blocksLineOfSight: false,
-    interactable: false,
-    description: "A paired magical portal. In exploration, stepping on it teleports the character to its twin.",
-  },
-};
 
 const els = {
   mainMenu: document.querySelector("#main-menu"),
@@ -198,8 +133,9 @@ const els = {
   gameDialogActions: document.querySelector("#game-dialog-actions"),
 };
 
-function createInitialState(heroNameOverride = "", heroForDifficulty = null, heroOptions = {}) {
+function createInitialState(heroNameOverride = "", heroForDifficulty = null, heroOptions = {}, themeId = defaultContent.theme) {
   const dungeonDefinition = getContentDefinition("dungeons", defaultContent.dungeon);
+  const theme = getContentDefinition("themes", themeId);
   const dungeonOptions = {
     ...(dungeonDefinition?.options ?? window.DungeonConfig.dungeon),
   };
@@ -207,6 +143,9 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
   if (isLevelOneDungeon) {
     dungeonOptions.roomCount = 10;
   }
+  Object.assign(dungeonOptions, theme?.generator ?? {});
+  const categoryRoomCount = theme?.generator?.roomCountByCategory?.[categoryForHeroLevel(heroForDifficulty?.level ?? 1)];
+  if (categoryRoomCount) dungeonOptions.roomCount = categoryRoomCount;
   const dungeon = generateDungeon(dungeonOptions);
   const heroTemplate = applyHeroCreationOptions(
     {
@@ -217,17 +156,18 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
     },
     heroOptions,
   );
-  const hero = createFighter({
+  const hero = createCombatant({
     ...heroTemplate,
   });
   hero.token = tokenFromName(hero.name, hero.token);
   hero.position = { ...dungeon.startPosition };
   const firstRoom = dungeon.rooms.find((room) => room.id === dungeon.entranceRoomId) ?? dungeon.rooms[0];
   const exit = createDungeonExit(dungeon, hero.position);
-  const dungeonObjects = createDungeonObjects(dungeon, [hero.position, exit.position]);
-  const monsters = createDungeonMonsters(dungeon, hero.position, heroForDifficulty ?? hero, exit.roomId, dungeonObjects);
+  const dungeonObjects = createDungeonObjects(dungeon, [hero.position, exit.position], themeId);
+  const monsters = createDungeonMonsters(dungeon, hero.position, heroForDifficulty ?? hero, exit.roomId, dungeonObjects, themeId);
 
   return {
+    themeId,
     combatStarted: false,
     mode: "exploration",
     round: 0,
@@ -235,7 +175,7 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
     initiative: [],
     room: {
       id: dungeon.id,
-      name: dungeonDefinition?.name ?? "Generated Dungeon",
+      name: theme?.name ?? dungeonDefinition?.name ?? "Generated Dungeon",
       gridSize: dungeon.gridSize,
       tileSizePx,
     },
@@ -248,18 +188,22 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
     exit,
     completed: false,
     shortRestsUsed: 0,
-    shortRestLimit: 3,
+    shortRestLimit: theme?.rest?.shortRestLimit ?? 3,
     chest: [],
     chestMoney: { cp: 0, sp: 0, gp: 0 },
     lootPiles: [],
     dungeonObjects,
+    party: {
+      activeHeroId: "hero",
+      heroIds: ["hero"],
+    },
     fighters: {
       hero,
       ...monsters,
     },
     log: [
       {
-        text: `Generated ${dungeon.roomCount} rooms. ${hero.name} starts at the entrance of ${firstRoom.name}.`,
+        text: `Generated ${dungeon.roomCount} rooms for ${theme?.name ?? dungeonDefinition?.name ?? "Generated Dungeon"}. ${hero.name} starts at the entrance of ${firstRoom.name}.`,
         type: "important",
       },
     ],
@@ -321,6 +265,10 @@ function createHomeState(hero, chest = [], chestMoney = { cp: 0, sp: 0, gp: 0 })
     chestMoney: normalizeMoney(chestMoney),
     lootPiles: [],
     dungeonObjects: [],
+    party: {
+      activeHeroId: "hero",
+      heroIds: ["hero"],
+    },
     fighters: {
       hero: restedHero,
     },
@@ -387,9 +335,9 @@ function tokenFromName(name, fallback = "M") {
   return (name.trim()[0] || fallback).toUpperCase();
 }
 
-function fighterRoleLabel(fighter) {
-  if (fighter.id === "hero") return `Level ${fighter.level ?? 1} Fighter`;
-  return fighter.role;
+function combatantRoleLabel(combatant) {
+  if (combatant.id === "hero") return `Level ${combatant.level ?? 1} Fighter`;
+  return combatant.role;
 }
 
 function fighterAbilityDefinitions(fighter = state?.fighters?.hero) {
@@ -457,11 +405,32 @@ function getContentDefinition(type, id) {
 }
 
 function currentThemeId() {
-  return defaultContent.theme ?? "default";
+  return state?.themeId ?? defaultContent.theme ?? "default";
+}
+
+function applyThemePalette() {
+  const palette = getContentDefinition("themes", currentThemeId())?.palette ?? {};
+  const root = document.documentElement;
+  for (const [name, value] of Object.entries(palette)) {
+    if (name === "bodyBackground") continue;
+    const cssName = name
+      .replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)
+      .replace(/([a-z])([0-9])/g, "$1-$2");
+    root.style.setProperty(`--${cssName}`, value);
+  }
+  if (palette.bodyBackground) {
+    document.body.style.background = palette.bodyBackground;
+  } else {
+    document.body.style.background = "";
+  }
 }
 
 function soundPathForMusic(key) {
   if (key === "home") return `${soundAssetRoot}/music/home.mp3`;
+  const theme = getContentDefinition("themes", currentThemeId());
+  if (key === "exploration" && theme?.music?.exploration) return theme.music.exploration;
+  if (key === "combat" && theme?.music?.combat) return theme.music.combat;
+  if (key === "boss-combat" && (theme?.music?.bossCombat || theme?.music?.boss)) return theme.music.bossCombat ?? theme.music.boss;
   return `${soundAssetRoot}/music/${currentThemeId()}-${key}.mp3`;
 }
 
@@ -510,13 +479,53 @@ function getMonsterTemplate(monsterId = defaultContent.monster) {
   return getContentDefinition("monsters", monsterId) ?? (monsterId === defaultContent.monster ? templates.monster : null);
 }
 
-function dungeonMonsterIds() {
-  const theme = getContentDefinition("themes", defaultContent.theme);
+function monsterMatchesTags(monster, requiredTags = []) {
+  const monsterTags = new Set(monster?.tags ?? []);
+  return requiredTags.every((tag) => monsterTags.has(tag));
+}
+
+function contentMatchesAnyTagGroup(entry, tagGroups = []) {
+  return tagGroups.some((requiredTags) => monsterMatchesTags(entry, requiredTags));
+}
+
+function normalizeTagGroups(primaryGroups = [], legacyTags = []) {
+  if (Array.isArray(primaryGroups) && primaryGroups.length) return primaryGroups;
+  return Array.isArray(legacyTags) && legacyTags.length ? [legacyTags] : [];
+}
+
+function monsterIdsMatchingTagGroups(tagGroups = [], options = {}) {
+  if (!tagGroups.length) return [];
+  const { includeBosses = true } = options;
+  return window.DungeonContent
+    .list("monsters")
+    .filter((monster) => contentMatchesAnyTagGroup(monster, tagGroups))
+    .filter((monster) => includeBosses || !monster.tags?.includes("boss"))
+    .map((monster) => monster.id);
+}
+
+function idsMatchingTagGroups(type, tagGroups = [], options = {}) {
+  if (!tagGroups.length) return [];
+  const { excludeKinds = [] } = options;
+  return window.DungeonContent
+    .list(type)
+    .filter((entry) => contentMatchesAnyTagGroup(entry, tagGroups))
+    .filter((entry) => !excludeKinds.includes(entry.kind))
+    .map((entry) => entry.id);
+}
+
+function dungeonMonsterIds(themeId = currentThemeId()) {
+  const theme = getContentDefinition("themes", themeId);
+  const tagGroups = normalizeTagGroups(theme?.monsterTagGroups, theme?.monsterTags);
+  const taggedMonsterIds = monsterIdsMatchingTagGroups(tagGroups, { includeBosses: false });
+  if (taggedMonsterIds.length) return taggedMonsterIds;
   return theme?.monsterIds?.length ? theme.monsterIds : [defaultContent.monster];
 }
 
-function dungeonBossMonsterIds() {
-  const theme = getContentDefinition("themes", defaultContent.theme);
+function dungeonBossMonsterIds(themeId = currentThemeId()) {
+  const theme = getContentDefinition("themes", themeId);
+  const bossTagGroups = normalizeTagGroups(theme?.bossMonsterTagGroups, theme?.bossMonsterTags);
+  const taggedBossMonsterIds = monsterIdsMatchingTagGroups(bossTagGroups);
+  if (taggedBossMonsterIds.length) return taggedBossMonsterIds;
   return theme?.bossMonsterIds ?? [];
 }
 
@@ -550,9 +559,9 @@ function monsterCategoryRingColor(monster) {
   return monsterCategoryRingColors[category] ?? monsterCategoryRingColors[1];
 }
 
-function weightedMonsterIdsForHero(hero) {
+function weightedMonsterIdsForHero(hero, themeId = currentThemeId()) {
   const targetCategory = categoryForHeroLevel(hero.level ?? 1);
-  const entries = dungeonMonsterIds()
+  const entries = dungeonMonsterIds(themeId)
     .map((id) => ({ id, template: getMonsterTemplate(id) }))
     .filter((entry) => entry.template && monsterCategory(entry.template) <= targetCategory)
     .map((entry) => {
@@ -563,7 +572,7 @@ function weightedMonsterIdsForHero(hero) {
       };
     });
 
-  return entries.length ? entries : dungeonMonsterIds().map((id) => ({ id, weight: 1 }));
+  return entries.length ? entries : dungeonMonsterIds(themeId).map((id) => ({ id, weight: 1 }));
 }
 
 function pickWeightedMonsterId(entries, usedCounts = {}) {
@@ -580,9 +589,9 @@ function pickWeightedMonsterId(entries, usedCounts = {}) {
   return adjustedEntries.at(-1)?.id ?? defaultContent.monster;
 }
 
-function bossMonsterIdForHero(hero) {
+function bossMonsterIdForHero(hero, themeId = currentThemeId()) {
   const targetCategory = categoryForHeroLevel(hero.level ?? 1);
-  const bosses = dungeonBossMonsterIds()
+  const bosses = dungeonBossMonsterIds(themeId)
     .map((id) => ({ id, template: getMonsterTemplate(id) }))
     .filter((entry) => entry.template && monsterCategory(entry.template) <= targetCategory)
     .sort((a, b) => monsterCategory(b.template) - monsterCategory(a.template));
@@ -601,7 +610,11 @@ function applyMonsterCategoryScaling(monster, hero) {
 }
 
 function objectTemplate(type) {
-  return dungeonObjectTemplates[type] ?? null;
+  return getContentDefinition("furniture", type);
+}
+
+function objectIsTrap(object) {
+  return objectTemplate(object?.type)?.kind === "trap";
 }
 
 function objectCells(object) {
@@ -661,6 +674,29 @@ function objectTouchesBlockedCell(object, blockedKeys) {
   );
 }
 
+function dungeonFurnitureIds(themeId = currentThemeId()) {
+  const theme = getContentDefinition("themes", themeId);
+  const tagGroups = normalizeTagGroups(theme?.furnitureTagGroups, theme?.furnitureTags);
+  const taggedFurnitureIds = idsMatchingTagGroups("furniture", tagGroups, { excludeKinds: ["trap"] });
+  if (taggedFurnitureIds.length) return taggedFurnitureIds;
+  if (theme?.furnitureIds?.length) return theme.furnitureIds;
+  return ["table", "bigRock", "chest", "portal"];
+}
+
+function dungeonFloorTrapIds(themeId = currentThemeId()) {
+  const theme = getContentDefinition("themes", themeId);
+  const tagGroups = normalizeTagGroups(theme?.trapTagGroups, theme?.trapTags);
+  if (Array.isArray(theme?.trapTagGroups) && theme.trapTagGroups.length === 0) return [];
+  const taggedTrapIds = idsMatchingTagGroups("furniture", tagGroups).filter((id) => objectTemplate(id)?.kind === "trap");
+  if (taggedTrapIds.length) return taggedTrapIds;
+  return theme?.trapIds ?? ["trap"];
+}
+
+function objectSpawnChance(type, fallback, themeId = currentThemeId()) {
+  const theme = getContentDefinition("themes", themeId);
+  return theme?.furnitureSpawnChances?.[type] ?? objectTemplate(type)?.spawnChance ?? fallback;
+}
+
 function roomDoorKeys(room) {
   return new Set((room.doors ?? []).map(positionKey));
 }
@@ -697,8 +733,8 @@ function randomOpenCell(cells, blockedKeys) {
     .find((cell) => ![cell, ...adjacentCells(cell)].some((candidate) => blockedKeys.has(positionKey(candidate)))) ?? null;
 }
 
-function randomTrapDifficulty() {
-  const options = objectTemplate("trap").spotDcs;
+function randomTrapDifficulty(type = "trap") {
+  const options = objectTemplate(type)?.spotDcs ?? [{ label: "Normal", dc: 12 }];
   return options[Math.floor(Math.random() * options.length)] ?? options[1];
 }
 
@@ -719,8 +755,8 @@ function portalCandidateCells(dungeon, blockedKeys, objects) {
   );
 }
 
-function tryCreatePortalPair(dungeon, blockedKeys, objects, objectId) {
-  if ((dungeon.rooms?.length ?? 0) < 2 || Math.random() >= 0.35) return;
+function tryCreatePortalPair(dungeon, blockedKeys, objects, objectId, themeId = currentThemeId()) {
+  if ((dungeon.rooms?.length ?? 0) < 2 || Math.random() >= objectSpawnChance("portal", 0.35, themeId)) return;
 
   const candidates = portalCandidateCells(dungeon, blockedKeys, objects).sort(() => Math.random() - 0.5);
   const first = candidates[0];
@@ -752,12 +788,19 @@ function randomChestLoot(count = 2) {
   }).filter(Boolean);
 }
 
-function chestTrapPool() {
-  return window.DungeonContent.list("traps").filter((trap) => trap.placement === "chest");
+function chestTrapPool(themeId = currentThemeId()) {
+  const theme = getContentDefinition("themes", themeId);
+  const tagGroups = normalizeTagGroups(theme?.trapTagGroups, theme?.trapTags);
+  if (Array.isArray(theme?.trapTagGroups) && theme.trapTagGroups.length === 0) return [];
+  const trapIds = idsMatchingTagGroups("traps", tagGroups);
+  return window.DungeonContent
+    .list("traps")
+    .filter((trap) => trap.placement === "chest")
+    .filter((trap) => !tagGroups.length || trapIds.includes(trap.id));
 }
 
-function randomChestTrap() {
-  const pool = chestTrapPool();
+function randomChestTrap(themeId = currentThemeId()) {
+  const pool = chestTrapPool(themeId);
   const template = pool[Math.floor(Math.random() * pool.length)];
   return template
     ? {
@@ -771,35 +814,39 @@ function randomChestTrap() {
     : null;
 }
 
-function createDungeonObjects(dungeon, reservedPositions = []) {
+function createDungeonObjects(dungeon, reservedPositions = [], themeId = currentThemeId()) {
   const objects = [];
+  const theme = getContentDefinition("themes", themeId);
+  const trapSettings = theme?.traps ?? {};
+  const allowedFurniture = new Set(dungeonFurnitureIds(themeId));
+  const floorTrapIds = dungeonFloorTrapIds(themeId);
   const blockedKeys = new Set((dungeon.doors ?? []).map(positionKey));
   reservedPositions.forEach((position) => blockedKeys.add(positionKey(position)));
   const objectId = (type) => `${type}-${objects.length + 1}`;
 
   for (const room of dungeon.rooms ?? []) {
-    if (Math.random() < 0.5) {
+    if (allowedFurniture.has("table") && Math.random() < objectSpawnChance("table", 0.5, themeId)) {
       const table = tryCreateTableForRoom(room, blockedKeys, objectId("table"));
       if (table) objects.push(table);
     }
-    if (Math.random() < 0.18) {
+    if (allowedFurniture.has("bigRock") && Math.random() < objectSpawnChance("bigRock", 0.18, themeId)) {
       const position = randomOpenCell(
-      room.cells.filter((cell) => !roomDoorKeys(room).has(positionKey(cell))),
-      blockedKeys
+        room.cells.filter((cell) => !roomDoorKeys(room).has(positionKey(cell))),
+        blockedKeys,
       );
 
-    if (position) {
-      objects.push({
-        id: objectId("bigRock"),
-        type: "bigRock",
-        position: { ...position },
-      });
+      if (position) {
+        objects.push({
+          id: objectId("bigRock"),
+          type: "bigRock",
+          position: { ...position },
+        });
 
-      blockedKeys.add(positionKey(position));
-    }
+        blockedKeys.add(positionKey(position));
+      }
     }
 
-    if (Math.random() < 0.2) {
+    if (allowedFurniture.has("chest") && Math.random() < objectSpawnChance("chest", 0.2, themeId)) {
       const position = randomOpenCell(wallAdjacentRoomCells(room), blockedKeys);
       if (position) {
         const chest = {
@@ -808,29 +855,33 @@ function createDungeonObjects(dungeon, reservedPositions = []) {
           position: { ...position },
           items: randomChestLoot(Math.floor(Math.random() * 3)),
         };
-        if (Math.random() < 0.3) chest.trap = randomChestTrap();
+        if (Math.random() < (trapSettings.chestChance ?? 0.3)) chest.trap = randomChestTrap(themeId);
         objects.push(chest);
         blockedKeys.add(positionKey(position));
       }
     }
 
-    if (Math.random() < 0.28) {
+    if (floorTrapIds.length && Math.random() < (trapSettings.roomChance ?? 0.28)) {
       const position = randomOpenCell(room.cells.filter((cell) => !roomDoorKeys(room).has(positionKey(cell))), blockedKeys);
       if (position) {
-        const difficulty = randomTrapDifficulty();
-        objects.push({ id: objectId("trap"), type: "trap", position: { ...position }, armed: true, spotDc: difficulty.dc, spotDifficulty: difficulty.label });
+        const type = floorTrapIds[Math.floor(Math.random() * floorTrapIds.length)];
+        const difficulty = randomTrapDifficulty(type);
+        objects.push({ id: objectId(type), type, position: { ...position }, armed: true, spotDc: difficulty.dc, spotDifficulty: difficulty.label });
       }
     }
   }
 
   for (const corridor of dungeon.corridors ?? []) {
-    if (Math.random() < 0.035 && !blockedKeys.has(positionKey(corridor))) {
-      const difficulty = randomTrapDifficulty();
-      objects.push({ id: objectId("trap"), type: "trap", position: { ...corridor }, armed: true, spotDc: difficulty.dc, spotDifficulty: difficulty.label });
+    if (floorTrapIds.length && Math.random() < (trapSettings.corridorChance ?? 0.035) && !blockedKeys.has(positionKey(corridor))) {
+      const type = floorTrapIds[Math.floor(Math.random() * floorTrapIds.length)];
+      const difficulty = randomTrapDifficulty(type);
+      objects.push({ id: objectId(type), type, position: { ...corridor }, armed: true, spotDc: difficulty.dc, spotDifficulty: difficulty.label });
     }
   }
 
-  tryCreatePortalPair(dungeon, blockedKeys, objects, objectId);
+  if (allowedFurniture.has("portal")) {
+    tryCreatePortalPair(dungeon, blockedKeys, objects, objectId, themeId);
+  }
 
   return objects;
 }
@@ -1282,8 +1333,8 @@ function refreshDerivedStats(fighter) {
   return fighter;
 }
 
-function createFighter(template) {
-  const fighter = {
+function createCombatant(template) {
+  const combatant = {
     ...template,
     baseAc: template.baseAc ?? template.ac ?? 10,
     baseDamage: { ...template.damage },
@@ -1308,21 +1359,21 @@ function createFighter(template) {
     dodging: false,
     disengaged: false,
   };
-  if (fighter.baseAttackAbilityMod === undefined) {
-    fighter.baseAttackAbilityMod = abilityMod(fighter, attackAbilityForWeapon(activeWeapon(fighter)));
+  if (combatant.baseAttackAbilityMod === undefined) {
+    combatant.baseAttackAbilityMod = abilityMod(combatant, attackAbilityForWeapon(activeWeapon(combatant)));
   }
-  ensureStarterHeroEquipment(fighter);
-  ensureFighterAbilityState(fighter);
-  return refreshDerivedStats(fighter);
+  ensureStarterHeroEquipment(combatant);
+  ensureFighterAbilityState(combatant);
+  return refreshDerivedStats(combatant);
 }
 
-function createDungeonMonsters(dungeon, heroPosition, hero, exitRoomId = "", dungeonObjects = []) {
+function createDungeonMonsters(dungeon, heroPosition, hero, exitRoomId = "", dungeonObjects = [], themeId = currentThemeId()) {
   const monsters = {};
   const rooms = dungeon.rooms;
-  const bossMonsterId = heroNeedsDungeonBoss(hero) ? bossMonsterIdForHero(hero) : null;
+  const bossMonsterId = heroNeedsDungeonBoss(hero) ? bossMonsterIdForHero(hero, themeId) : null;
   const bossRoomId = bossMonsterId ? exitRoomId || createDungeonExit(dungeon, heroPosition).roomId : null;
   const monsterRooms = rooms.filter((room, index) => room.id !== bossRoomId && (index === 0 || (index > 0 && Math.random() < 0.72)));
-  const monsterEntries = weightedMonsterIdsForHero(hero);
+  const monsterEntries = weightedMonsterIdsForHero(hero, themeId);
   const targetCategory = categoryForHeroLevel(hero.level ?? 1);
   const targetCategoryEntries = monsterEntries.filter((entry) => {
     const template = getMonsterTemplate(entry.id);
@@ -1344,7 +1395,7 @@ function createDungeonMonsters(dungeon, heroPosition, hero, exitRoomId = "", dun
     if (!monsterTemplate) continue;
     usedMonsterCounts[monsterId] = (usedMonsterCounts[monsterId] ?? 0) + 1;
     spawnedTargetCategory ||= monsterCategory(monsterTemplate) === targetCategory;
-    const monster = createFighter({
+    const monster = createCombatant({
       ...monsterTemplate,
       id: `monster-${room.id}`,
       name: index === 0 ? monsterTemplate.name : `${monsterTemplate.name} ${index + 1}`,
@@ -1363,7 +1414,7 @@ function createDungeonMonsters(dungeon, heroPosition, hero, exitRoomId = "", dun
     const bossTemplate = getMonsterTemplate(bossMonsterId);
     const bossRoom = rooms.find((room) => room.id === bossRoomId);
     if (bossTemplate && bossRoom) {
-      const boss = createFighter({
+      const boss = createCombatant({
         ...bossTemplate,
         id: `boss-${bossRoom.id}`,
         name: bossTemplate.name,
@@ -1400,12 +1451,17 @@ function normalizeLoadedState(loadedState) {
   const normalized = {
     ...freshState,
     ...loadedState,
+    themeId: loadedState.themeId ?? freshState.themeId ?? defaultContent.theme,
     mode: loadedState.mode ?? (loadedState.combatStarted ? "combat" : "exploration"),
     fighters: {
       ...freshState.fighters,
       ...loadedState.fighters,
     },
     dungeon: ensureCorridorPassages(loadedState.dungeon ?? freshState.dungeon),
+    party: {
+      activeHeroId: loadedState.party?.activeHeroId ?? "hero",
+      heroIds: Array.isArray(loadedState.party?.heroIds) && loadedState.party.heroIds.length ? loadedState.party.heroIds : ["hero"],
+    },
     exploration: {
       ...freshState.exploration,
       ...loadedState.exploration,
@@ -1469,6 +1525,16 @@ function updateSaveStatus(message = "") {
     const savedCount = getSlots().filter((slot) => slot.hasSave).length;
     els.saveStatus.textContent = savedCount > 0 ? `${savedCount} save slot${savedCount === 1 ? "" : "s"} available.` : "No saved adventure found.";
   }
+}
+
+function selectSaveSlot(slotId) {
+  if (!Number.isInteger(slotId) || slotId < 1 || slotId > slotCount) return;
+  if (activeSaveSlot === slotId) return;
+  activeSaveSlot = slotId;
+  renderSaveSlots();
+  const input = els.saveSlots.querySelector(`#save-slot-name-${slotId}`);
+  input?.focus();
+  input?.setSelectionRange(input.value.length, input.value.length);
 }
 
 function escapeAttribute(value) {
@@ -2041,9 +2107,28 @@ async function startNewAdventure() {
   centerViewOnHero();
 }
 
-function startNewDungeonWithHero() {
+function availableDungeonThemes() {
+  return window.DungeonContent
+    .list("themes")
+    .filter((theme) => !theme.hidden)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function chooseDungeonThemeId() {
+  const themes = availableDungeonThemes();
+  if (themes.length <= 1) return themes[0]?.id ?? defaultContent.theme;
+  return showChoiceDialog({
+    title: "Choose Dungeon",
+    message: "Where do you want to venture next?",
+    choices: themes.map((theme) => ({ value: theme.id, label: theme.name })),
+  });
+}
+
+async function startNewDungeonWithHero() {
+  const themeId = await chooseDungeonThemeId();
+  if (!themeId) return;
   const previousHero = state.fighters.hero;
-  const nextState = createInitialState(previousHero.name, previousHero);
+  const nextState = createInitialState(previousHero.name, previousHero, {}, themeId);
   const nextHero = refreshDerivedStats({
     ...previousHero,
     position: { ...nextState.fighters.hero.position },
@@ -2061,7 +2146,7 @@ function startNewDungeonWithHero() {
   saveQuickstart(state);
   roomIsBuilt = false;
   hideHomeMenu();
-  addLog(`${nextHero.name} leaves home for a new dungeon.`, "important");
+  addLog(`${nextHero.name} leaves home for ${getContentDefinition("themes", themeId)?.name ?? "a new dungeon"}.`, "important");
   render();
   centerViewOnHero();
 }
@@ -2741,9 +2826,9 @@ function collectLootAtPosition(fighter, position) {
 
 function triggerTrapAtPosition(fighter, position) {
   const trap = objectAt(position);
-  if (!trap || trap.type !== "trap" || trap.armed === false || trap.disarmed || !fighter.alive) return false;
+  if (!trap || !objectIsTrap(trap) || trap.armed === false || trap.disarmed || !fighter.alive) return false;
 
-  const template = objectTemplate("trap");
+  const template = objectTemplate(trap.type);
   const damageRoll = rollDice(template.damage.count, template.damage.sides);
   const rawDamage = damageRoll.total;
   const modified = calculateDamageModifiers(fighter, rawDamage, template.damage.type);
@@ -2787,7 +2872,7 @@ function checkTrapDetectionOnReveal() {
   if (!hero) return;
 
   for (const trap of state.dungeonObjects ?? []) {
-    if (trap.type !== "trap" || trap.spotChecked || !objectCells(trap).some(isKnownTile)) continue;
+    if (!objectIsTrap(trap) || trap.spotChecked || !objectCells(trap).some(isKnownTile)) continue;
 
     trap.spotChecked = true;
     const roll = rollDie(20);
@@ -3582,31 +3667,31 @@ function finishMapPan(event) {
   mapPan = null;
 }
 
-function createFighterToken(fighter) {
+function createCombatantToken(combatant) {
   const token = document.createElement("div");
-  token.className = `token ${fighter.id}`;
-  token.dataset.fighter = fighter.id;
-  token.title = fighter.name;
+  token.className = `token ${combatant.id}`;
+  token.dataset.combatant = combatant.id;
+  token.title = combatant.name;
 
-  if (fighter.id !== "hero") {
-    const category = Math.max(1, Math.min(10, Number(monsterCategory(fighter)) || 1));
+  if (combatant.id !== "hero") {
+    const category = Math.max(1, Math.min(10, Number(monsterCategory(combatant)) || 1));
 
     token.classList.add("monster-token", `monster-category-${category}`);
     token.dataset.category = String(category);
-    token.style.setProperty("--token-ring-color", monsterCategoryRingColor(fighter));
-    token.title = `${fighter.name} — Category ${category}`;
+    token.style.setProperty("--token-ring-color", monsterCategoryRingColor(combatant));
+    token.title = `${combatant.name} - Category ${category}`;
   }
 
-  const tokenArtPath = fighterTokenArt(fighter);
+  const tokenArtPath = combatantTokenArt(combatant);
 
   const tokenImage = document.createElement("img");
   tokenImage.className = "token-art hidden";
-  tokenImage.alt = fighter.name;
+  tokenImage.alt = combatant.name;
   tokenImage.draggable = false;
 
   const tokenLabel = document.createElement("span");
   tokenLabel.className = "token-label";
-  tokenLabel.textContent = fighter.token;
+  tokenLabel.textContent = combatant.token;
 
   if (tokenArtPath) {
     tokenImage.src = tokenArtPath;
@@ -3636,25 +3721,25 @@ function createFighterToken(fighter) {
 
   token.addEventListener("contextmenu", (event) => {
     event.preventDefault();
-    const current = state.fighters[fighter.id];
+    const current = state.fighters[combatant.id];
     if (current && (current.id === "hero" || isKnownTile(current.position))) {
-      showFighterInfo(current);
+      showCombatantInfo(current);
     }
   });
 
-  if (fighter.id === "hero") {
+  if (combatant.id === "hero") {
     token.addEventListener("pointerdown", handleHeroPointerDown);
   }
 
   return token;
 }
-function fighterTokenArt(fighter) {
+function combatantTokenArt(fighter) {
   return fighter.tokenArt ?? fighter.tokenImage ?? fighter.art ?? "";
 }
 
-function ensureFighterToken(fighter) {
-  if (els.room.querySelector(`[data-fighter="${fighter.id}"]`)) return;
-  els.room.querySelector(".token-layer")?.prepend(createFighterToken(fighter));
+function ensureCombatantToken(fighter) {
+  if (els.room.querySelector(`[data-combatant="${fighter.id}"]`)) return;
+  els.room.querySelector(".token-layer")?.prepend(createCombatantToken(fighter));
 }
 
 function buildRoom() {
@@ -3688,7 +3773,7 @@ function buildRoom() {
   tokenLayer.className = "token-layer";
 
   for (const fighter of Object.values(state.fighters)) {
-    tokenLayer.append(createFighterToken(fighter));
+    tokenLayer.append(createCombatantToken(fighter));
   }
 
   const exitToken = document.createElement("div");
@@ -3760,7 +3845,7 @@ function renderDungeonObjects() {
     if (!objectCells(object).some(isKnownTile)) continue;
     const template = objectTemplate(object.type);
     if (!template) continue;
-    if (object.type === "trap" && !object.detected && !object.spent && !object.disarmed) continue;
+    if (objectIsTrap(object) && !object.detected && !object.spent && !object.disarmed) continue;
 
     const element = document.createElement("button");
     element.className = `dungeon-object ${object.type}${object.spent ? " spent" : ""}${object.disarmed ? " disarmed" : ""}${object.detected ? " detected" : ""}`;
@@ -3774,7 +3859,7 @@ function renderDungeonObjects() {
       bigRock: "R",
     };
 
-element.textContent = objectSymbols[object.type] ?? "?";
+element.textContent = objectSymbols[object.type] ?? (objectIsTrap(object) ? "!" : "?");
     element.style.left = `${object.position.x * scaledTileSizePx}px`;
     element.style.top = `${object.position.y * scaledTileSizePx}px`;
     element.style.width = `${(object.width ?? template.width) * scaledTileSizePx}px`;
@@ -3817,8 +3902,8 @@ function placeHomeChestToken() {
 }
 
 function placeToken(fighter) {
-  ensureFighterToken(fighter);
-  const token = els.room.querySelector(`[data-fighter="${fighter.id}"]`);
+  ensureCombatantToken(fighter);
+  const token = els.room.querySelector(`[data-combatant="${fighter.id}"]`);
   if (!token) return;
 
   const scaledTileSizePx = currentTileSizePx();
@@ -3912,7 +3997,7 @@ function renderHeroStatusCard(element, fighter) {
     <div class="fighter-top">
       <div>
         <div class="fighter-name">${fighter.name}</div>
-        <div class="fighter-role">${escapeHtml(fighterRoleLabel(fighter))}</div>
+        <div class="fighter-role">${escapeHtml(combatantRoleLabel(fighter))}</div>
       </div>
       <div class="card-actions">
         <button class="icon-button open-inventory" type="button" title="Inventory and equipment" aria-label="Inventory and equipment">I</button>
@@ -3954,7 +4039,7 @@ async function renameHero() {
   render();
 }
 
-function showFighterInfo(fighter) {
+function showCombatantInfo(fighter) {
   refreshDerivedStats(fighter);
   const hpPercent = Math.max(0, Math.round((fighter.hp / fighter.maxHp) * 100));
   const weapon = activeWeapon(fighter);
@@ -3962,7 +4047,7 @@ function showFighterInfo(fighter) {
   const abilities = ["str", "dex", "con", "int", "wis", "cha"];
   els.fighterInfoName.textContent = fighter.name;
   els.fighterInfoBody.innerHTML = `
-    <div class="fighter-role">${escapeHtml(fighterRoleLabel(fighter))}</div>
+    <div class="fighter-role">${escapeHtml(combatantRoleLabel(fighter))}</div>
     <div class="hp-line">
       <div class="hp-text"><span>HP</span><span>${fighter.hp} / ${fighter.maxHp}</span></div>
       <div class="hp-bar"><div class="hp-fill" style="width: ${hpPercent}%"></div></div>
@@ -4015,7 +4100,7 @@ function showDungeonObjectInfo(object) {
   const canDisarm =
     state.mode !== "combat" &&
     objectAdjacent &&
-    ((object.type === "trap" && object.detected && object.armed !== false && !object.disarmed) ||
+    ((objectIsTrap(object) && object.detected && object.armed !== false && !object.disarmed) ||
       (object.type === "chest" && object.trap?.detected && !object.trap.disarmAttempted));
   const canInvestigate = state.mode !== "combat" && template.kind === "furniture" && objectAdjacent && !object.investigated;
   const chestItems = object.type === "chest" || isHomeChest ? object.items ?? [] : [];
@@ -4029,9 +4114,9 @@ function showDungeonObjectInfo(object) {
       <div class="stat-pill"><b>${object.width ?? template.width}x${object.height ?? template.height}</b><span>Size</span></div>
       <div class="stat-pill"><b>${template.blocksMovement ? "No" : "Yes"}</b><span>Crossable</span></div>
       <div class="stat-pill"><b>${template.interactable ? "Yes" : "No"}</b><span>Interactable</span></div>
-      ${object.type === "trap" ? `<div class="stat-pill"><b>${object.armed === false ? "Spent" : "Armed"}</b><span>State</span></div>` : ""}
-      ${object.type === "trap" ? `<div class="stat-pill"><b>${object.spotDc ?? 12}</b><span>Spot DC</span></div>` : ""}
-      ${object.type === "trap" ? `<div class="stat-pill"><b>${object.detected ? "Spotted" : "Hidden"}</b><span>Detection</span></div>` : ""}
+      ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.armed === false ? "Spent" : "Armed"}</b><span>State</span></div>` : ""}
+      ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.spotDc ?? 12}</b><span>Spot DC</span></div>` : ""}
+      ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.detected ? "Spotted" : "Hidden"}</b><span>Detection</span></div>` : ""}
       ${object.type === "chest" && object.trap?.detected ? `<div class="stat-pill"><b>${object.trap.spotDc ?? 12}</b><span>Trap DC</span></div>` : ""}
     </div>
     ${
@@ -4042,7 +4127,7 @@ function showDungeonObjectInfo(object) {
         : ""
     }
     ${
-      object.type === "trap"
+      objectIsTrap(object)
         ? `<button type="button" data-action="disarm-trap" data-object="${escapeAttribute(object.id)}" ${canDisarm ? "" : "disabled"}>Disarm</button>`
         : ""
     }
@@ -4294,7 +4379,7 @@ function spawnInvestigationAmbush(object) {
   }
 
   const monsterTemplate = getMonsterTemplate(pickWeightedMonsterId(weightedMonsterIdsForHero(state.fighters.hero)));
-  const monster = createFighter({
+  const monster = createCombatant({
     ...monsterTemplate,
     id: `ambush-${Date.now()}`,
     name: `${monsterTemplate.name} Ambusher`,
@@ -5094,7 +5179,7 @@ function sellStoreItem(itemId) {
   renderStoreMenu();
 }
 
-function fighterLevelFeatureNames(level) {
+function fighterClassFeatureNames(level) {
   const features = [];
   if (level === 1) features.push("Second Wind");
   if (level === 2) features.push("Action Surge");
@@ -5192,7 +5277,7 @@ async function levelUpHero() {
   const oldConMod = abilityMod(hero, "con");
   const hpGain = 6 + abilityMod(hero, "con");
   hero.level = (hero.level ?? 1) + 1;
-  hero.role = fighterRoleLabel(hero);
+  hero.role = combatantRoleLabel(hero);
   hero.maxHp += hpGain;
   hero.hitDiceRemaining = hero.level;
   let asiText = "";
@@ -5211,7 +5296,7 @@ async function levelUpHero() {
   }
   ensureFighterAbilityState(hero);
   hero.hp = hero.maxHp;
-  const features = fighterLevelFeatureNames(hero.level);
+  const features = fighterClassFeatureNames(hero.level);
   const featureText = features.length ? ` New feature${features.length === 1 ? "" : "s"}: ${features.join(", ")}.` : "";
   const levelUpText = `${hero.name} reaches level ${hero.level} and gains ${hpGain} max HP.${featureText}${asiText}`;
   addLog(levelUpText, "important");
@@ -5590,6 +5675,7 @@ function renderLog() {
 }
 
 function renderControls() {
+  applyThemePalette();
   const fighter = activeFighter();
   const heroTurn = state.mode === "combat" && fighter?.id === "hero" && combatMonsters().length > 0;
   const heroCanAttack = heroTurn && state.fighters.hero.hasAction && Boolean(attackTarget());
@@ -5682,7 +5768,7 @@ els.returnHome.addEventListener("click", returnHomeEarly);
 els.endTurn.addEventListener("click", endTurn);
 els.heroCard.addEventListener("contextmenu", (event) => {
   event.preventDefault();
-  showFighterInfo(state.fighters.hero);
+  showCombatantInfo(state.fighters.hero);
 });
 els.newGame.addEventListener("click", () => {
   showMainMenu();
@@ -5706,6 +5792,9 @@ els.debugKill.addEventListener("click", debugKillVisibleMonsters);
 els.saveGame.addEventListener("click", () => saveAdventure(activeSaveSlot));
 els.startAdventure.addEventListener("click", startNewAdventure);
 els.saveSlots.addEventListener("click", (event) => {
+  const slotElement = event.target.closest("[data-slot]");
+  if (slotElement) selectSaveSlot(Number(slotElement.dataset.slot));
+
   const button = event.target.closest("button");
   if (!button) return;
 
@@ -5719,6 +5808,10 @@ els.saveSlots.addEventListener("click", (event) => {
   if (button.dataset.action === "delete-slot") {
     deleteAdventure(slotId);
   }
+});
+els.saveSlots.addEventListener("input", (event) => {
+  const slotElement = event.target.closest("[data-slot]");
+  if (slotElement) activeSaveSlot = Number(slotElement.dataset.slot);
 });
 els.clearLog.addEventListener("click", () => {
   state.log = [];

@@ -15,6 +15,31 @@
   --iron: #312b2c;
   --floor: #302b2a;
   --floor-alt: #272324;
+  --room-bg: #171314;
+  --room-border: #5a4335;
+  --tile-bg: #120f10;
+  --tile-bg-alt: #161112;
+  --tile-border: rgba(12, 10, 10, 0.78);
+  --hidden-tile: #0c090a;
+  --wall: #100d0e;
+  --wall-line: rgba(246, 234, 216, 0.05);
+  --wall-detail: rgba(246, 234, 216, 0.075);
+  --door: rgba(215, 168, 79, 0.38);
+  --door-border: rgba(246, 234, 216, 0.24);
+  --door-open: rgba(120, 152, 173, 0.4);
+  --reachable: rgba(215, 168, 79, 0.18);
+  --reachable-border: rgba(215, 168, 79, 0.46);
+  --reachable-hover: #4a3731;
+  --path-preview: #3d4a3d;
+  --path-preview-dot: rgba(112, 173, 102, 0.3);
+  --path-preview-border: rgba(180, 226, 169, 0.72);
+  --object-bg: rgba(13, 10, 11, 0.72);
+  --object-border: rgba(215, 168, 79, 0.44);
+  --table-bg: linear-gradient(145deg, #6b4a32, #3d271d);
+  --trap-bg: linear-gradient(145deg, #4b3d38, #181315);
+  --portal-bg: radial-gradient(circle, #86f0ff, #4a3c9d 58%, #24174a);
+  --chest-bg: linear-gradient(145deg, #8f6237, #4d2e1f);
+  --rock-bg: linear-gradient(145deg, #4e5249, #252a25);
   --dock-height: 92px;
   --grid-size: 7;
   --tile-size: 54px;
@@ -318,8 +343,8 @@ h1 {
 
 .room {
   aspect-ratio: 1;
-  background: #171314;
-  border: 8px solid #5a4335;
+  background: var(--room-bg);
+  border: 8px solid var(--room-border);
   box-sizing: content-box;
   box-shadow:
     inset 0 0 0 2px #171112,
@@ -344,8 +369,8 @@ h1 {
 
 .tile {
   align-items: center;
-  background: #120f10;
-  border: 1px solid rgba(12, 10, 10, 0.78);
+  background: var(--tile-bg);
+  border: 1px solid var(--tile-border);
   border-radius: 0;
   display: flex;
   justify-content: center;
@@ -365,7 +390,7 @@ h1 {
 }
 
 .tile:nth-child(2n) {
-  background: #161112;
+  background: var(--tile-bg-alt);
 }
 
 .tile.walkable {
@@ -381,15 +406,15 @@ h1 {
 }
 
 .tile.hidden-tile {
-  background: #0c090a;
+  background: var(--hidden-tile);
   border-color: rgba(0, 0, 0, 0.5);
 }
 
 .tile.seen-wall {
   background:
     linear-gradient(135deg, rgba(246, 234, 216, 0.035) 0 1px, transparent 1px 8px),
-    #100d0e;
-  border-color: rgba(246, 234, 216, 0.05);
+    var(--wall);
+  border-color: var(--wall-line);
 }
 
 .tile::after {
@@ -400,13 +425,13 @@ h1 {
 }
 
 .tile.seen-wall::after {
-  border-color: rgba(246, 234, 216, 0.075);
+  border-color: var(--wall-detail);
   inset: 18%;
 }
 
 .tile.door::after {
-  background: rgba(215, 168, 79, 0.38);
-  border: 1px solid rgba(246, 234, 216, 0.24);
+  background: var(--door);
+  border: 1px solid var(--door-border);
   box-shadow: 0 0 8px rgba(215, 168, 79, 0.22);
   inset: auto;
 }
@@ -440,7 +465,7 @@ h1 {
 }
 
 .tile.open-door::after {
-  background: rgba(120, 152, 173, 0.4);
+  background: var(--door-open);
   border-color: rgba(200, 215, 223, 0.42);
 }
 
@@ -449,8 +474,8 @@ h1 {
 }
 
 .tile.reachable::before {
-  background: rgba(215, 168, 79, 0.18);
-  border: 1px solid rgba(215, 168, 79, 0.46);
+  background: var(--reachable);
+  border: 1px solid var(--reachable-border);
   border-radius: 50%;
   content: "";
   height: 32%;
@@ -459,19 +484,19 @@ h1 {
 }
 
 .tile.reachable:hover {
-  background: #4a3731;
+  background: var(--reachable-hover);
 }
 
 .tile.path-preview {
-  background: #3d4a3d;
+  background: var(--path-preview);
   color: #f6ead8;
   font-size: 0.78rem;
   font-weight: 900;
 }
 
 .tile.path-preview::before {
-  background: rgba(112, 173, 102, 0.3);
-  border: 1px solid rgba(180, 226, 169, 0.72);
+  background: var(--path-preview-dot);
+  border: 1px solid var(--path-preview-border);
   border-radius: 50%;
   content: "";
   height: 38%;
@@ -506,8 +531,8 @@ h1 {
 
 .dungeon-object {
   align-items: center;
-  background: rgba(13, 10, 11, 0.72);
-  border: 2px solid rgba(215, 168, 79, 0.44);
+  background: var(--object-bg);
+  border: 2px solid var(--object-border);
   border-radius: 4px;
   color: #f6ead8;
   display: flex;
@@ -522,12 +547,12 @@ h1 {
 }
 
 .dungeon-object.table {
-  background: linear-gradient(145deg, #6b4a32, #3d271d);
+  background: var(--table-bg);
   border-color: rgba(215, 168, 79, 0.34);
 }
 
 .dungeon-object.trap {
-  background: linear-gradient(145deg, #4b3d38, #181315);
+  background: var(--trap-bg);
   border-color: rgba(214, 93, 74, 0.58);
   color: #ffd0c8;
 }
@@ -549,16 +574,20 @@ h1 {
 }
 
 .dungeon-object.portal {
-  background: radial-gradient(circle, #86f0ff, #4a3c9d 58%, #24174a);
+  background: var(--portal-bg);
   border-color: #b7f7ff;
   box-shadow: 0 0 14px rgba(113, 219, 255, 0.55);
   color: #f5ffff;
 }
 
 .dungeon-object.chest {
-  background: linear-gradient(145deg, #8f6237, #4d2e1f);
+  background: var(--chest-bg);
   border-color: #e4b16a;
   color: #fff0c8;
+}
+
+.dungeon-object.bigRock {
+  background: var(--rock-bg);
 }
 
 .token {

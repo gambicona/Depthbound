@@ -1,6 +1,7 @@
 (() => {
 window.DungeonContent.register("traps", "needleTrap", {
   name: "Needle Trap",
+  tags: ["trap", "chest", "needle", "piercing", "old-guardroom", "forest"],
   placement: "chest",
   spotDc: 12,
   spotDifficulty: "Normal",
