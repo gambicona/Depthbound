@@ -28,7 +28,7 @@ window.DungeonContent.register("monsters", "armoryHaunt", {
   speedFeet: 30,
   behavior: "melee",
   token: "W",
-  tokenArt: "assets/tokens/armory-haunt.png",
+  tokenArt: "assets/tokens/armory-haunt.jpg",
   tags: [
     "undead",
     "skeletal",
@@ -64,7 +64,7 @@ window.DungeonContent.register("monsters", "ashBarracksVeteran", {
   speedFeet: 30,
   behavior: "melee",
   token: "V",
-  tokenArt: "assets/tokens/ash-barracks-veteran.png",
+  tokenArt: "assets/tokens/ash-barracks-veteran.jpg",
   equipment: {
     mainHand: "longsword",
     offHand: "shield"
@@ -119,7 +119,7 @@ window.DungeonContent.register("monsters", "bannerKnight", {
   speedFeet: 30,
   behavior: "melee",
   token: "B",
-  tokenArt: "assets/tokens/banner-knight.png",
+  tokenArt: "assets/tokens/banner-knight.jpg",
   equipment: {
     mainHand: "longsword",
     offHand: "shield"
@@ -181,7 +181,7 @@ window.DungeonContent.register("monsters", "barricadeCrossbowman", {
   speedFeet: 25,
   behavior: "rangedKiter",
   token: "X",
-  tokenArt: "assets/tokens/barricade-crossbowman.png",
+  tokenArt: "assets/tokens/barricade-crossbowman.jpg",
   equipment: {
     mainHand: "light-crossbow",
     offHand: null,
@@ -249,7 +249,7 @@ window.DungeonContent.register("monsters", "blackArrowSentry", {
   speedFeet: 30,
   behavior: "rangedKiter",
   token: "N",
-  tokenArt: "assets/tokens/black-arrow-sentry.png",
+  tokenArt: "assets/tokens/black-arrow-sentry.jpg",
   abilityMods: {
     dex: 3,
     str: 0
@@ -315,7 +315,7 @@ window.DungeonContent.register("monsters", "boneLockbreaker", {
   speedFeet: 35,
   behavior: "melee",
   token: "K",
-  tokenArt: "assets/tokens/bone-lockbreaker.png",
+  tokenArt: "assets/tokens/bone-lockbreaker.jpg",
   equipment: {
     mainHand: "shortsword",
     offHand: null
@@ -363,7 +363,7 @@ window.DungeonContent.register("monsters", "boneMaulBrute", {
   speedFeet: 25,
   behavior: "melee",
   token: "M",
-  tokenArt: "assets/tokens/bone-maul-brute.png",
+  tokenArt: "assets/tokens/bone-maul-brute.jpg",
   equipment: {
     mainHand: "maul",
     offHand: null
@@ -395,7 +395,7 @@ window.DungeonContent.register("monsters", "boneMaulBrute", {
 window.DungeonContent.register("monsters", "boneRecruit", {
   name: "Bone Recruit",
   role: "Weak skeletal guard",
-  maxHp: 7,
+  maxHp: 5,
   category: 1,
   xp: 25,
   ac: 12,
@@ -415,9 +415,9 @@ window.DungeonContent.register("monsters", "boneRecruit", {
   ],
   initiativeBonus: 1,
   speedFeet: 30,
-  behavior: "melee",
+  behavior: "swarm",
   token: "R",
-  tokenArt: "assets/tokens/bone-recruit.png",
+  tokenArt: "assets/tokens/bone-recruit.jpg",
   tags: [
     "undead",
     "skeletal",
@@ -452,7 +452,7 @@ window.DungeonContent.register("monsters", "cryptExecutioner", {
   speedFeet: 25,
   behavior: "melee",
   token: "E",
-  tokenArt: "assets/tokens/crypt-executioner.png",
+  tokenArt: "assets/tokens/crypt-executioner.jpg",
   equipment: {
     mainHand: "greataxe",
     offHand: null
@@ -506,7 +506,7 @@ window.DungeonContent.register("monsters", "cryptGuard", {
   speedFeet: 25,
   behavior: "melee",
   token: "C",
-  tokenArt: "assets/tokens/crypt-guard.png",
+  tokenArt: "assets/tokens/crypt-guard.jpg",
   tags: [
     "undead",
     "skeletal",
@@ -541,7 +541,7 @@ window.DungeonContent.register("monsters", "graveBannerCastellan", {
   speedFeet: 30,
   behavior: "melee",
   token: "K",
-  tokenArt: "assets/tokens/grave-banner-castellan.png",
+  tokenArt: "assets/tokens/grave-banner-castellan.jpg",
   equipment: {
     mainHand: "greatsword",
     offHand: null
@@ -599,7 +599,7 @@ window.DungeonContent.register("monsters", "gravePikeman", {
   speedFeet: 25,
   behavior: "melee",
   token: "P",
-  tokenArt: "assets/tokens/grave-pikeman.png",
+  tokenArt: "assets/tokens/grave-pikeman.jpg",
   equipment: {
     mainHand: "pike",
     offHand: null
@@ -648,7 +648,7 @@ window.DungeonContent.register("monsters", "graveplateSentinel", {
   speedFeet: 25,
   behavior: "melee",
   token: "S",
-  tokenArt: "assets/tokens/graveplate-sentinel.png",
+  tokenArt: "assets/tokens/graveplate-sentinel.jpg",
   equipment: {
     mainHand: "greatsword",
     offHand: null
@@ -702,7 +702,7 @@ window.DungeonContent.register("monsters", "guardroomCommander", {
   speedFeet: 30,
   behavior: "melee",
   token: "B",
-  tokenArt: "assets/tokens/guardroom-commander.png",
+  tokenArt: "assets/tokens/guardroom-commander.jpg",
   extraLoot: [
     {
       kind: "randomEquipment"
@@ -720,7 +720,7 @@ window.DungeonContent.register("monsters", "guardroomCommander", {
 window.DungeonContent.register("monsters", "guardroomHound", {
   name: "Guardroom Hound",
   role: "Undead hunting dog",
-  maxHp: 12,
+  maxHp: 5,
   category: 1,
   xp: 60,
   ac: 13,
@@ -740,9 +740,9 @@ window.DungeonContent.register("monsters", "guardroomHound", {
   ],
   initiativeBonus: 3,
   speedFeet: 40,
-  behavior: "melee",
+  behavior: "swarm",
   token: "H",
-  tokenArt: "assets/tokens/guardroom-hound.png",
+  tokenArt: "assets/tokens/guardroom-hound.jpg",
   tags: [
     "undead",
     "skeletal",
@@ -783,7 +783,7 @@ window.DungeonContent.register("monsters", "hollowMarksman", {
   speedFeet: 30,
   behavior: "rangedKiter",
   token: "M",
-  tokenArt: "assets/tokens/hollow-marksman.png",
+  tokenArt: "assets/tokens/hollow-marksman.jpg",
   abilityMods: {
     dex: 2,
     str: 0
@@ -854,7 +854,7 @@ window.DungeonContent.register("monsters", "lanternHexguard", {
   speedFeet: 30,
   behavior: "rangedKiter",
   token: "L",
-  tokenArt: "assets/tokens/lantern-hexguard.png",
+  tokenArt: "assets/tokens/lantern-hexguard.jpg",
   extraLoot: [
     {
       kind: "randomEquipment"
@@ -900,7 +900,7 @@ window.DungeonContent.register("monsters", "lanternWraith", {
   speedFeet: 30,
   behavior: "rangedKiter",
   token: "L",
-  tokenArt: "assets/tokens/lantern-wraith.png",
+  tokenArt: "assets/tokens/lantern-wraith.jpg",
   tags: [
     "undead",
     "skeletal",
@@ -926,6 +926,7 @@ window.DungeonContent.register("monsters", "oathboundJailer", {
     sides: 8,
     bonus: 2,
     type: "bludgeoning",
+    weaponName: "Jailer's Chain",
     label: "1d8 + 2 bludgeoning",
     range: {
       kind: "melee",
@@ -942,7 +943,7 @@ window.DungeonContent.register("monsters", "oathboundJailer", {
   speedFeet: 25,
   behavior: "melee",
   token: "J",
-  tokenArt: "assets/tokens/oathbound-jailer.png",
+  tokenArt: "assets/tokens/oathbound-jailer.jpg",
   equipment: {
     mainHand: "chain",
     offHand: null
@@ -997,7 +998,7 @@ window.DungeonContent.register("monsters", "oathscarDuelist", {
   speedFeet: 35,
   behavior: "melee",
   token: "D",
-  tokenArt: "assets/tokens/oathscar-duelist.png",
+  tokenArt: "assets/tokens/oathscar-duelist.jpg",
   equipment: {
     mainHand: "rapier",
     offHand: null
@@ -1050,7 +1051,7 @@ window.DungeonContent.register("monsters", "oldSergeant", {
   speedFeet: 25,
   behavior: "melee",
   token: "G",
-  tokenArt: "assets/tokens/old-sergeant.png",
+  tokenArt: "assets/tokens/old-sergeant.jpg",
   equipment: {
     mainHand: "longsword",
     offHand: "shield"
@@ -1094,6 +1095,7 @@ window.DungeonContent.register("monsters", "restlessJailer", {
     sides: 8,
     bonus: 2,
     type: "bludgeoning",
+    weaponName: "Jailer's Chain",
     label: "1d8 + 2 bludgeoning",
     range: {
       kind: "melee",
@@ -1110,7 +1112,7 @@ window.DungeonContent.register("monsters", "restlessJailer", {
   speedFeet: 25,
   behavior: "melee",
   token: "J",
-  tokenArt: "assets/tokens/restless-jailer.png",
+  tokenArt: "assets/tokens/restless-jailer.jpg",
   extraLoot: [
     {
       kind: "randomEquipment"
@@ -1156,7 +1158,7 @@ window.DungeonContent.register("monsters", "ruinArbalester", {
   speedFeet: 25,
   behavior: "rangedKiter",
   token: "A",
-  tokenArt: "assets/tokens/ruin-arbalester.png",
+  tokenArt: "assets/tokens/ruin-arbalester.jpg",
   abilityMods: {
     dex: 3,
     str: 0
@@ -1226,7 +1228,7 @@ window.DungeonContent.register("monsters", "rustedHalberdier", {
   speedFeet: 25,
   behavior: "melee",
   token: "H",
-  tokenArt: "assets/tokens/rusted-halberdier.png",
+  tokenArt: "assets/tokens/rusted-halberdier.jpg",
   equipment: {
     mainHand: "halberd",
     offHand: null
@@ -1275,7 +1277,7 @@ window.DungeonContent.register("monsters", "rustedShieldbearer", {
   speedFeet: 20,
   behavior: "melee",
   token: "S",
-  tokenArt: "assets/tokens/rusted-shieldbearer.png",
+  tokenArt: "assets/tokens/rusted-shieldbearer.jpg",
   equipment: {
     mainHand: "mace",
     offHand: "shield"
@@ -1329,7 +1331,7 @@ window.DungeonContent.register("monsters", "skeletalSpearman", {
   speedFeet: 30,
   behavior: "melee",
   token: "P",
-  tokenArt: "assets/tokens/skeletal-spearman.png",
+  tokenArt: "assets/tokens/skeletal-spearman.jpg",
   equipment: {
     mainHand: "spear",
     offHand: null
@@ -1384,7 +1386,7 @@ window.DungeonContent.register("monsters", "skeletonArcher", {
   speedFeet: 25,
   behavior: "rangedKiter",
   token: "A",
-  tokenArt: "assets/tokens/skeleton-archer.png",
+  tokenArt: "assets/tokens/skeleton-archer.jpg",
   abilityMods: {
     dex: 2,
     str: 0
@@ -1450,7 +1452,7 @@ window.DungeonContent.register("monsters", "towerShieldRemnant", {
   speedFeet: 20,
   behavior: "melee",
   token: "T",
-  tokenArt: "assets/tokens/tower-shield-remnant.png",
+  tokenArt: "assets/tokens/tower-shield-remnant.jpg",
   equipment: {
     mainHand: "mace",
     offHand: "tower-shield"
@@ -1500,7 +1502,7 @@ window.DungeonContent.register("monsters", "wardenOfTheOldWatch", {
   speedFeet: 30,
   behavior: "melee",
   token: "W",
-  tokenArt: "assets/tokens/warden-of-the-old-watch.png",
+  tokenArt: "assets/tokens/warden-of-the-old-watch.jpg",
   equipment: {
     mainHand: "battleaxe",
     offHand: "shield"

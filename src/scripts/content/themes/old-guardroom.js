@@ -23,6 +23,7 @@ window.DungeonContent.register("themes", "oldGuardroom", {
     wall: "#100d0e",
     wallLine: "rgba(246, 234, 216, 0.05)",
     wallDetail: "rgba(246, 234, 216, 0.075)",
+    wallEdge: "rgba(188, 174, 154, 0.34)",
     door: "rgba(215, 168, 79, 0.38)",
     doorBorder: "rgba(246, 234, 216, 0.24)",
     doorOpen: "rgba(120, 152, 173, 0.4)",

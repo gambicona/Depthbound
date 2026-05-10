@@ -13,6 +13,7 @@
         <h1>Dungeon Room Prototype</h1>
         <div class="menu-actions">
           <button id="start-adventure" type="button">Start New Adventure</button>
+          <button id="main-tutorial" class="ghost-button" type="button">Tutorial</button>
         </div>
         <div id="save-slots" class="save-slots" aria-label="Save slots"></div>
         <p id="save-status" class="save-status"></p>
@@ -32,8 +33,14 @@
               <span id="zoom-label">100%</span>
               <button id="zoom-in" class="icon-button ghost-button" type="button" title="Zoom in" aria-label="Zoom in">+</button>
             </div>
+            <label class="volume-controls" aria-label="Sound volume">
+              <span class="volume-text">Volume</span>
+              <span id="volume-label">50%</span>
+              <input id="volume-slider" type="range" min="0" max="100" step="1" value="50" />
+            </label>
+            <button id="toggle-admin-mode" class="ghost-button admin-mode-button" type="button">Adminmode</button>
             <button id="toggle-layout" class="ghost-button debug-button" type="button">Show Dungeon Layout</button>
-            <button id="debug-kill" class="ghost-button debug-button" type="button">Debug Kill Monsters</button>
+            <button id="debug-kill" class="ghost-button debug-button" type="button">Kill all visible Monsters</button>
             <button id="save-game" class="ghost-button" type="button">Save</button>
             <button id="new-game" class="ghost-button" type="button">Main Menu</button>
             <button id="tutorial" class="ghost-button" type="button">Tutorial</button>
@@ -75,19 +82,20 @@
 
     <nav class="action-dock" aria-label="Combat actions">
       <button id="roll-initiative" type="button">Roll Initiative [R]</button>
+      <button id="select-party" type="button" disabled>Select Party</button>
       <div class="dock-action">
         <button id="attack" type="button" disabled>
-          <span>Attack [A]</span>
+          <span>Attack [T]</span>
           <small id="attack-note">No target</small>
         </button>
       </div>
       <div class="dock-action">
-        <button id="action-button" type="button" disabled>Action</button>
+        <button id="action-button" type="button" disabled>Other [X]</button>
       </div>
-      <button id="use-item" type="button" disabled>Use Item</button>
-      <button id="abilities" type="button" disabled>Abilities</button>
-      <button id="short-rest" type="button" disabled>Short Rest</button>
-      <button id="return-home" type="button" disabled>Return Home</button>
+      <button id="use-item" type="button" disabled>Use Item [U]</button>
+      <button id="abilities" type="button" disabled>Abilities [B]</button>
+      <button id="short-rest" type="button" disabled>Short Rest [Q]</button>
+      <button id="return-home" type="button" disabled>Return Home [H]</button>
       <button id="end-turn" type="button" disabled>End Turn [E]</button>
     </nav>
 
@@ -124,7 +132,7 @@
     <div id="action-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="action-menu-title">
       <div class="fighter-info-panel">
         <div class="panel-heading">
-          <h2 id="action-menu-title">Action</h2>
+          <h2 id="action-menu-title">Other</h2>
           <button id="close-action-menu" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
         </div>
         <div id="action-menu-body" class="fighter-info-body"></div>
@@ -180,9 +188,26 @@
       </form>
     </div>
 
+    <div id="tutorial-tour" class="tutorial-tour hidden" aria-live="polite">
+      <div id="tutorial-highlight" class="tutorial-highlight hidden"></div>
+      <section class="tutorial-tour-card" aria-label="Interactive tutorial">
+        <p id="tutorial-tour-step" class="eyebrow">Tutorial</p>
+        <h2 id="tutorial-tour-title">Tour</h2>
+        <p id="tutorial-tour-body"></p>
+        <div class="tutorial-tour-actions">
+          <button id="tutorial-tour-back" class="ghost-button" type="button">Back</button>
+          <button id="tutorial-tour-next" type="button">Next</button>
+          <button id="tutorial-tour-close" class="ghost-button" type="button">Finish</button>
+        </div>
+      </section>
+    </div>
+
     <script src="src/scripts/config.js" defer></script>
     <script src="src/scripts/content/registry.js" defer></script>
     <script src="src/scripts/content/items/equipment.js" defer></script>
+    <script src="src/scripts/content/items/treasure.js" defer></script>
+    <script src="src/scripts/content/items/magic_items.js" defer></script>
+    <script src="src/scripts/content/items/magic_accessories.js" defer></script>
     <script src="src/scripts/content/classes/fighter.js" defer></script>
     <script src="src/scripts/content/monsters/skeletal-undead-pack.js" defer></script>
     <script src="src/scripts/content/monsters/zombie-undead-pack.js" defer></script>

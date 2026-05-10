@@ -1,46 +1,76 @@
 How to add new furniture or dungeon objects
 
-Dungeon object templates live in src/scripts/app.js in the dungeonObjectTemplates object.
+1. Add the furniture template in:
+   src/scripts/content/furniture/dungeon-furniture-pack.js
 
-Each template can define:
+Use DungeonContent.register("furniture", id, template):
 
-name: Display name.
-kind: furniture, trap, container, or another short category.
-width and height: Size in grid squares.
-blocksMovement: true if heroes and monsters must path around it.
-interactable: true if it should have actions later.
-description: Text shown in the right-click info panel.
-
-Example:
-
-myStatue: {
+(() => {
+window.DungeonContent.register("furniture", "myStatue", {
   name: "Stone Statue",
   kind: "furniture",
+  tags: ["furniture", "old-guardroom"],
   width: 1,
   height: 1,
   blocksMovement: true,
-  interactable: false,
+  interactable: true,
   description: "A cracked stone statue. It blocks movement.",
+});
+})();
+
+Important fields:
+name: Display name.
+kind: Usually "furniture", "container", "trap", or "portal".
+tags: Used by themes to allow or block this furniture.
+width and height: Size in grid squares.
+blocksMovement: true if heroes and monsters must path around it.
+interactable: true if it should show actions in the right-click panel.
+description: Text shown in the right-click info panel.
+
+2. Load the file in index.html before app.js if it is a new file.
+
+3. Make it eligible for a theme.
+
+Themes use furnitureTagGroups:
+
+furnitureTagGroups: [
+  ["furniture", "old-guardroom"],
+  ["chest"],
+]
+
+A furniture object can spawn when it matches at least one full tag group.
+
+4. Give it a spawn chance.
+
+In the theme file:
+
+furnitureSpawnChances: {
+  myStatue: 0.12,
 }
 
-To make it spawn, update createDungeonObjects in src/scripts/app.js.
+5. Add placement logic if the existing object placement does not know this type yet.
 
-Common placement rules already used:
+The shared placement function is createDungeonObjects in src/scripts/app.js.
+It already handles tables, big rocks, chests, traps, and portals. A new shape or special rule needs a small placement branch there.
 
-Tables:
-2x1, placed near the room center, never on doors, blocks movement.
+Useful helpers:
+objectCells(object): all grid cells occupied by the object.
+blockingObjectKeys(): movement-blocking object cells.
+objectAt(position): object on a tile.
+objectTemplate(type): reads the furniture/trap template.
+showDungeonObjectInfo(object): right-click info panel.
+randomOpenCell(cells, blockedKeys): pick a legal free tile.
+wallAdjacentRoomCells(room): good chest-like placement candidates.
 
-Chests:
-1x1, placed next to room walls, blocks movement, has an inventory.
+6. Chests and loot
 
-Traps:
-1x1, can spawn in rooms and hallways, does not block movement, triggers when stepped on.
+Use type "chest" for normal dungeon chests. They automatically get randomChestLoot and may get chest traps.
 
-Important helpers:
+Custom containers need custom interaction code in showDungeonObjectInfo/takeObjectItem unless they follow the existing chest shape:
 
-objectCells(object): returns all grid cells occupied by the object.
-blockingObjectKeys(): collects movement-blocking object cells.
-objectAt(position): finds the object on a tile.
-showDungeonObjectInfo(object): controls the right-click info panel.
-
-After adding a new blocking object type, make sure it has blocksMovement: true so pathfinding routes around it automatically.
+{
+  id: objectId("chest"),
+  type: "chest",
+  position: { ...position },
+  items: randomChestLoot(2),
+}

@@ -5,6 +5,8 @@ This system should stay generic and modular. It should not be hardcoded around o
 
 Core Design:
 Items should be matched by tags and metadata, not only by exact item IDs.
+these are neither equipable nor consumeable items and they will never provide any bonuses like magic items do. they should be a seperate category.
+also they should be stored in a separate bag, the ressource bag in the inventory (hero inventory and home storage chest) so that they do not clutter the screen too much.
 
 An item can belong to several logical groups at once. For example:
 Green Vines can be:

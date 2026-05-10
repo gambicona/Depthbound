@@ -51,6 +51,29 @@ function uniqueTags(tags) {
   return Array.from(new Set(tags.filter(Boolean)));
 }
 
+function weaponProficiencyTags(base) {
+  const [training, style] = String(base.category ?? "").split(/\s+/);
+  return uniqueTags([
+    base.category,
+    base.weaponRange,
+    training ? `${training} weapon` : "",
+    style ? `${style} weapon` : "",
+    training && style ? `${training} ${style}` : "",
+    training ? `weapon:${training}` : "",
+    style ? `weapon:${style}` : "",
+    base.category ? `proficiency:${base.category}` : "",
+  ]);
+}
+
+function armorProficiencyTags(base) {
+  return uniqueTags([
+    base.category,
+    base.category ? `${base.category} armor` : "",
+    base.category ? `armor:${base.category}` : "",
+    base.category ? `proficiency:${base.category}` : "",
+  ]);
+}
+
 function registerMagicWeapon(id, baseItemId, name, rarity, priceGp, magic = {}) {
   const base = getBaseItem(baseItemId);
   if (!base) return;
@@ -67,6 +90,7 @@ function registerMagicWeapon(id, baseItemId, name, rarity, priceGp, magic = {}) 
     baseEquipmentId: baseItemId,
     tags: uniqueTags([
       ...(base.tags ?? []),
+      ...weaponProficiencyTags(base),
       "magic",
       "magic-item",
       "magic-weapon",
@@ -122,6 +146,7 @@ function registerMagicArmor(id, baseItemId, name, rarity, priceGp, magic = {}) {
     baseEquipmentId: baseItemId,
     tags: uniqueTags([
       ...(base.tags ?? []),
+      ...armorProficiencyTags(base),
       "magic",
       "magic-item",
       "magic-armor",

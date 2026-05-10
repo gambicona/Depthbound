@@ -53,7 +53,7 @@
     behavior: "melee",
     token: "D",
 
-    tokenArt: "assets/tokens/dune-jackal.png",
+    tokenArt: "assets/tokens/dune-jackal.jpg",
     specialAbility: [
       "Pounce"
     ]
@@ -89,7 +89,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/sand-scorpion.png",
+    tokenArt: "assets/tokens/sand-scorpion.jpg",
     damageResistances: [
       "poison"
     ],
@@ -125,7 +125,7 @@
     speedFeet: 35,
     behavior: "melee",
     token: "D",
-    tokenArt: "assets/tokens/dust-hyena.png",
+    tokenArt: "assets/tokens/dust-hyena.jpg",
   });
   window.BeastBiomeMonsterIds.desert = window.BeastBiomeMonsterIds.desert || [];
   window.BeastBiomeMonsterIds.desert.push("dustHyena");
@@ -157,7 +157,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/sunback-tortoise.png",
+    tokenArt: "assets/tokens/sunback-tortoise.jpg",
     specialAbility: [
       "ShellGuard"
     ]
@@ -193,7 +193,7 @@
     token: "O",
 
 
-    tokenArt: "assets/tokens/old-dune-boar.png",
+    tokenArt: "assets/tokens/old-dune-boar.jpg",
     specialAbility: [
       "Charge",
       "BossRoar"
@@ -235,7 +235,7 @@
     behavior: "melee",
     token: "G",
 
-    tokenArt: "assets/tokens/glass-fang-viper.png",
+    tokenArt: "assets/tokens/glass-fang-viper.jpg",
     damageResistances: [
       "poison"
     ],
@@ -273,7 +273,7 @@
     token: "D",
 
 
-    tokenArt: "assets/tokens/dune-lion.png",
+    tokenArt: "assets/tokens/dune-lion.jpg",
     specialAbility: [
       "Pounce"
     ]
@@ -308,7 +308,7 @@
     token: "A",
 
 
-    tokenArt: "assets/tokens/ashback-camel.png",
+    tokenArt: "assets/tokens/ashback-camel.jpg",
     specialAbility: [
       "Charge"
     ]
@@ -343,7 +343,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/spine-tail-monitor.png",
+    tokenArt: "assets/tokens/spine-tail-monitor.jpg",
     damageResistances: [
       "slashing"
     ],
@@ -382,7 +382,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/scarred-sand-manticore.png",
+    tokenArt: "assets/tokens/scarred-sand-manticore.jpg",
     specialAbility: [
       "Pounce",
       "BossRoar"
@@ -423,7 +423,7 @@
     behavior: "melee",
     token: "S",
 
-    tokenArt: "assets/tokens/storm-dune-raptor.png",
+    tokenArt: "assets/tokens/storm-dune-raptor.jpg",
     specialAbility: [
       "Pounce"
     ]
@@ -459,7 +459,7 @@
     token: "B",
 
 
-    tokenArt: "assets/tokens/bonecrack-scorpion.png",
+    tokenArt: "assets/tokens/bonecrack-scorpion.jpg",
     damageResistances: [
       "poison"
     ],
@@ -497,7 +497,7 @@
     token: "D",
 
 
-    tokenArt: "assets/tokens/dunehorn-rhino.png",
+    tokenArt: "assets/tokens/dunehorn-rhino.jpg",
     specialAbility: [
       "Charge"
     ]
@@ -532,7 +532,7 @@
     token: "A",
 
 
-    tokenArt: "assets/tokens/ancient-glassback-tortoise.png",
+    tokenArt: "assets/tokens/ancient-glassback-tortoise.jpg",
     damageResistances: [
       "slashing"
     ],
@@ -572,7 +572,7 @@
     token: "T",
 
 
-    tokenArt: "assets/tokens/titan-sandmaw.png",
+    tokenArt: "assets/tokens/titan-sandmaw.jpg",
     specialAbility: [
       "BurrowAmbush",
       "BossRoar"
@@ -600,7 +600,7 @@
       "underground",
       "rat"
     ],
-    maxHp: 9,
+    maxHp: 5,
     category: 1,
     xp: 40,
     ac: 13,
@@ -615,9 +615,9 @@
     },
     initiativeBonus: 3,
     speedFeet: 40,
-    behavior: "melee",
+    behavior: "swarm",
     token: "C",
-    tokenArt: "assets/tokens/cave-rat.png",
+    tokenArt: "assets/tokens/cave-rat.jpg",
   });
   window.BeastBiomeMonsterIds.underground = window.BeastBiomeMonsterIds.underground || [];
   window.BeastBiomeMonsterIds.underground.push("caveRat");
@@ -649,7 +649,7 @@
     token: "B",
 
 
-    tokenArt: "assets/tokens/blind-cave-hound.png",
+    tokenArt: "assets/tokens/blind-cave-hound.jpg",
     specialAbility: [
       "Pounce"
     ]
@@ -684,7 +684,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/stoneback-beetle.png",
+    tokenArt: "assets/tokens/stoneback-beetle.jpg",
     damageResistances: [
       "bludgeoning"
     ],
@@ -723,7 +723,7 @@
     token: "P",
 
 
-    tokenArt: "assets/tokens/pale-cave-spider.png",
+    tokenArt: "assets/tokens/pale-cave-spider.jpg",
     damageResistances: [
       "poison"
     ],
@@ -762,7 +762,7 @@
     token: "D",
 
 
-    tokenArt: "assets/tokens/deep-tunnel-boar.png",
+    tokenArt: "assets/tokens/deep-tunnel-boar.jpg",
     specialAbility: [
       "Charge",
       "BossRoar"
@@ -803,7 +803,7 @@
     behavior: "melee",
     token: "G",
 
-    tokenArt: "assets/tokens/gloom-mole.png",
+    tokenArt: "assets/tokens/gloom-mole.jpg",
     specialAbility: [
       "BurrowAmbush"
     ]
@@ -836,7 +836,7 @@
     speedFeet: 30,
     behavior: "melee",
     token: "C",
-    tokenArt: "assets/tokens/crag-toad.png",
+    tokenArt: "assets/tokens/crag-toad.jpg",
   });
   window.BeastBiomeMonsterIds.underground = window.BeastBiomeMonsterIds.underground || [];
   window.BeastBiomeMonsterIds.underground.push("cragToad");
@@ -868,7 +868,7 @@
     token: "R",
 
 
-    tokenArt: "assets/tokens/razor-mandible-beetle.png",
+    tokenArt: "assets/tokens/razor-mandible-beetle.jpg",
     damageResistances: [
       "slashing"
     ],
@@ -906,7 +906,7 @@
     token: "D",
 
 
-    tokenArt: "assets/tokens/darkmantle-panther.png",
+    tokenArt: "assets/tokens/darkmantle-panther.jpg",
     specialAbility: [
       "Pounce"
     ]
@@ -942,7 +942,7 @@
     token: "O",
 
 
-    tokenArt: "assets/tokens/old-cavern-croc.png",
+    tokenArt: "assets/tokens/old-cavern-croc.jpg",
     specialAbility: [
       "BloodFrenzy",
       "BossRoar"
@@ -983,7 +983,7 @@
     behavior: "melee",
     token: "D",
 
-    tokenArt: "assets/tokens/deep-rift-stalker.png",
+    tokenArt: "assets/tokens/deep-rift-stalker.jpg",
     specialAbility: [
       "BurrowAmbush"
     ]
@@ -1018,7 +1018,7 @@
     token: "C",
 
 
-    tokenArt: "assets/tokens/crystal-carapace-scarab.png",
+    tokenArt: "assets/tokens/crystal-carapace-scarab.jpg",
     damageResistances: [
       "bludgeoning",
       "slashing"
@@ -1057,7 +1057,7 @@
     token: "B",
 
 
-    tokenArt: "assets/tokens/basalt-mauler.png",
+    tokenArt: "assets/tokens/basalt-mauler.jpg",
     damageResistances: [
       "bludgeoning"
     ],
@@ -1096,7 +1096,7 @@
     token: "N",
 
 
-    tokenArt: "assets/tokens/nightglass-spider.png",
+    tokenArt: "assets/tokens/nightglass-spider.jpg",
     damageResistances: [
       "poison"
     ],
@@ -1136,7 +1136,7 @@
     token: "T",
 
 
-    tokenArt: "assets/tokens/tunnel-king-worm.png",
+    tokenArt: "assets/tokens/tunnel-king-worm.jpg",
     specialAbility: [
       "BurrowAmbush",
       "BossRoar"
@@ -1181,7 +1181,7 @@
     speedFeet: 40,
     behavior: "melee",
     token: "B",
-    tokenArt: "assets/tokens/bog-frog.png",
+    tokenArt: "assets/tokens/bog-frog.jpg",
   });
   window.BeastBiomeMonsterIds.swamp = window.BeastBiomeMonsterIds.swamp || [];
   window.BeastBiomeMonsterIds.swamp.push("bogFrog");
@@ -1211,7 +1211,7 @@
     speedFeet: 35,
     behavior: "melee",
     token: "M",
-    tokenArt: "assets/tokens/mud-snapper.png",
+    tokenArt: "assets/tokens/mud-snapper.jpg",
   });
   window.BeastBiomeMonsterIds.swamp = window.BeastBiomeMonsterIds.swamp || [];
   window.BeastBiomeMonsterIds.swamp.push("mudSnapper");
@@ -1243,7 +1243,7 @@
     token: "L",
 
 
-    tokenArt: "assets/tokens/leech-hound.png",
+    tokenArt: "assets/tokens/leech-hound.jpg",
     specialAbility: [
       "BloodFrenzy"
     ]
@@ -1279,7 +1279,7 @@
     token: "R",
 
 
-    tokenArt: "assets/tokens/reed-viper.png",
+    tokenArt: "assets/tokens/reed-viper.jpg",
     damageResistances: [
       "poison"
     ],
@@ -1318,7 +1318,7 @@
     token: "O",
 
 
-    tokenArt: "assets/tokens/old-bog-gator.png",
+    tokenArt: "assets/tokens/old-bog-gator.jpg",
     specialAbility: [
       "BloodFrenzy",
       "BossRoar"
@@ -1359,7 +1359,7 @@
     behavior: "melee",
     token: "M",
 
-    tokenArt: "assets/tokens/mire-stag.png",
+    tokenArt: "assets/tokens/mire-stag.jpg",
     specialAbility: [
       "Charge"
     ]
@@ -1394,7 +1394,7 @@
     token: "R",
 
 
-    tokenArt: "assets/tokens/rotwater-croc.png",
+    tokenArt: "assets/tokens/rotwater-croc.jpg",
     specialAbility: [
       "MarshAmbush"
     ]
@@ -1429,7 +1429,7 @@
     token: "B",
 
 
-    tokenArt: "assets/tokens/bogback-boar.png",
+    tokenArt: "assets/tokens/bogback-boar.jpg",
     damageResistances: [
       "piercing"
     ],
@@ -1474,7 +1474,7 @@
     token: "P",
 
 
-    tokenArt: "assets/tokens/plague-mire-toad.png",
+    tokenArt: "assets/tokens/plague-mire-toad.jpg",
     damageResistances: [
       "poison"
     ],
@@ -1513,7 +1513,7 @@
     token: "M",
 
 
-    tokenArt: "assets/tokens/mossjaw-croc.png",
+    tokenArt: "assets/tokens/mossjaw-croc.jpg",
     specialAbility: [
       "MarshAmbush",
       "BossRoar"
@@ -1554,7 +1554,7 @@
     behavior: "melee",
     token: "F",
 
-    tokenArt: "assets/tokens/fen-reaper-cat.png",
+    tokenArt: "assets/tokens/fen-reaper-cat.jpg",
     specialAbility: [
       "Pounce"
     ]
@@ -1589,7 +1589,7 @@
     token: "G",
 
 
-    tokenArt: "assets/tokens/giant-swamp-leech.png",
+    tokenArt: "assets/tokens/giant-swamp-leech.jpg",
     specialAbility: [
       "BloodFrenzy"
     ]
@@ -1624,7 +1624,7 @@
     token: "M",
 
 
-    tokenArt: "assets/tokens/mudmaw-behemoth.png",
+    tokenArt: "assets/tokens/mudmaw-behemoth.jpg",
     damageResistances: [
       "bludgeoning"
     ],
@@ -1663,7 +1663,7 @@
     token: "V",
 
 
-    tokenArt: "assets/tokens/venom-bog-hydra.png",
+    tokenArt: "assets/tokens/venom-bog-hydra.jpg",
     damageResistances: [
       "poison"
     ],
@@ -1702,7 +1702,7 @@
     token: "A",
 
 
-    tokenArt: "assets/tokens/ancient-mire-gator.png",
+    tokenArt: "assets/tokens/ancient-mire-gator.jpg",
     specialAbility: [
       "MarshAmbush",
       "BossRoar"
@@ -1747,7 +1747,7 @@
     speedFeet: 40,
     behavior: "melee",
     token: "S",
-    tokenArt: "assets/tokens/snow-hare.png",
+    tokenArt: "assets/tokens/snow-hare.jpg",
   });
   window.BeastBiomeMonsterIds.arctic = window.BeastBiomeMonsterIds.arctic || [];
   window.BeastBiomeMonsterIds.arctic.push("snowHare");
@@ -1779,7 +1779,7 @@
     token: "I",
 
 
-    tokenArt: "assets/tokens/ice-fox.png",
+    tokenArt: "assets/tokens/ice-fox.jpg",
     damageResistances: [
       "cold"
     ],
@@ -1817,7 +1817,7 @@
     token: "F",
 
 
-    tokenArt: "assets/tokens/frost-wolf.png",
+    tokenArt: "assets/tokens/frost-wolf.jpg",
     damageResistances: [
       "cold"
     ],
@@ -1855,7 +1855,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/snowback-boar.png",
+    tokenArt: "assets/tokens/snowback-boar.jpg",
     damageResistances: [
       "cold"
     ],
@@ -1894,7 +1894,7 @@
     token: "O",
 
 
-    tokenArt: "assets/tokens/old-icehorn-ram.png",
+    tokenArt: "assets/tokens/old-icehorn-ram.jpg",
     damageResistances: [
       "cold"
     ],
@@ -1938,7 +1938,7 @@
     behavior: "melee",
     token: "W",
 
-    tokenArt: "assets/tokens/white-dire-wolf.png",
+    tokenArt: "assets/tokens/white-dire-wolf.jpg",
     damageResistances: [
       "cold"
     ],
@@ -1976,7 +1976,7 @@
     token: "I",
 
 
-    tokenArt: "assets/tokens/ice-claw-lynx.png",
+    tokenArt: "assets/tokens/ice-claw-lynx.jpg",
     damageResistances: [
       "cold"
     ]
@@ -2011,7 +2011,7 @@
     token: "T",
 
 
-    tokenArt: "assets/tokens/tundra-ox.png",
+    tokenArt: "assets/tokens/tundra-ox.jpg",
     damageResistances: [
       "cold"
     ],
@@ -2050,7 +2050,7 @@
     token: "F",
 
 
-    tokenArt: "assets/tokens/frostbite-viper.png",
+    tokenArt: "assets/tokens/frostbite-viper.jpg",
     damageResistances: [
       "cold",
       "poison"
@@ -2090,7 +2090,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/snowhide-bear.png",
+    tokenArt: "assets/tokens/snowhide-bear.jpg",
     damageResistances: [
       "cold"
     ],
@@ -2134,7 +2134,7 @@
     behavior: "melee",
     token: "G",
 
-    tokenArt: "assets/tokens/glacier-wolf.png",
+    tokenArt: "assets/tokens/glacier-wolf.jpg",
     damageResistances: [
       "cold"
     ],
@@ -2172,7 +2172,7 @@
     token: "M",
 
 
-    tokenArt: "assets/tokens/mammoth-calf-rampager.png",
+    tokenArt: "assets/tokens/mammoth-calf-rampager.jpg",
     damageResistances: [
       "cold"
     ],
@@ -2210,7 +2210,7 @@
     token: "I",
 
 
-    tokenArt: "assets/tokens/iceplate-tortoise.png",
+    tokenArt: "assets/tokens/iceplate-tortoise.jpg",
     damageResistances: [
       "cold",
       "slashing"
@@ -2249,7 +2249,7 @@
     token: "P",
 
 
-    tokenArt: "assets/tokens/polar-mauler.png",
+    tokenArt: "assets/tokens/polar-mauler.jpg",
     damageResistances: [
       "cold"
     ],
@@ -2288,7 +2288,7 @@
     token: "A",
 
 
-    tokenArt: "assets/tokens/ancient-frosthorn-mammoth.png",
+    tokenArt: "assets/tokens/ancient-frosthorn-mammoth.jpg",
     damageResistances: [
       "cold"
     ],
@@ -2319,7 +2319,7 @@
       "urban",
       "rat"
     ],
-    maxHp: 9,
+    maxHp: 5,
     category: 1,
     xp: 40,
     ac: 13,
@@ -2334,10 +2334,10 @@
     },
     initiativeBonus: 3,
     speedFeet: 40,
-    behavior: "melee",
+    behavior: "swarm",
     token: "A",
 
-    tokenArt: "assets/tokens/alley-rat.png",
+    tokenArt: "assets/tokens/alley-rat.jpg",
     specialAbility: [
       "SewerSkulk"
     ]
@@ -2372,7 +2372,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/stray-fighting-dog.png",
+    tokenArt: "assets/tokens/stray-fighting-dog.jpg",
     specialAbility: [
       "Pounce"
     ]
@@ -2412,7 +2412,7 @@
     speedFeet: 30,
     behavior: "rangedKiter",
     token: "R",
-    tokenArt: "assets/tokens/roof-crow-swarm.png",
+    tokenArt: "assets/tokens/roof-crow-swarm.jpg",
   });
   window.BeastBiomeMonsterIds.urban = window.BeastBiomeMonsterIds.urban || [];
   window.BeastBiomeMonsterIds.urban.push("roofCrowSwarm");
@@ -2444,7 +2444,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/sewer-snapper.png",
+    tokenArt: "assets/tokens/sewer-snapper.jpg",
     specialAbility: [
       "SewerSkulk"
     ]
@@ -2480,7 +2480,7 @@
     token: "O",
 
 
-    tokenArt: "assets/tokens/old-yard-mastiff.png",
+    tokenArt: "assets/tokens/old-yard-mastiff.jpg",
     specialAbility: [
       "Pounce",
       "BossRoar"
@@ -2521,7 +2521,7 @@
     behavior: "melee",
     token: "S",
 
-    tokenArt: "assets/tokens/sewer-gator.png",
+    tokenArt: "assets/tokens/sewer-gator.jpg",
     specialAbility: [
       "SewerSkulk"
     ]
@@ -2556,7 +2556,7 @@
     token: "C",
 
 
-    tokenArt: "assets/tokens/chimney-marten.png",
+    tokenArt: "assets/tokens/chimney-marten.jpg",
     specialAbility: [
       "Pounce"
     ]
@@ -2591,7 +2591,7 @@
     token: "M",
 
 
-    tokenArt: "assets/tokens/mange-wolf.png",
+    tokenArt: "assets/tokens/mange-wolf.jpg",
     specialAbility: [
       "BloodFrenzy"
     ]
@@ -2626,7 +2626,7 @@
     token: "I",
 
 
-    tokenArt: "assets/tokens/ironhide-sewer-boar.png",
+    tokenArt: "assets/tokens/ironhide-sewer-boar.jpg",
     damageResistances: [
       "piercing"
     ],
@@ -2665,7 +2665,7 @@
     token: "K",
 
 
-    tokenArt: "assets/tokens/king-of-the-kennels.png",
+    tokenArt: "assets/tokens/king-of-the-kennels.jpg",
     specialAbility: [
       "Pounce",
       "BossRoar"
@@ -2706,7 +2706,7 @@
     behavior: "melee",
     token: "D",
 
-    tokenArt: "assets/tokens/dire-sewer-gator.png",
+    tokenArt: "assets/tokens/dire-sewer-gator.jpg",
     specialAbility: [
       "SewerSkulk"
     ]
@@ -2741,7 +2741,7 @@
     token: "R",
 
 
-    tokenArt: "assets/tokens/rooftop-razorwing.png",
+    tokenArt: "assets/tokens/rooftop-razorwing.jpg",
     specialAbility: [
       "Pounce"
     ]
@@ -2776,7 +2776,7 @@
     token: "P",
 
 
-    tokenArt: "assets/tokens/plague-alley-mastiff.png",
+    tokenArt: "assets/tokens/plague-alley-mastiff.jpg",
     damageResistances: [
       "poison"
     ],
@@ -2814,7 +2814,7 @@
     token: "C",
 
 
-    tokenArt: "assets/tokens/cistern-shellback.png",
+    tokenArt: "assets/tokens/cistern-shellback.jpg",
     damageResistances: [
       "slashing"
     ],
@@ -2853,7 +2853,7 @@
     token: "O",
 
 
-    tokenArt: "assets/tokens/old-sewer-king.png",
+    tokenArt: "assets/tokens/old-sewer-king.jpg",
     specialAbility: [
       "SewerSkulk",
       "BossRoar"
@@ -2899,7 +2899,7 @@
     behavior: "melee",
     token: "R",
 
-    tokenArt: "assets/tokens/reef-eel.png",
+    tokenArt: "assets/tokens/reef-eel.jpg",
     specialAbility: [
       "Aquatic"
     ]
@@ -2934,7 +2934,7 @@
     token: "R",
 
 
-    tokenArt: "assets/tokens/river-snapper.png",
+    tokenArt: "assets/tokens/river-snapper.jpg",
     specialAbility: [
       "Aquatic",
       "ShellGuard"
@@ -2970,7 +2970,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/silverfin-piranha.png",
+    tokenArt: "assets/tokens/silverfin-piranha.jpg",
     specialAbility: [
       "BloodFrenzy"
     ]
@@ -3005,7 +3005,7 @@
     token: "M",
 
 
-    tokenArt: "assets/tokens/marsh-otter.png",
+    tokenArt: "assets/tokens/marsh-otter.jpg",
     specialAbility: [
       "Aquatic"
     ]
@@ -3041,7 +3041,7 @@
     token: "O",
 
 
-    tokenArt: "assets/tokens/old-river-croc.png",
+    tokenArt: "assets/tokens/old-river-croc.jpg",
     specialAbility: [
       "Aquatic",
       "BossRoar"
@@ -3082,7 +3082,7 @@
     behavior: "melee",
     token: "R",
 
-    tokenArt: "assets/tokens/razorfin-barracuda.png",
+    tokenArt: "assets/tokens/razorfin-barracuda.jpg",
     specialAbility: [
       "Aquatic",
       "Pounce"
@@ -3118,7 +3118,7 @@
     token: "B",
 
 
-    tokenArt: "assets/tokens/blackwater-croc.png",
+    tokenArt: "assets/tokens/blackwater-croc.jpg",
     specialAbility: [
       "Aquatic"
     ]
@@ -3153,7 +3153,7 @@
     token: "G",
 
 
-    tokenArt: "assets/tokens/giant-reef-crab.png",
+    tokenArt: "assets/tokens/giant-reef-crab.jpg",
     damageResistances: [
       "slashing"
     ],
@@ -3198,7 +3198,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/shock-eel.png",
+    tokenArt: "assets/tokens/shock-eel.jpg",
     damageResistances: [
       "lightning"
     ],
@@ -3237,7 +3237,7 @@
     token: "R",
 
 
-    tokenArt: "assets/tokens/reefjaw-shark.png",
+    tokenArt: "assets/tokens/reefjaw-shark.jpg",
     specialAbility: [
       "Aquatic",
       "BloodFrenzy"
@@ -3278,7 +3278,7 @@
     behavior: "melee",
     token: "D",
 
-    tokenArt: "assets/tokens/deepwater-shark.png",
+    tokenArt: "assets/tokens/deepwater-shark.jpg",
     specialAbility: [
       "Aquatic",
       "BloodFrenzy"
@@ -3314,7 +3314,7 @@
     token: "A",
 
 
-    tokenArt: "assets/tokens/armored-reef-crab.png",
+    tokenArt: "assets/tokens/armored-reef-crab.jpg",
     damageResistances: [
       "slashing",
       "piercing"
@@ -3360,7 +3360,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/storm-eel.png",
+    tokenArt: "assets/tokens/storm-eel.jpg",
     damageResistances: [
       "lightning"
     ],
@@ -3398,7 +3398,7 @@
     token: "T",
 
 
-    tokenArt: "assets/tokens/tide-mauler.png",
+    tokenArt: "assets/tokens/tide-mauler.jpg",
     specialAbility: [
       "Aquatic"
     ]
@@ -3434,7 +3434,7 @@
     token: "A",
 
 
-    tokenArt: "assets/tokens/ancient-harbor-shark.png",
+    tokenArt: "assets/tokens/ancient-harbor-shark.jpg",
     specialAbility: [
       "Aquatic",
       "BossRoar"
@@ -3480,7 +3480,7 @@
     behavior: "melee",
     token: "C",
 
-    tokenArt: "assets/tokens/cliff-goat.png",
+    tokenArt: "assets/tokens/cliff-goat.jpg",
     specialAbility: [
       "RockClimber"
     ]
@@ -3515,7 +3515,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/stone-marmot.png",
+    tokenArt: "assets/tokens/stone-marmot.jpg",
     specialAbility: [
       "RockClimber"
     ]
@@ -3550,7 +3550,7 @@
     token: "C",
 
 
-    tokenArt: "assets/tokens/crag-wolf.png",
+    tokenArt: "assets/tokens/crag-wolf.jpg",
     specialAbility: [
       "Pounce",
       "RockClimber"
@@ -3590,7 +3590,7 @@
     speedFeet: 30,
     behavior: "rangedKiter",
     token: "T",
-    tokenArt: "assets/tokens/talon-hawk.png",
+    tokenArt: "assets/tokens/talon-hawk.jpg",
   });
   window.BeastBiomeMonsterIds.mountain = window.BeastBiomeMonsterIds.mountain || [];
   window.BeastBiomeMonsterIds.mountain.push("talonHawk");
@@ -3623,7 +3623,7 @@
     token: "O",
 
 
-    tokenArt: "assets/tokens/old-granite-ram.png",
+    tokenArt: "assets/tokens/old-granite-ram.jpg",
     specialAbility: [
       "Charge",
       "RockClimber"
@@ -3664,7 +3664,7 @@
     behavior: "melee",
     token: "D",
 
-    tokenArt: "assets/tokens/dire-crag-wolf.png",
+    tokenArt: "assets/tokens/dire-crag-wolf.jpg",
     specialAbility: [
       "Pounce",
       "RockClimber"
@@ -3700,7 +3700,7 @@
     token: "B",
 
 
-    tokenArt: "assets/tokens/boulder-boar.png",
+    tokenArt: "assets/tokens/boulder-boar.jpg",
     specialAbility: [
       "Charge"
     ]
@@ -3735,7 +3735,7 @@
     token: "I",
 
 
-    tokenArt: "assets/tokens/ironhorn-ram.png",
+    tokenArt: "assets/tokens/ironhorn-ram.jpg",
     damageResistances: [
       "bludgeoning"
     ],
@@ -3774,7 +3774,7 @@
     token: "R",
 
 
-    tokenArt: "assets/tokens/ridge-lion.png",
+    tokenArt: "assets/tokens/ridge-lion.jpg",
     specialAbility: [
       "Pounce",
       "RockClimber"
@@ -3811,7 +3811,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/scarred-peak-bear.png",
+    tokenArt: "assets/tokens/scarred-peak-bear.jpg",
     specialAbility: [
       "BossRoar",
       "RockClimber"
@@ -3852,7 +3852,7 @@
     behavior: "melee",
     token: "A",
 
-    tokenArt: "assets/tokens/avalanche-ram.png",
+    tokenArt: "assets/tokens/avalanche-ram.jpg",
     specialAbility: [
       "Charge",
       "RockClimber"
@@ -3888,7 +3888,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/sky-talon-rocling.png",
+    tokenArt: "assets/tokens/sky-talon-rocling.jpg",
     specialAbility: [
       "Pounce"
     ]
@@ -3923,7 +3923,7 @@
     token: "G",
 
 
-    tokenArt: "assets/tokens/graniteback-bear.png",
+    tokenArt: "assets/tokens/graniteback-bear.jpg",
     damageResistances: [
       "bludgeoning"
     ],
@@ -3961,7 +3961,7 @@
     token: "M",
 
 
-    tokenArt: "assets/tokens/mountain-mane-lion.png",
+    tokenArt: "assets/tokens/mountain-mane-lion.jpg",
     specialAbility: [
       "Pounce",
       "BloodFrenzy"
@@ -3998,7 +3998,7 @@
     token: "A",
 
 
-    tokenArt: "assets/tokens/ancient-stonehorn-yak.png",
+    tokenArt: "assets/tokens/ancient-stonehorn-yak.jpg",
     damageResistances: [
       "bludgeoning"
     ],
@@ -4047,7 +4047,7 @@
     behavior: "melee",
     token: "P",
 
-    tokenArt: "assets/tokens/prairie-jackal.png",
+    tokenArt: "assets/tokens/prairie-jackal.jpg",
     specialAbility: [
       "Pounce"
     ]
@@ -4082,7 +4082,7 @@
     token: "F",
 
 
-    tokenArt: "assets/tokens/field-boar.png",
+    tokenArt: "assets/tokens/field-boar.jpg",
     specialAbility: [
       "Charge"
     ]
@@ -4115,7 +4115,7 @@
     speedFeet: 40,
     behavior: "melee",
     token: "S",
-    tokenArt: "assets/tokens/swift-step-antelope.png",
+    tokenArt: "assets/tokens/swift-step-antelope.jpg",
   });
   window.BeastBiomeMonsterIds.grassland = window.BeastBiomeMonsterIds.grassland || [];
   window.BeastBiomeMonsterIds.grassland.push("swiftStepAntelope");
@@ -4145,7 +4145,7 @@
     speedFeet: 35,
     behavior: "melee",
     token: "B",
-    tokenArt: "assets/tokens/burrow-mongoose.png",
+    tokenArt: "assets/tokens/burrow-mongoose.jpg",
   });
   window.BeastBiomeMonsterIds.grassland = window.BeastBiomeMonsterIds.grassland || [];
   window.BeastBiomeMonsterIds.grassland.push("burrowMongoose");
@@ -4178,7 +4178,7 @@
     token: "O",
 
 
-    tokenArt: "assets/tokens/old-plainstusk.png",
+    tokenArt: "assets/tokens/old-plainstusk.jpg",
     specialAbility: [
       "Charge",
       "BossRoar"
@@ -4219,7 +4219,7 @@
     behavior: "melee",
     token: "S",
 
-    tokenArt: "assets/tokens/savanna-lioness.png",
+    tokenArt: "assets/tokens/savanna-lioness.jpg",
     specialAbility: [
       "Pounce"
     ]
@@ -4254,7 +4254,7 @@
     token: "P",
 
 
-    tokenArt: "assets/tokens/plainstalker-hyena.png",
+    tokenArt: "assets/tokens/plainstalker-hyena.jpg",
     specialAbility: [
       "BloodFrenzy"
     ]
@@ -4289,7 +4289,7 @@
     token: "T",
 
 
-    tokenArt: "assets/tokens/thunderhoof-bison.png",
+    tokenArt: "assets/tokens/thunderhoof-bison.jpg",
     specialAbility: [
       "Charge"
     ]
@@ -4324,7 +4324,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/shieldback-pangolin.png",
+    tokenArt: "assets/tokens/shieldback-pangolin.jpg",
     damageResistances: [
       "slashing"
     ],
@@ -4363,7 +4363,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/scarred-savanna-lion.png",
+    tokenArt: "assets/tokens/scarred-savanna-lion.jpg",
     specialAbility: [
       "Pounce",
       "BossRoar"
@@ -4404,7 +4404,7 @@
     behavior: "melee",
     token: "E",
 
-    tokenArt: "assets/tokens/elder-prairie-lion.png",
+    tokenArt: "assets/tokens/elder-prairie-lion.jpg",
     specialAbility: [
       "Pounce"
     ]
@@ -4439,7 +4439,7 @@
     token: "S",
 
 
-    tokenArt: "assets/tokens/stampede-bison.png",
+    tokenArt: "assets/tokens/stampede-bison.jpg",
     specialAbility: [
       "Stampede"
     ]
@@ -4474,7 +4474,7 @@
     token: "I",
 
 
-    tokenArt: "assets/tokens/ironhide-rhino.png",
+    tokenArt: "assets/tokens/ironhide-rhino.jpg",
     damageResistances: [
       "piercing"
     ],
@@ -4513,7 +4513,7 @@
     token: "R",
 
 
-    tokenArt: "assets/tokens/razor-mane-hyena.png",
+    tokenArt: "assets/tokens/razor-mane-hyena.jpg",
     specialAbility: [
       "BloodFrenzy"
     ]
@@ -4549,7 +4549,7 @@
     token: "A",
 
 
-    tokenArt: "assets/tokens/ancient-thunderhoof.png",
+    tokenArt: "assets/tokens/ancient-thunderhoof.jpg",
     specialAbility: [
       "Stampede",
       "BossRoar"

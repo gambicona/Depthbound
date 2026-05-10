@@ -247,9 +247,10 @@ function connectRooms(a, b, corridors, rooms, options = {}) {
 
 function roomStartPosition(room) {
   const firstDoor = room.doors[0] ?? center(room);
+  const doorKeys = new Set((room.doors ?? []).map(key));
   const sorted = room.cells
     .slice()
-    .filter((cell) => !(cell.x === firstDoor.x && cell.y === firstDoor.y))
+    .filter((cell) => !doorKeys.has(key(cell)))
     .sort((a, b) => Math.abs(a.x - firstDoor.x) + Math.abs(a.y - firstDoor.y) - (Math.abs(b.x - firstDoor.x) + Math.abs(b.y - firstDoor.y)));
   return sorted[0] ?? center(room);
 }
@@ -320,6 +321,7 @@ function generateDungeon(options = {}) {
 
   const entranceRoom = rooms[0];
   const entranceDoor = entranceRoom.doors[0] ?? center(entranceRoom);
+  const startPosition = roomStartPosition(entranceRoom);
 
   return {
     id: `dungeon-${Date.now()}`,
@@ -331,7 +333,7 @@ function generateDungeon(options = {}) {
     doors,
     entranceRoomId: entranceRoom.id,
     entranceDoor,
-    startPosition: { ...entranceDoor },
+    startPosition,
     walkable: Array.from(walkable).map((cellKey) => {
       const [x, y] = cellKey.split(",").map(Number);
       return { x, y };

@@ -34,7 +34,7 @@ window.DungeonContent.register("monsters", "monsterTemplate", {
   speedFeet: 30,
   behavior: "melee",
   token: "M",
-  tokenArt: "assets/tokens/monster-template.png",
+  tokenArt: "assets/tokens/monster-template.jpg",
   equipment: {
     mainHand: null,
     offHand: null,

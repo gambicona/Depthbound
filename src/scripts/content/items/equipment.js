@@ -3,6 +3,52 @@ const gp = (amount) => ({ amount, unit: "gp", text: `${amount} gp` });
 const sp = (amount) => ({ amount, unit: "sp", text: `${amount} sp` });
 const cp = (amount) => ({ amount, unit: "cp", text: `${amount} cp` });
 
+function diceText(damage, fallbackBonus = "") {
+  if (damage.flat) return `${damage.flat}${damage.type ? ` ${damage.type}` : ""}`;
+  const bonus = damage.bonus ? ` + ${damage.bonus}` : fallbackBonus;
+  return `${damage.count}d${damage.sides}${bonus}${damage.type ? ` ${damage.type}` : ""}`;
+}
+
+function weaponDescription(name, category, weaponRange, damage, properties = [], propertyData = {}) {
+  const propertyText = properties.length ? ` Properties: ${properties.join(", ")}.` : "";
+  const rangeText = propertyData.thrown ? ` Can be thrown up to ${propertyData.thrown.feet} ft.` : weaponRange === "ranged" ? " Built for ranged attacks." : " Built for close combat.";
+  return `${name} is a ${category} weapon that deals ${diceText(damage)} damage.${rangeText}${propertyText}`;
+}
+
+function armorDescription(name, category, armorData, strength, stealth) {
+  const acText = armorData.bonus ? `adds +${armorData.bonus} AC` : `sets base AC to ${armorData.base}`;
+  const strengthText = strength ? ` Requires STR ${strength}.` : "";
+  const stealthText = stealth ? " Gives stealth disadvantage." : "";
+  return `${name} is ${category} armor that ${acText}.${strengthText}${stealthText}`;
+}
+
+function uniqueTags(tags) {
+  return Array.from(new Set(tags.filter(Boolean)));
+}
+
+function weaponTags(category, weaponRange) {
+  const [training, style] = String(category).split(/\s+/);
+  return uniqueTags([
+    category,
+    weaponRange,
+    `${training} weapon`,
+    `${style} weapon`,
+    `${training} ${style}`,
+    `weapon:${training}`,
+    `weapon:${style}`,
+    `proficiency:${category}`,
+  ]);
+}
+
+function armorTags(category) {
+  return uniqueTags([
+    category,
+    `${category} armor`,
+    `armor:${category}`,
+    `proficiency:${category}`,
+  ]);
+}
+
 function weapon(id, name, category, weaponRange, cost, damage, weightLb, properties = [], propertyData = {}) {
   window.DungeonContent.register("items", id, {
     name,
@@ -17,6 +63,8 @@ function weapon(id, name, category, weaponRange, cost, damage, weightLb, propert
     ammoKind: propertyData.ammoKind ?? (id.includes("crossbow") ? "bolt" : id.includes("bow") ? "arrow" : null),
     properties,
     propertyData,
+    tags: weaponTags(category, weaponRange),
+    description: propertyData.description ?? weaponDescription(name, category, weaponRange, damage, properties, propertyData),
   });
 }
 
@@ -31,6 +79,8 @@ function armor(id, name, category, cost, armorData, strength, stealth, weightLb,
     armor: armorData,
     requirements: strength ? { strength } : {},
     stealthDisadvantage: stealth,
+    tags: armorTags(category),
+    description: armorDescription(name, category, armorData, strength, stealth),
   });
 }
 
@@ -43,6 +93,7 @@ function ammunition(id, name, kind, cost, weightLb, quantity = 20) {
     weightLb,
     slots: ["quiver"],
     ammo: { kind, quantity },
+    description: `${name} is ammunition for weapons that use ${kind}s. This stack contains ${quantity}.`,
   });
 }
 
@@ -54,6 +105,7 @@ function healingPotion(id, name, dice, bonus, cost) {
     cost,
     weightLb: 0.5,
     slots: ["belt1", "belt2", "belt3", "belt4", "belt5"],
+    description: `${name} restores ${dice.count}d${dice.sides} + ${bonus} HP when used.`,
     use: {
       kind: "healing",
       resource: "bonusAction",
@@ -76,7 +128,7 @@ weapon("spear", "Spear", "simple melee", "melee", gp(1), { count: 1, sides: 6, t
 weapon("crossbow-light", "Crossbow, Light", "simple ranged", "ranged", gp(25), { count: 1, sides: 8, type: "piercing", bonusAbility: "dex" }, 5, ["ammunition", "loading", "two-handed"], { range: { kind: "ranged", normal: 80, long: 320, feet: 80 } });
 weapon("dart", "Dart", "simple ranged", "ranged", cp(5), { count: 1, sides: 4, type: "piercing", bonusAbility: "dex" }, 0.25, ["finesse", "thrown"], { thrown: { kind: "thrown", normal: 20, long: 60, feet: 20 } });
 weapon("shortbow", "Shortbow", "simple ranged", "ranged", gp(25), { count: 1, sides: 6, type: "piercing", bonusAbility: "dex" }, 2, ["ammunition", "two-handed"], { range: { kind: "ranged", normal: 80, long: 320, feet: 80 } });
-weapon("sling", "Sling", "simple ranged", "ranged", sp(1), { count: 1, sides: 4, type: "bludgeoning", bonusAbility: "dex" }, 0, ["ammunition"], { range: { kind: "ranged", normal: 30, long: 120, feet: 30 } });
+weapon("sling", "Sling", "simple ranged", "ranged", sp(1), { count: 1, sides: 4, type: "bludgeoning", bonusAbility: "dex" }, 0, ["ammunition"], { range: { kind: "ranged", normal: 30, long: 120, feet: 30 }, ammoKind: "pebble" });
 
 weapon("battleaxe", "Battleaxe", "martial melee", "melee", gp(10), { count: 1, sides: 8, type: "slashing", bonusAbility: "str" }, 4, ["versatile"], { versatile: { count: 1, sides: 10 } });
 weapon("flail", "Flail", "martial melee", "melee", gp(10), { count: 1, sides: 8, type: "bludgeoning", bonusAbility: "str" }, 2);
@@ -122,6 +174,7 @@ armor("shield", "Shield", "shield", gp(10), { bonus: 2 }, null, false, 6, ["offH
 
 ammunition("arrows-20", "Arrows (20)", "arrow", gp(1), 1, 20);
 ammunition("bolts-20", "Crossbow Bolts (20)", "bolt", gp(1), 1.5, 20);
+ammunition("pebbles-20", "Pebbles (20)", "pebble", cp(4), 1, 20);
 healingPotion("potion-healing", "Potion of Healing", { count: 2, sides: 4 }, 2, gp(10));
 healingPotion("potion-greater-healing", "Potion of Greater Healing", { count: 4, sides: 4 }, 4, gp(100));
 healingPotion("potion-superior-healing", "Potion of Superior Healing", { count: 8, sides: 4 }, 8, gp(500));

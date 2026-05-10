@@ -23,6 +23,7 @@ window.DungeonContent.register("themes", "forestOfTheBeasts", {
     wall: "#071108",
     wallLine: "rgba(168, 223, 150, 0.08)",
     wallDetail: "rgba(168, 223, 150, 0.12)",
+    wallEdge: "rgba(82, 148, 78, 0.5)",
     door: "rgba(116, 174, 80, 0.46)",
     doorBorder: "rgba(190, 235, 151, 0.32)",
     doorOpen: "rgba(110, 155, 92, 0.42)",

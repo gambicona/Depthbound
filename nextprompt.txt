@@ -1,41 +1,27 @@
-Fix saving everytime to state 1
-fix calculation of initiative bonus for character
-add back buttons in character creation
-Inventory on press I
-arrow or wsad movement of character (remap attack then)
-Make disarm traps give small xp.
-make walls visible kinda like doors in between the grid boxes
-make short rest dialogue better explained
-make the exit right click description
-restless jailers attack range is 10 ft but displayed as 5ft, has no weapon in description even though it has a chain
-make chests lootable in combat (only while standing next to it)
-chest and table spawned diagonally blocking part of the room.
-sling needs ammo, pebbles as item
-add faster movement for long distances (faster after x steps)
-unify home chests menus (add deposit and withdraw all to chest menu)
-rename button is broken (get into the select a martial weapon menu)
-remove debug combat log of not spotted trap
+with a party of four Heros of lvl 2,2,1,1 it spawned a forest dungeon with a boss but also with 10 rooms. make the 10 room rule only apply to first-level dungeons of there is only one hero in the party.
 
-weapon stuff: thrown weapons and pick them up again, off hand attack
-add selection who to target with attack if multiple available
-toggleable admin mode, buttons otherwise hidden
-add extra attack for fighter and rework fighter class object
-add role selection for character (tank, dd, heal)
+
+add spells framework: actions or bonus actions, spell level and slots, effects aoe damage, single target attack, heal, buff, debuff. Heros and monsters could have spells.
+add aoe effect abilities
+add roles: pet and support (pet like controllable npc for example ranger pet, support acts on its own)
+add the standard item descriptions
+add extra attack for fighter, subclass
 add more monster behaviour (already according to role and int)
 Give type to monsters (undead etc)
 make furniture jumpable (for pits etc)
-add loot category (equipment that can not be bought but sold, can have magical properties such as +1 or extra dmg)
-add treasure category (valuables that can only be sold, but for full value)
-instructions to add: new loot and treasure, new furniture
 
-token artwork (Heros)
+
 Monster Compendium to collect
 Cleric class
-races
+races (balance)
 build base
 NPCs with (random) quests
 make it possible to go back to lower level dungeons to redo them and gain items from bosses for quests for example
-Sort which furniture in which theme is generating
 predefined dungeons and dungeon creator
 ressource points to get ressources (stone pit, con check, get stone, farmable, as configurable file, spawnable in dungeons at walls)
 packs to find (Medizin Pack Proviant Pack, etc) that can either be sold to merchants or even factions for points or be opened to gain whatever is inside
+add stealthing through rooms a possibilty
+add locks to chests to lockpick (for rogues and such, add tool proficiencies?)
+
+
+check if multiple heros are saved correctly. if i save at home, i wanna spawn at home. if i save in a dungoen, i wanna start excatly in the same dungeon and where i left off and when i go home again have all the heros in the roster if they were any.
