@@ -1,8 +1,7 @@
-with a party of four Heros of lvl 2,2,1,1 it spawned a forest dungeon with a boss but also with 10 rooms. make the 10 room rule only apply to first-level dungeons of there is only one hero in the party.
+the cleric need to get his selection of starter gear.
+why is monk unarmed die at lvl one a d6? should be d4
 
 
-add spells framework: actions or bonus actions, spell level and slots, effects aoe damage, single target attack, heal, buff, debuff. Heros and monsters could have spells.
-add aoe effect abilities
 add roles: pet and support (pet like controllable npc for example ranger pet, support acts on its own)
 add the standard item descriptions
 add extra attack for fighter, subclass
@@ -22,6 +21,11 @@ ressource points to get ressources (stone pit, con check, get stone, farmable, a
 packs to find (Medizin Pack Proviant Pack, etc) that can either be sold to merchants or even factions for points or be opened to gain whatever is inside
 add stealthing through rooms a possibilty
 add locks to chests to lockpick (for rogues and such, add tool proficiencies?)
+Factions with quests (Monsterhunter, buying pelts etc, elementalists, Gravebinder etc)
+Arena fighting pit for glory
 
 
 check if multiple heros are saved correctly. if i save at home, i wanna spawn at home. if i save in a dungoen, i wanna start excatly in the same dungeon and where i left off and when i go home again have all the heros in the roster if they were any.
+check availabilty of premade hero token.
+
+

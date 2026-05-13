@@ -1,0 +1,40 @@
+(() => {
+const halfCasterSpellPoints = { 1: 2, 2: 4, 3: 6, 4: 6, 5: 14, 6: 14, 7: 17, 8: 17, 9: 27, 10: 27, 11: 32, 12: 32, 13: 38, 14: 38, 15: 44, 16: 44, 17: 57, 18: 57, 19: 64, 20: 64 };
+
+window.DungeonContent.register("classes", "paladin", {
+  name: "Oathsworn",
+  className: "Paladin",
+  classId: "paladin",
+  classRole: "paladin",
+  casterType: "half",
+  role: "Level 1 Paladin",
+  level: 1,
+  xp: 0,
+  hitDie: 10,
+  maxHp: 13,
+  abilityMods: { str: 3, dex: 0, con: 2, cha: 2 },
+  baseAc: 10,
+  attackBonus: 5,
+  damage: { count: 1, sides: 8, bonus: 3, type: "slashing", label: "1d8 + 3 slashing" },
+  initiativeBonus: 0,
+  speedFeet: 30,
+  spellcastingAbility: "cha",
+  spellPointProgression: halfCasterSpellPoints,
+  spellList: ["bless", "cure_wounds", "divine_favor", "shield_of_faith", "compelled_duel", "heroism", "thunderous_smite", "wrathful_smite", "aid", "branding_smite"],
+  spells: [],
+  token: "P",
+  classFeatures: [
+    { level: 1, name: "Lay on Hands" },
+    { level: 2, name: "Divine Smite" },
+    { level: 5, name: "Extra Attack" },
+    { level: 6, name: "Aura of Protection" },
+  ],
+  abilities: [
+    { id: "layOnHands", name: "Lay on Hands", level: 1, refresh: "longRest", uses: 1, resource: "action", description: "Heal yourself for 5 HP per paladin level." },
+    { id: "divineSmite", name: "Divine Smite", level: 2, refresh: "turn", uses: 1, resource: "bonusAction", description: "Charge your next weapon hit with radiant damage." },
+  ],
+  equipment: { mainHand: "longsword", offHand: "shield", torso: "chain-mail" },
+  inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["longsword", "shield", "chain-mail"] },
+  startingGear: { fixed: true, equipment: { mainHand: "longsword", offHand: "shield", torso: "chain-mail" }, inventory: ["longsword", "shield", "chain-mail"] },
+});
+})();

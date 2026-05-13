@@ -1,0 +1,413 @@
+Race / Species Balance Review
+Updated: 2026-05-09
+
+Purpose
+This note reviews the current race/species and subrace implementation for game balance in this dungeon crawler. It is not a rules transcript. It is a practical tuning pass for this game's current systems: grid combat, movement, damage, inventory, resting, and d20 checks.
+
+Current Important Context
+- There is no light system, so darkvision has no value.
+- There is no spell system yet, so innate spellcasting has no active value.
+- There is no social/tool system yet, so languages, tools, and social traits have little or no value.
+- Weapon and armor proficiencies are stored/displayed but not enforced yet.
+- Ability score bonuses, speed, damage resistance, Dwarven Toughness, Halfling Lucky, Half-Orc Relentless Endurance, and Half-Orc Savage Attacks are active.
+- Because many noncombat traits are intentionally inactive, some races currently feel much weaker than their tabletop versions.
+
+
+Balance Snapshot
+
+Strong Right Now
+
+Human / Standard Human
+- +1 to all six stats is very strong in a game where most checks and attacks are direct ability/modifier math.
+- It is especially good for generalist heroes and for players who do not want to optimize.
+- No special combat trait, but the raw stat total is high.
+
+Hill Dwarf
+- +2 CON, +1 WIS, poison resistance, 25 ft speed, and +1 HP per level.
+- Very durable.
+- The lower speed matters, but in tight dungeon rooms it may not fully offset the durability.
+- Strong defensive pick.
+
+Half-Orc
+- +2 STR and +1 CON already fit fighter-style combat very well.
+- Relentless Endurance is extremely valuable because it prevents a downed-state spiral.
+- Savage Attacks is a clean offensive boost.
+- Strongest melee damage/survival package.
+
+Halfling / Stout Halfling
+- +2 DEX and Lucky are very good because Lucky touches almost every important d20 roll.
+- Stout adds CON and poison resistance, making it a very strong defensive dex option.
+- 25 ft speed is a real cost but not always painful.
+
+Dragonborn
+- +2 STR, +1 CHA, 30 ft speed, and resistance from ancestry.
+- Solid, but not as explosive as Half-Orc because breath weapon is not implemented.
+- Strong when the chosen resistance matches dungeon damage types.
+
+
+Medium Right Now
+
+Mountain Dwarf
+- +2 CON and +2 STR are numerically huge.
+- Poison resistance is useful.
+- 25 ft speed is the main drawback.
+- Light/medium armor proficiency is stored, but because proficiency is not enforced yet, this part has little practical value.
+- Strong stats, but not as interesting as Hill Dwarf or Half-Orc until proficiency matters.
+
+Wood Elf
+- +2 DEX, +1 WIS, and 35 ft speed are all active.
+- Fast and reliable, especially for ranged or mobile heroes.
+- Missing stealth/darkvision/trance means it is mostly a movement-stat package.
+
+Drow / High Elf / Eladrin
+- +2 DEX plus +1 CHA or INT.
+- Weapon proficiencies are stored but not enforced.
+- Innate spells are stored but inactive.
+- Good stat line, but currently less exciting than Wood Elf.
+
+Tiefling Variants
+- Fire resistance is active and useful.
+- Ability bonuses vary by variant.
+- Innate spells are inactive, so many variants are mostly stat package + fire resistance.
+- Zariel is currently the best fighter-facing Tiefling because +1 STR helps directly.
+
+
+Weak Right Now
+
+Gnome
+- +2 INT is weak for a mostly fighter-like combat game unless INT checks/trap interactions become central.
+- 25 ft speed hurts.
+- Gnome Cunning is stored but inactive.
+- Forest Gnome and Deep Gnome get DEX, which helps. Rock Gnome gets CON, which helps a bit.
+- Still underpowered compared with Halfling or Dwarf.
+
+Half-Elf
+- +2 CHA and two flexible +1s are good, but not enough to replace inactive Fey Ancestry, skills, and spell/variant features.
+- Flexible stats help, but it has no active combat trait right now.
+- Needs either active skill value or a small dungeon-facing feature.
+
+Ghostwise / Lightfoot Halfling
+- Lucky keeps all Halflings relevant.
+- Ghostwise and Lightfoot lose value because their subrace traits are social/stealth oriented and inactive.
+- Stout is clearly the best Halfling right now.
+
+Non-Zariel Tieflings
+- Fire resistance helps, but spell traits are inactive.
+- Variants with +INT or +WIS can feel weaker for fighter builds unless the player values checks.
+
+
+Main Balance Problem
+The current implementation favors races with active combat math:
+- Direct ability bonuses
+- Damage resistance
+- Extra HP
+- Once-per-rest survival
+- Extra crit damage
+- Speed
+
+It undervalues races whose tabletop identity depends on:
+- Spells
+- Darkvision
+- Social features
+- Tool proficiencies
+- Stealth rules
+- Save advantage against specific magical effects
+
+That means the current playable balance is not yet "fair" if judged by the full tabletop race package. It is reasonable for a first implementation, but a later pass should give every race at least one active dungeon-combat or exploration hook.
+
+
+Suggested Balanced Feature Budget
+For this game, each race/subrace should aim for roughly:
+- One primary stat package.
+- One always-relevant dungeon feature.
+- One situational feature.
+- One drawback only if the active features are especially strong.
+
+Approximate value guide:
+- +2/+1 ability bonuses: baseline.
+- Flexible +1/+1: valuable but not enough alone.
+- Resistance: medium value, high in themed dungeons.
+- 35 ft speed: medium value.
+- 25 ft speed: meaningful drawback.
+- +1 HP per level: high value.
+- Relentless Endurance: high value.
+- Halfling Lucky: high value.
+- Extra crit die: medium value.
+- Weapon/armor proficiency: currently low value until enforced.
+- Stored spells/darkvision/social/tool traits: currently zero active value.
+
+
+Suggested Balanced Active Set
+
+Human
+Keep:
+- +1 to all stats.
+- 30 ft speed.
+
+Optional balance idea:
+- No extra features needed.
+- Human is simple and strong enough.
+
+
+Dwarf Base
+Keep:
+- +2 CON.
+- 25 ft speed.
+- Poison resistance.
+
+Suggested future active feature:
+- Add "Dwarven Stability": once per turn, if moved by a monster effect, reduce forced movement by 5 ft.
+- This gives dwarf identity without needing tools/stonecunning.
+
+Hill Dwarf
+Keep:
+- +1 WIS.
+- +1 HP per level.
+
+Balance note:
+- Strong but fine because speed is 25 ft.
+
+Mountain Dwarf
+Keep:
+- +2 STR.
+- Armor proficiencies stored.
+
+Suggested balance idea:
+- Once armor proficiency is enforced, Mountain Dwarf becomes good naturally.
+- Until then, consider adding "Armor Comfort": ignore 5 ft of movement penalty from heavy armor or armor slowdown effects if such effects exist later.
+
+Duergar
+Current issue:
+- +1 STR alone does not make up for inactive Duergar magic/darkvision.
+
+Suggested active feature:
+- "Duergar Endurance": once per long rest, gain resistance to one hit of poison or necrotic damage after damage is rolled.
+- Or "Enlarge Placeholder": once per long rest, add +1d4 melee damage for one turn.
+
+
+Elf Base
+Keep:
+- +2 DEX.
+- 30 ft speed.
+- Perception proficiency stored.
+
+Suggested future active feature:
+- "Elven Focus": once per short rest, reroll a failed trap spotting/investigation check.
+- This gives elves a dungeon-relevant identity without darkvision.
+
+Drow
+Current issue:
+- Drow spells/darkvision are inactive.
+
+Suggested active feature:
+- "Drow Ambush": once per combat, if attacking a monster that has not acted this round, add +1 to hit.
+- Avoid sunlight sensitivity unless there is a light/surface system.
+
+High Elf
+Current issue:
+- Cantrip inactive.
+
+Suggested active feature:
+- "Arcane Training": +1 to disarm/investigate magical furniture/traps, if trap types later support magical tags.
+- Short-term alternative: +1 INT checks involving dungeon objects.
+
+Eladrin
+Current issue:
+- Fey Step inactive.
+
+Suggested active feature:
+- "Fey Step Placeholder": once per long rest, move up to 10 ft without triggering opportunity attacks.
+- This is easy to balance and fits the tactical grid.
+
+Shadar-kai
+Keep:
+- +1 CON.
+- Necrotic resistance.
+
+Suggested active feature:
+- If teleport gets implemented, give a short teleport plus resistance for one turn.
+- Until then, necrotic resistance + CON is acceptable but situational.
+
+Wood Elf
+Keep:
+- +1 WIS.
+- 35 ft speed.
+
+Balance note:
+- This is already a clean, useful package.
+- No immediate buff needed.
+
+
+Dragonborn
+Keep:
+- +2 STR.
+- +1 CHA.
+- 30 ft speed.
+- Ancestry resistance.
+
+Current issue:
+- Breath weapon is inactive, so Dragonborn loses its signature active tool.
+
+Suggested active feature:
+- Add Breath Weapon as a once-per-short-rest cone/line action.
+- Damage should scale gently by dungeon category or hero level.
+- Suggested starting version:
+  - Action, 15 ft cone or 20 ft line.
+  - Save DC = 8 + proficiency + CON mod.
+  - Damage = 2d6 at low levels, half on save.
+  - Damage type from ancestry.
+
+Chromatic
+- With breath implemented, add no further buff initially.
+
+Gem
+- If flight/telepathy stay inactive, let Gem choose from rarer resistances as its advantage.
+- Force/psychic/radiant/thunder/necro resistance can be strong depending on dungeon type.
+
+Metallic
+- Later add a defensive/control breath option, but start with the same damage breath for balance simplicity.
+
+
+Gnome Base
+Current issue:
+- +2 INT and 25 ft speed are weak in current combat.
+
+Suggested active feature:
+- "Gnome Cunning": once per short rest, reroll a failed INT/WIS/CHA saving throw.
+- Since save context is limited, apply it only to non-physical saves if the game can identify ability.
+- This would make gnomes feel clever and defensively unique.
+
+Deep Gnome
+- +1 DEX helps.
+- Suggested active feature: +1 to disarm/spot traps while underground/cave themes, or always +1 to trap spotting.
+
+Forest Gnome
+- +1 DEX helps.
+- Suggested active feature: "Minor Illusion Placeholder": once per combat, impose disadvantage on the next attack against the gnome.
+
+Rock Gnome
+- +1 CON helps.
+- Suggested active feature: "Tinker Patch": once per long rest, restore 1 spent charge to a nonmagical consumable/tool item, or gain +1 to disarm traps.
+
+
+Half-Elf
+Keep:
+- +2 CHA.
+- Two flexible +1 bonuses.
+- 30 ft speed.
+
+Current issue:
+- Lacks active identity while skills/spells are inactive.
+
+Suggested active feature:
+- "Versatile Training": choose one of three active packages during creation:
+  - Scout: +1 to trap spotting/investigation.
+  - Duelist: +1 initiative.
+  - Support: +1 to Medicine checks.
+- This makes Half-Elf flexible without being strictly stronger than specialists.
+
+Drow / High / Wood Half-Elf
+- Drow: could later inherit Drow Ambush.
+- High: could later inherit Arcane Training.
+- Wood: could later choose 35 ft speed OR stealth feature.
+
+
+Halfling Base
+Keep:
+- +2 DEX.
+- 25 ft speed.
+- Lucky.
+
+Balance note:
+- Lucky is very strong. The speed drawback is important and should remain.
+
+Ghostwise
+Current issue:
+- +1 WIS is okay, but Silent Speech is inactive.
+
+Suggested active feature:
+- "Quiet Coordination": once per combat, switching target with Tab also gives +1 to the next attack against that target by this halfling, or allow one adjacent ally to ignore opportunity attack from one monster this turn.
+
+Lightfoot
+Current issue:
+- +1 CHA is weak for current combat.
+
+Suggested active feature:
+- "Naturally Stealthy Placeholder": once per combat, if adjacent to an ally, impose disadvantage on one ranged attack against the Lightfoot.
+
+Stout
+Keep:
+- +1 CON.
+- Poison resistance.
+
+Balance note:
+- Strongest Halfling currently, but acceptable because poison is situational and speed is 25 ft.
+
+
+Half-Orc
+Keep:
+- +2 STR.
+- +1 CON.
+- 30 ft speed.
+- Relentless Endurance.
+- Savage Attacks.
+
+Balance note:
+- Very strong for melee.
+- This is okay if other races get their missing active features later.
+- If it proves too strong now, tune Relentless Endurance to once per dungeon instead of once per long rest, but that may feel harsh.
+
+
+Tiefling Base
+Keep:
+- Fire resistance.
+- 30 ft speed.
+
+Current issue:
+- Many variants rely on spells that are inactive.
+
+Suggested active feature:
+- Give every Tiefling "Infernal Spark": once per short rest, after hitting with an attack, add 1d4 fire damage.
+- This gives them an active identity without implementing full spellcasting.
+- It should not stack too high with future smite/spell features.
+
+Variant ideas:
+- Baalzebul: poison/decay theme, once per rest add 1d4 poison instead of fire.
+- Dispater: defensive trick, once per rest +2 AC against one attack.
+- Fierna: charm theme, once per rest one monster has -1 to attack this hero for one turn.
+- Glasya: stealth trick, once per rest Disengage as bonus action.
+- Levistus: cold defense, once per rest gain temporary HP equal to level + CON mod.
+- Mammon: utility, +1 to loot/chest investigation or trap disarm.
+- Mephistopheles: fire offense, Infernal Spark upgrades to 1d6.
+- Zariel: martial smite, once per rest add 1d4 radiant/fire on melee hit.
+
+
+Recommended Next Implementation Order
+1. Dragonborn Breath Weapon.
+2. Gnome Cunning or trap-focused gnome feature.
+3. Half-Elf flexible active package.
+4. Tiefling Infernal Spark variants.
+5. Eladrin/Shadar-kai/Drow tactical once-per-rest features.
+6. Proficiency enforcement for weapons and armor.
+7. Condition-aware saving throws, then activate Fey Ancestry, Brave, Gnome Cunning in a more faithful way.
+8. Spell system, then migrate stored racial spell traits into actual usable abilities.
+
+
+Suggested Balanced Baseline If You Want Simple Fairness Now
+If the goal is good game balance before a spell system exists, every race should have:
+- Ability score bonuses.
+- Speed.
+- At least one active combat/exploration feature.
+
+Minimal additions to reach that:
+- Dwarf: already okay.
+- Elf: add one trap/perception reroll per short rest.
+- Dragonborn: add breath weapon.
+- Gnome: add one mental save/check reroll per short rest.
+- Half-Elf: add flexible Scout/Duelist/Support package.
+- Halfling: already okay.
+- Half-Orc: already okay.
+- Tiefling: add Infernal Spark once per short rest.
+- Human: already okay.
+
+This would make the list feel much more even in the current dungeon crawler while leaving room for full spell/social systems later.

@@ -1,6 +1,10 @@
 (() => {
 window.DungeonContent.register("classes", "fighter", {
   name: "Mira Vale",
+  className: "Fighter",
+  classId: "fighter",
+  classRole: "fighter",
+  casterType: "none",
   role: "Level 1 Fighter",
   level: 1,
   xp: 0,
@@ -13,6 +17,12 @@ window.DungeonContent.register("classes", "fighter", {
   initiativeBonus: 2,
   speedFeet: 30,
   token: "M",
+  classFeatures: [
+    { level: 1, name: "Second Wind" },
+    { level: 2, name: "Action Surge" },
+    { level: 5, name: "Extra Attack" },
+    { level: 9, name: "Indomitable" },
+  ],
   abilities: [
     {
       id: "secondWind",

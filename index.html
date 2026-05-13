@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dungeon Room Prototype</title>
+    <title>Depthbound</title>
     <link rel="stylesheet" href="src/styles/main.css" />
   </head>
   <body>
     <section id="main-menu" class="main-menu" aria-label="Main menu">
       <div class="menu-panel">
         <p class="eyebrow">Dungeon crawler</p>
-        <h1>Dungeon Room Prototype</h1>
+        <h1>Depthbound</h1>
         <div class="menu-actions">
           <button id="start-adventure" type="button">Start New Adventure</button>
           <button id="main-tutorial" class="ghost-button" type="button">Tutorial</button>
@@ -24,7 +24,7 @@
       <section class="arena" aria-label="Dungeon room">
         <div class="topbar">
           <div>
-            <p class="eyebrow">D&D-like crawler prototype</p>
+            <p class="eyebrow">Depthbound</p>
             <h1 id="room-title">Old Guardroom</h1>
           </div>
           <div class="top-actions">
@@ -82,7 +82,7 @@
 
     <nav class="action-dock" aria-label="Combat actions">
       <button id="roll-initiative" type="button">Roll Initiative [R]</button>
-      <button id="select-party" type="button" disabled>Select Party</button>
+      <button id="select-party" type="button" disabled>Select Party [Q]</button>
       <div class="dock-action">
         <button id="attack" type="button" disabled>
           <span>Attack [T]</span>
@@ -94,7 +94,7 @@
       </div>
       <button id="use-item" type="button" disabled>Use Item [U]</button>
       <button id="abilities" type="button" disabled>Abilities [B]</button>
-      <button id="short-rest" type="button" disabled>Short Rest [Q]</button>
+      <button id="short-rest" type="button" disabled>Short Rest</button>
       <button id="return-home" type="button" disabled>Return Home [H]</button>
       <button id="end-turn" type="button" disabled>End Turn [E]</button>
     </nav>
@@ -208,7 +208,19 @@
     <script src="src/scripts/content/items/treasure.js" defer></script>
     <script src="src/scripts/content/items/magic_items.js" defer></script>
     <script src="src/scripts/content/items/magic_accessories.js" defer></script>
+    <script src="src/scripts/content/spells/core-spells.js" defer></script>
+    <script src="src/scripts/content/classes/barbarian.js" defer></script>
     <script src="src/scripts/content/classes/fighter.js" defer></script>
+    <script src="src/scripts/content/classes/monk.js" defer></script>
+    <script src="src/scripts/content/classes/rogue.js" defer></script>
+    <script src="src/scripts/content/classes/cleric.js" defer></script>
+    <script src="src/scripts/content/classes/druid.js" defer></script>
+    <script src="src/scripts/content/classes/wizard.js" defer></script>
+    <script src="src/scripts/content/classes/bard.js" defer></script>
+    <script src="src/scripts/content/classes/sorcerer.js" defer></script>
+    <script src="src/scripts/content/classes/paladin.js" defer></script>
+    <script src="src/scripts/content/classes/ranger.js" defer></script>
+    <script src="src/scripts/content/classes/warlock.js" defer></script>
     <script src="src/scripts/content/monsters/skeletal-undead-pack.js" defer></script>
     <script src="src/scripts/content/monsters/zombie-undead-pack.js" defer></script>
     <script src="src/scripts/content/monsters/forest-beast-pack.js" defer></script>

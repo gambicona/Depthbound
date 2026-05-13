@@ -18,6 +18,7 @@ let roomZoom = 1;
 let currentInventoryDrag = null;
 let mapPan = null;
 let suppressNextTileClick = false;
+let pendingSpellTargeting = null;
 let adminMode = false;
 let adminTeleportEnabled = false;
 let adminGodMode = false;
@@ -41,6 +42,29 @@ let fledMonsterIds = new Set();
 let interactiveTutorialActive = false;
 let interactiveTutorialStep = 0;
 let predefinedHeroTokenArt = [];
+let renderedTileKeys = new Set();
+let pathfindingJobsThisTurn = 0;
+let perfOverlayElement = null;
+const activeCorridorRadius = 14;
+const monsterAiDecisionIntervalMs = 250;
+const monsterPathfindingBudgetPerTurn = 6;
+const perfStats = {
+  frames: 0,
+  lastSecondAt: performance.now(),
+  fps: 0,
+  visibleTiles: 0,
+  renderedTiles: 0,
+  totalEntities: 0,
+  activeEntities: 0,
+  sleepingEntities: 0,
+  renderedEntities: 0,
+  aiUpdates: 0,
+  aiUpdatesPerSecond: 0,
+  pathfindingJobs: 0,
+  pathfindingJobsLastFrame: 0,
+  pathfindingJobsPerSecond: 0,
+  renderMs: 0,
+};
 const heldMovementKeys = new Map();
 const dialogBackValue = "__back";
 const noHeroTokenArtValue = "__none";
@@ -282,6 +306,24 @@ const abilities = ["str", "dex", "con", "int", "wis", "cha"];
 const standardArray = [15, 14, 13, 12, 10, 8];
 const pregeneratedAbilityScores = { str: 15, con: 14, dex: 13, wis: 12, int: 10, cha: 8 };
 const fighterAbilityScoreImprovementLevels = new Set([4, 6, 8, 12, 14, 16, 19]);
+const classAbilityScoreImprovementLevels = {
+  fighter: new Set([4, 6, 8, 12, 14, 16, 19]),
+  rogue: new Set([4, 8, 10, 12, 16, 19]),
+};
+const classPredefinedAbilityScores = {
+  barbarian: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
+  bard: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
+  cleric: { str: 13, dex: 10, con: 14, int: 8, wis: 15, cha: 12 },
+  druid: { str: 8, dex: 13, con: 14, int: 12, wis: 15, cha: 10 },
+  fighter: { str: 15, dex: 13, con: 14, int: 10, wis: 12, cha: 8 },
+  monk: { str: 12, dex: 15, con: 13, int: 10, wis: 14, cha: 8 },
+  paladin: { str: 15, dex: 12, con: 13, int: 8, wis: 10, cha: 14 },
+  ranger: { str: 12, dex: 15, con: 13, int: 10, wis: 14, cha: 8 },
+  rogue: { str: 8, dex: 15, con: 14, int: 13, wis: 12, cha: 10 },
+  sorcerer: { str: 8, dex: 13, con: 14, int: 10, wis: 12, cha: 15 },
+  warlock: { str: 10, dex: 13, con: 14, int: 8, wis: 12, cha: 15 },
+  wizard: { str: 8, dex: 13, con: 14, int: 15, wis: 12, cha: 10 },
+};
 
 const els = {
   mainMenu: document.querySelector("#main-menu"),
@@ -373,14 +415,16 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
     dungeonOptions.roomCount = 10;
   }
   Object.assign(dungeonOptions, theme?.generator ?? {});
-  const categoryRoomCount = theme?.generator?.roomCountByCategory?.[categoryForHeroLevel(heroForDifficulty?.level ?? 1)];
-  if (categoryRoomCount) dungeonOptions.roomCount = categoryRoomCount;
+  const category = categoryForHeroLevel(heroForDifficulty?.level ?? 1);
+  const categoryRoomCount = theme?.generator?.roomCountByCategory?.[category];
+  if (categoryRoomCount && (category !== 1 || partySize <= 1)) dungeonOptions.roomCount = categoryRoomCount;
   const dungeon = generateDungeon(dungeonOptions);
+  const classId = heroOptions.classId ?? defaultContent.heroClass;
   const heroTemplate = applyHeroCreationOptions(
     {
-      ...getHeroTemplate(),
+      ...getHeroTemplate(classId),
       id: "hero",
-      name: heroNameOverride.trim() || getHeroTemplate().name,
+      name: heroNameOverride.trim() || getHeroTemplate(classId).name,
       position: { x: 0, y: 0 },
     },
     heroOptions,
@@ -534,6 +578,8 @@ function prepareRestedHero(hero, position) {
     relentlessEnduranceUsed: false,
   });
   resetFighterAbilityUses(restedHero);
+  restedHero.spellPoints = spellPointMaximum(restedHero);
+  ensureSpellPointState(restedHero);
   return restedHero;
 }
 
@@ -690,7 +736,7 @@ function setActiveHero(heroId) {
 function selectableHeroIds() {
   return new Set(
     (state.mode === "home" ? rosterHeroes() : partyHeroes())
-      .filter((hero) => hero?.alive && !hero.dead)
+      .filter((hero) => heroCanAct(hero))
       .map((hero) => hero.id),
   );
 }
@@ -718,7 +764,7 @@ function toggleHeroSelection(heroId) {
 
 function selectActivePartyForMovement() {
   const ids = partyHeroes()
-    .filter((hero) => hero?.alive && !hero.dead)
+    .filter((hero) => heroCanAct(hero))
     .map((hero) => hero.id);
   if (ids.length === 0) return false;
   selectedHeroIds = new Set(ids);
@@ -1003,12 +1049,12 @@ async function cropTokenDataUrl(fullDataUrl, crop = {}) {
 
 function combatantRoleLabel(combatant) {
   const species = combatant?.speciesName ? ` ${combatant.speciesName}` : "";
-  if (combatant.id === "hero" || isRosterHeroId(combatant?.id)) return `Level ${combatant.level ?? 1}${species} Fighter`;
+  if (combatant.id === "hero" || isRosterHeroId(combatant?.id)) return `Level ${combatant.level ?? 1}${species} ${combatant.className ?? "Fighter"}`;
   return combatant.role;
 }
 
 function fighterAbilityDefinitions(fighter = state?.fighters?.hero) {
-  const source = fighter?.abilities ?? (fighter?.id === "hero" ? getHeroTemplate().abilities : []) ?? [];
+  const source = fighter?.abilities ?? (isRosterHeroId(fighter?.id) ? getHeroTemplate(fighter?.classId).abilities : []) ?? [];
   return source.map((ability) => ({
     ...ability,
     usesByLevel: Array.isArray(ability.usesByLevel) ? ability.usesByLevel.map((entry) => ({ ...entry })) : undefined,
@@ -1024,10 +1070,57 @@ function abilityMaxUses(fighter, ability) {
   return uses;
 }
 
-function resetFighterAbilityUses(fighter) {
-  fighter.abilityUses = {};
+function spellPointMaximum(fighter) {
+  const level = fighter?.level ?? 1;
+  const progression = fighter?.spellPointProgression ?? {};
+  let points = fighter?.spellPointMax ?? progression[level] ?? 0;
+  for (const [entryLevel, value] of Object.entries(progression)) {
+    if (level >= Number(entryLevel)) points = value;
+  }
+  return Math.max(0, Number(points) || 0);
+}
+
+function classSpellListForFighter(fighter = state?.fighters?.hero) {
+  return [...(fighter?.classSpellList ?? fighter?.spellList ?? fighter?.spells ?? [])];
+}
+
+function spellDefinitionsForFighter(fighter = state?.fighters?.hero) {
+  return (fighter?.spells ?? [])
+    .map((spellId) => getContentDefinition("spells", spellId))
+    .filter((spell) => spell && spellUnlockedForFighter(fighter, spell));
+}
+
+function casterTypeForFighter(fighter) {
+  return fighter?.casterType ?? (["paladin", "ranger"].includes(fighter?.classId) ? "half" : fighter?.classId === "warlock" ? "pact" : "full");
+}
+
+function maxSpellLevelForFighter(fighter) {
+  const level = fighter?.level ?? 1;
+  const casterType = casterTypeForFighter(fighter);
+  if (casterType === "none") return 0;
+  if (casterType === "pact") return level >= 9 ? 5 : level >= 7 ? 4 : level >= 5 ? 3 : level >= 3 ? 2 : 1;
+  if (casterType === "half") return level >= 17 ? 5 : level >= 13 ? 4 : level >= 9 ? 3 : level >= 5 ? 2 : 1;
+  return level >= 17 ? 9 : level >= 15 ? 8 : level >= 13 ? 7 : level >= 11 ? 6 : level >= 9 ? 5 : level >= 7 ? 4 : level >= 5 ? 3 : level >= 3 ? 2 : 1;
+}
+
+function spellUnlockedForFighter(fighter, spell) {
+  if (!fighter || !spell) return false;
+  return spellBaseLevel(spell) <= maxSpellLevelForFighter(fighter);
+}
+
+function ensureSpellPointState(fighter) {
+  const max = spellPointMaximum(fighter);
+  fighter.spellPointMax = max;
+  fighter.spellPoints = Math.min(max, fighter.spellPoints ?? max);
+  fighter.classSpellList = classSpellListForFighter(fighter);
+  fighter.spells = [...(fighter.spells ?? [])].filter((spellId) => fighter.classSpellList.includes(spellId));
+  return fighter;
+}
+
+function resetFighterAbilityUses(fighter, refresh = "all") {
+  fighter.abilityUses = refresh === "all" ? {} : { ...(fighter.abilityUses ?? {}) };
   for (const ability of fighterAbilityDefinitions(fighter)) {
-    if ((fighter.level ?? 1) >= (ability.level ?? 1)) {
+    if ((fighter.level ?? 1) >= (ability.level ?? 1) && (refresh === "all" || ability.refresh === refresh || ability.refresh === "turn")) {
       fighter.abilityUses[ability.id] = 0;
     }
   }
@@ -1041,6 +1134,7 @@ function ensureFighterAbilityState(fighter) {
       fighter.abilityUses[ability.id] = Math.min(fighter.abilityUses[ability.id] ?? 0, abilityMaxUses(fighter, ability));
     }
   }
+  ensureSpellPointState(fighter);
   return fighter;
 }
 
@@ -1050,6 +1144,10 @@ function scoreToMod(score) {
 
 function abilityModsFromScores(scores = {}) {
   return Object.fromEntries(abilities.map((ability) => [ability, scoreToMod(scores[ability] ?? 10)]));
+}
+
+function proficiencyBonus(fighter) {
+  return 2 + Math.floor(((fighter?.level ?? 1) - 1) / 4);
 }
 
 function firstSubraceId(raceId) {
@@ -1148,6 +1246,7 @@ function abilityBonusSummary(bonuses = {}) {
 
 function applyHeroCreationOptions(template, options = {}) {
   const settings = { ...template, ...options };
+  const classId = options.classId ?? settings.classId ?? defaultContent.heroClass;
   const raceSelection = normalizeRaceSelection(options.raceSelection);
   const raceTraits = raceTraitsForSelection(raceSelection);
   const abilityScores = options.abilityScores
@@ -1159,6 +1258,8 @@ function applyHeroCreationOptions(template, options = {}) {
   const maxHp = abilityScores ? hitDie + abilityMods.con + (raceTraits.hpPerLevel ?? 0) * level : (settings.maxHp ?? template.maxHp);
   return {
     ...settings,
+    classId,
+    className: settings.className ?? settings.class ?? "Fighter",
     raceSelection,
     race: raceTraits.raceId,
     subrace: raceTraits.subraceId,
@@ -1264,8 +1365,8 @@ function updateBackgroundMusic() {
   currentMusic.play().catch(() => {});
 }
 
-function getHeroTemplate() {
-  return getContentDefinition("classes", defaultContent.heroClass) ?? templates.hero;
+function getHeroTemplate(classId = defaultContent.heroClass) {
+  return getContentDefinition("classes", classId) ?? getContentDefinition("classes", defaultContent.heroClass) ?? templates.hero;
 }
 
 function getMonsterTemplate(monsterId = defaultContent.monster) {
@@ -1806,6 +1907,19 @@ function normalizeItem(item) {
   return cloneData(item);
 }
 
+function starterEquipmentItem(itemId) {
+  return {
+    id: itemId,
+    itemId,
+    starterEquipment: true,
+    sell: { valueCp: 0, rate: 0 },
+  };
+}
+
+function starterEquipmentItems(itemIds = []) {
+  return itemIds.map((itemId) => (typeof itemId === "string" ? starterEquipmentItem(itemId) : { ...itemId, starterEquipment: true, sell: { ...(itemId.sell ?? {}), valueCp: 0, rate: 0 } }));
+}
+
 function normalizeEquipment(equipment = {}) {
   const normalized = { ...defaultEquipment(), ...equipment };
   for (const slot of equipmentSlots) {
@@ -1814,8 +1928,8 @@ function normalizeEquipment(equipment = {}) {
   return normalized;
 }
 
-function defaultHeroItems() {
-  return (getHeroTemplate().inventory?.items ?? []).map(normalizeItem);
+function defaultHeroItems(fighter = null) {
+  return starterEquipmentItems(getHeroTemplate(fighter?.classId).inventory?.items ?? []).map(normalizeItem);
 }
 
 function normalizeInventory(template = {}) {
@@ -1902,6 +2016,7 @@ function addItemToInventory(fighter, item, prefix = "stack") {
   for (const stack of fighter.inventory.items) {
     if (remaining <= 0) break;
     if (stack.type !== "ammunition" || stack.ammo?.kind !== item.ammo.kind) continue;
+    if (Boolean(stack.starterEquipment) !== Boolean(item.starterEquipment)) continue;
     const room = Math.max(0, limit - (stack.ammo.quantity ?? 0));
     if (room <= 0) continue;
     const moved = Math.min(room, remaining);
@@ -1949,14 +2064,14 @@ function ensureStarterHeroEquipment(fighter) {
   if (fighter.id !== "hero") return;
 
   if ((fighter.inventory.items ?? []).length === 0) {
-    const starterItems = defaultHeroItems();
+    const starterItems = defaultHeroItems(fighter);
     const itemIds = new Set(fighter.inventory.items.map((item) => item.id));
     for (const item of starterItems) {
       if (!itemIds.has(item.id)) fighter.inventory.items.push(item);
     }
   }
 
-  const templateEquipment = getHeroTemplate().equipment ?? {};
+  const templateEquipment = getHeroTemplate(fighter.classId).equipment ?? {};
   for (const slot of equipmentSlots) {
     if (fighter.equipment[slot.id] === undefined) {
       fighter.equipment[slot.id] = templateEquipment[slot.id] ?? null;
@@ -2113,9 +2228,10 @@ function canLevelUp(hero = state.fighters.hero) {
   return (hero.xp ?? 0) >= xpForNextLevel(hero.level ?? 1);
 }
 
-function attackAbilityForWeapon(weapon) {
+function attackAbilityForWeapon(weapon, fighter = null) {
   if (!weapon) return "str";
   if (weapon.weaponRange === "ranged" || weapon.range?.kind === "ranged") return "dex";
+  if (fighter && weapon.properties?.includes("finesse") && abilityMod(fighter, "dex") > abilityMod(fighter, "str")) return "dex";
   return "str";
 }
 
@@ -2146,7 +2262,7 @@ function attackBonusForWeapon(fighter, weapon = activeWeapon(fighter)) {
   const baseBonus = fighter.attackBonus ?? 0;
   const baseAbility = fighter.baseAttackAbilityMod ?? abilityMod(fighter, "str");
   const statusBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.attackBonus ?? 0), 0);
-  return baseBonus - baseAbility + abilityMod(fighter, attackAbilityForWeapon(weapon)) + (weapon?.magic?.attackBonus ?? 0) + magicEffects(fighter).attackBonus + statusBonus;
+  return baseBonus - baseAbility + abilityMod(fighter, attackAbilityForWeapon(weapon, fighter)) + (weapon?.magic?.attackBonus ?? 0) + magicEffects(fighter).attackBonus + statusBonus;
 }
 
 function formatDamage(damage) {
@@ -2173,6 +2289,9 @@ function calculateDamageModifiers(target, damage, type) {
   const effects = magicEffects(target);
   const resistances = [...(target.damageResistances ?? []), ...effects.resistances];
   const vulnerabilities = [...(target.damageVulnerabilities ?? []), ...effects.vulnerabilities];
+  if ((target.statusEffects ?? []).some((effect) => effect.id === "rage") && ["bludgeoning", "piercing", "slashing"].includes(normalizedType)) {
+    resistances.push(normalizedType);
+  }
 
   if (damageFlagMatches(target.damageImmunities, normalizedType)) {
     return { damage: 0, reason: "immune" };
@@ -2216,15 +2335,16 @@ function unarmedDamageProfile(fighter) {
 function damageProfile(fighter, options = {}) {
   const weapon = options.weapon ?? activeWeapon(fighter);
   const includeDamageModifier = options.includeDamageModifier !== false;
+  const statusDamageBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.damageBonus ?? 0), 0);
   if (!options.forceThrown && !isPartyHeroId(fighter?.id) && weapon?.properties?.includes("thrown") && weapon.range?.kind === "thrown" && !monsterCanThrowWeapon(fighter, weapon)) {
     return {
       ...weapon.damage,
-      bonus: (includeDamageModifier ? abilityMod(fighter, "str") : 0) + (weapon.magic?.damageBonus ?? 0) + magicEffects(fighter).damageBonus,
+      bonus: (includeDamageModifier ? abilityMod(fighter, "str") : 0) + (weapon.magic?.damageBonus ?? 0) + magicEffects(fighter).damageBonus + statusDamageBonus,
       range: { kind: "melee", feet: 5 },
       extraDamage: [...(weapon.magic?.extraDamage ?? []), ...magicEffects(fighter).extraDamage],
       label: formatDamage({
         ...weapon.damage,
-        bonus: (includeDamageModifier ? abilityMod(fighter, "str") : 0) + (weapon.magic?.damageBonus ?? 0) + magicEffects(fighter).damageBonus,
+        bonus: (includeDamageModifier ? abilityMod(fighter, "str") : 0) + (weapon.magic?.damageBonus ?? 0) + magicEffects(fighter).damageBonus + statusDamageBonus,
       }),
     };
   }
@@ -2234,7 +2354,7 @@ function damageProfile(fighter, options = {}) {
         flat: fighter.baseDamage.flat,
         count: fighter.baseDamage.count ?? 0,
         sides: fighter.baseDamage.sides ?? 0,
-        bonus: (includeDamageModifier ? (fighter.baseDamage.bonus ?? 0) : 0) + magicEffects(fighter).damageBonus,
+        bonus: (includeDamageModifier ? (fighter.baseDamage.bonus ?? 0) : 0) + magicEffects(fighter).damageBonus + statusDamageBonus,
         type: fighter.baseDamage.type,
         range: fighter.baseDamage.range ?? { kind: "melee", feet: 5 },
         weaponName: fighter.baseDamage.weaponName,
@@ -2247,7 +2367,7 @@ function damageProfile(fighter, options = {}) {
       flat: 1,
       count: 0,
       sides: 0,
-      bonus: (includeDamageModifier ? abilityMod(fighter, "str") : 0) + magicEffects(fighter).damageBonus,
+      bonus: (includeDamageModifier ? abilityMod(fighter, "str") : 0) + magicEffects(fighter).damageBonus + statusDamageBonus,
       type: "bludgeoning",
       range: { kind: "melee", feet: 5 },
       extraDamage: magicEffects(fighter).extraDamage,
@@ -2255,7 +2375,7 @@ function damageProfile(fighter, options = {}) {
     return { ...damage, label: formatDamage(damage) };
   }
 
-  const bonusAbility = attackAbilityForWeapon(weapon);
+  const bonusAbility = attackAbilityForWeapon(weapon, fighter);
   const bonus = includeDamageModifier ? abilityMod(fighter, bonusAbility) : 0;
   const oneHandingVersatile = weapon.properties?.includes("versatile") && !equippedItem(fighter, "offHand");
   const damageDice = oneHandingVersatile ? weapon.propertyData?.versatile ?? weapon.damage : weapon.damage;
@@ -2263,7 +2383,7 @@ function damageProfile(fighter, options = {}) {
     flat: damageDice.flat,
     count: damageDice.count ?? 0,
     sides: damageDice.sides ?? 0,
-    bonus: bonus + (weapon.magic?.damageBonus ?? 0) + magicEffects(fighter).damageBonus,
+    bonus: bonus + (weapon.magic?.damageBonus ?? 0) + magicEffects(fighter).damageBonus + statusDamageBonus,
     type: weapon.damage.type,
     range: weapon.range ?? { kind: "melee", feet: 5 },
     extraDamage: [...(weapon.magic?.extraDamage ?? []), ...magicEffects(fighter).extraDamage],
@@ -2276,7 +2396,7 @@ function opportunityAttackProfile(fighter) {
   if (weapon) {
     return {
       ...damageProfile({ ...fighter, equipment: { ...fighter.equipment, mainHand: weapon.id, offHand: fighter.equipment?.offHand } }),
-      attackAbility: attackAbilityForWeapon(weapon),
+      attackAbility: attackAbilityForWeapon(weapon, fighter),
       weaponName: weapon.name,
       weapon,
     };
@@ -2347,7 +2467,8 @@ function refreshDerivedStats(fighter) {
   fighter.baseMaxHp = fighter.baseMaxHp ?? fighter.maxHp ?? 1;
   const effects = magicEffects(fighter);
   const statusSpeedBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.speedBonusFeet ?? 0), 0);
-  fighter.maxHp = Math.max(1, fighter.baseMaxHp + (effects.maxHpBonus ?? 0));
+  const statusMaxHpBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.maxHpBonus ?? 0), 0);
+  fighter.maxHp = Math.max(1, fighter.baseMaxHp + (effects.maxHpBonus ?? 0) + statusMaxHpBonus);
   if (fighter.hp > fighter.maxHp) fighter.hp = fighter.maxHp;
   fighter.speedFeet = Math.max(5, (fighter.baseSpeedFeet ?? fighter.speedFeet ?? 30) + (effects.speedBonusFeet ?? 0) + statusSpeedBonus);
   if (fighter.abilityScores) {
@@ -2381,6 +2502,13 @@ function createCombatant(template) {
     inventory: normalizeInventory(template.inventory),
     abilities: fighterAbilityDefinitions(template),
     abilityUses: { ...(template.abilityUses ?? {}) },
+    casterType: template.casterType,
+    spellcastingAbility: template.spellcastingAbility,
+    spellPointProgression: template.spellPointProgression ? { ...template.spellPointProgression } : undefined,
+    spellPointMax: template.spellPointMax,
+    spellPoints: template.spellPoints,
+    classSpellList: [...(template.classSpellList ?? template.spellList ?? template.spells ?? [])],
+    spells: [...(template.spells ?? [])],
     partyRole: template.partyRole ?? (template.id === "hero" ? "tank" : undefined),
     position: { ...template.position },
     hp: template.maxHp,
@@ -2393,10 +2521,11 @@ function createCombatant(template) {
     canMoveThroughMonsters: false,
   };
   if (combatant.baseAttackAbilityMod === undefined) {
-    combatant.baseAttackAbilityMod = scoreToMod(baseAbilityScore(combatant, attackAbilityForWeapon(activeWeapon(combatant))));
+    combatant.baseAttackAbilityMod = scoreToMod(baseAbilityScore(combatant, attackAbilityForWeapon(activeWeapon(combatant), combatant)));
   }
   ensureStarterHeroEquipment(combatant);
   ensureFighterAbilityState(combatant);
+  ensureSpellPointState(combatant);
   return refreshDerivedStats(combatant);
 }
 
@@ -2591,16 +2720,18 @@ function syncActiveHeroToTurn() {
 
 function normalizeLoadedState(loadedState) {
   const freshState = createInitialState();
+  const loadedFighters =
+    loadedState.fighters && Object.keys(loadedState.fighters).length
+      ? { ...loadedState.fighters }
+      : { ...freshState.fighters };
+  if (!loadedFighters.hero && freshState.fighters.hero) loadedFighters.hero = freshState.fighters.hero;
   const normalized = {
     ...freshState,
     ...loadedState,
     themeId: loadedState.themeId ?? freshState.themeId ?? defaultContent.theme,
     saveSlotId: loadedState.saveSlotId ?? activeSaveSlot,
     mode: loadedState.mode ?? (loadedState.combatStarted ? "combat" : "exploration"),
-    fighters: {
-      ...freshState.fighters,
-      ...loadedState.fighters,
-    },
+    fighters: loadedFighters,
     dungeon: ensureCorridorPassages(loadedState.dungeon ?? freshState.dungeon),
     party: {
       activeHeroId: loadedState.party?.activeHeroId ?? "hero",
@@ -2696,7 +2827,15 @@ function normalizeLoadedState(loadedState) {
     fighter.weaponProficiencies = uniqueValues(fighter.weaponProficiencies ?? []);
     fighter.armorProficiencies = uniqueValues(fighter.armorProficiencies ?? []);
     fighter.skillProficiencies = uniqueValues(fighter.skillProficiencies ?? []);
-    fighter.baseAttackAbilityMod = fighter.baseAttackAbilityMod ?? scoreToMod(baseAbilityScore(fighter, attackAbilityForWeapon(activeWeapon(fighter))));
+    fighter.classId = fighter.classId ?? defaultContent.heroClass;
+    const classTemplate = getHeroTemplate(fighter.classId);
+    fighter.className = fighter.className ?? classTemplate.className ?? "Fighter";
+    fighter.casterType = fighter.casterType ?? classTemplate.casterType;
+    fighter.spellcastingAbility = fighter.spellcastingAbility ?? classTemplate.spellcastingAbility;
+    fighter.spellPointProgression = fighter.spellPointProgression ?? classTemplate.spellPointProgression;
+    fighter.classSpellList = fighter.classSpellList ?? classTemplate.classSpellList ?? classTemplate.spellList ?? classTemplate.spells ?? [];
+    fighter.spells = fighter.spells ?? [];
+    fighter.baseAttackAbilityMod = fighter.baseAttackAbilityMod ?? scoreToMod(baseAbilityScore(fighter, attackAbilityForWeapon(activeWeapon(fighter), fighter)));
     fighter.level = fighter.level ?? 1;
     fighter.xp = fighter.xp ?? 0;
     fighter.hitDie = fighter.hitDie ?? 10;
@@ -2704,6 +2843,7 @@ function normalizeLoadedState(loadedState) {
     fighter.equipment = normalizeEquipment(fighter.equipment);
     fighter.inventory = normalizeInventory(fighter.inventory);
     ensureFighterAbilityState(fighter);
+    ensureSpellPointState(fighter);
     fighter.hasBonusAction = fighter.hasBonusAction ?? true;
     fighter.dodging = fighter.dodging ?? false;
     fighter.disengaged = fighter.disengaged ?? false;
@@ -3411,13 +3551,19 @@ function showTwoSelectionDialog({ title, message, items, labels, confirmText = "
   });
 }
 
-async function createHeroGearOptions() {
-  const heroTemplate = getHeroTemplate();
+async function createHeroGearOptions(classId = defaultContent.heroClass) {
+  const heroTemplate = getHeroTemplate(classId);
   const startingGear = heroTemplate.startingGear;
+  if (startingGear?.fixed) {
+    return {
+      equipment: { ...(startingGear.equipment ?? heroTemplate.equipment ?? {}) },
+      inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: starterEquipmentItems(startingGear.inventory ?? heroTemplate.inventory?.items ?? []) },
+    };
+  }
   if (!startingGear) {
     return {
       equipment: { mainHand: "longsword", torso: "chain-mail" },
-      inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["chain-mail", "longsword"] },
+      inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: starterEquipmentItems(["chain-mail", "longsword"]) },
     };
   }
 
@@ -3513,7 +3659,7 @@ async function createHeroGearOptions() {
     equipment,
     inventory: {
       money: { cp: 0, sp: 0, gp: 0 },
-      items,
+      items: starterEquipmentItems(items),
     },
   };
 }
@@ -3729,6 +3875,25 @@ function showHeroRaceDialog({ selection = defaultRaceSelection, allowBack = true
     renderField();
     els.gameDialog.classList.remove("hidden");
     els.gameDialogField.querySelector("select")?.focus();
+  });
+}
+
+function availableHeroClasses() {
+  return window.DungeonContent
+    .list("classes")
+    .filter((entry) => !entry.hidden)
+    .sort((a, b) => (a.className ?? a.name).localeCompare(b.className ?? b.name));
+}
+
+async function showHeroClassDialog({ allowBack = true } = {}) {
+  const choices = availableHeroClasses().map((entry) => ({
+    value: entry.id,
+    label: `${entry.className ?? entry.name}${entry.spells?.length ? " (spellcaster)" : ""}`,
+  }));
+  return showChoiceDialog({
+    title: "Choose Class",
+    message: "Choose this hero's class.",
+    choices: allowBack ? withBackChoice(choices) : choices,
   });
 }
 
@@ -4069,7 +4234,51 @@ function showAbilityAssignmentDialog(scores, raceSelection = defaultRaceSelectio
   });
 }
 
-async function createCharacterOptions(raceSelection = defaultRaceSelection) {
+function spellChoiceCountForClassLevel(classId, level) {
+  const template = getHeroTemplate(classId);
+  const casterType = template.casterType ?? "none";
+  if (casterType === "none") return 0;
+  if (casterType === "full") return level === 1 ? 2 : 1;
+  if (casterType === "half") return level === 1 || (level > 1 && level % 2 === 1) ? 1 : 0;
+  if (casterType === "pact") return level === 1 ? 2 : level >= 3 && level <= 17 && level % 2 === 1 ? 1 : 0;
+  return 0;
+}
+
+function eligibleSpellChoicesFor(classSource, chosenSpellIds = []) {
+  const chosen = new Set(chosenSpellIds);
+  const maxLevel = maxSpellLevelForFighter(classSource);
+  return classSpellListForFighter(classSource)
+    .map((spellId) => getContentDefinition("spells", spellId))
+    .filter((spell) => spell && !chosen.has(spell.id) && spellBaseLevel(spell) <= maxLevel);
+}
+
+async function chooseClassSpells(classSource, count, chosenSpellIds = []) {
+  const chosen = [...chosenSpellIds];
+  let unusedCredits = 0;
+  for (let index = 0; index < count; index += 1) {
+    const eligible = eligibleSpellChoicesFor(classSource, chosen);
+    if (!eligible.length) {
+      unusedCredits += 1;
+      continue;
+    }
+    const choice = await showChoiceDialog({
+      title: "Choose Spell",
+      message: `Choose a ${classSource.className ?? "class"} spell (${index + 1}/${count}).`,
+      choices: eligible.map((spell) => ({
+        value: spell.id,
+        label: `${spell.name} (L${spellBaseLevel(spell)})`,
+      })),
+    });
+    if (!choice) {
+      unusedCredits += count - index;
+      break;
+    }
+    chosen.push(choice);
+  }
+  return { spells: chosen, unusedCredits };
+}
+
+async function createCharacterOptions(raceSelection = defaultRaceSelection, classId = defaultContent.heroClass) {
   let step = 0;
   let choice = null;
   let abilityScores = null;
@@ -4087,7 +4296,7 @@ async function createCharacterOptions(raceSelection = defaultRaceSelection) {
         });
         if (choice === dialogBackValue) return dialogBackValue;
         if (!choice) return null;
-        abilityScores = choice === "pregenerated" ? pregeneratedAbilityScores : null;
+        abilityScores = choice === "pregenerated" ? (classPredefinedAbilityScores[classId] ?? pregeneratedAbilityScores) : null;
         step += 1;
       } else if (step === 1 && choice !== "pregenerated" && !abilityScores) {
         const scores = choice === "roll" ? abilities.map(rollAbilityScore) : standardArray;
@@ -4099,14 +4308,20 @@ async function createCharacterOptions(raceSelection = defaultRaceSelection) {
       }
     }
 
-    const gearOptions = await createHeroGearOptions();
+    const gearOptions = await createHeroGearOptions(classId);
     if (gearOptions === dialogBackValue) {
       step = 0;
       choice = null;
       abilityScores = null;
       continue;
     }
-    if (gearOptions) return { abilityScores, ...gearOptions };
+    if (gearOptions) {
+      const classTemplate = getHeroTemplate(classId);
+      const classSpellList = [...(classTemplate.classSpellList ?? classTemplate.spellList ?? classTemplate.spells ?? [])];
+      const spellChoiceCount = spellChoiceCountForClassLevel(classId, 1);
+      const spellChoice = spellChoiceCount ? await chooseClassSpells({ ...classTemplate, classSpellList, level: 1 }, spellChoiceCount) : { spells: [], unusedCredits: 0 };
+      return { abilityScores, classSpellList, spells: spellChoice.spells, unusedSpellChoiceCredits: spellChoice.unusedCredits, ...gearOptions };
+    }
     return null;
   }
 }
@@ -4119,6 +4334,7 @@ async function startNewAdventure() {
   let heroOptions = null;
   let chosenTokenArt = "";
   let raceSelection = defaultRaceSelection;
+  let classId = defaultContent.heroClass;
   while (!heroOptions) {
     const identity = await showHeroIdentityDialog({
       title: "Character Name",
@@ -4130,6 +4346,13 @@ async function startNewAdventure() {
     if (!identity) return;
     chosenName = identity.name || getHeroTemplate().name;
     chosenTokenArt = identity.tokenArt;
+    const chosenClass = await showHeroClassDialog();
+    if (chosenClass === dialogBackValue) {
+      heroOptions = null;
+      continue;
+    }
+    if (!chosenClass) return;
+    classId = chosenClass;
     const chosenRace = await showHeroRaceDialog({ selection: raceSelection });
     if (chosenRace === dialogBackValue) {
       heroOptions = null;
@@ -4137,7 +4360,7 @@ async function startNewAdventure() {
     }
     if (!chosenRace) return;
     raceSelection = chosenRace;
-    heroOptions = await createCharacterOptions(raceSelection);
+    heroOptions = await createCharacterOptions(raceSelection, classId);
     if (heroOptions === dialogBackValue) {
       heroOptions = null;
       continue;
@@ -4147,6 +4370,7 @@ async function startNewAdventure() {
   const d20Mode = await showD20ModeDialog({ allowBack: false });
   if (!d20Mode) return;
   heroOptions.d20Mode = normalizeD20Mode(d20Mode);
+  heroOptions.classId = classId;
   heroOptions.tokenArt = chosenTokenArt;
   heroOptions.raceSelection = raceSelection;
   showDungeonLayout = false;
@@ -4345,6 +4569,7 @@ function applyDamageToFighter(defender, damage) {
   const wasDown = isPartyHeroId(defender.id) && defender.hp <= 0;
   const previousHp = defender.hp;
   defender.hp = Math.max(0, defender.hp - damage);
+  checkConcentrationAfterDamage(defender, damage);
   if (!isPartyHeroId(defender.id)) {
     defender.alive = defender.hp > 0;
     return;
@@ -4377,6 +4602,14 @@ function applyDamageToFighter(defender, damage) {
   downHero(defender);
   addLog(`${defender.name} drops to 0 HP and starts making death saves.`, "important");
   handleHeroDeath();
+}
+
+function checkConcentrationAfterDamage(fighter, damage) {
+  if (!fighter?.concentration || damage <= 0 || fighter.hp <= 0) return;
+  const dc = Math.max(10, Math.floor(damage / 2));
+  const save = savingThrow(fighter, "con", dc);
+  addLog(`${fighter.name} makes a concentration save: CON ${save.roll} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
+  if (!save.success) endConcentration(fighter, "failed concentration save");
 }
 
 function showDeathSaveMenu(hero) {
@@ -4464,6 +4697,22 @@ function heroCanAct(fighter) {
   return fighter?.alive && !fighter.dead && fighter.hp > 0;
 }
 
+function heroIsStableAtZero(hero) {
+  return Boolean(hero?.alive && !hero.dead && hero.hp <= 0 && (hero.deathSaves?.successes ?? 0) >= 3);
+}
+
+function heroIsUnstableDying(hero) {
+  return Boolean(hero?.alive && !hero.dead && hero.hp <= 0 && (hero.deathSaves?.successes ?? 0) < 3);
+}
+
+function unstableDyingPartyHeroes() {
+  return partyHeroes().filter(heroIsUnstableDying);
+}
+
+function stableUnconsciousPartyHeroes() {
+  return partyHeroes().filter(heroIsStableAtZero);
+}
+
 function partyDefeatedOrDying() {
   const heroes = partyHeroes();
   return heroes.length === 0 || heroes.every((hero) => !heroCanAct(hero));
@@ -4489,11 +4738,17 @@ function addTurnStartLog(fighter) {
 }
 
 function resetTurnResources(fighter) {
+  tickStatusDurations(fighter);
   fighter.statusEffects = (fighter.statusEffects ?? []).filter((effect) => !effect.expiresAtStartOfTurn);
+  for (const ability of fighterAbilityDefinitions(fighter).filter((entry) => entry.refresh === "turn")) {
+    fighter.abilityUses = { ...(fighter.abilityUses ?? {}), [ability.id]: 0 };
+  }
   refreshDerivedStats(fighter);
   if (isPartyHeroId(fighter?.id) && fighter.hp <= 0) {
+    endConcentration(fighter, "defeated");
     fighter.movementLeft = 0;
     fighter.hasAction = false;
+    fighter.attacksRemaining = 0;
     fighter.hasBonusAction = false;
     fighter.dodging = false;
     fighter.disengaged = false;
@@ -4501,12 +4756,65 @@ function resetTurnResources(fighter) {
     return;
   }
   const movementLocked = (fighter.statusEffects ?? []).some((effect) => effect.speedLocked);
+  const actionLocked = (fighter.statusEffects ?? []).some((effect) => effect.actionLocked);
   fighter.movementLeft = movementLocked ? 0 : Math.floor(fighter.speedFeet / feetPerSquare);
-  fighter.hasAction = true;
-  fighter.hasBonusAction = true;
+  fighter.hasAction = !actionLocked;
+  fighter.attacksRemaining = fighter.hasAction ? attacksPerAttackAction(fighter) : 0;
+  fighter.sneakAttackUsedThisTurn = false;
+  fighter.hasBonusAction = !actionLocked;
   fighter.dodging = false;
   fighter.disengaged = false;
   fighter.canMoveThroughMonsters = false;
+}
+
+function tickStatusDurations(fighter) {
+  if (!fighter?.statusEffects?.length) return;
+  const expired = [];
+  fighter.statusEffects = fighter.statusEffects
+    .map((effect) => {
+      if (!effect.durationRounds) return effect;
+      return { ...effect, durationRounds: effect.durationRounds - 1 };
+    })
+    .filter((effect) => {
+      const keep = !effect.durationRounds || effect.durationRounds > 0;
+      if (!keep) expired.push(effect.label ?? effect.id);
+      return keep;
+    });
+  if (expired.length) addLog(`${fighter.name}'s ${expired.join(", ")} ${expired.length === 1 ? "expires" : "expire"}.`);
+}
+
+function attacksPerAttackAction(fighter) {
+  const level = fighter?.level ?? 1;
+  if (!["barbarian", "fighter", "monk", "paladin", "ranger"].includes(fighter?.classId)) return 1;
+  if (fighter.classId === "fighter") return level >= 20 ? 4 : level >= 11 ? 3 : level >= 5 ? 2 : 1;
+  return level >= 5 ? 2 : 1;
+}
+
+function sneakAttackDice(fighter) {
+  if (fighter?.classId !== "rogue") return 0;
+  return Math.ceil((fighter.level ?? 1) / 2);
+}
+
+function canApplySneakAttack(attacker, defender, weapon, rangedAttack) {
+  if (attacker?.classId !== "rogue" || attacker.sneakAttackUsedThisTurn) return false;
+  const eligibleWeapon = rangedAttack || weapon?.properties?.includes("finesse");
+  if (!eligibleWeapon) return false;
+  return Object.values(state.fighters).some(
+    (fighter) =>
+      fighter.id !== attacker.id &&
+      fighter.id !== defender.id &&
+      fighter.alive &&
+      !fighter.dead &&
+      isPartyHeroId(fighter.id) === isPartyHeroId(attacker.id) &&
+      hasMeleeAccess(fighter, defender),
+  );
+}
+
+function consumeWeaponRider(attacker) {
+  const rider = (attacker.statusEffects ?? []).find((effect) => effect.weaponRider || ["thunderous-smite", "wrathful-smite", "branding-smite", "ensnaring-strike", "hail-of-thorns"].includes(effect.id));
+  if (!rider) return null;
+  attacker.statusEffects = (attacker.statusEffects ?? []).filter((effect) => effect.id !== rider.id);
+  return rider;
 }
 
 function expireEndOfTurnEffects(fighter) {
@@ -4639,8 +4947,10 @@ function positionFromKey(tileKey) {
 
 function exposedWallKeys() {
   const walkable = currentWalkable();
+  const activeKeys = activeTileKeys();
   const walls = new Set();
   for (const tileKey of walkable) {
+    if (!activeKeys.has(tileKey)) continue;
     const position = positionFromKey(tileKey);
     if (!isKnownTile(position)) continue;
 
@@ -4654,8 +4964,9 @@ function exposedWallKeys() {
 
 function visibleFloorEdgeKeys() {
   const keys = new Set();
+  const walkable = currentWalkable();
   for (const tileKey of visibleWalkable()) {
-    if (!currentWalkable().has(tileKey)) continue;
+    if (!walkable.has(tileKey)) continue;
     keys.add(tileKey);
   }
   return keys;
@@ -4699,6 +5010,103 @@ function currentDiscoveredRoomIds() {
   return new Set(state.exploration?.discoveredRoomIds ?? []);
 }
 
+function activeRoomIds() {
+  const rooms = state.dungeon?.rooms ?? [];
+  if (showDungeonLayout) return new Set(rooms.map((room) => room.id));
+  if (state.mode === "home") return new Set(["home-room"]);
+
+  const ids = new Set();
+  const heroPositions = partyHeroes().map((hero) => hero.position);
+  const addRoomAt = (position) => {
+    const room = roomForPosition(position);
+    if (room) ids.add(room.id);
+  };
+
+  partyHeroes().forEach((hero) => addRoomAt(hero.position));
+  const active = activeFighter();
+  if (active?.position) addRoomAt(active.position);
+  combatMonsters().forEach((monster) => addRoomAt(monster.position));
+
+  const opened = currentOpenedKeys();
+  const discovered = currentDiscoveredRoomIds();
+  for (const room of rooms) {
+    if (ids.has(room.id) || !discovered.has(room.id)) continue;
+    const hasNearbyOpenedDoor = room.doors.some((door) => {
+      const doorKey = positionKey(door);
+      if (!opened.has(doorKey)) return false;
+      const corridor = door.corridor ?? door;
+      return heroPositions.some((heroPosition) => distance(heroPosition, corridor) <= activeCorridorRadius);
+    });
+    if (hasNearbyOpenedDoor) ids.add(room.id);
+  }
+
+  return ids;
+}
+
+function activeTileKeys() {
+  const keys = new Set();
+  const rooms = state.dungeon?.rooms ?? [];
+  if (showDungeonLayout) {
+    (state.dungeon?.walkable ?? []).forEach((cell) => keys.add(positionKey(cell)));
+    (state.dungeon?.doors ?? []).forEach((door) => keys.add(positionKey(door)));
+    return keys;
+  }
+
+  const activeRooms = activeRoomIds();
+  for (const room of rooms) {
+    if (!activeRooms.has(room.id)) continue;
+    room.cells.forEach((cell) => keys.add(positionKey(cell)));
+    room.doors.forEach((door) => keys.add(positionKey(door)));
+  }
+
+  const heroPositions = partyHeroes().map((hero) => hero.position);
+  const opened = currentOpenedKeys();
+  for (const tileKey of opened) {
+    const position = positionFromKey(tileKey);
+    if (heroPositions.some((heroPosition) => distance(heroPosition, position) <= activeCorridorRadius)) {
+      keys.add(tileKey);
+      adjacentCells(position).forEach((cell) => {
+        const key = positionKey(cell);
+        if (opened.has(key)) keys.add(key);
+      });
+    }
+  }
+
+  for (const door of state.dungeon?.doors ?? []) {
+    const doorKey = positionKey(door);
+    const corridorKey = door.corridor ? positionKey(door.corridor) : "";
+    if (activeRooms.has(door.roomId) || keys.has(corridorKey)) keys.add(doorKey);
+  }
+
+  return keys;
+}
+
+function rememberedTileKeys() {
+  const keys = activeTileKeys();
+  if (showDungeonLayout) return keys;
+
+  const discovered = currentDiscoveredRoomIds();
+  for (const room of state.dungeon?.rooms ?? []) {
+    if (!discovered.has(room.id)) continue;
+    room.cells.forEach((cell) => keys.add(positionKey(cell)));
+    room.doors.forEach((door) => keys.add(positionKey(door)));
+  }
+
+  const opened = currentOpenedKeys();
+  opened.forEach((tileKey) => keys.add(tileKey));
+  for (const door of state.dungeon?.doors ?? []) {
+    if (adjacentCells(door).some((cell) => opened.has(positionKey(cell)))) {
+      keys.add(positionKey(door));
+    }
+  }
+
+  return keys;
+}
+
+function isTileActive(position) {
+  return activeTileKeys().has(positionKey(position));
+}
+
 function isKnownTile(position) {
   if (showDungeonLayout) return true;
   const tileKey = positionKey(position);
@@ -4733,8 +5141,9 @@ function surroundingCells(position) {
 function visibleWalkable() {
   const known = new Set();
   const openedKeys = currentOpenedKeys();
+  const discovered = currentDiscoveredRoomIds();
   for (const room of state.dungeon?.rooms ?? []) {
-    if (currentDiscoveredRoomIds().has(room.id)) {
+    if (discovered.has(room.id)) {
       room.cells.forEach((cell) => known.add(positionKey(cell)));
       room.doors.forEach((door) => known.add(positionKey(door)));
     }
@@ -4811,11 +5220,13 @@ function hasVisibleWallEdge(position, delta, visibleWallKeys = exposedWallKeys()
 function wallEdgeSegments() {
   const segments = [];
   const walkable = currentWalkable();
+  const activeKeys = activeTileKeys();
   const visibleWallKeys = exposedWallKeys();
   const visibleFloorKeys = visibleFloorEdgeKeys();
   const north = { x: 0, y: -1 };
   const west = { x: -1, y: 0 };
   for (const tileKey of walkable) {
+    if (!activeKeys.has(tileKey)) continue;
     const position = positionFromKey(tileKey);
     if (!visibleFloorKeys.has(tileKey)) continue;
     if (hasVisibleWallEdge(position, { x: 1, y: 0 }, visibleWallKeys, visibleFloorKeys)) segments.push({ position, direction: "east" });
@@ -4845,7 +5256,9 @@ function doorsAtCorridorMouth(position) {
 }
 
 function visibleMonsters() {
-  return aliveMonsters().filter((monster) => isKnownTile(monster.position));
+  const activeTiles = activeTileKeys();
+  const activeInitiativeIds = new Set((state.initiative ?? []).map((entry) => entry.fighterId));
+  return aliveMonsters().filter((monster) => (activeInitiativeIds.has(monster.id) || activeTiles.has(positionKey(monster.position))) && isKnownTile(monster.position));
 }
 
 function monsterHasLineOfSightToHero(monster) {
@@ -5087,7 +5500,33 @@ function canOpportunityAttack(attacker, defender, from, to) {
   return hadThreat && !keepsThreat;
 }
 
-function opportunityAttack(attacker, defender) {
+async function finishEncounterAfterLastMonsterFalls() {
+  if (combatMonsters().length > 0) return false;
+
+  const dyingHeroes = unstableDyingPartyHeroes();
+  if (dyingHeroes.length > 0) {
+    addLog("The enemies are down, but death saves continue.", "important");
+    while (unstableDyingPartyHeroes().length > 0) {
+      const hero = unstableDyingPartyHeroes()[0];
+      await rollDeathSave(hero);
+      render();
+      if (partyHeroes().length === 0) break;
+    }
+  }
+
+  if (partyDefeatedOrDying()) {
+    await handleHeroDeath();
+    return true;
+  }
+
+  if (combatMonsters().length === 0 && state.combatStarted && !partyDefeatedOrDying()) {
+    endCurrentEncounter();
+    addLog("The room falls quiet. Exploration resumes.", "important");
+  }
+  return true;
+}
+
+async function opportunityAttack(attacker, defender) {
   const profile = opportunityAttackProfile(attacker);
   const attackRollResult = rollD20ForFighter(attacker, { disadvantage: defender.dodging });
   const attackRolls = attackRollResult.rolls;
@@ -5153,10 +5592,7 @@ function opportunityAttack(attacker, defender) {
       if (isPartyHeroId(attacker.id)) playSoundEffect("enemyDefeated");
       awardMonsterXp(defender);
       dropLootForMonster(defender);
-      if (combatMonsters().length === 0) {
-        endCurrentEncounter();
-        addLog("The room falls quiet. Exploration resumes.", "important");
-      }
+      await finishEncounterAfterLastMonsterFalls();
     }
   }
 }
@@ -5242,6 +5678,13 @@ function itemValueGp(item) {
 function itemValueCp(item) {
   if (!item?.cost) return 0;
   return moneyToCp({ [item.cost.unit]: item.cost.amount ?? 0 });
+}
+
+function itemSellValueCp(item) {
+  if (item?.starterEquipment) return 0;
+  if (item?.sell?.valueCp !== undefined) return Math.max(0, Math.floor(item.sell.valueCp));
+  const sellRate = item?.sell?.rate ?? (item?.store?.sellable === true ? 0.5 : 0.5);
+  return Math.floor(itemValueCp(item) * sellRate);
 }
 
 function weightedPick(entries) {
@@ -5517,9 +5960,10 @@ function triggerPortalAtPosition(fighter, position) {
 function checkTrapDetectionOnReveal() {
   const heroes = partyHeroes();
   if (!heroes.length) return;
+  const activeTiles = activeTileKeys();
 
   for (const trap of state.dungeonObjects ?? []) {
-    if (!objectIsTrap(trap) || trap.detected || !objectCells(trap).some(isKnownTile)) continue;
+    if (!objectIsTrap(trap) || trap.detected || !objectCells(trap).some((cell) => activeTiles.has(positionKey(cell)) && isKnownTile(cell))) continue;
 
     trap.spotCheckedBy = trap.spotCheckedBy ?? [];
     for (const hero of heroes.filter((entry) => !trap.spotCheckedBy.includes(entry.id))) {
@@ -5538,7 +5982,7 @@ function checkTrapDetectionOnReveal() {
   }
 
   for (const chest of state.dungeonObjects ?? []) {
-    if (chest.type !== "chest" || !chest.trap || chest.trap.detected || !objectCells(chest).some(isKnownTile)) continue;
+    if (chest.type !== "chest" || !chest.trap || chest.trap.detected || !objectCells(chest).some((cell) => activeTiles.has(positionKey(cell)) && isKnownTile(cell))) continue;
 
     chest.trap.spotCheckedBy = chest.trap.spotCheckedBy ?? [];
     for (const hero of heroes.filter((entry) => !chest.trap.spotCheckedBy.includes(entry.id))) {
@@ -5905,7 +6349,10 @@ async function makeAttack(attacker, defender, options = {}) {
   }
 
   if (usesBonusAction) attacker.hasBonusAction = false;
-  else attacker.hasAction = false;
+  else {
+    attacker.attacksRemaining = Math.max(0, (attacker.attacksRemaining ?? attacksPerAttackAction(attacker)) - 1);
+    attacker.hasAction = attacker.attacksRemaining > 0;
+  }
   spendAmmunition(attacker, weapon);
   if (weapon?.properties?.includes("thrown") && !thrownAsMelee) {
     recordMonsterThrownWeaponUse(attacker, weapon);
@@ -5968,6 +6415,25 @@ async function makeAttack(attacker, defender, options = {}) {
       label: `${extraRoll.rolls.join(" + ")}${extra.bonus ? ` ${abilityLabel(extra.bonus)}` : ""} ${extra.type}`,
     });
   }
+  if (canApplySneakAttack(attacker, defender, weapon, rangedAttack)) {
+    const diceCount = sneakAttackDice(attacker) * (isCritical ? 2 : 1);
+    const sneakRoll = rollDice(diceCount, 6);
+    packets.push({
+      raw: sneakRoll.total,
+      type: attackDamage.type,
+      label: `Sneak Attack ${sneakRoll.rolls.join(" + ")} ${attackDamage.type}`,
+    });
+    attacker.sneakAttackUsedThisTurn = true;
+  }
+  const rider = consumeWeaponRider(attacker);
+  if (rider?.damageBonus) {
+    packets.push({
+      raw: rider.damageBonus,
+      type: rider.damageType ?? "radiant",
+      label: `${rider.label ?? "Weapon rider"} ${rider.damageBonus} ${rider.damageType ?? "radiant"}`,
+    });
+    addLog(`${attacker.name}'s ${rider.label ?? "weapon rider"} is released on the hit.`, "important");
+  }
   if (isPartyHeroId(defender.id) && adminEnabled() && adminGodMode) {
     addLog(`God mode prevents ${attacker.name}'s damage to ${defender.name}.`, "important");
     render();
@@ -6004,10 +6470,7 @@ async function makeAttack(attacker, defender, options = {}) {
     } else {
       handleHeroDeath();
     }
-    if (isPartyHeroId(attacker.id) && combatMonsters().length === 0) {
-      endCurrentEncounter();
-      addLog("The room falls quiet. Exploration resumes.", "important");
-    }
+    if (isPartyHeroId(attacker.id)) await finishEncounterAfterLastMonsterFalls();
   }
 
   render();
@@ -6037,7 +6500,8 @@ function shouldUseMonsterSpecial(kind = "active") {
 
 function savingThrow(target, ability, dc) {
   const roll = rollD20ForFighter(target).roll;
-  const bonus = abilityMod(target, ability);
+  const statusBonus = (target.statusEffects ?? []).reduce((sum, effect) => sum + (effect.saveBonus ?? 0), 0);
+  const bonus = abilityMod(target, ability) + statusBonus;
   const total = roll + bonus;
   const success = total >= dc;
   recordD20OutcomeForFighter(target, success);
@@ -6091,7 +6555,11 @@ function showSavingThrowMenu({ target, ability, dc, message }) {
 }
 
 async function rollSavingThrow(target, ability, dc, message) {
-  if (!isPartyHeroId(target?.id)) return savingThrow(target, ability, dc);
+  if (!isPartyHeroId(target?.id)) {
+    const save = savingThrow(target, ability, dc);
+    addLog(`${target.name} rolls ${ability.toUpperCase()} save: ${save.roll} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
+    return save;
+  }
   addLog(message, "important");
   const save = await showSavingThrowMenu({ target, ability, dc, message });
   addLog(`${target.name} rolls ${ability.toUpperCase()} save: ${save.roll} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
@@ -6102,6 +6570,9 @@ function applyStatusEffect(target, effect) {
   target.statusEffects = (target.statusEffects ?? []).filter((entry) => entry.id !== effect.id);
   target.statusEffects.push(effect);
   refreshDerivedStats(target);
+  if (effect.tempHp) {
+    target.hp = Math.min(target.maxHp, target.hp + effect.tempHp);
+  }
 }
 
 function specialDamageDice(monster, sides = 6) {
@@ -6119,6 +6590,531 @@ function applySpecialDamage(source, target, damage, type, label) {
   const note = modified.reason ? ` ${target.name} is ${modified.reason} to ${type} damage.` : "";
   addLog(`${source.name}'s ${label} deals ${modified.damage} ${type} damage to ${target.name}.${note}`, "damage");
   return modified.damage;
+}
+
+function spellcastingAbility(fighter) {
+  return fighter?.spellcastingAbility ?? "wis";
+}
+
+function spellSaveDc(fighter) {
+  return 8 + proficiencyBonus(fighter) + abilityMod(fighter, spellcastingAbility(fighter));
+}
+
+function spellAttackBonus(fighter) {
+  return proficiencyBonus(fighter) + abilityMod(fighter, spellcastingAbility(fighter));
+}
+
+function spellBaseLevel(spell) {
+  return Math.max(1, Math.min(9, spell?.level ?? 1));
+}
+
+function spellCastLevel(spell) {
+  return Math.max(spellBaseLevel(spell), Math.min(9, spell?.castLevel ?? spellBaseLevel(spell)));
+}
+
+function spellPointCost(spell, castLevel = spellCastLevel(spell)) {
+  return spell?.costsByLevel?.[castLevel] ?? spell?.cost ?? ({ 1: 2, 2: 3, 3: 5, 4: 6, 5: 7, 6: 9, 7: 10, 8: 11, 9: 13 }[castLevel] ?? 2);
+}
+
+function spellAvailableCastLevels(fighter, spell) {
+  if (!spell) return [];
+  const maxSpellLevel = maxSpellLevelForFighter(fighter);
+  const levels = [];
+  for (let level = spellBaseLevel(spell); level <= maxSpellLevel; level += 1) levels.push(level);
+  return levels;
+}
+
+function spellWithCastLevel(spell, castLevel = spellBaseLevel(spell)) {
+  return { ...spell, castLevel: Math.max(spellBaseLevel(spell), Math.min(9, Number(castLevel) || spellBaseLevel(spell))) };
+}
+
+function spellResourceLabel(spell) {
+  if (spell?.resource === "bonusAction") return "Quick action";
+  if (spell?.resource === "reaction") return "Reaction";
+  if (spell?.resource === "weaponRider") return "Weapon rider";
+  return "Action";
+}
+
+function concentrationId(caster) {
+  return caster?.id ? `concentration-${caster.id}` : "";
+}
+
+function endConcentration(caster, reason = "") {
+  if (!caster?.concentration) return;
+  const id = caster.concentration.id;
+  const spellName = caster.concentration.spellName;
+  for (const fighter of Object.values(state.fighters ?? {})) {
+    fighter.statusEffects = (fighter.statusEffects ?? []).filter((effect) => effect.concentrationId !== id);
+    refreshDerivedStats(fighter);
+  }
+  caster.concentration = null;
+  addLog(`${caster.name}'s concentration on ${spellName} ends${reason ? ` (${reason})` : ""}.`, "important");
+}
+
+function startConcentration(caster, spell) {
+  if (!spell?.concentration) return;
+  endConcentration(caster, "new concentration spell");
+  caster.concentration = { id: concentrationId(caster), spellId: spell.id, spellName: spell.name };
+  addLog(`${caster.name} concentrates on ${spell.name}.`, "important");
+}
+
+function canPaySpellCost(caster, spell) {
+  ensureSpellPointState(caster);
+  return (caster.spellPoints ?? 0) >= spellPointCost(spell);
+}
+
+function canCastSpell(caster, spell) {
+  if (!heroCanAct(caster) || !spell || !canPaySpellCost(caster, spell)) return false;
+  if (state.mode === "combat") {
+    if (activeFighter()?.id !== caster.id) return false;
+    if (["bonusAction", "reaction", "weaponRider"].includes(spell.resource)) return Boolean(caster.hasBonusAction);
+    return Boolean(caster.hasAction);
+  }
+  return true;
+}
+
+function spendSpellResources(caster, spell) {
+  if (spell.concentration) startConcentration(caster, spell);
+  const cost = spellPointCost(spell);
+  caster.spellPoints = Math.max(0, (caster.spellPoints ?? 0) - cost);
+  addLog(`${caster.name} spends ${cost} SP on ${spell.name} (spell level ${spellCastLevel(spell)}).`, "important");
+  if (state.mode === "combat") {
+    if (["bonusAction", "reaction", "weaponRider"].includes(spell.resource)) caster.hasBonusAction = false;
+    else caster.hasAction = false;
+  }
+}
+
+function spellRangeSquares(spell) {
+  return Math.max(1, Math.floor((spell.range?.feet ?? 5) / feetPerSquare));
+}
+
+function spellAreaSquares(spell) {
+  const extraFeet = Math.max(0, spellCastLevel(spell) - spellBaseLevel(spell)) * (spell.upcast?.areaRadiusFeetPerLevel ?? 0);
+  return Math.max(0, Math.floor(((spell.area?.radiusFeet ?? 0) + extraFeet) / feetPerSquare));
+}
+
+function spellCanTargetPoint(spell) {
+  return spell?.target === "point" || (spell?.area && spell?.range?.kind === "ranged" && spell?.effect?.kind !== "healing");
+}
+
+function spellTargetingMode(spell) {
+  if (spell.target === "direction" || ["breath", "cone"].includes(spell.area?.shape)) return "direction";
+  if (spellCanTargetPoint(spell)) return "point";
+  return "target";
+}
+
+function currentPendingSpellTargeting() {
+  if (!pendingSpellTargeting) return null;
+  const caster = state.fighters[pendingSpellTargeting.casterId];
+  const spell = getContentDefinition("spells", pendingSpellTargeting.spellId);
+  const castSpell = spell ? spellWithCastLevel(spell, pendingSpellTargeting.castLevel) : null;
+  if (!caster || !castSpell || !canCastSpell(caster, castSpell)) {
+    pendingSpellTargeting = null;
+    return null;
+  }
+  return { ...pendingSpellTargeting, caster, spell: castSpell };
+}
+
+function clearPendingSpellTargeting() {
+  if (!pendingSpellTargeting) return;
+  pendingSpellTargeting = null;
+  renderRoom();
+}
+
+function fighterAtPosition(position) {
+  if (!position) return null;
+  return Object.values(state.fighters).find(
+    (fighter) => fighter.alive && !fighter.dead && fighter.position.x === position.x && fighter.position.y === position.y,
+  ) ?? null;
+}
+
+function spellTargetsFor(caster, spell) {
+  const range = spellRangeSquares(spell);
+  if (spell.target === "self") {
+    return caster?.alive ? [caster] : [];
+  }
+  if (spell.target === "ally") {
+    return partyHeroes().filter((hero) => hero.alive && distance(caster.position, hero.position) <= range);
+  }
+  if (spell.target === "enemy") {
+    return visibleMonsters().filter((monster) => monster.alive && distance(caster.position, monster.position) <= range && hasClearLineOfSight(caster.position, monster.position));
+  }
+  if (spell.target === "creature") {
+    return Object.values(state.fighters).filter(
+      (fighter) => fighter.alive && !fighter.dead && isKnownTile(fighter.position) && distance(caster.position, fighter.position) <= range && hasClearLineOfSight(caster.position, fighter.position),
+    );
+  }
+  if (spell.target === "point") {
+    return visibleMonsters().filter((monster) => monster.alive && distance(caster.position, monster.position) <= range && hasClearLineOfSight(caster.position, monster.position));
+  }
+  return [];
+}
+
+function isValidSpellTarget(caster, spell, target) {
+  if (!caster || !spell || !target?.alive || target.dead) return false;
+  return spellTargetsFor(caster, spell).some((entry) => entry.id === target.id);
+}
+
+function isValidSpellPointTarget(caster, spell, position) {
+  if (!caster || !spell || !position) return false;
+  const key = positionKey(position);
+  if (!window.DungeonGrid.isInsideGrid(position, currentGridSize())) return false;
+  if (!isKnownTile(position) || !currentWalkable().has(key)) return false;
+  if (distance(caster.position, position) > spellRangeSquares(spell)) return false;
+  if (!hasClearLineOfSight(caster.position, position)) return false;
+  const casterRoom = roomForPosition(caster.position);
+  const targetRoom = roomForPosition(position);
+  return !casterRoom || targetRoom?.id === casterRoom.id;
+}
+
+function spellAreaCells(originPosition, spell) {
+  if (!originPosition) return [];
+  if (!spell.area) return [{ ...originPosition }];
+  const radius = spellAreaSquares(spell);
+  const cells = [];
+  const walkable = currentWalkable();
+  const grid = currentGridSize();
+  for (let y = originPosition.y - radius; y <= originPosition.y + radius; y += 1) {
+    for (let x = originPosition.x - radius; x <= originPosition.x + radius; x += 1) {
+      const cell = { x, y };
+      if (!window.DungeonGrid.isInsideGrid(cell, grid) || !walkable.has(positionKey(cell))) continue;
+      if (spell.area.shape === "cube") {
+        if (Math.abs(x - originPosition.x) <= radius && Math.abs(y - originPosition.y) <= radius) cells.push(cell);
+      } else if (distance(cell, originPosition) <= radius) {
+        cells.push(cell);
+      }
+    }
+  }
+  return cells;
+}
+
+function spellTargetsFromCells(cells) {
+  const keys = new Set(cells.map(positionKey));
+  return Object.values(state.fighters).filter((fighter) => fighter.alive && !fighter.dead && keys.has(positionKey(fighter.position)));
+}
+
+function areaTargetsForSpell(origin, spell, caster) {
+  const originPosition = origin?.position ?? origin;
+  const targets = spell.area ? spellTargetsFromCells(spellAreaCells(originPosition, spell)) : spellTargetsFromCells([originPosition]);
+  return targets.filter((target) => spellAffectsFighter(caster, spell, target));
+}
+
+function spellAffectsFighter(caster, spell, target) {
+  if (!caster || !spell || !target?.alive || target.dead) return false;
+  if (spell.target === "ally" || spell.effect?.kind === "healing") return isPartyHeroId(target.id);
+  if (spell.target === "self") return target.id === caster.id;
+  if (["damage", "attackDamage", "status"].includes(spell.effect?.kind)) return hostileTo(caster, target);
+  return true;
+}
+
+function directionFromCasterToPosition(caster, position) {
+  if (!caster || !position) return null;
+  const dx = position.x - caster.position.x;
+  const dy = position.y - caster.position.y;
+  if (dx === 0 && dy === 0) return null;
+  if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? "east" : "west";
+  return dy > 0 ? "south" : "north";
+}
+
+function spellDirectionCells(caster, direction, spell) {
+  if (!caster || !direction) return [];
+  const length = Math.max(1, Math.floor((spell.area?.lengthFeet ?? spell.range?.feet ?? 15) / feetPerSquare));
+  const width = Math.max(1, Math.floor((spell.area?.widthFeet ?? 5) / feetPerSquare));
+  const deltas = {
+    north: { x: 0, y: -1 },
+    east: { x: 1, y: 0 },
+    south: { x: 0, y: 1 },
+    west: { x: -1, y: 0 },
+  };
+  const delta = deltas[direction] ?? deltas.north;
+  const cells = [];
+  for (const tileKey of currentWalkable()) {
+    const cell = positionFromKey(tileKey);
+    const dx = cell.x - caster.position.x;
+    const dy = cell.y - caster.position.y;
+    const forward = delta.x ? dx * delta.x : dy * delta.y;
+    const side = delta.x ? Math.abs(dy) : Math.abs(dx);
+    if (forward <= 0 || forward > length) continue;
+    if (spell.area?.shape === "cone") {
+      if (side <= forward) cells.push(cell);
+    } else if (side < width) {
+      cells.push(cell);
+    }
+  }
+  return cells;
+}
+
+function spellPreviewCells(targeting = currentPendingSpellTargeting()) {
+  if (!targeting?.hoverPosition) return new Set();
+  if (targeting.mode === "point") {
+    if (!isValidSpellPointTarget(targeting.caster, targeting.spell, targeting.hoverPosition)) return new Set();
+    return new Set(spellAreaCells(targeting.hoverPosition, targeting.spell).map(positionKey));
+  }
+  if (targeting.mode === "direction") {
+    const direction = directionFromCasterToPosition(targeting.caster, targeting.hoverPosition);
+    return new Set(spellDirectionCells(targeting.caster, direction, targeting.spell).map(positionKey));
+  }
+  const target = fighterAtPosition(targeting.hoverPosition);
+  if (!isValidSpellTarget(targeting.caster, targeting.spell, target)) return new Set();
+  return new Set((targeting.spell.area ? spellAreaCells(target.position, targeting.spell) : [target.position]).map(positionKey));
+}
+
+function hoverSpellTarget(position) {
+  if (!currentPendingSpellTargeting()) return;
+  pendingSpellTargeting.hoverPosition = position ? { ...position } : null;
+  renderRoom();
+}
+
+function isSpellTokenTargetable(targeting, fighter) {
+  if (!targeting || !fighter?.position) return false;
+  if (targeting.mode === "point") return isValidSpellPointTarget(targeting.caster, targeting.spell, fighter.position);
+  if (targeting.mode === "direction") return Boolean(directionFromCasterToPosition(targeting.caster, fighter.position));
+  return isValidSpellTarget(targeting.caster, targeting.spell, fighter);
+}
+
+function startSpellTargeting(caster, spell) {
+  const mode = spellTargetingMode(spell);
+  pendingSpellTargeting = {
+    casterId: caster.id,
+    spellId: spell.id,
+    castLevel: spellCastLevel(spell),
+    mode,
+    hoverPosition: mode === "target" ? spellTargetsFor(caster, spell)[0]?.position ?? null : caster.position,
+  };
+  const instructions = {
+    point: "Choose a square for the spell area.",
+    direction: "Choose a direction from the caster.",
+    target: "Choose a creature to center or target the spell.",
+  };
+  addLog(`${caster.name} readies ${spell.name} at spell level ${spellCastLevel(spell)} for ${spellPointCost(spell)} SP. ${instructions[mode]}`, "important");
+  hideAbilitiesMenu();
+  render();
+}
+
+async function confirmPendingSpellTarget(position) {
+  const targeting = currentPendingSpellTargeting();
+  if (!targeting) return false;
+  const { caster, spell, mode } = targeting;
+  pendingSpellTargeting = null;
+  if (mode === "point") {
+    if (!isValidSpellPointTarget(caster, spell, position)) {
+      pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), mode, hoverPosition: position };
+      addLog(`${spell.name} needs a visible square in range inside this room.`, "important");
+      render();
+      return true;
+    }
+    await castSpellAtPoint(caster, spell, position);
+    return true;
+  }
+  if (mode === "direction") {
+    const direction = directionFromCasterToPosition(caster, position);
+    if (!direction) {
+      pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), mode, hoverPosition: position };
+      render();
+      return true;
+    }
+    await castSpellInDirection(caster, spell, direction);
+    return true;
+  }
+  const target = fighterAtPosition(position);
+  if (!isValidSpellTarget(caster, spell, target)) {
+    pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), mode, hoverPosition: position };
+    addLog(`That is not a valid target for ${spell.name}.`, "important");
+    render();
+    return true;
+  }
+  await castSpellAtTarget(caster, spell, target);
+  return true;
+}
+
+function breathTemplateTargets(caster, direction, spell) {
+  return spellTargetsFromCells(spellDirectionCells(caster, direction, spell)).filter((fighter) => spellAffectsFighter(caster, spell, fighter));
+}
+
+function scaledSpellDice(spell) {
+  const dice = { ...(spell.effect?.dice ?? { count: 1, sides: 6 }) };
+  const extraLevels = Math.max(0, spellCastLevel(spell) - spellBaseLevel(spell));
+  if (spell.upcast?.diceAtLevel?.[spellCastLevel(spell)]) {
+    dice.count = spell.upcast.diceAtLevel[spellCastLevel(spell)];
+  } else {
+    dice.count = (dice.count ?? 1) + extraLevels * (spell.upcast?.dicePerLevel ?? 0);
+  }
+  dice.bonus = (dice.bonus ?? 0) + extraLevels * (spell.upcast?.bonusPerLevel ?? 0);
+  return dice;
+}
+
+async function applySpellDamage(caster, target, spell) {
+  const dice = scaledSpellDice(spell);
+  const roll = rollDice(dice.count, dice.sides);
+  let raw = Math.max(1, roll.total + (dice.bonus ?? 0));
+  let save = null;
+  if (spell.save) {
+    save = await rollSavingThrow(target, spell.save.ability, spellSaveDc(caster), `${caster.name}'s ${spell.name} forces ${target.name} to make a ${spell.save.ability.toUpperCase()} save.`);
+    if (save.success && spell.save.halfDamage) raw = Math.floor(raw / 2);
+  }
+  applySpecialDamage(caster, target, raw, spell.effect.type ?? "force", spell.name);
+  if (spell.effect?.status && (!save || !save.success)) await applySpellStatus(caster, target, spell, { skipSave: true });
+}
+
+function applySpellHealing(caster, target, spell) {
+  const dice = scaledSpellDice(spell);
+  const roll = rollDice(dice.count, dice.sides);
+  const bonus = spell.effect?.abilityBonus === "spellcasting" ? abilityMod(caster, spellcastingAbility(caster)) : spell.effect?.bonus ?? 0;
+  const healed = applyHealingToHero(target, Math.max(0, roll.total + bonus));
+  addLog(`${caster.name}'s ${spell.name} heals ${target.name} for ${healed} HP (${roll.rolls.join(" + ")} ${abilityLabel(bonus)}).`, "heal");
+}
+
+async function applySpellAttack(caster, target, spell) {
+  const rollResult = rollD20ForFighter(caster);
+  const roll = rollResult.roll;
+  const bonus = spellAttackBonus(caster);
+  const total = roll + bonus;
+  const targetAc = armorClass(target);
+  addLog(`${caster.name} casts ${spell.name}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.`, "important");
+  recordD20OutcomeForFighter(caster, roll !== 1 && total >= targetAc);
+  if (roll === 1 || total < targetAc) {
+    addLog(`${spell.name} misses ${target.name}.`);
+    return;
+  }
+  const dice = scaledSpellDice(spell);
+  const damageRoll = rollDice(dice.count * (roll === 20 ? 2 : 1), dice.sides);
+  const extra = spell.effect?.abilityBonus === "spellcasting" ? abilityMod(caster, spellcastingAbility(caster)) : 0;
+  applySpecialDamage(caster, target, Math.max(1, damageRoll.total + (dice.bonus ?? 0) + extra), spell.effect?.type ?? "force", spell.name);
+  if (spell.effect?.status) await applySpellStatus(caster, target, spell);
+}
+
+async function applySpellStatus(caster, target, spell, options = {}) {
+  if (spell.save && !options.skipSave) {
+    const save = await rollSavingThrow(target, spell.save.ability, spellSaveDc(caster), `${caster.name}'s ${spell.name} forces ${target.name} to make a ${spell.save.ability.toUpperCase()} save.`);
+    if (save.success && spell.save.negatesStatus) {
+      addLog(`${target.name} resists ${spell.name}.`);
+      return;
+    }
+  }
+  const effect = {
+    ...(spell.effect?.status ?? {}),
+    id: spell.effect?.status?.id ?? spell.id,
+    label: spell.effect?.status?.label ?? spell.name,
+  };
+  if (spell.concentration) effect.concentrationId = concentrationId(caster);
+  if (spell.resource === "weaponRider") effect.weaponRider = true;
+  if ((target.id?.startsWith("boss-") || target.tags?.includes("boss")) && effect.actionLocked) {
+    delete effect.actionLocked;
+    effect.speedBonusFeet = Math.min(effect.speedBonusFeet ?? 0, -10);
+    effect.label = `${effect.label} Resisted`;
+  }
+  applyStatusEffect(target, effect);
+  addLog(`${caster.name}'s ${spell.name} applies ${effect.label} to ${target.name}.`, "important");
+}
+
+async function castSpellAtTarget(caster, spell, target) {
+  if (!canCastSpell(caster, spell) || !target) return;
+  spendSpellResources(caster, spell);
+  if (spell.effect?.kind === "healing") {
+    applySpellHealing(caster, target, spell);
+  } else if (spell.effect?.kind === "status") {
+    await applySpellStatus(caster, target, spell);
+  } else if (spell.effect?.kind === "attackDamage") {
+    const wasAlive = target.alive;
+    await applySpellAttack(caster, target, spell);
+    if (wasAlive && !target.alive && !isPartyHeroId(target.id)) {
+      if (isPartyHeroId(caster.id)) playSoundEffect("enemyDefeated");
+      awardMonsterXp(target);
+      dropLootForMonster(target);
+      await finishEncounterAfterLastMonsterFalls();
+    }
+  } else if (spell.effect?.kind === "damage") {
+    const targets = spell.area ? areaTargetsForSpell(target, spell, caster) : [target];
+    addLog(`${caster.name} casts ${spell.name} at spell level ${spellCastLevel(spell)} for ${spellPointCost(spell)} SP${spell.area ? ` at ${target.name}` : ""}.`, "important");
+    for (const entry of targets) {
+      const wasAlive = entry.alive;
+      await applySpellDamage(caster, entry, spell);
+      if (!entry.alive && isPartyHeroId(entry.id)) handleHeroDeath();
+      if (wasAlive && !entry.alive && !isPartyHeroId(entry.id)) {
+        if (isPartyHeroId(caster.id)) playSoundEffect("enemyDefeated");
+        awardMonsterXp(entry);
+        dropLootForMonster(entry);
+      }
+    }
+    if (isPartyHeroId(caster.id)) await finishEncounterAfterLastMonsterFalls();
+  }
+  refreshDerivedStats(caster);
+  hideAbilitiesMenu();
+  render();
+}
+
+async function castSpellAtPoint(caster, spell, position) {
+  if (!canCastSpell(caster, spell) || !position) return;
+  if (spell.effect?.kind === "teleport") {
+    if (window.DungeonGrid.isOccupied(position, state.fighters, caster)) {
+      addLog(`${spell.name} needs an empty destination.`, "important");
+      render();
+      return;
+    }
+    spendSpellResources(caster, spell);
+    caster.position = { ...position };
+    addLog(`${caster.name} casts ${spell.name} at spell level ${spellCastLevel(spell)} for ${spellPointCost(spell)} SP and teleports.`, "important");
+    refreshDerivedStats(caster);
+    hideAbilitiesMenu();
+    render();
+    return;
+  }
+  spendSpellResources(caster, spell);
+  const targets = spell.area ? areaTargetsForSpell(position, spell, caster) : spellTargetsFromCells([position]);
+  addLog(`${caster.name} casts ${spell.name} at spell level ${spellCastLevel(spell)} for ${spellPointCost(spell)} SP at (${position.x + 1}, ${position.y + 1}).`, "important");
+  for (const target of targets) {
+    const wasAlive = target.alive;
+    if (spell.effect?.kind === "damage") await applySpellDamage(caster, target, spell);
+    else if (spell.effect?.kind === "status") await applySpellStatus(caster, target, spell);
+    if (!target.alive && isPartyHeroId(target.id)) handleHeroDeath();
+    if (wasAlive && !target.alive && !isPartyHeroId(target.id)) {
+      if (isPartyHeroId(caster.id)) playSoundEffect("enemyDefeated");
+      awardMonsterXp(target);
+      dropLootForMonster(target);
+    }
+  }
+  if (isPartyHeroId(caster.id)) await finishEncounterAfterLastMonsterFalls();
+  refreshDerivedStats(caster);
+  hideAbilitiesMenu();
+  render();
+}
+
+async function castSpellInDirection(caster, spell, direction) {
+  if (!canCastSpell(caster, spell)) return;
+  spendSpellResources(caster, spell);
+  const targets = breathTemplateTargets(caster, direction, spell);
+  addLog(`${caster.name} casts ${spell.name} at spell level ${spellCastLevel(spell)} for ${spellPointCost(spell)} SP ${direction}.`, "important");
+  for (const target of targets) {
+    const wasAlive = target.alive;
+    if (spell.effect?.kind === "damage") await applySpellDamage(caster, target, spell);
+    else if (spell.effect?.kind === "status") await applySpellStatus(caster, target, spell);
+    if (wasAlive && !target.alive && !isPartyHeroId(target.id)) {
+      if (isPartyHeroId(caster.id)) playSoundEffect("enemyDefeated");
+      awardMonsterXp(target);
+      dropLootForMonster(target);
+    }
+    if (!target.alive && isPartyHeroId(target.id)) handleHeroDeath();
+  }
+  if (isPartyHeroId(caster.id)) await finishEncounterAfterLastMonsterFalls();
+  hideAbilitiesMenu();
+  render();
+}
+
+async function chooseAndCastSpell(spellId, castLevel = null) {
+  const caster = state.mode === "combat" ? activeFighter() : activeHero();
+  const baseSpell = spellDefinitionsForFighter(caster).find((entry) => entry.id === spellId);
+  const spell = baseSpell ? spellWithCastLevel(baseSpell, castLevel ?? spellBaseLevel(baseSpell)) : null;
+  if (!canCastSpell(caster, spell)) return;
+  if (spell?.target === "self") {
+    await castSpellAtTarget(caster, spell, caster);
+    return;
+  }
+  if (spellTargetingMode(spell) === "target" && !spellTargetsFor(caster, spell).length) {
+    addLog(`No valid target for ${spell.name}.`, "important");
+    renderLog();
+    return;
+  }
+  startSpellTargeting(caster, spell);
 }
 
 function pushTargetAway(source, target) {
@@ -6292,12 +7288,18 @@ function maybeRunMonsterTurn() {
   els.useItem.disabled = true;
   els.endTurn.disabled = true;
   window.clearTimeout(monsterTurnTimer);
+  const now = performance.now();
+  const dueAt = fighter.nextAiDecisionAt ?? 0;
+  const delay = Math.max(tokenSlideMs, dueAt - now);
   monsterTurnTimer = window.setTimeout(() => {
     const current = activeFighter();
     if (current && !isPartyHeroId(current.id)) {
+      current.nextAiDecisionAt = performance.now() + monsterAiDecisionIntervalMs;
+      pathfindingJobsThisTurn = 0;
+      perfStats.aiUpdates += 1;
       runMonsterAi(current);
     }
-  }, tokenSlideMs);
+  }, delay);
 }
 
 function movementWalkableFor(fighter) {
@@ -6382,7 +7384,7 @@ function sleep(ms) {
 }
 
 async function moveFighterAlongPath(fighter, path, silent = false) {
-  if (!fighter.alive || (state.mode === "combat" && fighter.movementLeft <= 0)) return false;
+  if (!heroCanAct(fighter) || (state.mode === "combat" && fighter.movementLeft <= 0)) return false;
   if (!path || path.length === 0 || path.length > movementLimitFor(fighter)) return false;
   if (window.DungeonGrid.isOccupied(path.at(-1), state.fighters, fighter)) return false;
 
@@ -6401,7 +7403,7 @@ async function moveFighterAlongPath(fighter, path, silent = false) {
   for (const step of path) {
     const opportunityAttackers = Object.values(state.fighters).filter((candidate) => canOpportunityAttack(candidate, fighter, fighter.position, step));
     for (const attacker of opportunityAttackers) {
-      opportunityAttack(attacker, fighter);
+      await opportunityAttack(attacker, fighter);
       if (!fighter.alive) break;
     }
     if (!fighter.alive) break;
@@ -6579,6 +7581,10 @@ function handleTileClick(position) {
     suppressNextTileClick = false;
     return;
   }
+  if (pendingSpellTargeting) {
+    void confirmPendingSpellTarget(position);
+    return;
+  }
   if (movementInProgress || dragPath) return;
   if (adminEnabled() && adminTeleportEnabled) {
     adminTeleportHero(position);
@@ -6615,7 +7621,7 @@ function handleTileClick(position) {
 async function moveHeroByKeyboard(delta) {
   if (!gameHasStarted || movementInProgress || dragPath || state.completed) return;
   const hero = activeHero();
-  if (!hero?.alive) return;
+  if (!heroCanAct(hero)) return;
   if (state.mode === "combat" && (activeFighter()?.id !== hero.id || combatMonsters().length === 0)) return;
   if (state.mode === "combat" && hero.hp <= 0) return;
 
@@ -6632,6 +7638,14 @@ async function moveHeroByKeyboard(delta) {
     addLog("A hostile creature is present. Roll initiative before moving.");
     render();
     return;
+  }
+
+  if (state.mode !== "combat" && selectedMovableHeroes(hero.id).length > 1) {
+    const movedTogether = await moveSelectedHeroesTo(destination, hero);
+    if (movedTogether) {
+      window.requestAnimationFrame(nudgeViewForHeroNearEdge);
+      return true;
+    }
   }
 
   if (!isValidPathStep(hero, hero.position, destination, [])) return;
@@ -6716,6 +7730,20 @@ function monsterMovementWalkable(monster, baseWalkable = currentWalkable()) {
   return walkable;
 }
 
+function consumeMonsterPathfindingJob(monster) {
+  if (!monster || !monster.alive) return false;
+  if (pathfindingJobsThisTurn >= monsterPathfindingBudgetPerTurn) return false;
+  pathfindingJobsThisTurn += 1;
+  perfStats.pathfindingJobs += 1;
+  perfStats.pathfindingJobsLastFrame += 1;
+  return true;
+}
+
+function monsterReachableTiles(monster, options) {
+  if (!consumeMonsterPathfindingJob(monster)) return new Map();
+  return reachableTiles(monster, state.fighters, options);
+}
+
 function pathProvokesOpportunity(mover, path = []) {
   let from = mover.position;
   for (const step of path) {
@@ -6734,6 +7762,7 @@ function canAttackFromPosition(attacker, target, position) {
 }
 
 function pathForMonster(monster, destination, walkable = monsterMovementWalkable(monster)) {
+  if (!consumeMonsterPathfindingJob(monster)) return null;
   return findPath(monster.position, destination, monster, state.fighters, {
     gridSize: currentGridSize(),
     walkable,
@@ -6747,7 +7776,7 @@ function attackPlanAgainst(monster, target, avoidOpportunity = false, baseWalkab
   const movementBase = monsterRoom ? roomWalkableSet(monsterRoom) : baseWalkable;
   const walkable = monsterMovementWalkable(monster, movementBase);
   const reachable = Array.from(
-    reachableTiles(monster, state.fighters, {
+    monsterReachableTiles(monster, {
       gridSize: currentGridSize(),
       walkable,
       maxCost: monster.movementLeft,
@@ -6807,7 +7836,7 @@ function chooseMonsterAttackPlan(monster) {
 function bestPathToward(mover, target, avoidOpportunity = false) {
   const walkable = monsterMovementWalkable(mover);
   const reachable = Array.from(
-    reachableTiles(mover, state.fighters, {
+    monsterReachableTiles(mover, {
       gridSize: currentGridSize(),
       walkable,
       canTraverse: (from, to, path) => canTraverseMovementEdge(mover, from, to, path),
@@ -6845,6 +7874,7 @@ function roomWalkableSet(room, fighter = null) {
 
 function roomOnlyPath(mover, destination, room) {
   const walkable = roomWalkableSet(room, mover);
+  if (!consumeMonsterPathfindingJob(mover)) return null;
   return findPath(mover.position, destination, mover, state.fighters, {
     gridSize: currentGridSize(),
     walkable,
@@ -6858,7 +7888,7 @@ function bestRoomKitePath(mover, target, avoidOpportunity = false) {
 
   const range = normalRangeSquares(mover);
   const reachable = Array.from(
-    reachableTiles(mover, state.fighters, {
+    monsterReachableTiles(mover, {
       gridSize: currentGridSize(),
       walkable: roomWalkableSet(room, mover),
       maxCost: mover.movementLeft,
@@ -6911,7 +7941,7 @@ function bestSwarmPath(mover, target) {
 
   const walkable = monsterMovementWalkable(mover);
   const reachable = Array.from(
-    reachableTiles(mover, state.fighters, {
+    monsterReachableTiles(mover, {
       gridSize: currentGridSize(),
       walkable,
       maxCost: mover.movementLeft,
@@ -7031,20 +8061,20 @@ async function runMonsterAi(monster) {
 function heroCanStartMovement() {
   const hero = activeHero();
   if (!gameHasStarted || movementInProgress || state.completed) return false;
-  if (state.mode === "home") return Boolean(hero?.alive);
+  if (state.mode === "home") return heroCanAct(hero);
   if (state.mode === "combat") {
-    return activeFighter()?.id === hero?.id && combatMonsters().length > 0 && hero.movementLeft > 0;
+    return activeFighter()?.id === hero?.id && combatMonsters().length > 0 && heroCanAct(hero) && hero.movementLeft > 0;
   }
-  return !threatPresent();
+  return heroCanAct(hero) && !threatPresent();
 }
 
 function heroCanUseDoor() {
   const hero = activeHero();
   if (!gameHasStarted || movementInProgress || state.completed) return false;
   if (state.mode === "combat") {
-    return activeFighter()?.id === hero?.id && combatMonsters().length > 0;
+    return activeFighter()?.id === hero?.id && combatMonsters().length > 0 && heroCanAct(hero);
   }
-  return true;
+  return heroCanAct(hero);
 }
 
 function tryOpenDoorFromHeroPosition() {
@@ -7171,6 +8201,16 @@ function handleHeroPointerDown(event) {
   if (!gameHasStarted || movementInProgress) return;
   const heroId = event.currentTarget?.dataset?.combatant;
   if (!heroId) return;
+  if (pendingSpellTargeting) {
+    const hero = state.fighters[heroId];
+    if (hero?.position) {
+      event.preventDefault();
+      event.stopPropagation();
+      suppressNextHeroClick = true;
+      void confirmPendingSpellTarget(hero.position);
+    }
+    return;
+  }
   if ((event.shiftKey || event.ctrlKey || event.metaKey) && state.mode !== "combat") {
     event.preventDefault();
     event.stopPropagation();
@@ -7222,6 +8262,15 @@ function handleHeroPointerDown(event) {
 
 function handleMapPanPointerDown(event) {
   if (event.button !== 0 || !gameHasStarted || dragPath) return;
+  if (pendingSpellTargeting) {
+    const position = tilePositionFromPoint(event.clientX, event.clientY);
+    if (position) {
+      event.preventDefault();
+      event.stopPropagation();
+      void confirmPendingSpellTarget(position);
+    }
+    return;
+  }
   if (adminEnabled() && adminTeleportEnabled && event.target.closest(".tile")) return;
   if (event.target.closest(".token, .chest-token, .topbar, button:not(.tile)")) return;
   if (event.target === els.roomScroll) return;
@@ -7332,10 +8381,21 @@ function createCombatantToken(combatant) {
       showCombatantInfo(current);
     }
   });
+  token.addEventListener("mouseenter", () => {
+    const current = state.fighters[combatant.id];
+    if (current?.position) hoverSpellTarget(current.position);
+  });
 
   if (heroToken) {
     token.addEventListener("pointerdown", handleHeroPointerDown);
     token.addEventListener("click", (event) => {
+      if (pendingSpellTargeting) {
+        const current = state.fighters[combatant.id];
+        if (current?.position) void confirmPendingSpellTarget(current.position);
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (suppressNextHeroClick) {
         suppressNextHeroClick = false;
         event.preventDefault();
@@ -7357,6 +8417,12 @@ function createCombatantToken(combatant) {
     token.addEventListener("click", (event) => {
       const current = state.fighters[combatant.id];
       if (!current?.alive || !isKnownTile(current.position)) return;
+      if (pendingSpellTargeting) {
+        void confirmPendingSpellTarget(current.position);
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (state.mode === "combat" && selectedHeroCanTargetMonster(current)) {
         selectAttackTarget(current.id);
       } else {
@@ -7387,8 +8453,27 @@ function ensureCombatantToken(fighter) {
   els.room.querySelector(".token-layer")?.prepend(createCombatantToken(fighter));
 }
 
+function createTileButton(position) {
+  const tile = document.createElement("button");
+  tile.className = "tile";
+  tile.type = "button";
+  tile.dataset.x = String(position.x);
+  tile.dataset.y = String(position.y);
+  tile.addEventListener("click", () => handleTileClick(position));
+  tile.addEventListener("mouseenter", () => hoverSpellTarget(position));
+  tile.addEventListener("contextmenu", (event) => {
+    const table = planningTablePosition();
+    if (state.mode === "home" && position.y === table.y && position.x >= table.x && position.x < table.x + 2) {
+      event.preventDefault();
+      showPlanningTableInfo();
+    }
+  });
+  return tile;
+}
+
 function buildRoom() {
   els.room.innerHTML = "";
+  renderedTileKeys = new Set();
   const mapGridSize = currentGridSize();
   const scaledTileSizePx = currentTileSizePx();
   const roomSizePx = mapGridSize * scaledTileSizePx;
@@ -7402,32 +8487,13 @@ function buildRoom() {
   const tileLayer = document.createElement("div");
   tileLayer.className = "tile-layer";
 
-  for (let y = 0; y < mapGridSize; y += 1) {
-    for (let x = 0; x < mapGridSize; x += 1) {
-      const tile = document.createElement("button");
-      tile.className = "tile";
-      tile.type = "button";
-      tile.dataset.x = x;
-      tile.dataset.y = y;
-      tile.addEventListener("click", () => handleTileClick({ x, y }));
-      tile.addEventListener("contextmenu", (event) => {
-        const table = planningTablePosition();
-        if (state.mode === "home" && y === table.y && x >= table.x && x < table.x + 2) {
-          event.preventDefault();
-          showPlanningTableInfo();
-        }
-      });
-      tileLayer.append(tile);
-    }
-  }
-
   const tokenLayer = document.createElement("div");
   tokenLayer.className = "token-layer";
 
   const wallEdgeLayer = document.createElement("div");
   wallEdgeLayer.className = "wall-edge-layer";
 
-  for (const fighter of Object.values(state.fighters)) {
+  for (const fighter of Object.values(state.fighters).filter((entry) => isRosterHeroId(entry.id))) {
     tokenLayer.append(createCombatantToken(fighter));
   }
 
@@ -7535,14 +8601,45 @@ function renderWallEdges() {
   }
 }
 
+function renderTileButtons(tileKeys) {
+  const tileLayer = els.room.querySelector(".tile-layer");
+  if (!tileLayer) return;
+
+  for (const tileKey of Array.from(renderedTileKeys)) {
+    if (tileKeys.has(tileKey)) continue;
+    tileLayer.querySelector(`[data-tile-key="${tileKey}"]`)?.remove();
+    renderedTileKeys.delete(tileKey);
+  }
+
+  const scaledTileSizePx = currentTileSizePx();
+  for (const tileKey of tileKeys) {
+    const position = positionFromKey(tileKey);
+    if (renderedTileKeys.has(tileKey)) {
+      const existing = tileLayer.querySelector(`[data-tile-key="${tileKey}"]`);
+      if (existing) {
+        existing.style.left = `${position.x * scaledTileSizePx}px`;
+        existing.style.top = `${position.y * scaledTileSizePx}px`;
+      }
+      continue;
+    }
+    const tile = createTileButton(position);
+    tile.dataset.tileKey = tileKey;
+    tile.style.left = `${position.x * scaledTileSizePx}px`;
+    tile.style.top = `${position.y * scaledTileSizePx}px`;
+    tileLayer.append(tile);
+    renderedTileKeys.add(tileKey);
+  }
+}
+
 function renderLootPiles() {
   const lootLayer = els.room.querySelector(".loot-layer");
   if (!lootLayer) return;
 
   lootLayer.innerHTML = "";
   const scaledTileSizePx = currentTileSizePx();
+  const activeTiles = activeTileKeys();
   for (const pile of state.lootPiles ?? []) {
-    if (!isKnownTile(pile.position)) continue;
+    if (!activeTiles.has(positionKey(pile.position)) || !isKnownTile(pile.position)) continue;
 
     const token = document.createElement("div");
     token.className = "loot-token";
@@ -7561,8 +8658,9 @@ function renderDungeonObjects() {
   checkTrapDetectionOnReveal();
   objectLayer.innerHTML = "";
   const scaledTileSizePx = currentTileSizePx();
+  const activeTiles = activeTileKeys();
   for (const object of state.dungeonObjects ?? []) {
-    if (!objectCells(object).some(isKnownTile)) continue;
+    if (!objectCells(object).some((cell) => activeTiles.has(positionKey(cell)) && isKnownTile(cell))) continue;
     const template = objectTemplate(object.type);
     if (!template) continue;
     if (objectIsTrap(object) && !object.detected && !object.spent && !object.disarmed) continue;
@@ -7660,6 +8758,8 @@ function placeToken(fighter) {
   token.classList.toggle("selected-hero", heroToken && selectedHeroIds.has(fighter.id));
   token.classList.toggle("in-attack-range", !heroToken && attackTargets().some((target) => target.id === fighter.id));
   token.classList.toggle("selected-target", !heroToken && selectedAttackTarget()?.id === fighter.id);
+  const spellTargeting = currentPendingSpellTargeting();
+  token.classList.toggle("spell-click-target", isSpellTokenTargetable(spellTargeting, fighter));
   const art = combatantTokenArt(fighter);
   const tokenImage = token.querySelector(".token-art");
   const tokenLabel = token.querySelector(".token-label");
@@ -7680,6 +8780,15 @@ function placeToken(fighter) {
   }
 }
 
+function renderableFighters(activeTiles = activeTileKeys()) {
+  const initiativeIds = new Set((state.initiative ?? []).map((entry) => entry.fighterId));
+  return Object.values(state.fighters).filter((fighter) => {
+    if (isRosterHeroId(fighter.id)) return true;
+    if (!fighter.alive) return false;
+    return showDungeonLayout || initiativeIds.has(fighter.id) || activeTiles.has(positionKey(fighter.position));
+  });
+}
+
 function renderRoom() {
   if (!roomIsBuilt) buildRoom();
 
@@ -7693,10 +8802,15 @@ function renderRoom() {
 
   const hero = activeHero();
   const heroTurn = state.mode === "combat" && activeFighter()?.id === hero?.id && combatMonsters().length > 0;
+  const activeTiles = activeTileKeys();
+  const rememberedTiles = rememberedTileKeys();
+  renderTileButtons(rememberedTiles);
   const walkable = currentWalkable();
   const doorKeys = new Set((state.dungeon?.doors ?? []).map(positionKey));
   const openedDoorKeys = new Set(state.exploration?.openedDoorKeys ?? []);
   const visibleWalls = exposedWallKeys();
+  const spellTargeting = currentPendingSpellTargeting();
+  const spellPreview = spellPreviewCells(spellTargeting);
   const reachable = heroTurn
       ? reachableTiles(hero, state.fighters, {
           gridSize: currentGridSize(),
@@ -7716,9 +8830,12 @@ function renderRoom() {
           })
         : new Map();
 
+  perfStats.visibleTiles = rememberedTiles.size;
+  perfStats.renderedTiles = renderedTileKeys.size;
   els.room.querySelectorAll(".tile").forEach((tile) => {
     const position = { x: Number(tile.dataset.x), y: Number(tile.dataset.y) };
     const key = positionKey(position);
+    const isActiveTile = activeTiles.has(key);
     const isReachable = reachable.has(key);
     const isWalkable = walkable.has(key);
     const door = doorAt(position);
@@ -7727,7 +8844,17 @@ function renderRoom() {
     const isSeenWall = !isWalkable && visibleWalls.has(key);
     const pathIndex = dragPath?.findIndex((step) => positionKey(step) === key) ?? -1;
     const isAdminTeleportTarget = canAdminTeleportTo(position);
+    const spellTargetAtTile = fighterAtPosition(position);
+    const isSpellAffected = spellPreview.has(key);
+    const isSpellOrigin = spellTargeting?.hoverPosition && positionKey(spellTargeting.hoverPosition) === key;
+    const isSpellTargetable =
+      spellTargeting?.mode === "point"
+        ? isValidSpellPointTarget(spellTargeting.caster, spellTargeting.spell, position)
+        : spellTargeting?.mode === "direction"
+          ? Boolean(directionFromCasterToPosition(spellTargeting.caster, position))
+          : isValidSpellTarget(spellTargeting?.caster, spellTargeting?.spell, spellTargetAtTile);
     tile.classList.toggle("walkable", isWalkable && isKnown);
+    tile.classList.toggle("fog-memory", isKnown && !isActiveTile);
     tile.classList.toggle("hidden-tile", !isKnown && !isSeenWall);
     tile.classList.toggle("seen-wall", isSeenWall);
     tile.classList.toggle("door", isDoor && isKnown);
@@ -7738,14 +8865,44 @@ function renderRoom() {
     tile.classList.toggle("open-door", isKnown && openedDoorKeys.has(key));
     tile.classList.toggle("reachable", isReachable && !(adminEnabled() && adminTeleportEnabled));
     tile.classList.toggle("path-preview", pathIndex >= 0);
+    tile.classList.toggle("spell-targetable", Boolean(isSpellTargetable));
+    tile.classList.toggle("spell-origin", Boolean(isSpellOrigin));
+    tile.classList.toggle("spell-aoe-preview", isSpellAffected);
+    tile.classList.toggle("spell-affected-occupied", isSpellAffected && Boolean(spellTargetAtTile));
     tile.textContent = pathIndex >= 0 ? String(pathIndex + 1) : "";
-    const openableDoor = Boolean(canOpenDoor(position));
+    const openableDoor = isActiveTile && Boolean(canOpenDoor(position));
     tile.classList.toggle("openable-door", openableDoor);
-    tile.disabled = adminEnabled() && adminTeleportEnabled ? !isAdminTeleportTarget : ((!isReachable && !openableDoor) || !isKnown) && !dragPath;
-    tile.title = isAdminTeleportTarget ? "Admin teleport here" : openableDoor ? "Open door" : isReachable ? `${reachable.get(key) * feetPerSquare} ft` : "";
+    tile.disabled = spellTargeting
+      ? false
+      : adminEnabled() && adminTeleportEnabled
+        ? !isAdminTeleportTarget
+        : ((!isReachable && !openableDoor) || !isKnown) && !dragPath;
+    tile.title = spellTargeting
+      ? isSpellAffected
+        ? `${spellTargeting.spell.name} affects this square`
+        : isSpellTargetable
+          ? `Cast ${spellTargeting.spell.name} here`
+          : ""
+      : isAdminTeleportTarget
+        ? "Admin teleport here"
+        : openableDoor
+          ? "Open door"
+          : isReachable
+            ? `${reachable.get(key) * feetPerSquare} ft`
+            : "";
   });
 
-  Object.values(state.fighters).forEach(placeToken);
+  const renderable = renderableFighters(activeTiles);
+  const renderableIds = new Set(renderable.map((fighter) => fighter.id));
+  els.room.querySelectorAll("[data-combatant]").forEach((token) => {
+    const id = token.dataset.combatant;
+    if (!isRosterHeroId(id) && !renderableIds.has(id)) token.remove();
+  });
+  renderable.forEach(placeToken);
+  perfStats.totalEntities = Object.values(state.fighters).length + (state.lootPiles?.length ?? 0) + (state.dungeonObjects?.length ?? 0);
+  perfStats.activeEntities = renderable.length;
+  perfStats.sleepingEntities = Math.max(0, aliveMonsters().length - renderable.filter((fighter) => !isRosterHeroId(fighter.id)).length);
+  perfStats.renderedEntities = renderable.length;
   placeExitToken();
   placeHomeChestToken();
   placePlanningTableToken();
@@ -7782,10 +8939,11 @@ function renderHeroStatusCard(element, fighter) {
     <div class="status-line">
       ${fighter.dodging ? '<span class="status-pill status-dodge">Dodging</span>' : ""}
       ${fighter.disengaged ? '<span class="status-pill status-disengage">Disengaged</span>' : ""}
+      ${(fighter.statusEffects ?? []).map((effect) => `<span class="status-pill status-dodge">${escapeHtml(effect.label ?? effect.id)}</span>`).join("")}
       ${fighter.hp <= 0 && !fighter.dead ? `<span class="status-pill status-dodge">Death saves ${fighter.deathSaves?.successes ?? 0}/3 | ${fighter.deathSaves?.failures ?? 0}/3</span>` : ""}
       ${fighter.dead ? '<span class="status-pill status-disengage">Dead</span>' : ""}
     </div>
-    <div class="wallet-line">XP: ${fighter.xp ?? 0} / ${xpForNextLevel(fighter.level ?? 1)} - Hit Dice: ${fighter.hitDiceRemaining ?? 0}/${fighter.level ?? 1} - Rests: ${state.shortRestsUsed ?? 0}/${state.shortRestLimit ?? 3} - Inventory: ${escapeHtml(moneyText(fighter.inventory.money))} - Hero Tokens: ${fighter.inventory.heroTokens ?? 0}</div>
+    <div class="wallet-line">XP: ${fighter.xp ?? 0} / ${xpForNextLevel(fighter.level ?? 1)} - Hit Dice: ${fighter.hitDiceRemaining ?? 0}/${fighter.level ?? 1}${(fighter.spellPointMax ?? 0) > 0 ? ` - Spell Points: ${fighter.spellPoints ?? 0}/${fighter.spellPointMax ?? 0}` : ""} - Rests: ${state.shortRestsUsed ?? 0}/${state.shortRestLimit ?? 3} - Inventory: ${escapeHtml(moneyText(fighter.inventory.money))} - Hero Tokens: ${fighter.inventory.heroTokens ?? 0}</div>
   `;
 
   element.querySelector(".rename-hero").addEventListener("click", renameHero);
@@ -8150,6 +9308,7 @@ async function createRosterHero() {
   let heroOptions = null;
   let chosenTokenArt = "";
   let raceSelection = defaultRaceSelection;
+  let classId = defaultContent.heroClass;
   while (!heroOptions) {
     const identity = await showHeroIdentityDialog({
       title: "New Hero Name",
@@ -8164,6 +9323,16 @@ async function createRosterHero() {
     }
     chosenName = identity.name || "New Hero";
     chosenTokenArt = identity.tokenArt;
+    const chosenClass = await showHeroClassDialog();
+    if (chosenClass === dialogBackValue) {
+      heroOptions = null;
+      continue;
+    }
+    if (!chosenClass) {
+      showPlanningTableInfo();
+      return;
+    }
+    classId = chosenClass;
     const chosenRace = await showHeroRaceDialog({ selection: raceSelection });
     if (chosenRace === dialogBackValue) {
       heroOptions = null;
@@ -8174,7 +9343,7 @@ async function createRosterHero() {
       return;
     }
     raceSelection = chosenRace;
-    heroOptions = await createCharacterOptions(raceSelection);
+    heroOptions = await createCharacterOptions(raceSelection, classId);
     if (heroOptions === dialogBackValue) {
       heroOptions = null;
       continue;
@@ -8188,13 +9357,13 @@ async function createRosterHero() {
   const hero = createCombatant(
     applyHeroCreationOptions(
       {
-        ...getHeroTemplate(),
+        ...getHeroTemplate(classId),
         id: heroId,
         name: chosenName.trim() || "New Hero",
         tokenArt: chosenTokenArt,
         position: planningTablePosition(),
       },
-      { ...heroOptions, raceSelection },
+      { ...heroOptions, raceSelection, classId },
     ),
   );
   hero.id = heroId;
@@ -8470,39 +9639,41 @@ function itemDetails(item) {
   const weight = item.weightLb || item.weightLb === 0 ? `; ${item.weightLb} lb.` : "";
   const magicText = item.magic ? magicItemDetails(item) : "";
   const chargeText = item.use?.charges ? `; charges ${item.use.charges.remaining ?? item.use.charges.max}/${item.use.charges.max} (${item.use.charges.refresh})` : "";
+  const starterText = item.starterEquipment ? "; starter equipment, no resale value" : "";
   if (item.type === "weapon") {
-    const ability = attackAbilityForWeapon(item);
+    const ability = attackAbilityForWeapon(item, activeHero());
     const bonus = abilityMod(activeHero(), ability);
     const damage = formatDamage({ ...item.damage, bonus });
     const range = item.range ? `${item.range.kind}${item.range.feet ? ` ${item.range.feet} ft` : ""}` : "melee";
     const propertyText = item.properties?.length ? `; ${item.properties.join(", ")}` : "";
-    return `${damage}, ${range}${propertyText}${magicText}${cost}${weight}`;
+    return `${damage}, ${range}${propertyText}${magicText}${cost}${weight}${starterText}`;
   }
   if (item.type === "armor") {
     const ac = item.armor?.bonus ? `+${item.armor.bonus} AC` : `AC ${item.armor?.base ?? "?"}`;
     const req = item.requirements?.strength ? `; Str ${item.requirements.strength}` : "";
     const stealth = item.stealthDisadvantage ? "; stealth disadvantage" : "";
-    return `${ac}${req}${stealth}${magicText}${cost}${weight}`;
+    return `${ac}${req}${stealth}${magicText}${cost}${weight}${starterText}`;
   }
   if (item.type === "ammunition") {
-    return `${item.ammo?.quantity ?? 0} ${item.ammo?.kind ?? "ammo"}${cost}${weight}`;
+    return `${item.ammo?.quantity ?? 0} ${item.ammo?.kind ?? "ammo"}${cost}${weight}${starterText}`;
   }
   if (item.type === "consumable") {
     if (item.use?.kind === "healing") {
-      return `${item.use.dice.count}d${item.use.dice.sides} + ${item.use.bonus} HP; ${item.use.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}`;
+      return `${item.use.dice.count}d${item.use.dice.sides} + ${item.use.bonus} HP; ${item.use.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
     }
-    return `${item.category ?? "Consumable"}; ${item.use?.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}`;
+    return `${item.category ?? "Consumable"}; ${item.use?.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
   }
-  if (item.type === "accessory") return `${magicText.replace(/^; /, "") || item.loot?.rarity || "magic"}${chargeText}${cost}${weight}`;
-  if (item.type === "treasure") return `${item.treasure?.kind ?? item.category ?? "treasure"}; value ${item.cost?.text ?? priceText(item.treasure?.valueCp ?? 0)}${weight}`;
+  if (item.type === "accessory") return `${magicText.replace(/^; /, "") || item.loot?.rarity || "magic"}${chargeText}${cost}${weight}${starterText}`;
+  if (item.type === "treasure") return `${item.treasure?.kind ?? item.category ?? "treasure"}; value ${item.cost?.text ?? priceText(item.treasure?.valueCp ?? 0)}${weight}${starterText}`;
   return item.type ?? "Item";
 }
 
 function itemInventoryText(item) {
   const description = item?.magic?.description || item?.treasure?.description || item?.description;
+  const starterWarning = item?.starterEquipment ? " Starter equipment has no resale value." : "";
   if (!description) return itemDetails(item);
   const chargeText = item.use?.charges ? ` Charges ${item.use.charges.remaining ?? item.use.charges.max}/${item.use.charges.max} (${item.use.charges.refresh}).` : "";
-  return `${description}${chargeText}`;
+  return `${description}${chargeText}${starterWarning}`;
 }
 
 function showInventoryItemInfo(itemId) {
@@ -9535,7 +10706,8 @@ function hasSpentShortRestAbility(fighter) {
 function renderAbilitiesMenu() {
   const hero = state.mode === "combat" ? activeFighter() : activeHero();
   const entries = availableFighterAbilities(hero);
-  els.abilitiesBody.innerHTML = entries.length
+  const spells = spellDefinitionsForFighter(hero);
+  els.abilitiesBody.innerHTML = entries.length || spells.length
     ? `
       <div class="use-item-list">
         ${entries
@@ -9554,9 +10726,33 @@ function renderAbilitiesMenu() {
             `;
           })
           .join("")}
+        ${spells
+          .map((spell) => {
+            const castLevels = spellAvailableCastLevels(hero, spell);
+            const castButtons = castLevels
+              .map((castLevel) => {
+                const castSpell = spellWithCastLevel(spell, castLevel);
+                const disabled = canCastSpell(hero, castSpell) ? "" : "disabled";
+                const upcast = castLevel > spellBaseLevel(spell) ? ` L${castLevel}` : "";
+                return `<button type="button" data-action="cast-spell" data-spell="${escapeAttribute(spell.id)}" data-cast-level="${castLevel}" ${disabled}>Cast${upcast}</button>`;
+              })
+              .join("");
+            const costText = castLevels.map((level) => `L${level}: ${spellPointCost(spellWithCastLevel(spell, level))} SP`).join(", ");
+            const concentration = spell.concentration ? " Concentration." : "";
+            return `
+              <div class="use-item-row">
+                <div>
+                  <b>${escapeHtml(spell.name)} <small>L${spellBaseLevel(spell)}</small></b>
+                  <span>${escapeHtml(spell.description)} ${escapeHtml(spellResourceLabel(spell))}.${concentration} Costs: ${escapeHtml(costText)}. Spell points: ${hero.spellPoints ?? 0}/${hero.spellPointMax ?? 0}.</span>
+                </div>
+                <div class="use-item-actions">${castButtons}</div>
+              </div>
+            `;
+          })
+          .join("")}
       </div>
     `
-    : `<p class="empty-note">No extra abilities available yet.</p>`;
+    : `<p class="empty-note">No extra abilities or spells available yet.</p>`;
 }
 
 function showAbilitiesMenu() {
@@ -9625,13 +10821,13 @@ function renderStoreMenu() {
           sellableItems.length
             ? sellableItems
                 .map((item) => {
-                  const sellRate = item.sell?.rate ?? (item.store?.sellable === true ? 0.5 : 0.5);
-                  const price = Math.floor(itemValueCp(item) * sellRate);
+                  const price = itemSellValueCp(item);
+                  const starterWarning = item.starterEquipment ? " - starter gear has no resale value" : "";
                   return `
                     <div class="store-row">
                       <div>
                         <b>${escapeHtml(item.name)}</b>
-                        <span>${escapeHtml(itemDetails(item))} - ${escapeHtml(priceText(price))}</span>
+                        <span>${escapeHtml(itemDetails(item))} - ${escapeHtml(priceText(price))}${escapeHtml(starterWarning)}</span>
                       </div>
                       <button type="button" data-action="sell-store-item" data-item="${item.id}">Sell</button>
                     </div>
@@ -9677,8 +10873,9 @@ function sellStoreItem(itemId) {
   const item = itemForId(hero, itemId);
   if (!item) return;
   hero.inventory.items = hero.inventory.items.filter((entry) => entry.id !== itemId);
-  addMoney(hero.inventory.money, Math.floor(itemValueCp(item) * (item.sell?.rate ?? (item.store?.sellable === true ? 0.5 : 0.5))));
-  addLog(`${hero.name} sells ${item.name}.`, "important");
+  const saleValue = itemSellValueCp(item);
+  addMoney(hero.inventory.money, saleValue);
+  addLog(`${hero.name} sells ${item.name} for ${priceText(saleValue)}.${item.starterEquipment ? " Starter equipment has no resale value." : ""}`, "important");
   render();
   renderStoreMenu();
 }
@@ -9689,6 +10886,25 @@ function fighterClassFeatureNames(level) {
   if (level === 2) features.push("Action Surge");
   if (fighterAbilityScoreImprovementLevels.has(level)) features.push("Ability Score Improvement");
   return features;
+}
+
+function abilityScoreImprovementLevelsForClass(classId) {
+  return classAbilityScoreImprovementLevels[classId] ?? new Set([4, 8, 12, 16, 19]);
+}
+
+function classFeatureNames(hero, level) {
+  const features = [];
+  const template = getHeroTemplate(hero.classId);
+  for (const feature of template.classFeatures ?? []) {
+    if (feature.level === level) features.push(feature.name);
+  }
+  if (abilityScoreImprovementLevelsForClass(hero.classId).has(level)) features.push("Ability Score Improvement");
+  return features;
+}
+
+function rageDamageBonus(hero) {
+  const level = hero?.level ?? 1;
+  return level >= 16 ? 4 : level >= 9 ? 3 : 2;
 }
 
 function showAbilityScoreImprovementDialog(hero) {
@@ -9780,14 +10996,14 @@ async function levelUpHero() {
   if (state.mode !== "home" || !canLevelUp(hero)) return;
   const oldConMod = scoreToMod(baseAbilityScore(hero, "con"));
   const racialHpGain = hero.racialHpPerLevel ?? 0;
-  const hpGain = 6 + oldConMod + racialHpGain;
+  const hpGain = Math.max(1, Math.floor((hero.hitDie ?? 10) / 2) + 1 + oldConMod + racialHpGain);
   hero.level = (hero.level ?? 1) + 1;
   hero.role = combatantRoleLabel(hero);
   hero.baseMaxHp = (hero.baseMaxHp ?? hero.maxHp) + hpGain;
   hero.maxHp = hero.baseMaxHp;
   hero.hitDiceRemaining = hero.level;
   let asiText = "";
-  if (fighterAbilityScoreImprovementLevels.has(hero.level ?? 1)) {
+  if (abilityScoreImprovementLevelsForClass(hero.classId).has(hero.level ?? 1)) {
     hero.abilityScores = Object.fromEntries(abilities.map((ability) => [ability, baseAbilityScore(hero, ability)]));
     const increases = await showAbilityScoreImprovementDialog(hero);
     if (increases) {
@@ -9802,17 +11018,28 @@ async function levelUpHero() {
     }
   }
   ensureFighterAbilityState(hero);
+  let spellText = "";
+  const spellChoices = spellChoiceCountForClassLevel(hero.classId, hero.level ?? 1) + (hero.unusedSpellChoiceCredits ?? 0);
+  if (spellChoices > 0) {
+    const result = await chooseClassSpells(hero, spellChoices, hero.spells ?? []);
+    const gained = result.spells.filter((spellId) => !(hero.spells ?? []).includes(spellId));
+    hero.spells = result.spells;
+    hero.unusedSpellChoiceCredits = result.unusedCredits;
+    if (gained.length) spellText = ` New spell${gained.length === 1 ? "" : "s"}: ${gained.map((spellId) => getContentDefinition("spells", spellId)?.name ?? spellId).join(", ")}.`;
+  }
   refreshDerivedStats(hero);
   hero.hp = hero.maxHp;
-  const features = fighterClassFeatureNames(hero.level);
+  hero.spellPointMax = spellPointMaximum(hero);
+  hero.spellPoints = hero.spellPointMax;
+  const features = classFeatureNames(hero, hero.level);
   const featureText = features.length ? ` New feature${features.length === 1 ? "" : "s"}: ${features.join(", ")}.` : "";
   const racialHpText = racialHpGain ? ` (${racialHpGain} from Dwarven Toughness)` : "";
-  const levelUpText = `${hero.name} reaches level ${hero.level} and gains ${hpGain} max HP${racialHpText}.${featureText}${asiText}`;
+  const levelUpText = `${hero.name} reaches level ${hero.level} and gains ${hpGain} max HP${racialHpText}.${featureText}${asiText}${spellText}`;
   addLog(levelUpText, "important");
   hideHomeMenu();
   render();
   await showChoiceDialog({
-    title: `Level ${hero.level} Fighter`,
+    title: `Level ${hero.level} ${hero.className ?? "Fighter"}`,
     message: levelUpText,
     choices: [{ value: "ok", label: "Continue" }],
   });
@@ -9887,6 +11114,8 @@ function useFighterAbility(abilityId) {
   hero.abilityUses[ability.id] = (hero.abilityUses[ability.id] ?? 0) + 1;
   if (state.mode === "combat" && ability.resource === "bonusAction") {
     hero.hasBonusAction = false;
+  } else if (state.mode === "combat" && ability.resource === "action") {
+    hero.hasAction = false;
   }
 
   if (ability.id === "secondWind") {
@@ -9902,28 +11131,134 @@ function useFighterAbility(abilityId) {
     addLog(`${hero.name} uses Action Surge and regains an action.`, "important");
   }
 
+  if (ability.id === "rage") {
+    applyStatusEffect(hero, { id: "rage", label: "Rage", damageBonus: rageDamageBonus(hero), durationRounds: 10 });
+    addLog(`${hero.name} enters a Rage.`, "important");
+  }
+
+  if (ability.id === "recklessAttack") {
+    applyStatusEffect(hero, { id: "reckless-attack", label: "Reckless", attackBonus: 2, acBonus: -2, expiresAtStartOfTurn: true });
+    addLog(`${hero.name} attacks recklessly.`, "important");
+  }
+
+  if (ability.id === "patientDefense" || ability.id === "uncannyDodge") {
+    hero.dodging = true;
+    addLog(`${hero.name} takes a defensive stance.`, "important");
+  }
+
+  if (ability.id === "cunningActionDash") {
+    hero.movementLeft = (hero.movementLeft ?? 0) + Math.floor(hero.speedFeet / feetPerSquare);
+    addLog(`${hero.name} uses Cunning Action to Dash.`, "important");
+  }
+
+  if (ability.id === "eldritchMaster") {
+    hero.spellPoints = spellPointMaximum(hero);
+    addLog(`${hero.name} uses Eldritch Master and restores pact spell points.`, "important");
+  }
+
+  if (ability.id === "bardicInspiration") {
+    applyStatusEffect(hero, { id: "bardic-inspiration", label: "Inspired", attackBonus: 2, saveBonus: 2, durationRounds: 3 });
+    addLog(`${hero.name} uses Bardic Inspiration.`, "important");
+  }
+
+  if (ability.id === "wildShape") {
+    applyStatusEffect(hero, { id: "wild-shape", label: "Wild Shape", tempHp: 5 + (hero.level ?? 1), damageBonus: 2, durationRounds: 3 });
+    addLog(`${hero.name} takes on a combat beast shape.`, "important");
+  }
+
+  if (ability.id === "layOnHands") {
+    const healing = 5 * (hero.level ?? 1);
+    const healed = applyHealingToHero(hero, healing);
+    addLog(`${hero.name} uses Lay on Hands and heals ${healed} HP.`, "heal");
+  }
+
+  if (ability.id === "divineSmite") {
+    applyStatusEffect(hero, { id: "divine-smite", label: "Divine Smite", weaponRider: true, damageBonus: 9, damageType: "radiant", expiresAtEndOfTurn: true });
+    addLog(`${hero.name} prepares a Divine Smite.`, "important");
+  }
+
+  if (ability.id === "empoweredSpell") {
+    applyStatusEffect(hero, { id: "empowered-spell", label: "Empowered Spell", damageBonus: 3, durationRounds: 1 });
+    addLog(`${hero.name} gathers empowered arcane force.`, "important");
+  }
+
+  if (ability.id === "arcaneRecovery") {
+    const recovered = Math.min(spellPointMaximum(hero) - (hero.spellPoints ?? 0), Math.max(1, Math.ceil((hero.level ?? 1) / 2)));
+    hero.spellPoints = Math.min(spellPointMaximum(hero), (hero.spellPoints ?? 0) + recovered);
+    addLog(`${hero.name} uses Arcane Recovery and regains ${recovered} SP.`, "important");
+  }
+
+  if (ability.id === "channelDivinity") {
+    const targets = visibleMonsters().filter((monster) => distance(hero.position, monster.position) <= 3);
+    addLog(`${hero.name} uses Channel Divinity.`, "important");
+    for (const target of targets) {
+      applySpecialDamage(hero, target, Math.max(1, rollDice(2, 8).total + abilityMod(hero, spellcastingAbility(hero))), "radiant", "Channel Divinity");
+      if (!target.alive) {
+        playSoundEffect("enemyDefeated");
+        awardMonsterXp(target);
+        dropLootForMonster(target);
+      }
+    }
+    void finishEncounterAfterLastMonsterFalls();
+  }
+
+  if (ability.id === "rangerCompanion") {
+    const target = attackTarget() ?? visibleMonsters()[0];
+    if (target) {
+      const damage = Math.max(1, rollDice(1, 8).total + proficiencyBonus(hero));
+      applySpecialDamage(hero, target, damage, "piercing", "Ranger Companion");
+      addLog(`${hero.name}'s companion strikes ${target.name}.`, "important");
+      if (!target.alive) {
+        playSoundEffect("enemyDefeated");
+        awardMonsterXp(target);
+        dropLootForMonster(target);
+        void finishEncounterAfterLastMonsterFalls();
+      }
+    } else {
+      addLog(`${hero.name}'s companion has no target.`, "important");
+    }
+  }
+
   refreshDerivedStats(hero);
   hideAbilitiesMenu();
   render();
 }
 
 function shortRestHeroes() {
-  return partyHeroes().filter((hero) => hero.alive && !hero.dead);
+  return partyHeroes().filter((hero) => heroCanAct(hero) || heroIsStableAtZero(hero));
 }
 
 function partyNeedsShortRest() {
   return shortRestHeroes().some(
     (hero) =>
+      heroIsStableAtZero(hero) ||
       (hero.hp < hero.maxHp && (hero.hitDiceRemaining ?? hero.level ?? 1) > 0) ||
       hasSpentShortRestAbility(hero),
   );
 }
 
+function finishStableHeroesAfterShortRest() {
+  for (const hero of stableUnconsciousPartyHeroes()) {
+    hero.hp = 1;
+    hero.deathSaves = { successes: 0, failures: 0 };
+    refreshDerivedStats(hero);
+    addLog(`${hero.name} wakes at the end of the short rest with 1 HP.`, "heal");
+  }
+}
+
 function beginPartyShortRest() {
   if ((state.shortRestsUsed ?? 0) >= (state.shortRestLimit ?? 3)) return false;
+  if (unstableDyingPartyHeroes().length > 0) {
+    addLog("A hero is still making death saves. Stabilize them before taking a short rest.", "important");
+    return false;
+  }
   state.shortRestsUsed = (state.shortRestsUsed ?? 0) + 1;
   for (const hero of shortRestHeroes()) {
-    resetFighterAbilityUses(hero);
+    resetFighterAbilityUses(hero, "shortRest");
+    if (casterTypeForFighter(hero) === "pact") {
+      hero.spellPoints = spellPointMaximum(hero);
+      addLog(`${hero.name}'s pact spell points refresh on the short rest.`, "important");
+    }
     refreshItemChargesForFighter(hero, "shortRest");
   }
   addLog("The party takes a short rest. Short-rest abilities refresh for every active hero.", "important");
@@ -9943,12 +11278,13 @@ function renderShortRestDialogBody(spentAny = false) {
         .map((hero) => {
           const conMod = abilityMod(hero, "con");
           hero.hitDiceRemaining = hero.hitDiceRemaining ?? hero.level ?? 1;
-          const canSpend = spentAny && (hero.hitDiceRemaining ?? 0) > 0 && hero.hp < hero.maxHp;
+          const canSpend = spentAny && hero.hp > 0 && (hero.hitDiceRemaining ?? 0) > 0 && hero.hp < hero.maxHp;
+          const status = heroIsStableAtZero(hero) ? " - stable; wakes at rest end" : "";
           return `
             <div class="rest-hero-row">
               <div>
                 <b>${escapeHtml(hero.name)}</b>
-                <span>HP ${hero.hp}/${hero.maxHp} - Hit dice ${hero.hitDiceRemaining ?? 0}/${hero.level ?? 1} - d${hero.hitDie ?? 10} ${abilityLabel(conMod)} CON</span>
+                <span>HP ${hero.hp}/${hero.maxHp} - Hit dice ${hero.hitDiceRemaining ?? 0}/${hero.level ?? 1} - d${hero.hitDie ?? 10} ${abilityLabel(conMod)} CON${status}</span>
               </div>
               <button type="button" data-rest-action="spend" data-hero="${hero.id}" ${canSpend ? "" : "disabled"}>Roll Hit Die</button>
             </div>
@@ -9972,7 +11308,10 @@ function showShortRestMenu() {
       els.gameDialogForm.classList.remove("wide-dialog");
       els.gameDialog.classList.add("hidden");
       activeDialogCancel = null;
-      if (spentAny) playSoundEffect("shortRestFinished");
+      if (spentAny) {
+        finishStableHeroesAfterShortRest();
+        playSoundEffect("shortRestFinished");
+      }
       resolve(spentAny);
     };
 
@@ -10023,6 +11362,11 @@ function showShortRestMenu() {
 async function takeShortRest() {
   const heroes = shortRestHeroes();
   if ((state.shortRestsUsed ?? 0) >= (state.shortRestLimit ?? 3) || state.mode === "combat" || heroes.length === 0) return;
+  if (unstableDyingPartyHeroes().length > 0) {
+    addLog("A hero is still making death saves. Stabilize them before taking a short rest.", "important");
+    render();
+    return;
+  }
 
   for (const hero of heroes) hero.hitDiceRemaining = hero.hitDiceRemaining ?? hero.level ?? 1;
   render();
@@ -10251,7 +11595,7 @@ function renderControls() {
   const heroCanOpenAbilities =
     gameHasStarted &&
     heroCanAct(actingHero) &&
-    availableFighterAbilities(actingHero).length > 0 &&
+    (availableFighterAbilities(actingHero).length > 0 || spellDefinitionsForFighter(actingHero).length > 0) &&
     (state.mode !== "combat" || heroTurn);
 
   els.rollInitiative.disabled = !gameHasStarted || state.completed || movementInProgress || state.mode === "combat" || !threatPresent();
@@ -10302,7 +11646,7 @@ function renderControls() {
   els.debugKill.disabled = !adminEnabled() || visibleMonsters().length === 0;
   els.levelUp.disabled = !gameHasStarted || state.mode !== "home" || !canLevelUp(hero);
   if (els.selectParty) {
-    const selectableCount = partyHeroes().filter((entry) => entry?.alive && !entry.dead).length;
+    const selectableCount = partyHeroes().filter((entry) => heroCanAct(entry)).length;
     els.selectParty.disabled = !gameHasStarted || state.mode === "combat" || selectableCount <= 1;
   }
   if (els.roomTitle) els.roomTitle.textContent = state.mode === "home" ? "Home" : state.room.name;
@@ -10323,7 +11667,59 @@ function renderControls() {
   updateBackgroundMusic();
 }
 
+function ensurePerfOverlay() {
+  if (perfOverlayElement) return perfOverlayElement;
+  perfOverlayElement = document.createElement("div");
+  perfOverlayElement.id = "perf-overlay";
+  perfOverlayElement.style.cssText = [
+    "position:fixed",
+    "left:12px",
+    "top:12px",
+    "z-index:50",
+    "padding:8px 10px",
+    "background:rgba(12,10,8,0.86)",
+    "color:#f3e7cc",
+    "border:1px solid rgba(215,168,79,0.45)",
+    "border-radius:6px",
+    "font:12px/1.35 monospace",
+    "pointer-events:none",
+    "white-space:pre",
+  ].join(";");
+  document.body.append(perfOverlayElement);
+  return perfOverlayElement;
+}
+
+function updatePerfOverlay() {
+  perfStats.frames += 1;
+  const now = performance.now();
+  const elapsed = now - perfStats.lastSecondAt;
+  if (elapsed >= 1000) {
+    perfStats.fps = Math.round((perfStats.frames * 1000) / elapsed);
+    perfStats.aiUpdatesPerSecond = perfStats.aiUpdates;
+    perfStats.pathfindingJobsPerSecond = perfStats.pathfindingJobs;
+    perfStats.frames = 0;
+    perfStats.aiUpdates = 0;
+    perfStats.pathfindingJobs = 0;
+    perfStats.lastSecondAt = now;
+  }
+
+  const overlay = ensurePerfOverlay();
+  overlay.style.display = adminEnabled() ? "" : "none";
+  if (!adminEnabled()) {
+    perfStats.pathfindingJobsLastFrame = 0;
+    return;
+  }
+  overlay.textContent = [
+    `FPS ${perfStats.fps} | render ${perfStats.renderMs.toFixed(1)}ms`,
+    `tiles ${perfStats.renderedTiles}/${perfStats.visibleTiles}`,
+    `entities ${perfStats.activeEntities} active, ${perfStats.sleepingEntities} sleeping, ${perfStats.totalEntities} total`,
+    `AI ${perfStats.aiUpdatesPerSecond}/s | paths ${perfStats.pathfindingJobsPerSecond}/s (${perfStats.pathfindingJobsLastFrame} last)`,
+  ].join("\n");
+  perfStats.pathfindingJobsLastFrame = 0;
+}
+
 function render() {
+  const renderStart = performance.now();
   renderRoom();
   renderHeroStatusCard(els.heroCard, activeHero());
   activateFledMonstersWithLineOfSight();
@@ -10332,6 +11728,8 @@ function render() {
   renderControls();
   scheduleInitiativePromptIfNeeded();
   updateInteractiveTutorial();
+  perfStats.renderMs = performance.now() - renderStart;
+  updatePerfOverlay();
 }
 
 els.rollInitiative.addEventListener("click", rollInitiative);
@@ -10571,6 +11969,9 @@ els.abilitiesMenu.addEventListener("click", (event) => {
   if (button?.dataset.action === "use-fighter-ability") {
     useFighterAbility(button.dataset.ability);
   }
+  if (button?.dataset.action === "cast-spell") {
+    void chooseAndCastSpell(button.dataset.spell, button.dataset.castLevel);
+  }
 });
 els.inventoryMenu.addEventListener("click", (event) => {
   if (event.target === els.inventoryMenu) {
@@ -10685,6 +12086,10 @@ window.addEventListener("resize", () => {
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     clearHeldMovementKeys();
+    if (pendingSpellTargeting) {
+      clearPendingSpellTargeting();
+      return;
+    }
     if (activeDialogCancel) {
       activeDialogCancel();
       return;
@@ -10750,9 +12155,15 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     showAbilitiesMenu();
   }
+  if (key === "q" && els.selectParty && !els.selectParty.disabled) {
+    event.preventDefault();
+    selectActivePartyForMovement();
+    return;
+  }
   if (key === "q" && !els.shortRest.disabled) {
     event.preventDefault();
     takeShortRest();
+    return;
   }
   if (key === "h" && !els.returnHome.disabled) {
     event.preventDefault();

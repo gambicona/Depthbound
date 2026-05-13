@@ -1,0 +1,35 @@
+(() => {
+window.DungeonContent.register("classes", "rogue", {
+  name: "Night Knife",
+  className: "Rogue",
+  classId: "rogue",
+  classRole: "rogue",
+  casterType: "none",
+  role: "Level 1 Rogue",
+  level: 1,
+  xp: 0,
+  hitDie: 8,
+  maxHp: 10,
+  abilityMods: { dex: 2, con: 2, int: 1, wis: 1 },
+  baseAc: 10,
+  attackBonus: 4,
+  damage: { count: 1, sides: 8, bonus: 2, type: "piercing", label: "1d8 + 2 piercing" },
+  initiativeBonus: 2,
+  speedFeet: 30,
+  token: "G",
+  classFeatures: [
+    { level: 1, name: "Sneak Attack" },
+    { level: 2, name: "Cunning Action" },
+    { level: 5, name: "Uncanny Dodge" },
+    { level: 7, name: "Evasion" },
+    { level: 11, name: "Reliable Talent" },
+  ],
+  abilities: [
+    { id: "cunningActionDash", name: "Cunning Action: Dash", level: 2, refresh: "turn", uses: 1, resource: "bonusAction", description: "Dash as a quick action." },
+    { id: "uncannyDodge", name: "Uncanny Dodge", level: 5, refresh: "shortRest", uses: 1, resource: "bonusAction", description: "Reduce incoming pressure with a defensive reaction." },
+  ],
+  equipment: { mainHand: "rapier", torso: "leather" },
+  inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["rapier", "shortbow", "arrows-20", "leather"] },
+  startingGear: { fixed: true, equipment: { mainHand: "rapier", torso: "leather", quiver: "arrows-20" }, inventory: ["rapier", "shortbow", "arrows-20", "leather"] },
+});
+})();

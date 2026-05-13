@@ -2,6 +2,12 @@
     "folders": [
         {
             "path": "../.."
+        },
+        {
+            "path": "../../../../Dokumente/Omaswebsite/Omas-Website"
         }
-    ]
+    ],
+    "settings": {
+        "liveServer.settings.multiRootWorkspaceName": "DnDgame"
+    }
 }

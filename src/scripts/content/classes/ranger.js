@@ -1,0 +1,39 @@
+(() => {
+const halfCasterSpellPoints = { 1: 2, 2: 4, 3: 6, 4: 6, 5: 14, 6: 14, 7: 17, 8: 17, 9: 27, 10: 27, 11: 32, 12: 32, 13: 38, 14: 38, 15: 44, 16: 44, 17: 57, 18: 57, 19: 64, 20: 64 };
+
+window.DungeonContent.register("classes", "ranger", {
+  name: "Trail Warden",
+  className: "Ranger",
+  classId: "ranger",
+  classRole: "ranger",
+  casterType: "half",
+  role: "Level 1 Ranger",
+  level: 1,
+  xp: 0,
+  hitDie: 10,
+  maxHp: 12,
+  abilityMods: { str: 1, dex: 3, con: 2, wis: 2 },
+  baseAc: 10,
+  attackBonus: 5,
+  damage: { count: 1, sides: 8, bonus: 3, type: "piercing", label: "1d8 + 3 piercing" },
+  initiativeBonus: 3,
+  speedFeet: 30,
+  spellcastingAbility: "wis",
+  spellPointProgression: halfCasterSpellPoints,
+  spellList: ["hunters_mark", "cure_wounds", "ensnaring_strike", "hail_of_thorns", "fog_cloud", "longstrider", "barkskin", "spike_growth", "silence", "cordon_of_arrows"],
+  spells: [],
+  token: "R",
+  classFeatures: [
+    { level: 1, name: "Favored Foe" },
+    { level: 2, name: "Fighting Style" },
+    { level: 3, name: "Ranger Companion" },
+    { level: 5, name: "Extra Attack" },
+  ],
+  abilities: [
+    { id: "rangerCompanion", name: "Ranger Companion", level: 3, refresh: "shortRest", uses: 1, resource: "bonusAction", description: "Command a companion strike in simplified form." },
+  ],
+  equipment: { mainHand: "longbow", torso: "leather", quiver: "arrows-20" },
+  inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["longbow", "leather", "arrows-20"] },
+  startingGear: { fixed: true, equipment: { mainHand: "longbow", torso: "leather", quiver: "arrows-20" }, inventory: ["longbow", "leather", "arrows-20"] },
+});
+})();

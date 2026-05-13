@@ -1,0 +1,48 @@
+Monster Special Ability Bibliography
+
+Tuning lives in src/scripts/app.js under monsterSpecialAbilityTuning.
+Active abilities use activeUseChance. On-hit riders use onHitUseChance. Defensive/passive-on-turn abilities use defensiveUseChance.
+
+Implemented mechanical families:
+
+- Aquatic, RockClimber, SewerSkulk
+  Biome/movement identity abilities. Currently descriptive; these monsters already express their mobility through speed and placement.
+
+- BloodFrenzy
+  If the monster is at or below half HP at the start of its turn, it gains +1 attack for that turn.
+
+- BossRoar, Root-Rending Roar, Stormhorn Burst, Gravequake, Stampede
+  Active area ability. Nearby heroes make a Strength save. Failed saves take bludgeoning damage and suffer the Shaken attack penalty until the end of their next turn.
+
+- Briarhide, ShellGuard, Stubborn Beast, Thornhide
+  Defensive start-of-turn ability. Once per fight, the monster may gain +2 AC until the end of its turn.
+
+- Bile Spray, Blight Belch, Plague Breath, Rot Burst, Rot Crown Pulse
+  Active area ability. Nearby heroes make a Constitution save. Failed saves take poison damage; successful saves take half.
+
+- Charge, Corpse Slam, Crushing Stomp, Mauling Rush, Pounce, Predator Lunge, Swooping Strike, Thunder Charge
+  On-hit rider after the monster moved at least 20 ft this turn. Adds bludgeoning damage and may shove the target 5 ft on a failed Strength save.
+
+- Claw Fever, Deep Venom, Sickening Claws, Venom Bite, VenomBite
+  On-hit venom rider. Target makes a Constitution save. Failed saves take poison damage. Sickening variants also apply a small attack penalty.
+
+- Crippling Bite, Dragging Grasp, Drowning Grip, Hamstring Bite, Web Snare, WebSnare
+  On-hit restraint rider. Target makes a Strength or Dexterity save. Failed saves have movement stopped until the end of their next turn.
+
+- Fireball, Lesser Fireball
+  Active ranged area ability. Visible heroes in range make a Dexterity save. Failed saves take fire damage; successful saves take half.
+
+- Grave Spark, Venom Spit
+  Active ranged special shot. Targeted heroes make a Dexterity save. Failed saves take necrotic or poison damage; successful saves take half.
+
+- SelfHeal
+  Defensive start-of-turn ability. Once per fight, when at or below half HP, the monster may heal 1d6 + category HP.
+
+- ThickHide, FrostHide
+  Passive durability identity abilities. The actual resistance is read from the monster's damageResistances field.
+
+- Undead Fortitude
+  Defensive death trigger. When reduced to 0 HP, the monster may make a Constitution save against DC 5 + incoming damage. On success it remains at 1 HP.
+
+- Example Ability
+  Template-only placeholder. No gameplay effect.

@@ -1,0 +1,150 @@
+How to tune dungeon difficulty and loot generation
+
+This file describes the current practical knobs. Most are in src/scripts/app.js unless noted otherwise.
+
+Dungeon size
+
+createInitialState uses the selected theme's generator settings.
+
+Theme files:
+src/scripts/content/themes/old-guardroom.js
+src/scripts/content/themes/forest-of-the-beasts.js
+
+Useful theme fields:
+
+generator.roomCount
+generator.roomCountByCategory
+
+More rooms means more chances for monsters, chests, furniture, traps, and rests to matter.
+
+Monster categories
+
+categoryForHeroLevel(level) currently maps:
+levels 1-2 -> category 1
+levels 3-4 -> category 2
+levels 5-6 -> category 3
+
+Monster templates define category or cat. A monster can spawn if its category is not above the party's current category.
+
+Theme monster pools
+
+Themes use monsterTagGroups and bossMonsterTagGroups.
+
+Example:
+
+monsterTagGroups: [
+  ["undead", "old-guardroom"],
+]
+
+The monster must match one full tag group to be eligible.
+
+Room monster chance
+
+In createDungeonMonsters:
+
+if (room.id === bossRoomId || Math.random() >= 0.72) continue;
+
+The 0.72 means about 28% of rooms get a monster group. Lower the number for more fights, raise it for fewer fights.
+
+Monster count per room
+
+roomMonsterSpawnTuning controls how many monsters are in one monster room:
+
+roomMonsterSpawnTuning = {
+  baseCount: 1,
+  extraPerPartyMember: 0.65,
+  categoryGapBonus: 0.25,
+  maximumCount: 5,
+}
+
+baseCount: minimum count for a monster room.
+extraPerPartyMember: extra expected monsters for each party member beyond one.
+categoryGapBonus: extra expected monsters when low-category monsters appear in higher-category dungeons.
+maximumCount: hard cap.
+
+Swarm count
+
+swarmSpawnTuning controls monsters with behavior "swarm":
+
+minimumCount: minimum pack size.
+extraPerPartyMember: extra count per additional party member.
+extraPerCategoryGap: more low-category swarm monsters in higher-category dungeons.
+absoluteMaximum: hard cap.
+
+Bosses
+
+heroNeedsDungeonBoss(hero) currently returns true on even levels, such as 2, 4, 6, 8.
+Bosses spawn in the exit room and use bossMonsterTagGroups from the theme.
+
+Monster scaling
+
+applyMonsterCategoryScaling handles scaling lower-category monsters upward. Tune HP and attack scaling there if low-category monsters feel too weak or too strong in higher dungeons.
+
+Loot from normal monsters
+
+createLootForMonster controls normal and boss drop chances.
+
+Current normal monster chances:
+healing potion: 5%
+mundane equipment: 2%
+treasure: 2%
+magic item: about 1-2%, based on category
+
+These are intentionally low. Raise them slowly if fights feel unrewarding.
+
+Boss loot
+
+Current boss chances:
+healing potion: 30%
+mundane equipment: 18%
+treasure: 75%
+magic item: 20% + 8% per category, capped at 55%
+
+Bosses are the main source of magic items.
+
+Chest loot
+
+randomChestLoot controls chest rewards.
+
+Current chest logic:
+normal equipment/potion/ammo rolls first
+treasure chance increases by category
+magic chance is rare and increases by category
+
+Chest spawn chance is theme-controlled:
+
+furnitureSpawnChances: {
+  chest: 0.2,
+}
+
+Treasure and magic value caps
+
+maxLootPriceGpForCategory controls how valuable loot can be:
+
+category 1: 2,500 gp
+category 2: 9,000 gp
+category 3: 35,000 gp
+category 4: 90,000 gp
+category 5+: 200,000 gp
+
+If high-level loot appears too early, lower these caps.
+If loot feels boring at high levels, raise these caps or add more items under the current cap.
+
+Drop weights
+
+Magic items use item.loot.dropWeight.
+Treasure uses item.treasure.dropWeight.
+
+Higher weight means more common. Lower weight means rarer.
+
+Price also affects default weight in the item helper files, so expensive items are naturally rarer.
+
+Merchant rules
+
+Magic and treasure are loot-only for buying:
+store.buyable: false
+
+Treasure can be sold at full value using:
+sell.rate: 1
+
+Magic can be sold but is not currently buyable from the normal merchant.

@@ -1,0 +1,1598 @@
+SLIM SPELL IMPLEMENTATION INSTRUCTIONS
+Game Dungeon Crawler - Player Spell System, Levels 1-6
+
+Purpose
+=======
+Implement a slim, combat-focused spell system inspired by classic D&D spellcasting, optimized for a dungeon crawler. The goal is not to reproduce the full tabletop rules. The goal is to capture each class's fantasy with a manageable number of reusable combat spell templates.
+
+The initial implementation should cover only player character levels 1-6 and only the following spellcasting classes:
+
+- Cleric
+- Druid
+- Wizard
+- Bard
+- Sorcerer
+- Paladin
+- Ranger
+
+The system should focus on combat-relevant spells only:
+
+- Damage spells
+- Area damage spells
+- Healing spells
+- Buffs
+- Debuffs
+- Battlefield control
+- Terrain hazards
+- Mobility and defense tools
+- Weapon-enhancing smite/strike effects
+
+Do not prioritize non-combat utility, narrative-only magic, exploration-only spells, divination, rituals, long-duration travel spells, food/water spells, or purely social spells in the first pass.
+
+Important Design Direction
+==========================
+This spell system should be much slimmer than normal D&D. Each class receives a curated list of 10 iconic spells that represent the class flavor. These are not meant to be exhaustive class spell lists.
+
+The implementation should be data-driven wherever possible. Avoid creating one-off bespoke logic for every spell unless the spell absolutely requires it. Most spells should be expressible through shared spell templates such as:
+
+- Single-target damage
+- Multi-hit damage
+- Burst area damage
+- Cone area damage
+- Line area damage
+- Single-target healing
+- Multi-target healing
+- Ally buff
+- Enemy debuff
+- Disable/control
+- Sustained area hazard
+- Terrain modifier
+- Weapon attack rider
+- Reaction defense
+- Teleport/mobility
+- Summoned recurring attack
+
+The spell definitions should be easy to rebalance later. Damage dice, duration, range, area size, number of targets, status effects, and upcast scaling should be stored as editable spell data rather than hard-coded into game logic whenever feasible.
+
+Spell Point Variant
+===================
+Use a spell point system instead of individual spell slots.
+
+For levels 1-6, the game only needs to support spell levels 1-3 for full casters and spell levels 1-2 for half casters.
+
+Spell point costs:
+
+- 1st-level spell: 2 spell points
+- 2nd-level spell: 3 spell points
+- 3rd-level spell: 5 spell points
+
+Upcasting means the player pays the spell point cost of the higher spell level and the spell receives its listed scaling benefit.
+
+Examples:
+
+- A 1st-level spell cast at 1st level costs 2 spell points.
+- A 1st-level spell cast at 2nd level costs 3 spell points.
+- A 1st-level spell cast at 3rd level costs 5 spell points.
+- A 2nd-level spell cast at 3rd level costs 5 spell points.
+
+The UI should clearly show:
+
+- Base spell level
+- Current selected cast level
+- Spell point cost at selected level
+- What changes when upcast
+- Whether the spell requires concentration
+- Whether the spell is an action, quick action, reaction, or weapon-rider effect
+
+Scope Limits for Initial Implementation
+=======================================
+For the first pass, implement only spells available in the curated lists below.
+
+Do not implement:
+
+- Every official D&D spell
+- Non-combat utility spell lists
+- Ritual casting
+- Spell components
+- Material costs
+- Spell schools unless useful for internal classification
+- Complex tabletop edge cases
+- Counterspell interactions unless already part of the combat engine
+- Multiclass spellcasting unless the game already supports multiclassing
+- Full subclass-specific expanded spell lists
+
+If subclasses exist, subclass-granted spells can be added later as an additional layer. For now, implement the base class spell kits.
+
+Core Spell Properties
+=====================
+Each spell should have at least the following conceptual properties in the game's spell data:
+
+- Spell name
+- Class availability list
+- Base spell level
+- Minimum character level required, if the game gates by character level
+- Spell point cost by cast level
+- Action type
+- Target type
+- Range category
+- Area shape, if applicable
+- Area size, if applicable
+- Damage type, if applicable
+- Healing formula, if applicable
+- Saving throw type or defense check, if applicable
+- Attack roll requirement, if applicable
+- Duration
+- Concentration requirement
+- Status effects applied
+- Whether the effect is instant, recurring, sustained, or triggered
+- Upcast scaling behavior
+- Combat log text
+- Tooltip summary
+- AI usage category
+
+Suggested action categories:
+
+- Action: consumes the normal spell/action use for the turn.
+- Quick action: can be used as a smaller secondary action if the combat system supports it.
+- Reaction: used in response to a trigger, such as being attacked.
+- Weapon rider: cast first, then applies to the next successful weapon hit.
+- Sustained command: an already-active spell can produce an effect each turn without recasting, if the spell says so.
+
+If the game does not support quick actions, convert quick-action healing spells into normal actions but give them better range or slightly lower spell point cost only if needed for balance.
+
+If the game does not support reactions, defensive reaction spells such as Shield should be implemented as a temporary defensive stance or instant triggered defensive popup. The preferred implementation is reaction-based if possible.
+
+Concentration
+=============
+Several spells require concentration. Concentration is a balancing mechanic for strong ongoing spells.
+
+Rules for concentration:
+
+- A character may maintain only one concentration spell at a time.
+- Casting a new concentration spell ends the previous concentration spell from that caster.
+- If the caster is defeated, incapacitated, stunned, or otherwise unable to act, concentration ends.
+- If the combat system supports concentration break checks, taking damage should have a chance to break concentration.
+- If concentration break checks are not implemented yet, use the simpler rule: concentration only ends when duration expires, caster is disabled, caster dies, or caster starts another concentration spell.
+
+Concentration spells should show a clear active status indicator on the caster and on affected targets or areas.
+
+Durations
+=========
+To keep combat readable, most ongoing spells should use short tactical durations.
+
+Recommended standard durations:
+
+- Instant: resolves immediately.
+- 1 round: short disable or burst control.
+- 3 rounds: standard combat buff, debuff, aura, or hazard.
+- Encounter: use sparingly for simple passive buffs such as Mage Armor, Longstrider, Aid, or trap-like effects if that fits the dungeon crawler structure.
+
+Do not use long tabletop durations such as 1 minute, 10 minutes, 1 hour, or 8 hours in the first implementation. Convert them into 3 rounds or encounter duration as appropriate.
+
+Saving Throws and Attack Rolls
+==============================
+The game may not use tabletop-style saving throws. If it does, map spells to standard defenses.
+
+Recommended saving throw/defense mapping:
+
+- Dexterity / Reflex: avoid explosions, cones, lines, slippery ground, lightning, fireballs.
+- Constitution / Fortitude: resist thunder blasts, poison-like effects, endurance pressure.
+- Wisdom / Willpower: resist charm, fear, mental control, divine pressure.
+- Strength / Athletics: resist being pushed, restrained, knocked prone, or dragged.
+
+If the game uses a simplified defense system, use:
+
+- Physical defense for restraint, push, prone, and bodily effects.
+- Reflex defense for area damage.
+- Will defense for fear, charm, sleep, hold, bane, and similar mental effects.
+
+General resolution rules:
+
+- If a spell says "save for half," a successful save halves the damage and prevents secondary effects unless the spell says otherwise.
+- If a spell says "save or status," a successful save prevents the status.
+- If a spell uses a spell attack, the caster rolls against target defense.
+- If a spell automatically hits, it should be balanced by lower damage or spell point cost constraints.
+
+Recommended Status Effects
+==========================
+Implement or map the following status effects. These should be shared across spells.
+
+Exposed
+-------
+The next attack against the target has improved accuracy, advantage, or increased critical chance, depending on the combat system. Once triggered, Exposed is removed unless the spell says it lasts longer.
+
+Revealed
+--------
+The target cannot benefit from invisibility, stealth, or hidden status. Attacks against the target may also receive a small accuracy bonus if desired.
+
+Restrained
+----------
+The target cannot move or has severely reduced movement. Attacks against the target may gain an accuracy bonus. The target can still act unless the game chooses to make Restrained stronger.
+
+Held
+----
+The target cannot act for the duration. Melee hits against a Held target should be empowered if the engine supports this. This is a strong status and should usually last 1 round in the slim version.
+
+Prone
+-----
+The target loses movement or must spend part of its next turn standing. Melee attacks against the target may be easier; ranged attacks may be harder depending on existing combat rules.
+
+Frightened
+----------
+The target suffers attack penalties and may be unable or unwilling to move closer to the caster/source.
+
+Charmed/Stunned
+---------------
+For Hypnotic Pattern and similar effects, use a simplified control status: the target skips its next action or cannot act for 1 round. Damage should break the effect if specified.
+
+Asleep
+------
+The target skips its turn until the duration ends or until it takes damage. Best used only against low-health enemies.
+
+Obscured
+--------
+Creatures inside the affected area are difficult to target from outside. Ranged attacks into, out of, or through the area suffer an accuracy penalty.
+
+Marked
+------
+The target is linked to a specific attacker. The mark may cause extra damage from that attacker, penalize attacks against others, or both, depending on the spell.
+
+Slowed
+------
+The target has reduced movement. This is useful for Spirit Guardians, Spike Growth, and terrain effects.
+
+Temporary HP
+------------
+Extra hit points that are lost before normal HP. They do not stack unless the game already has a stacking rule. By default, replace weaker temporary HP with stronger temporary HP.
+
+Damage Types
+============
+Support the following damage types at minimum:
+
+- Fire
+- Lightning
+- Thunder
+- Radiant
+- Necrotic
+- Psychic
+- Force
+- Piercing
+
+If the game does not yet distinguish damage types mechanically, still include damage types in the spell data and combat log so resistances and vulnerabilities can be added later.
+
+Area Shapes
+===========
+Implement reusable area targeting shapes:
+
+- Single target
+- Self
+- Ally target
+- Enemy target
+- Small radius burst
+- Large radius burst
+- Cone
+- Line
+- Aura around caster
+- Ground-targeted persistent zone
+- Trap zone
+
+Approximate sizes should be tuned for the game's grid or spatial system.
+
+Recommended tactical sizes:
+
+- Small area: affects roughly 2-4 tightly grouped units.
+- Large area: affects roughly 4-8 units if positioned well.
+- Cone: short but wide frontal area.
+- Line: long narrow path.
+- Aura: centered on the caster and moves with caster if the spell says so.
+- Ground zone: fixed area that remains for the duration.
+
+Upcasting Rules
+===============
+Each spell has a specific upcast rule. Use the individual spell descriptions below as source of truth.
+
+General defaults:
+
+- Damage spells usually gain one extra damage die per spell level above base.
+- Healing spells usually gain one extra healing die per spell level above base.
+- Multi-target buffs/debuffs usually gain one extra target per spell level above base.
+- Area control spells usually gain area size or duration, not both, unless balance allows it.
+- Strong disables should generally gain extra targets, not longer disable duration.
+- Defensive reaction spells do not need scaling unless the game requires every spell to scale.
+
+If a spell's official tabletop upcasting is awkward for a dungeon crawler, use the simplified upcast rule from this document.
+
+Class Spell Lists
+=================
+Each class has exactly 10 curated spells in the initial slim implementation.
+
+A spell can appear on multiple class lists. Implement it once, then reference it from all allowed classes.
+
+The following lists are the implementation source of truth.
+
+------------------------------------------------------------
+CLERIC SPELLS
+------------------------------------------------------------
+Class identity:
+Healing, radiant damage, protection, divine pressure, anti-enemy debuffs.
+
+1. Cure Wounds
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: One adjacent ally or self if allowed
+Type: Healing
+Effect: Heal target for 1d8 + caster spell stat.
+Upcast: +1d8 healing per spell level above 1st.
+Notes: This is the stronger close-range heal.
+
+2. Healing Word
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Quick action if supported; otherwise Action
+Target: One ally at range
+Type: Healing
+Effect: Heal target for 1d4 + caster spell stat.
+Upcast: +1d4 healing per spell level above 1st.
+Notes: This is weaker than Cure Wounds but safer and faster.
+
+3. Guiding Bolt
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: One enemy at range
+Type: Single-target damage and debuff
+Effect: Make a ranged spell attack. On hit, deal 4d6 radiant damage and apply Exposed to the target.
+Upcast: +1d6 radiant damage per spell level above 1st.
+Notes: Exposed should usually benefit the next attack against the target, then expire.
+
+4. Bless
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: Up to 3 allies
+Type: Buff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Affected allies gain +1d4 or equivalent bonus to attacks and saves/checks.
+Upcast: +1 target per spell level above 1st.
+Notes: If the game does not use d4 bonuses, use a small flat accuracy and resistance bonus.
+
+5. Bane
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: Up to 3 enemies
+Type: Debuff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Each target makes a Will/Wisdom save. On failure, target suffers -1d4 or equivalent penalty to attacks and saves/checks.
+Upcast: +1 target per spell level above 1st.
+Notes: This is the offensive mirror of Bless.
+
+6. Shield of Faith
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Quick action if supported; otherwise Action
+Target: One ally or self
+Type: Defensive buff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Target gains +2 AC/defense.
+Upcast: +1 additional target per spell level above 1st.
+Notes: Keep concentration to prevent stacking too many defenses.
+
+7. Spiritual Weapon
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action to cast; recurring bonus attack each round if supported
+Target: Summoned weapon attacks enemies within range
+Type: Recurring damage
+Duration: 3 rounds
+Concentration: No
+Effect: Summon a divine weapon. Each round, it can strike one enemy for 1d8 + caster spell stat force or radiant damage.
+Upcast: +1d8 damage for every 2 spell levels above 2nd if higher levels are later supported. For levels 1-6, no meaningful upcast is required unless 3rd-level casting is allowed; then optionally increase to 2d8 + spell stat.
+Notes: This is a signature cleric damage spell because it does not require concentration.
+
+8. Hold Person
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: One humanoid or valid living enemy
+Type: Disable
+Duration: 1 round in slim version
+Concentration: Yes if duration can extend; otherwise optional
+Effect: Target makes a Will/Wisdom save. On failure, target becomes Held.
+Upcast: +1 target per spell level above 2nd.
+Notes: If enemy creature types are not implemented, allow it to affect most non-boss enemies. Bosses should resist or have shortened effect.
+
+9. Spirit Guardians
+Base level: 3
+Cost: 5 SP at 3rd level
+Action type: Action
+Target: Aura around caster
+Type: Sustained area damage and control
+Duration: 3 rounds
+Concentration: Yes
+Effect: Enemies entering the aura or starting their turn inside it take 3d8 radiant or necrotic damage, save for half. Enemies inside are Slowed.
+Upcast: +1d8 damage per spell level above 3rd if higher spell levels are later supported.
+Notes: This is one of the cleric's strongest tactical spells. The aura should clearly display its radius.
+
+10. Mass Healing Word
+Base level: 3
+Cost: 5 SP at 3rd level
+Action type: Quick action if supported; otherwise Action
+Target: Up to 6 allies at range
+Type: Multi-target healing
+Effect: Each target heals 1d4 + caster spell stat.
+Upcast: +1d4 healing per spell level above 3rd if higher spell levels are later supported.
+Notes: This is emergency party stabilization, not a full party reset.
+
+------------------------------------------------------------
+DRUID SPELLS
+------------------------------------------------------------
+Class identity:
+Nature control, terrain hazards, elemental damage, regeneration, beasts/natural magic flavor.
+
+1. Cure Wounds
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: One adjacent ally or self if allowed
+Type: Healing
+Effect: Heal target for 1d8 + caster spell stat.
+Upcast: +1d8 healing per spell level above 1st.
+Notes: Shared implementation with Cleric.
+
+2. Healing Word
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Quick action if supported; otherwise Action
+Target: One ally at range
+Type: Healing
+Effect: Heal target for 1d4 + caster spell stat.
+Upcast: +1d4 healing per spell level above 1st.
+Notes: Shared implementation with Cleric and Bard.
+
+3. Entangle
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: Small ground area
+Type: Area debuff and terrain control
+Duration: 3 rounds
+Concentration: Yes
+Effect: Vines fill the area. Enemies in the area make a Strength/Physical save or become Restrained for 1 round. The area remains difficult terrain for the duration.
+Upcast: Increase area size or increase difficult terrain duration by 1 round per spell level above 1st. Prefer area scaling.
+Notes: Initial restraint should not repeatedly lock the same target every turn unless balance supports it.
+
+4. Faerie Fire
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: Small area
+Type: Area debuff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Enemies in area make a Reflex/Dexterity save. On failure, they become Revealed and Exposed. Attacks against affected targets gain improved accuracy.
+Upcast: Increase area size per spell level above 1st.
+Notes: Shared implementation with Bard.
+
+5. Thunderwave
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: Close blast or short cone around caster
+Type: Area damage and push
+Effect: Enemies in area take 2d8 thunder damage, save for half. On failed save, enemies are pushed away from caster.
+Upcast: +1d8 thunder damage per spell level above 1st.
+Notes: Shared implementation with Sorcerer.
+
+6. Barkskin
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: One ally or self
+Type: Defensive buff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Target gains a defensive floor or +2 armor/defense, depending on existing armor system.
+Upcast: +1 target per spell level above 2nd.
+Notes: Shared implementation with Ranger.
+
+7. Heat Metal
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: One armored enemy or weapon-using enemy
+Type: Damage and debuff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Target takes 2d8 fire damage when the spell is cast and suffers an attack penalty while affected. If recurring damage is supported, repeat damage at the start of caster's turn or target's turn.
+Upcast: +1d8 fire damage per spell level above 2nd.
+Notes: If equipment tags are not implemented, allow targeting most armored, martial, or humanoid enemies. Do not allow on enemies clearly made of fire or without metal if such tags exist.
+
+8. Moonbeam
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: Small ground area
+Type: Sustained area damage
+Duration: 3 rounds
+Concentration: Yes
+Effect: Create a radiant beam. Enemies entering the area or starting their turn inside take 2d10 radiant damage, save for half.
+Upcast: +1d10 radiant damage per spell level above 2nd.
+Notes: If moving the beam each round is too complex, keep it fixed after placement.
+
+9. Spike Growth
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: Ground area
+Type: Terrain hazard
+Duration: 3 rounds
+Concentration: Yes
+Effect: Area becomes thorny terrain. Enemies moving through it take 2d4 piercing damage per tile/step or per movement segment and are Slowed.
+Upcast: Increase area size or +1d4 piercing damage per spell level above 2nd.
+Notes: Shared implementation with Ranger. Must have clear visual warning.
+
+10. Call Lightning
+Base level: 3
+Cost: 5 SP at 3rd level
+Action type: Action to cast; sustained command each round if supported
+Target: Small area each strike
+Type: Recurring area damage
+Duration: 3 rounds
+Concentration: Yes
+Effect: For the duration, the caster can call one lightning strike per round. Each strike affects a small area and deals 3d10 lightning damage, save for half.
+Upcast: +1d10 lightning damage per spell level above 3rd if higher levels are later supported.
+Notes: If sustained commands are not implemented, automatically strike the original target area each round.
+
+------------------------------------------------------------
+WIZARD SPELLS
+------------------------------------------------------------
+Class identity:
+Versatile arcane control, strong area damage, defensive reactions, battlefield manipulation.
+
+1. Magic Missile
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: One or more enemies at range
+Type: Multi-hit force damage
+Effect: Create 3 darts. Each dart automatically hits for 1d4 + 1 force damage. Darts may be assigned to one target or split among targets.
+Upcast: +1 dart per spell level above 1st.
+Notes: This spell should never miss unless the target has a special immunity.
+
+2. Shield
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Reaction
+Trigger: Caster is hit or targeted by an attack
+Target: Self
+Type: Defensive reaction
+Effect: Caster gains +5 AC/defense until the start of their next turn, potentially causing the triggering attack to miss.
+Upcast: No scaling required.
+Notes: Shared implementation with Sorcerer. If reactions are absent, implement as a 1-round defensive spell.
+
+3. Burning Hands
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: Short cone
+Type: Area fire damage
+Effect: Enemies in cone take 3d6 fire damage, save for half.
+Upcast: +1d6 fire damage per spell level above 1st.
+Notes: Shared implementation with Sorcerer.
+
+4. Sleep
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: Small area
+Type: Area disable
+Duration: 1 round or until damaged
+Effect: Enemies in area with low remaining HP fall Asleep. Sleeping enemies skip their turn until damaged or duration expires.
+Upcast: Increase affected HP threshold per spell level above 1st.
+Notes: Keep this reliable against weak enemies but poor against elites and bosses.
+
+5. Grease
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: Small ground area
+Type: Terrain control
+Duration: 3 rounds
+Concentration: No, unless needed for balance
+Effect: Area becomes slippery. Enemies entering or starting in the area make a Reflex/Dexterity save or fall Prone.
+Upcast: Increase area size per spell level above 1st.
+Notes: This is a low-damage control spell. Avoid making it too large.
+
+6. Scorching Ray
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: One or more enemies at range
+Type: Multi-hit fire damage
+Effect: Fire 3 rays. Each ray uses a spell attack and deals 2d6 fire damage on hit. Rays may be assigned to one target or split.
+Upcast: +1 ray per spell level above 2nd.
+Notes: Shared implementation with Sorcerer.
+
+7. Web
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: Ground area
+Type: Area control and terrain
+Duration: 3 rounds
+Concentration: Yes
+Effect: Area becomes webbed. Enemies in area make a Reflex/Dexterity save or become Restrained. The area is difficult terrain. Fire damage can remove or burn the webs if environmental interactions exist.
+Upcast: Increase area size or +1 round duration per spell level above 2nd. Prefer area scaling.
+Notes: Web should be stronger than Entangle but also more vulnerable to fire interactions if supported.
+
+8. Misty Step
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Quick action if supported; otherwise Action
+Target: Self
+Type: Mobility
+Effect: Teleport to a visible nearby tile/space within range.
+Upcast: Optional range increase per spell level above 2nd.
+Notes: Shared implementation with Sorcerer. Must validate destination: visible, unoccupied, walkable unless the game allows otherwise.
+
+9. Fireball
+Base level: 3
+Cost: 5 SP at 3rd level
+Action type: Action
+Target: Large area at range
+Type: Large area fire damage
+Effect: Enemies in area take 8d6 fire damage, save for half.
+Upcast: +1d6 fire damage per spell level above 3rd if higher levels are later supported.
+Notes: Shared implementation with Sorcerer. This should be a benchmark high-damage AoE.
+
+10. Haste
+Base level: 3
+Cost: 5 SP at 3rd level
+Action type: Action
+Target: One ally or self
+Type: Major buff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Target gains +2 defense, bonus movement, and one extra weapon attack or action-lite each turn.
+Upcast: Optional +1 target per spell level above 3rd if higher levels are later supported.
+Notes: Avoid allowing full extra spellcasting from Haste unless the game is balanced around it.
+
+------------------------------------------------------------
+BARD SPELLS
+------------------------------------------------------------
+Class identity:
+Support, charm, disruption, healing, sonic damage, enemy manipulation.
+
+1. Healing Word
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Quick action if supported; otherwise Action
+Target: One ally at range
+Type: Healing
+Effect: Heal target for 1d4 + caster spell stat.
+Upcast: +1d4 healing per spell level above 1st.
+Notes: Shared implementation.
+
+2. Dissonant Whispers
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: One enemy at range
+Type: Psychic damage and forced movement
+Effect: Target makes a Will/Wisdom save. On failure, target takes 3d6 psychic damage and moves away from the caster. On success, target takes half damage and does not move.
+Upcast: +1d6 psychic damage per spell level above 1st.
+Notes: Forced movement should avoid moving the target through impossible terrain.
+
+3. Faerie Fire
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: Small area
+Type: Area debuff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Enemies in area make a Reflex/Dexterity save. On failure, they become Revealed and Exposed. Attacks against affected targets gain improved accuracy.
+Upcast: Increase area size per spell level above 1st.
+Notes: Shared implementation with Druid.
+
+4. Heroism
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: One ally or self
+Type: Defensive buff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Target gains fear immunity and temporary HP at the start of each of its turns.
+Upcast: +1 target per spell level above 1st.
+Notes: Shared implementation with Paladin. Temporary HP amount should scale with spell stat or fixed class balance.
+
+5. Hideous Laughter
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: One enemy
+Type: Disable
+Duration: 1 round or until damaged
+Effect: Target makes a Will/Wisdom save. On failure, target becomes Disabled/Prone and cannot act for 1 round. Damage breaks the effect if it would otherwise last longer.
+Upcast: +1 target per spell level above 1st.
+Notes: Avoid using on mindless enemies if creature tags exist.
+
+6. Heat Metal
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: One armored enemy or weapon-using enemy
+Type: Damage and debuff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Target takes 2d8 fire damage and suffers an attack penalty while affected. If recurring damage is supported, repeat damage each round.
+Upcast: +1d8 fire damage per spell level above 2nd.
+Notes: Shared implementation with Druid.
+
+7. Hold Person
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: One humanoid or valid living enemy
+Type: Disable
+Duration: 1 round in slim version
+Concentration: Yes if duration can extend; otherwise optional
+Effect: Target makes a Will/Wisdom save. On failure, target becomes Held.
+Upcast: +1 target per spell level above 2nd.
+Notes: Shared implementation with Cleric.
+
+8. Shatter
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: Small area at range
+Type: Area thunder damage
+Effect: Enemies in area take 3d8 thunder damage, save for half. Objects and constructs may take extra damage if object/construct tags exist.
+Upcast: +1d8 thunder damage per spell level above 2nd.
+Notes: This is Bard's clean area damage option.
+
+9. Hypnotic Pattern
+Base level: 3
+Cost: 5 SP at 3rd level
+Action type: Action
+Target: Large area
+Type: Area control
+Duration: 1 round in slim version, or up to 3 rounds if damage breaks it reliably
+Concentration: Yes
+Effect: Enemies in area make a Will/Wisdom save. On failure, they become Charmed/Stunned and cannot act. Damage breaks the effect.
+Upcast: Increase area size or duration if higher spell levels are later supported.
+Notes: Strong control. Bosses should have resistance, immunity, or reduced duration.
+
+10. Mass Healing Word
+Base level: 3
+Cost: 5 SP at 3rd level
+Action type: Quick action if supported; otherwise Action
+Target: Up to 6 allies at range
+Type: Multi-target healing
+Effect: Each target heals 1d4 + caster spell stat.
+Upcast: +1d4 healing per spell level above 3rd if higher levels are later supported.
+Notes: Shared implementation with Cleric.
+
+------------------------------------------------------------
+SORCERER SPELLS
+------------------------------------------------------------
+Class identity:
+Raw magical power, blasting, mobility, self-defense, elemental force.
+
+1. Magic Missile
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: One or more enemies at range
+Type: Multi-hit force damage
+Effect: Create 3 darts. Each dart automatically hits for 1d4 + 1 force damage. Darts may be assigned to one target or split among targets.
+Upcast: +1 dart per spell level above 1st.
+Notes: Shared implementation with Wizard.
+
+2. Shield
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Reaction
+Trigger: Caster is hit or targeted by an attack
+Target: Self
+Type: Defensive reaction
+Effect: Caster gains +5 AC/defense until the start of their next turn, potentially causing the triggering attack to miss.
+Upcast: No scaling required.
+Notes: Shared implementation with Wizard.
+
+3. Mage Armor
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: Self or one ally
+Type: Defensive buff
+Duration: Encounter
+Concentration: No
+Effect: Target gains magical armor. Use this to make unarmored characters viable. Suggested effect: set a defensive floor or grant a flat armor bonus that does not stack with worn armor if the game tracks armor.
+Upcast: +1 target per spell level above 1st.
+Notes: Avoid stacking with heavy armor.
+
+4. Burning Hands
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: Short cone
+Type: Area fire damage
+Effect: Enemies in cone take 3d6 fire damage, save for half.
+Upcast: +1d6 fire damage per spell level above 1st.
+Notes: Shared implementation with Wizard.
+
+5. Thunderwave
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: Close blast or short cone around caster
+Type: Area damage and push
+Effect: Enemies in area take 2d8 thunder damage, save for half. On failed save, enemies are pushed away from caster.
+Upcast: +1d8 thunder damage per spell level above 1st.
+Notes: Shared implementation with Druid.
+
+6. Scorching Ray
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: One or more enemies at range
+Type: Multi-hit fire damage
+Effect: Fire 3 rays. Each ray uses a spell attack and deals 2d6 fire damage on hit. Rays may be assigned to one target or split.
+Upcast: +1 ray per spell level above 2nd.
+Notes: Shared implementation with Wizard.
+
+7. Mirror Image
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: Self
+Type: Defensive self-buff
+Duration: 3 rounds or until depleted
+Concentration: No
+Effect: Create 3 duplicates. When the caster is attacked, a duplicate may absorb or redirect the hit. Each successful duplicate trigger removes one duplicate.
+Upcast: +1 duplicate per spell level above 2nd.
+Notes: This should be strong against attacks but not necessarily against unavoidable area damage.
+
+8. Misty Step
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Quick action if supported; otherwise Action
+Target: Self
+Type: Mobility
+Effect: Teleport to a visible nearby tile/space within range.
+Upcast: Optional range increase per spell level above 2nd.
+Notes: Shared implementation with Wizard.
+
+9. Fireball
+Base level: 3
+Cost: 5 SP at 3rd level
+Action type: Action
+Target: Large area at range
+Type: Large area fire damage
+Effect: Enemies in area take 8d6 fire damage, save for half.
+Upcast: +1d6 fire damage per spell level above 3rd if higher levels are later supported.
+Notes: Shared implementation with Wizard.
+
+10. Lightning Bolt
+Base level: 3
+Cost: 5 SP at 3rd level
+Action type: Action
+Target: Line
+Type: Line lightning damage
+Effect: Enemies in a straight line take 8d6 lightning damage, save for half.
+Upcast: +1d6 lightning damage per spell level above 3rd if higher levels are later supported.
+Notes: This is the line-based alternative to Fireball.
+
+------------------------------------------------------------
+PALADIN SPELLS
+------------------------------------------------------------
+Class identity:
+Melee holy warrior, smites, defense, courage, healing, single-target pressure.
+
+Paladin is a half caster. For player levels 1-6, Paladin should only need 1st- and 2nd-level spells.
+
+1. Bless
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: Up to 3 allies
+Type: Buff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Affected allies gain +1d4 or equivalent bonus to attacks and saves/checks.
+Upcast: +1 target per spell level above 1st.
+Notes: Shared implementation with Cleric.
+
+2. Cure Wounds
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: One adjacent ally or self if allowed
+Type: Healing
+Effect: Heal target for 1d8 + caster spell stat.
+Upcast: +1d8 healing per spell level above 1st.
+Notes: Shared implementation with Cleric and Druid.
+
+3. Divine Favor
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Quick action if supported; otherwise Action
+Target: Self
+Type: Weapon damage buff
+Duration: 3 rounds
+Concentration: Yes
+Effect: The caster's weapon attacks deal +1d4 radiant damage.
+Upcast: +1d4 damage every 2 spell levels above 1st if higher spell levels are later supported. For current levels, scaling may be omitted.
+Notes: Simple sustained damage enhancer.
+
+4. Shield of Faith
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Quick action if supported; otherwise Action
+Target: One ally or self
+Type: Defensive buff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Target gains +2 AC/defense.
+Upcast: +1 additional target per spell level above 1st.
+Notes: Shared implementation with Cleric.
+
+5. Compelled Duel
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action or quick action, depending on tanking design
+Target: One enemy
+Type: Mark and tanking debuff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Target makes a Will/Wisdom save. On failure, it is Marked by the Paladin. While Marked, it suffers penalties when attacking anyone other than the Paladin.
+Upcast: +1 target per spell level above 1st.
+Notes: This should support Paladin's tank identity.
+
+6. Heroism
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: One ally or self
+Type: Defensive buff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Target gains fear immunity and temporary HP at the start of each of its turns.
+Upcast: +1 target per spell level above 1st.
+Notes: Shared implementation with Bard.
+
+7. Thunderous Smite
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Weapon rider
+Target: Self, consumed on next weapon hit
+Type: Smite damage and control
+Duration: Until next successful weapon hit or until end of next turn; concentration until triggered if needed
+Effect: Next weapon hit deals +2d6 thunder damage. Target makes a Physical/Strength save or is pushed and/or knocked Prone.
+Upcast: +1d6 thunder damage per spell level above 1st.
+Notes: The spell should not consume its damage if the attack misses unless the game intentionally wants misses to consume riders.
+
+8. Wrathful Smite
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Weapon rider
+Target: Self, consumed on next weapon hit
+Type: Smite damage and fear debuff
+Duration: Until next successful weapon hit or until end of next turn; fear lasts 2 rounds if applied
+Concentration: Until triggered; optionally while fear persists
+Effect: Next weapon hit deals +1d6 psychic damage. Target makes a Will/Wisdom save or becomes Frightened.
+Upcast: +1d6 psychic damage per spell level above 1st.
+Notes: Good against dangerous melee enemies.
+
+9. Aid
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: Up to 3 allies
+Type: Defensive party buff and healing support
+Duration: Encounter
+Concentration: No
+Effect: Each target increases current and maximum HP by 5 for the encounter.
+Upcast: +5 HP per spell level above 2nd.
+Notes: This is not temporary HP. It should stack with temporary HP but not with itself unless refreshed at a higher value.
+
+10. Branding Smite
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Weapon rider
+Target: Self, consumed on next weapon hit
+Type: Smite damage and reveal
+Duration: Until next successful weapon hit or until end of next turn; reveal lasts 3 rounds
+Concentration: Until triggered; optionally while reveal persists
+Effect: Next weapon hit deals +2d6 radiant damage and applies Revealed to the target.
+Upcast: +1d6 radiant damage per spell level above 2nd.
+Notes: Useful against invisible, evasive, or stealth enemies.
+
+------------------------------------------------------------
+RANGER SPELLS
+------------------------------------------------------------
+Class identity:
+Marks, ranged pressure, terrain control, mobility, nature tricks, ambush combat.
+
+Ranger is a half caster. For player levels 1-6, Ranger should only need 1st- and 2nd-level spells.
+
+1. Hunter's Mark
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Quick action if supported; otherwise Action
+Target: One enemy
+Type: Mark and damage boost
+Duration: 3 rounds
+Concentration: Yes
+Effect: Mark one enemy. The Ranger's weapon attacks against the marked enemy deal +1d6 damage. If the target dies, the Ranger may move the mark to another target if the combat system supports it.
+Upcast: Either increase duration or add +1d6 damage every 2 spell levels above 1st if higher levels are later supported. For current levels, duration scaling is safer.
+Notes: This is Ranger's core single-target damage spell.
+
+2. Cure Wounds
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: One adjacent ally or self if allowed
+Type: Healing
+Effect: Heal target for 1d8 + caster spell stat.
+Upcast: +1d8 healing per spell level above 1st.
+Notes: Shared implementation.
+
+3. Ensnaring Strike
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Weapon rider
+Target: Self, consumed on next weapon hit
+Type: Weapon damage and restraint
+Duration: Until next successful weapon hit or until end of next turn; restraint lasts 1 round
+Concentration: Until triggered; optionally while restraint persists
+Effect: Next weapon hit deals +1d6 piercing damage. Target makes a Physical/Strength save or becomes Restrained.
+Upcast: +1d6 piercing damage per spell level above 1st.
+Notes: Works with melee or ranged weapon attacks unless the game wants Ranger archery focus only.
+
+4. Hail of Thorns
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Weapon rider
+Target: Self, consumed on next ranged weapon hit
+Type: Ranged attack area burst
+Duration: Until next successful ranged weapon hit or until end of next turn
+Concentration: Until triggered if needed
+Effect: Next ranged weapon hit causes a thorn burst. Target and nearby enemies take 1d10 piercing damage, save for half.
+Upcast: +1d10 piercing damage per spell level above 1st.
+Notes: This is Ranger's early AoE damage option.
+
+5. Fog Cloud
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action
+Target: Ground area
+Type: Area obscurement
+Duration: 3 rounds
+Concentration: Yes
+Effect: Create an Obscured area. Ranged attacks into, out of, or through the fog suffer an accuracy penalty. Creatures inside may be harder to target.
+Upcast: Increase area size per spell level above 1st.
+Notes: Good for anti-archer and escape tactics.
+
+6. Longstrider
+Base level: 1
+Cost: 2 SP at 1st level
+Action type: Action or quick action
+Target: One ally or self
+Type: Mobility buff
+Duration: Encounter
+Concentration: No
+Effect: Target gains bonus movement.
+Upcast: +1 target per spell level above 1st.
+Notes: Keep it simple and useful for positioning.
+
+7. Barkskin
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: One ally or self
+Type: Defensive buff
+Duration: 3 rounds
+Concentration: Yes
+Effect: Target gains a defensive floor or +2 armor/defense, depending on existing armor system.
+Upcast: +1 target per spell level above 2nd.
+Notes: Shared implementation with Druid.
+
+8. Spike Growth
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: Ground area
+Type: Terrain hazard
+Duration: 3 rounds
+Concentration: Yes
+Effect: Area becomes thorny terrain. Enemies moving through it take 2d4 piercing damage per tile/step or per movement segment and are Slowed.
+Upcast: Increase area size or +1d4 piercing damage per spell level above 2nd.
+Notes: Shared implementation with Druid.
+
+9. Silence
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: Ground area
+Type: Anti-caster control
+Duration: 3 rounds
+Concentration: Yes
+Effect: Create a silent area. Creatures inside cannot cast spells that require speech/verbal casting. If verbal casting is not modeled, enemies inside suffer a severe spellcasting penalty or cannot cast most spells.
+Upcast: Increase area size or +1 round duration per spell level above 2nd.
+Notes: This is a tactical answer to enemy casters.
+
+10. Cordon of Arrows
+Base level: 2
+Cost: 3 SP at 2nd level
+Action type: Action
+Target: Trap zone
+Type: Trap and area denial
+Duration: Encounter or until triggers are spent
+Concentration: No
+Effect: Place a trap zone. The first enemies entering the zone trigger arrows for 2d6 piercing damage each, save for half. Limit number of triggers for balance.
+Upcast: +1d6 damage or +1 trigger per spell level above 2nd.
+Notes: This should support Ranger ambush identity. The zone should be visible to the player.
+
+Shared Spell Implementations
+============================
+The following spells are shared by multiple classes and should be implemented once:
+
+- Cure Wounds: Cleric, Druid, Paladin, Ranger
+- Healing Word: Cleric, Druid, Bard
+- Bless: Cleric, Paladin
+- Shield of Faith: Cleric, Paladin
+- Hold Person: Cleric, Bard
+- Mass Healing Word: Cleric, Bard
+- Faerie Fire: Druid, Bard
+- Thunderwave: Druid, Sorcerer
+- Barkskin: Druid, Ranger
+- Heat Metal: Druid, Bard
+- Spike Growth: Druid, Ranger
+- Magic Missile: Wizard, Sorcerer
+- Shield: Wizard, Sorcerer
+- Burning Hands: Wizard, Sorcerer
+- Scorching Ray: Wizard, Sorcerer
+- Misty Step: Wizard, Sorcerer
+- Fireball: Wizard, Sorcerer
+- Heroism: Bard, Paladin
+
+Avoid duplicate logic for these spells. Class identity should come from class availability, visuals, casting animations, and audio, not separate mechanical implementations.
+
+Recommended Spell Templates
+===========================
+Implement these reusable templates first, then define individual spells using them.
+
+1. Single-Target Heal
+Used by: Cure Wounds, Healing Word
+Required behavior: Choose ally, restore HP, apply upcast dice.
+
+2. Multi-Target Heal
+Used by: Mass Healing Word
+Required behavior: Choose multiple allies up to cap, restore HP to each.
+
+3. Single-Target Spell Attack
+Used by: Guiding Bolt
+Required behavior: Roll spell attack, apply damage on hit, apply optional status.
+
+4. Automatic Multi-Hit Damage
+Used by: Magic Missile
+Required behavior: Generate multiple projectiles, assign to targets, apply automatic damage.
+
+5. Multi-Ray Spell Attack
+Used by: Scorching Ray
+Required behavior: Generate multiple attack rolls, allow split targeting, apply damage per hit.
+
+6. Cone Damage
+Used by: Burning Hands, Thunderwave if implemented as cone
+Required behavior: Select cone, apply save for half, apply optional push.
+
+7. Burst Area Damage
+Used by: Fireball, Shatter, Hail of Thorns
+Required behavior: Select area, affect all valid enemies, save for half.
+
+8. Line Damage
+Used by: Lightning Bolt
+Required behavior: Select line direction or target line, affect all enemies in line, save for half.
+
+9. Ally Buff
+Used by: Bless, Shield of Faith, Barkskin, Heroism, Divine Favor, Longstrider, Mage Armor, Aid, Haste
+Required behavior: Apply status to ally/self, track duration, enforce concentration if needed.
+
+10. Enemy Debuff
+Used by: Bane, Compelled Duel, Heat Metal, Hunter's Mark
+Required behavior: Apply status after save if needed, track source caster, track duration.
+
+11. Disable/Control
+Used by: Hold Person, Hideous Laughter, Hypnotic Pattern, Sleep
+Required behavior: Apply action denial or restricted action state, handle damage break if relevant, handle boss resistance.
+
+12. Persistent Ground Hazard
+Used by: Moonbeam, Spike Growth, Web, Entangle, Grease, Fog Cloud, Silence
+Required behavior: Create area entity, apply effects to units entering/starting inside, expire after duration.
+
+13. Aura Around Caster
+Used by: Spirit Guardians
+Required behavior: Area follows caster, affects enemies entering/starting inside, expires with concentration.
+
+14. Recurring Command Spell
+Used by: Spiritual Weapon, Call Lightning
+Required behavior: Spell remains active and can produce one attack/strike per round without recasting.
+
+15. Weapon Rider
+Used by: Thunderous Smite, Wrathful Smite, Branding Smite, Ensnaring Strike, Hail of Thorns
+Required behavior: Apply temporary self-status that modifies next weapon hit, then consumes itself.
+
+16. Reaction Defense
+Used by: Shield
+Required behavior: Trigger when attacked, apply temporary defense bonus before final hit resolution if possible.
+
+17. Teleport
+Used by: Misty Step
+Required behavior: Validate destination and relocate caster instantly.
+
+Visual and UX Requirements
+==========================
+Each spell should have a clear tooltip containing:
+
+- Spell name
+- Class availability
+- Base level
+- Current spell point cost
+- Action type
+- Range
+- Targeting rules
+- Damage/healing amount
+- Duration
+- Concentration requirement
+- Upcast effect
+- Short tactical description
+
+During targeting, the UI should show:
+
+- Valid targets or valid ground tiles
+- Area preview for AoE spells
+- Affected enemies/allies before confirmation
+- Expected damage/healing range if the game supports previews
+- Spell point cost before confirmation
+- Warning if casting breaks current concentration
+
+During combat resolution, the combat log should report:
+
+- Caster name
+- Spell name
+- Cast level and spell point cost
+- Targets affected
+- Damage/healing dealt
+- Saves succeeded or failed
+- Status effects applied or resisted
+- Concentration started or ended
+- Upcast effect if relevant
+
+Visual distinction by class:
+
+- Cleric: radiant, gold/white, holy symbols, protective light.
+- Druid: vines, leaves, moonlight, storm clouds, natural terrain.
+- Wizard: precise arcane geometry, runes, classic elemental effects.
+- Bard: sound waves, color, charm motifs, musical resonance.
+- Sorcerer: raw energy, unstable elemental force, intense spell impact.
+- Paladin: weapon glow, radiant smite flashes, defensive auras.
+- Ranger: thorn bursts, marks, arrows, traps, fog, natural movement.
+
+AI Usage Guidelines
+===================
+Enemy or companion AI should understand broad spell categories.
+
+Suggested AI categories:
+
+- Emergency heal: use when ally is low HP.
+- Efficient heal: use when healing will not be wasted.
+- Finish target: use single-target damage on low HP enemy.
+- AoE damage: use when multiple enemies are clustered.
+- Control cluster: use when several enemies can be disabled or slowed.
+- Buff opener: use early in combat if expected fight length is long enough.
+- Defensive reaction: use when it prevents meaningful damage.
+- Escape/mobility: use when threatened in melee or to reach advantageous position.
+- Anti-caster: use Silence or control on enemy spellcasters.
+- Mark priority target: use Hunter's Mark or similar on durable/high-priority enemies.
+
+AI should avoid:
+
+- Wasting AoE on a single weak target unless necessary.
+- Healing targets near full HP.
+- Casting concentration spells that immediately overwrite a better active concentration spell.
+- Placing hazards where they mostly hurt allies.
+- Using control spells on immune bosses unless the spell has partial effect.
+
+Boss and Elite Handling
+=======================
+Hard control effects can trivialize bosses. Use special rules for elite and boss enemies.
+
+Recommended approach:
+
+- Bosses may be immune to full action-denial statuses such as Held, Asleep, and Charmed/Stunned.
+- If a boss resists full control, apply a weaker fallback effect instead, such as Slowed, Exposed, reduced accuracy, or reduced next action effectiveness.
+- Elites may have advantage/bonus on saves against hard control or reduced duration.
+- Damage portions of spells should usually still apply unless the boss has resistance or immunity.
+
+Examples:
+
+- Hold Person on boss: boss is not Held, but becomes Slowed or Exposed for 1 round on failed save.
+- Hypnotic Pattern on boss: boss does not lose full turn, but suffers attack penalty for 1 round.
+- Sleep on boss: no effect or minor accuracy penalty if failed save.
+
+Balance Guidelines
+==================
+Use these rough balance anchors.
+
+1st-level spells:
+
+- Single-target damage: around 3d6 to 4d6 if it requires attack/save.
+- Area damage: around 2d8 or 3d6.
+- Healing: around 1d4 to 1d8 + spell stat.
+- Buff/debuff: 3 rounds, concentration, moderate bonus or penalty.
+
+2nd-level spells:
+
+- Single-target/multi-hit damage: around 3 rays of 2d6, or recurring 2d8.
+- Area damage: around 3d8.
+- Control: stronger area or stronger single-target disable.
+- Terrain: meaningful but avoid automatic repeated hard lockdown.
+
+3rd-level spells:
+
+- Large AoE damage: around 8d6.
+- Strong recurring damage: around 3d8 to 3d10 per round with concentration.
+- Major buff: Haste-level effects, concentration required.
+- Multi-target emergency healing: useful but not overpowering.
+
+Concentration should be the main limiter for powerful ongoing spells. Spell points should be the main limiter for burst spells.
+
+Implementation Order
+====================
+Recommended implementation order:
+
+Phase 1: Core infrastructure
+- Spell point costs and spending.
+- Spell availability by class and character level.
+- Spell tooltips and targeting UI.
+- Basic single-target damage and healing.
+- Saving throw / defense check resolution.
+- Status effect application and duration tracking.
+- Concentration tracking.
+
+Phase 2: Simple spells
+- Cure Wounds
+- Healing Word
+- Magic Missile
+- Guiding Bolt
+- Burning Hands
+- Thunderwave
+- Bless
+- Bane
+- Shield of Faith
+- Hunter's Mark
+
+Phase 3: Areas and terrain
+- Fireball
+- Shatter
+- Lightning Bolt
+- Entangle
+- Grease
+- Web
+- Spike Growth
+- Fog Cloud
+- Silence
+
+Phase 4: Sustained and advanced effects
+- Spiritual Weapon
+- Spirit Guardians
+- Moonbeam
+- Call Lightning
+- Heat Metal
+- Haste
+- Mirror Image
+- Misty Step
+
+Phase 5: Weapon riders and half-caster identity
+- Divine Favor
+- Thunderous Smite
+- Wrathful Smite
+- Branding Smite
+- Ensnaring Strike
+- Hail of Thorns
+- Cordon of Arrows
+- Compelled Duel
+- Aid
+- Longstrider
+- Barkskin
+- Heroism
+
+Phase 6: Polish and balance
+- Class-specific visuals and sounds.
+- Combat log polish.
+- AI spell usage.
+- Boss resistance rules.
+- Tooltip clarity.
+- Upcast preview.
+- Spell selection screen.
+
+Character Level Gating
+======================
+For full casters:
+
+- Character levels 1-2: allow 1st-level spells.
+- Character levels 3-4: allow 1st- and 2nd-level spells.
+- Character levels 5-6: allow 1st-, 2nd-, and 3rd-level spells.
+
+Full casters in this document:
+
+- Cleric
+- Druid
+- Wizard
+- Bard
+- Sorcerer
+
+For half casters:
+
+- Character level 1: no spells, unless the game intentionally grants early magic.
+- Character levels 2-4: allow 1st-level spells.
+- Character levels 5-6: allow 1st- and 2nd-level spells.
+
+Half casters in this document:
+
+- Paladin
+- Ranger
+
+If the game wants every listed class to feel magical from level 1, it is acceptable to let Paladin and Ranger access a limited subset of 1st-level spells earlier than tabletop. If doing so, document that this is an intentional game adaptation.
+
+Prepared vs Known Spell Handling
+================================
+For this slim version, do not implement the full tabletop distinction between prepared casters and known-spell casters unless already present.
+
+Preferred simplified approach:
+
+- Each class has access to its curated 10-spell kit.
+- At any given time, a character equips a limited number of spells into active combat slots.
+- Spell slots in the UI are not spell slots in the tabletop sense; they are prepared/loaded spell buttons.
+- Spell point cost controls usage during combat.
+
+Suggested active spell loadout sizes:
+
+- Levels 1-2: 3-4 active spells
+- Levels 3-4: 4-5 active spells
+- Levels 5-6: 5-6 active spells
+
+This keeps combat manageable while preserving choice.
+
+If the game does not use active spell loadouts, allow all 10 class spells to be available once unlocked. However, this may overload the UI and reduce class differentiation.
+
+Class Flavor Notes
+==================
+Cleric should feel like:
+- The most reliable healer.
+- Strong against enemies through radiant pressure.
+- Durable support with Bless, Shield of Faith, and Spirit Guardians.
+
+Druid should feel like:
+- The best terrain controller.
+- A nature caster who shapes the battlefield.
+- Flexible between healing, elemental damage, and area denial.
+
+Wizard should feel like:
+- The most versatile arcane toolkit.
+- Strong area damage and control.
+- Fragile but protected by Shield, Misty Step, and control spells.
+
+Bard should feel like:
+- A support-disruptor hybrid.
+- Capable of healing, disabling, revealing, and sonic/psychic pressure.
+- Less direct blasting than Wizard/Sorcerer, but more control and support.
+
+Sorcerer should feel like:
+- The cleanest blaster.
+- Strong elemental burst damage.
+- Mobile and self-protective.
+- Less broad utility than Wizard but more direct destructive identity.
+
+Paladin should feel like:
+- A melee holy warrior.
+- Uses spells to empower attacks, protect allies, and hold enemy attention.
+- Has healing, but not as much as Cleric.
+
+Ranger should feel like:
+- A hunter and skirmisher.
+- Marks priority targets.
+- Controls space with traps, thorns, fog, and silence.
+- Has some healing, but not as much as Cleric or Druid.
+
+Acceptance Criteria
+===================
+The spell implementation is acceptable when the following are true:
+
+1. Each listed class has exactly the curated 10 spells available in the data.
+2. Shared spells are implemented once and referenced by multiple classes.
+3. Spell point costs follow the 2 / 3 / 5 cost curve for spell levels 1 / 2 / 3.
+4. Upcasting works for all spells that list upcast scaling.
+5. Concentration prevents multiple concentration spells from the same caster.
+6. Area spells preview their affected area before casting.
+7. Healing spells cannot target invalid enemies unless explicitly allowed by the game's rules.
+8. Damage spells cannot target invalid allies unless friendly fire is intentionally enabled.
+9. Buff and debuff durations tick down correctly by round.
+10. Status effects are visible in the UI and described in tooltips.
+11. The combat log clearly describes spell results.
+12. Bosses and elites are protected against hard-control abuse.
+13. Spell descriptions are concise enough for players but detailed enough to understand upcasting and concentration.
+14. Paladin and Ranger do not receive 3rd-level spells in the level 1-6 implementation unless intentionally house-ruled.
+15. The implementation remains data-driven enough that future spells can be added without rewriting combat logic.
+
+Testing Checklist
+=================
+Basic tests:
+
+- A character cannot cast a spell without enough spell points.
+- A character pays the correct spell point cost when casting.
+- Upcasting charges the correct higher cost.
+- Upcast damage/healing/targets apply correctly.
+- Concentration spell A ends when concentration spell B is cast by the same caster.
+- Concentration ends when the caster is defeated.
+- Non-concentration buffs can coexist with concentration buffs unless another rule prevents it.
+
+Targeting tests:
+
+- Single-target ally spells only select valid allies.
+- Single-target enemy spells only select valid enemies.
+- AoE previews match actual affected units.
+- Line spells affect every enemy in the line.
+- Cone spells affect enemies inside the cone only.
+- Ground hazards trigger correctly when enemies enter or start inside.
+- Teleport spells reject blocked or invalid destinations.
+
+Status tests:
+
+- Exposed is consumed after the next eligible attack.
+- Restrained reduces/prevents movement.
+- Held prevents action for the intended duration.
+- Prone applies its movement/action penalty.
+- Frightened applies attack/movement penalties.
+- Obscured affects ranged targeting.
+- Revealed prevents stealth/invisibility benefits.
+- Marked effects only benefit or constrain the correct source/target.
+
+Spell-specific tests:
+
+- Magic Missile never misses and can split darts.
+- Shield can prevent a hit if the defense bonus is enough.
+- Fireball damages all valid enemies in the area and allows saves for half.
+- Healing Word works at range and as quick action if quick actions exist.
+- Spirit Guardians follows the caster and damages enemies correctly.
+- Spike Growth damages enemies when they move through the area.
+- Hunter's Mark only adds damage from the Ranger who applied it.
+- Smite spells apply only to the next successful weapon hit.
+- Haste does not allow unintended extra full spellcasting unless specifically designed.
+- Silence meaningfully prevents or penalizes enemy spellcasting.
+
+Future Extension Notes
+======================
+After this first pass, future expansions can add:
+
+- Cantrips as basic magical attacks.
+- Subclass-specific spell additions.
+- Higher-level spells.
+- Ritual and exploration magic.
+- Spell schools and resistances.
+- Metamagic for Sorcerer.
+- Channel Divinity-like features for Cleric/Paladin.
+- Wild Shape or nature summons for Druid.
+- Bardic Inspiration as a separate class feature.
+- Wizard spellbook mechanics.
+- More advanced AI spell planning.
+
+Keep the first implementation narrow, readable, and easy to balance. The main success criterion is that each spellcasting class feels distinct in combat while the underlying implementation remains compact and reusable.
