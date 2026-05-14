@@ -16,6 +16,8 @@ window.DungeonContent.register("classes", "fighter", {
   damage: { count: 1, sides: 4, bonus: 3, type: "bludgeoning", label: "1d4 + 3 bludgeoning" },
   initiativeBonus: 2,
   speedFeet: 30,
+  armorProficiencies: ["light", "medium", "heavy", "shield"],
+  weaponProficiencies: ["simple", "martial"],
   token: "M",
   classFeatures: [
     { level: 1, name: "Second Wind" },

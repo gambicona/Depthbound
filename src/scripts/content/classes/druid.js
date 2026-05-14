@@ -18,9 +18,12 @@ window.DungeonContent.register("classes", "druid", {
   damage: { count: 1, sides: 6, bonus: 2, type: "bludgeoning", label: "1d6 + 2 bludgeoning" },
   initiativeBonus: 2,
   speedFeet: 30,
+  armorProficiencies: ["light", "medium", "shield"],
+  weaponProficiencies: ["club", "dagger", "dart", "javelin", "mace", "quarterstaff", "scimitar", "sickle", "sling", "spear"],
   spellcastingAbility: "wis",
   spellPointProgression: fullCasterSpellPoints,
   spellList: ["cure_wounds", "healing_word", "entangle", "faerie_fire", "thunderwave", "barkskin", "heat_metal", "moonbeam", "spike_growth", "call_lightning"],
+  cantripList: ["guidance", "produce-flame", "thorn-whip", "thunderclap", "frostbite", "poison-spray", "primal-savagery", "resistance", "shillelagh"],
   spells: [],
   token: "D",
   classFeatures: [
@@ -29,10 +32,39 @@ window.DungeonContent.register("classes", "druid", {
     { level: 18, name: "Beast Spells" },
   ],
   abilities: [
-    { id: "wildShape", name: "Wild Shape", level: 2, refresh: "shortRest", uses: 2, resource: "bonusAction", description: "Take a combat beast stance for temporary HP and melee pressure." },
+    { id: "wildShape", name: "Wild Shape", level: 2, refresh: "shortRest", uses: 2, resourcePool: "wildShape", resource: "bonusAction", description: "Take a combat beast stance for temporary HP and melee pressure." },
   ],
   equipment: { mainHand: "quarterstaff", offHand: "shield", torso: "leather" },
   inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["quarterstaff", "shield", "leather"] },
-  startingGear: { fixed: true, equipment: { mainHand: "quarterstaff", offHand: "shield", torso: "leather" }, inventory: ["quarterstaff", "shield", "leather"] },
+  startingGear: {
+    equipment: { torso: "leather" },
+    inventory: ["leather"],
+    steps: [
+      {
+        title: "Shield or Weapon",
+        message: "Choose your first druid item.",
+        choices: [
+          { value: "wooden-shield", label: "Wooden Shield", equipment: { offHand: "shield" }, inventory: ["shield"] },
+          {
+            value: "simple",
+            label: "Any simple weapon",
+            select: { pool: "simpleWeapons", title: "Choose Simple Weapon", message: "Select a simple weapon.", label: "Weapon", slot: "mainHand" },
+          },
+        ],
+      },
+      {
+        title: "Melee Weapon",
+        message: "Choose your druid melee weapon.",
+        choices: [
+          { value: "scimitar", label: "Scimitar", equipment: { mainHand: "scimitar" }, inventory: ["scimitar"] },
+          {
+            value: "simple-melee",
+            label: "Any simple melee weapon",
+            select: { pool: "simpleMeleeWeapons", title: "Choose Simple Melee Weapon", message: "Select a simple melee weapon.", label: "Weapon", slot: "mainHand" },
+          },
+        ],
+      },
+    ],
+  },
 });
 })();

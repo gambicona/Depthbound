@@ -665,6 +665,13 @@ h1 {
     inset 0 0 16px rgba(235, 72, 46, 0.35);
 }
 
+.tile.persistent-spell-area {
+  background:
+    linear-gradient(145deg, rgba(102, 184, 255, 0.22), rgba(162, 115, 255, 0.18)),
+    var(--floor);
+  box-shadow: inset 0 0 0 2px rgba(153, 205, 255, 0.34);
+}
+
 .wall-edge-layer {
   pointer-events: none;
   z-index: 1;
@@ -722,6 +729,22 @@ h1 {
   z-index: 1;
 }
 
+.dungeon-object-icon {
+  height: 82%;
+  object-fit: contain;
+  pointer-events: none;
+  width: 82%;
+}
+
+.dungeon-object-label {
+  line-height: 1;
+  pointer-events: none;
+}
+
+.dungeon-object.has-furniture-icon {
+  color: transparent;
+}
+
 .dungeon-object.table {
   background: var(--table-bg);
   border-color: rgba(215, 168, 79, 0.34);
@@ -764,6 +787,32 @@ h1 {
 
 .dungeon-object.bigRock {
   background: var(--rock-bg);
+}
+
+.dungeon-object.feature-defined-loot-container,
+.dungeon-object.feature-harvestable-resource,
+.dungeon-object.feature-hidden-loot {
+  border-color: rgba(228, 177, 106, 0.72);
+}
+
+.dungeon-object.feature-hazard-on-enter,
+.dungeon-object.feature-hazard-on-movement {
+  border-color: rgba(214, 93, 74, 0.7);
+  color: #ffd0c8;
+}
+
+.dungeon-object.feature-difficult-terrain {
+  background: linear-gradient(145deg, rgba(65, 72, 58, 0.9), rgba(29, 35, 28, 0.9));
+}
+
+.dungeon-object.feature-light-source {
+  box-shadow: 0 0 12px rgba(255, 213, 108, 0.42);
+}
+
+.dungeon-object.feature-cover,
+.dungeon-object.feature-destructible-object,
+.dungeon-object.feature-pushable-object {
+  border-style: dashed;
 }
 
 .token {
@@ -1319,7 +1368,8 @@ h1 {
 .sidebar-hero-art,
 .inventory-hero-art,
 .inspect-art,
-.initiative-art {
+.initiative-art,
+.dialog-actor-art {
   align-items: center;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--line);
@@ -1333,7 +1383,8 @@ h1 {
 .sidebar-hero-art img,
 .inventory-hero-art img,
 .inspect-art img,
-.initiative-art img {
+.initiative-art img,
+.dialog-actor-art img {
   height: 100%;
   object-fit: cover;
   width: 100%;
@@ -1343,7 +1394,8 @@ h1 {
 .sidebar-hero-art.empty span,
 .inventory-hero-art.empty span,
 .inspect-art.empty span,
-.initiative-art.empty span {
+.initiative-art.empty span,
+.dialog-actor-art.empty span {
   color: var(--accent);
   font-weight: 900;
 }
@@ -1367,6 +1419,66 @@ h1 {
 .initiative-art {
   height: 28px;
   width: 28px;
+}
+
+.dialog-actor {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dialog-actor b {
+  color: var(--text);
+  display: block;
+  font-size: 1rem;
+}
+
+.dialog-actor > div > span {
+  color: var(--muted);
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.dialog-actor-art {
+  height: 52px;
+  width: 52px;
+}
+
+.reaction-prompt {
+  background: rgba(24, 26, 31, 0.96);
+  border: 1px solid rgba(255, 220, 150, 0.42);
+  border-radius: 8px;
+  bottom: 18px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
+  color: var(--text);
+  max-width: min(360px, calc(100vw - 28px));
+  padding: 12px;
+  position: fixed;
+  right: 18px;
+  z-index: 80;
+}
+
+.reaction-prompt-title {
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.reaction-prompt p {
+  color: var(--muted);
+  line-height: 1.35;
+  margin: 8px 0 10px;
+}
+
+.reaction-prompt-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .inventory-stats .wallet-line {
@@ -1852,6 +1964,19 @@ h1 {
   font-size: 0.78rem;
   font-weight: 800;
   margin-top: 2px;
+}
+
+.equipment-item .proficiency-warning,
+.combatant-card .proficiency-warning,
+.ability-warning {
+  color: #e8786f;
+}
+
+.ability-warning {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 900;
+  margin-top: 3px;
 }
 
 .equipment-item {

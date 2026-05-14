@@ -18,6 +18,8 @@ window.DungeonContent.register("classes", "ranger", {
   damage: { count: 1, sides: 8, bonus: 3, type: "piercing", label: "1d8 + 3 piercing" },
   initiativeBonus: 3,
   speedFeet: 30,
+  armorProficiencies: ["light", "medium", "shield"],
+  weaponProficiencies: ["simple", "martial"],
   spellcastingAbility: "wis",
   spellPointProgression: halfCasterSpellPoints,
   spellList: ["hunters_mark", "cure_wounds", "ensnaring_strike", "hail_of_thorns", "fog_cloud", "longstrider", "barkskin", "spike_growth", "silence", "cordon_of_arrows"],
@@ -34,6 +36,31 @@ window.DungeonContent.register("classes", "ranger", {
   ],
   equipment: { mainHand: "longbow", torso: "leather", quiver: "arrows-20" },
   inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["longbow", "leather", "arrows-20"] },
-  startingGear: { fixed: true, equipment: { mainHand: "longbow", torso: "leather", quiver: "arrows-20" }, inventory: ["longbow", "leather", "arrows-20"] },
+  startingGear: {
+    equipment: { mainHand: "longbow", quiver: "arrows-20" },
+    inventory: ["longbow", "arrows-20"],
+    steps: [
+      {
+        title: "Starting Armor",
+        message: "Choose your ranger armor.",
+        choices: [
+          { value: "scale-mail", label: "Scale Mail", equipment: { torso: "scale-mail" }, inventory: ["scale-mail"] },
+          { value: "leather", label: "Leather Armor", equipment: { torso: "leather" }, inventory: ["leather"] },
+        ],
+      },
+      {
+        title: "Starting Weapons",
+        message: "Choose your ranger melee weapons.",
+        choices: [
+          { value: "shortswords", label: "Two Shortswords", equipment: { mainHand: "shortsword", offHand: "shortsword" }, inventory: ["shortsword", "shortsword"] },
+          {
+            value: "simple-melee",
+            label: "Two simple melee weapons",
+            selectTwo: { pool: "simpleMeleeWeapons", title: "Choose Two Simple Melee Weapons", message: "Select two simple melee weapons.", labels: ["First Weapon", "Second Weapon"], slots: ["mainHand", "offHand"], allowSame: true },
+          },
+        ],
+      },
+    ],
+  },
 });
 })();

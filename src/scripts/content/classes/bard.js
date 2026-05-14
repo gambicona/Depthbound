@@ -18,9 +18,12 @@ window.DungeonContent.register("classes", "bard", {
   damage: { count: 1, sides: 6, bonus: 3, type: "piercing", label: "1d6 + 3 piercing" },
   initiativeBonus: 3,
   speedFeet: 30,
+  armorProficiencies: ["light"],
+  weaponProficiencies: ["simple", "crossbow-hand", "longsword", "rapier", "shortsword"],
   spellcastingAbility: "cha",
   spellPointProgression: fullCasterSpellPoints,
   spellList: ["healing_word", "dissonant_whispers", "faerie_fire", "heroism", "hideous_laughter", "heat_metal", "hold_person", "shatter", "hypnotic_pattern", "mass_healing_word"],
+  cantripList: ["vicious-mockery", "mage-hand", "blade-ward", "thunderclap"],
   spells: [],
   token: "B",
   classFeatures: [
@@ -29,10 +32,28 @@ window.DungeonContent.register("classes", "bard", {
     { level: 5, name: "Font of Inspiration" },
   ],
   abilities: [
-    { id: "bardicInspiration", name: "Bardic Inspiration", level: 1, refresh: "longRest", uses: 3, usesByLevel: [{ level: 5, uses: 4 }, { level: 10, uses: 5 }, { level: 15, uses: 6 }], resource: "bonusAction", description: "Inspire yourself for a temporary attack and save bonus." },
+    { id: "bardicInspiration", name: "Bardic Inspiration", level: 1, refresh: "longRest", uses: 3, resourcePool: "bardicInspiration", resource: "bonusAction", description: "Give a hero an inspiration die they can add to a missed attack or save." },
   ],
   equipment: { mainHand: "rapier", torso: "leather" },
   inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["rapier", "leather"] },
-  startingGear: { fixed: true, equipment: { mainHand: "rapier", torso: "leather" }, inventory: ["rapier", "leather"] },
+  startingGear: {
+    equipment: { torso: "leather" },
+    inventory: ["leather"],
+    steps: [
+      {
+        title: "Starting Weapon",
+        message: "Choose your bard weapon.",
+        choices: [
+          { value: "rapier", label: "Rapier", equipment: { mainHand: "rapier" }, inventory: ["rapier"] },
+          { value: "longsword", label: "Longsword", equipment: { mainHand: "longsword" }, inventory: ["longsword"] },
+          {
+            value: "simple",
+            label: "Any simple weapon",
+            select: { pool: "simpleWeapons", title: "Choose Simple Weapon", message: "Select a simple weapon.", label: "Weapon", slot: "mainHand" },
+          },
+        ],
+      },
+    ],
+  },
 });
 })();

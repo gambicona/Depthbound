@@ -18,9 +18,12 @@ window.DungeonContent.register("classes", "wizard", {
   damage: { count: 1, sides: 6, bonus: 2, type: "bludgeoning", label: "1d6 + 2 bludgeoning" },
   initiativeBonus: 2,
   speedFeet: 30,
+  armorProficiencies: [],
+  weaponProficiencies: ["dagger", "dart", "sling", "quarterstaff", "crossbow-light"],
   spellcastingAbility: "int",
   spellPointProgression: fullCasterSpellPoints,
   spellList: ["magic_missile", "shield", "burning_hands", "sleep", "grease", "scorching_ray", "web", "misty_step", "fireball", "haste"],
+  cantripList: ["mage-hand", "blade-ward", "fire-bolt", "mind-sliver", "thunderclap", "chill-touch", "acid-splash", "booming-blade", "frostbite", "green-flame-blade", "ray-of-frost", "shocking-grasp", "toll-the-dead"],
   spells: [],
   token: "W",
   classFeatures: [
@@ -31,10 +34,21 @@ window.DungeonContent.register("classes", "wizard", {
     { level: 20, name: "Signature Spells" },
   ],
   abilities: [
-    { id: "arcaneRecovery", name: "Arcane Recovery", level: 1, refresh: "longRest", uses: 1, resource: "none", description: "Recover spell points equal to half wizard level, rounded up." },
+    { id: "arcaneRecovery", name: "Arcane Recovery", level: 1, refresh: "longRest", uses: 1, resourcePool: "arcaneRecovery", resource: "none", description: "Recover spell points equal to half wizard level, rounded up." },
   ],
   equipment: { mainHand: "quarterstaff", torso: null },
   inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["quarterstaff"] },
-  startingGear: { fixed: true, equipment: { mainHand: "quarterstaff", torso: null }, inventory: ["quarterstaff"] },
+  startingGear: {
+    steps: [
+      {
+        title: "Starting Weapon",
+        message: "Choose your wizard weapon.",
+        choices: [
+          { value: "quarterstaff", label: "Quarterstaff", equipment: { mainHand: "quarterstaff" }, inventory: ["quarterstaff"] },
+          { value: "dagger", label: "Dagger", equipment: { mainHand: "dagger" }, inventory: ["dagger"] },
+        ],
+      },
+    ],
+  },
 });
 })();

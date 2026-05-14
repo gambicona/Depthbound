@@ -1,0 +1,119 @@
+Furniture / Feature Component System Notes
+
+Implemented
+
+- Furniture and terrain features now use one shared FurnitureDefinition-style registry entry.
+- Definitions declare generic map properties:
+  - blocksMovement
+  - blocksLineOfSight
+  - inspectable / interactable
+  - placement
+  - symbol
+  - theme tags
+  - reusable behavior components
+- Gameplay code now reads generic properties and components instead of hardcoding behavior by names like Chest, Table, or BigRock.
+- Existing behavior was preserved:
+  - Dungeon Chest blocks movement, does not block line of sight, contains generated loot, and may have a trap.
+  - Table blocks movement, does not block line of sight, can be investigated for small hidden gold, and can trigger an ambush on a natural 1.
+  - Big Rock blocks movement and line of sight and is not inspectable.
+- Theme-based generation now supports the requested tags:
+  - dungeon
+  - crypt
+  - ruin
+  - forest
+  - underdark
+  - cave
+  - swamp
+  - temple
+  - arcane
+  - forge
+  - mine
+- Added broad feature catalogs:
+  - Dungeon / Crypt / Ruin features
+  - Forest / Wilds features
+  - Underdark / Natural Underground features
+  - Arcane / Temple / Library features
+  - Swamp / Bog / Rot features
+  - Forge / Mine / Industrial features
+- Added simple harvest/inspection items:
+  - Berry
+  - Medicinal Herb
+  - Glowcap
+  - Bitter Root
+  - Cave Salt
+  - Bone Charm
+  - Spider Silk
+  - Crystal Shard
+  - Sacred Ash
+- Old Guardroom now pulls more fitting dungeon/crypt/ruin features by tags and has tuned spawn chances for:
+  - iron-banded chests
+  - sarcophagi
+  - pillars
+  - rubble piles
+  - weapon racks
+  - armor stands
+  - hanging chains
+  - bookshelves
+  - barricades
+- Forest of the Beasts now pulls forest/wilds features by tags and has tuned spawn chances for:
+  - trees
+  - hollow trees
+  - fallen and rotten logs
+  - bushes and berry bushes
+  - thorn bushes and brambles
+  - vines and roots
+  - mossy boulders
+  - burrows and nests
+  - mushroom rings
+  - herb patches
+  - muddy sinkholes
+  - wasp nests
+
+Behavior Components Added
+
+- hiddenLoot
+- definedLootContainer
+- trap
+- ambushOnInspect
+- hazardOnEnter
+- hazardOnMovement
+- difficultTerrain
+- destructibleObject
+- pushableObject
+- cover
+- concealment
+- harvestableResource
+- lightSource
+- spawnPoint
+- interactableToggle
+
+Behavior That Is Active Now
+
+- Movement blocking works from generic definition data.
+- Line-of-sight blocking works from generic definition data.
+- Inspectability works from generic definition data and components.
+- Defined loot containers can generate loot and be looted.
+- Hidden loot and harvestable resources can be found through Investigation checks.
+- Ambush-on-inspect can spawn a nearby monster.
+- Floor traps and trapped containers are detected/disarmed through generic trap data.
+- Hazard-on-enter and hazard-on-movement can deal damage.
+- Difficult terrain costs extra movement.
+- Component labels are shown in the object inspection panel.
+- Object rendering uses each feature's symbol and component-based styling.
+
+Data Present But Not Fully Interactive Yet
+
+- Destructible objects have AC/HP component data, but there is not yet a dedicated attack/destroy object UI.
+- Pushable objects have component data, but there is not yet a push interaction UI.
+- Cover and concealment are displayed as components, but they are not yet wired into attack/stealth modifiers.
+- Light sources have component data and styling, but they do not yet expand visibility/fog of war.
+- Spawn points have component data, but most spawn-point effects are not yet connected to a specific interaction.
+- Interactable toggles have component data, but most toggle effects are placeholders for future puzzle/hazard controls.
+- Partial line-of-sight is represented narratively through cover/concealment components, but the current LOS engine is still binary for actual sight blocking.
+
+Notes For Adding More Features
+
+- Add new map objects in src/scripts/content/furniture/dungeon-furniture-pack.js with the feature(...) helper.
+- Prefer tags over direct theme-specific code.
+- Add a matching spawn chance in a theme file when a feature should appear more often there.
+- Keep actual gameplay hooks generic: use objectHasComponent(...), objectCanInspect(...), objectHasLoot(...), objectBlocksMovement(...), and objectBlocksLineOfSight(...).

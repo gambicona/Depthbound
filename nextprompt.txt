@@ -1,21 +1,20 @@
-the cleric need to get his selection of starter gear.
-why is monk unarmed die at lvl one a d6? should be d4
-
-
+Turn Ranger Companion and summon spells into persistent actors with pet command action economy.
 add roles: pet and support (pet like controllable npc for example ranger pet, support acts on its own)
+
 add the standard item descriptions
-add extra attack for fighter, subclass
+subclasses
 add more monster behaviour (already according to role and int)
 Give type to monsters (undead etc)
+Spell sound effects
 make furniture jumpable (for pits etc)
+more different furniture (also include bushes, trees etc)
+
+Bug report function
 
 
 Monster Compendium to collect
-Cleric class
-races (balance)
 build base
 NPCs with (random) quests
-make it possible to go back to lower level dungeons to redo them and gain items from bosses for quests for example
 predefined dungeons and dungeon creator
 ressource points to get ressources (stone pit, con check, get stone, farmable, as configurable file, spawnable in dungeons at walls)
 packs to find (Medizin Pack Proviant Pack, etc) that can either be sold to merchants or even factions for points or be opened to gain whatever is inside

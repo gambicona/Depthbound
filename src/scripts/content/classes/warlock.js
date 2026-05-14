@@ -18,9 +18,12 @@ window.DungeonContent.register("classes", "warlock", {
   damage: { count: 1, sides: 8, bonus: 1, type: "piercing", label: "1d8 + 1 piercing" },
   initiativeBonus: 1,
   speedFeet: 30,
+  armorProficiencies: ["light"],
+  weaponProficiencies: ["simple"],
   spellcastingAbility: "cha",
   spellPointProgression: pactSpellPoints,
   spellList: ["armor_of_agathys", "arms_of_hadar", "hex", "hellish_rebuke", "cause_fear", "darkness", "hold_person", "misty_step", "hunger_of_hadar", "vampiric_touch"],
+  cantripList: ["mage-hand", "blade-ward", "mind-sliver", "eldritch-blast", "thunderclap", "chill-touch", "booming-blade", "frostbite", "green-flame-blade", "poison-spray", "toll-the-dead"],
   spells: [],
   token: "Wk",
   classFeatures: [
@@ -32,11 +35,45 @@ window.DungeonContent.register("classes", "warlock", {
     { level: 20, name: "Eldritch Master" },
   ],
   abilities: [
-    { id: "eldritchBlast", name: "Eldritch Blast", level: 1, refresh: "turn", uses: 1, resource: "action", description: "A force spell attack that scales by level." },
     { id: "eldritchMaster", name: "Eldritch Master", level: 20, refresh: "longRest", uses: 1, resource: "action", description: "Restore pact spell points." },
   ],
   equipment: { mainHand: "crossbow-light", torso: "leather", quiver: "bolts-20" },
   inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["crossbow-light", "bolts-20", "leather", "dagger", "dagger"] },
-  startingGear: { fixed: true, equipment: { mainHand: "crossbow-light", torso: "leather", quiver: "bolts-20" }, inventory: ["crossbow-light", "bolts-20", "leather", "dagger", "dagger"] },
+  startingGear: {
+    equipment: { torso: "leather" },
+    inventory: ["leather"],
+    steps: [
+      {
+        title: "Starting Weapon",
+        message: "Choose your warlock weapon.",
+        choices: [
+          { value: "light-crossbow", label: "Light Crossbow and 20 Bolts", equipment: { mainHand: "crossbow-light" }, inventory: ["crossbow-light", "bolts-20"], quiver: "bolts-20" },
+          {
+            value: "simple",
+            label: "Any simple weapon",
+            select: { pool: "simpleWeapons", title: "Choose Simple Weapon", message: "Select a simple weapon.", label: "Weapon", slot: "mainHand" },
+          },
+        ],
+      },
+      {
+        title: "Second Weapon",
+        message: "Choose one additional simple weapon.",
+        choices: [
+          {
+            value: "simple",
+            label: "Any simple weapon",
+            select: { pool: "simpleWeapons", title: "Choose Simple Weapon", message: "Select a simple weapon.", label: "Weapon", slot: "" },
+          },
+        ],
+      },
+      {
+        title: "Daggers",
+        message: "Your warlock also starts with two daggers.",
+        choices: [
+          { value: "daggers", label: "Two Daggers", inventory: ["dagger", "dagger"] },
+        ],
+      },
+    ],
+  },
 });
 })();

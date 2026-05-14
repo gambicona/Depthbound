@@ -47,6 +47,31 @@ const availability = {
   silence: ["ranger"],
   "cordon-of-arrows": ["ranger"],
   fireball: ["wizard", "sorcerer"],
+  "vicious-mockery": ["bard"],
+  "mage-hand": ["artificer", "bard", "sorcerer", "warlock", "wizard"],
+  "blade-ward": ["bard", "sorcerer", "warlock", "wizard"],
+  guidance: ["artificer", "cleric", "druid"],
+  "sacred-flame": ["cleric"],
+  "spare-the-dying": ["artificer", "cleric"],
+  "produce-flame": ["druid"],
+  "thorn-whip": ["artificer", "druid"],
+  "fire-bolt": ["artificer", "sorcerer", "wizard"],
+  "mind-sliver": ["sorcerer", "warlock", "wizard"],
+  "eldritch-blast": ["warlock"],
+  "hellish-rebuke": ["warlock"],
+  thunderclap: ["artificer", "bard", "druid", "sorcerer", "warlock", "wizard"],
+  "chill-touch": ["sorcerer", "warlock", "wizard"],
+  "acid-splash": ["artificer", "sorcerer", "wizard"],
+  "booming-blade": ["artificer", "sorcerer", "warlock", "wizard"],
+  frostbite: ["artificer", "druid", "sorcerer", "warlock", "wizard"],
+  "green-flame-blade": ["artificer", "sorcerer", "warlock", "wizard"],
+  "poison-spray": ["artificer", "druid", "sorcerer", "warlock", "wizard"],
+  "primal-savagery": ["druid"],
+  "ray-of-frost": ["artificer", "sorcerer", "wizard"],
+  resistance: ["artificer", "cleric", "druid"],
+  shillelagh: ["druid"],
+  "shocking-grasp": ["artificer", "sorcerer", "wizard"],
+  "toll-the-dead": ["cleric", "warlock", "wizard"],
 };
 
 function minCharacterLevel(spellLevel, casterType = "full") {
@@ -56,16 +81,17 @@ function minCharacterLevel(spellLevel, casterType = "full") {
 
 function spell(id, definition) {
   const classes = availability[id] ?? [];
+  const isCantrip = definition.level === 0;
   window.DungeonContent.register("spells", id, {
     id,
     school: definition.school ?? "combat",
     classes,
-    minCharacterLevelFull: minCharacterLevel(definition.level, "full"),
-    minCharacterLevelHalf: minCharacterLevel(definition.level, "half"),
+    minCharacterLevelFull: isCantrip ? 1 : minCharacterLevel(definition.level, "full"),
+    minCharacterLevelHalf: isCantrip ? 1 : minCharacterLevel(definition.level, "half"),
     costsByLevel: Object.fromEntries(
-      [1, 2, 3]
+      [0, 1, 2, 3]
         .filter((level) => level >= definition.level)
-        .map((level) => [level, spellCostByLevel[level]]),
+        .map((level) => [level, isCantrip ? 0 : spellCostByLevel[level]]),
     ),
     ...definition,
   });
@@ -746,7 +772,7 @@ spell("hex", {
   description: "Concentration, 3 rounds. Mark and weaken a target.",
 });
 
-spell("hellish_rebuke", {
+spell("hellish-rebuke", {
   name: "Hellish Rebuke",
   level: 1,
   resource: reaction,
@@ -814,6 +840,280 @@ spell("vampiric_touch", {
   description: "Melee spell attack for 3d6 necrotic; caster gains a little vitality.",
 });
 
+spell("vicious-mockery", {
+  name: "Vicious Mockery",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 60 },
+  target: "enemy",
+  save: { ability: "wis" },
+  effect: { kind: "damage", dice: { count: 1, sides: 4 }, type: "psychic", status: { id: "mocked", label: "Mocked", attackBonus: -2, expiresAtEndOfTurn: true } },
+  description: "Cantrip. WIS save or psychic damage and a short attack penalty. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("mage-hand", {
+  name: "Mage Hand",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  effect: { kind: "status", status: { id: "mage-hand", label: "Mage Hand", durationRounds: 10 } },
+  description: "Cantrip. The next chest this hero opens is manipulated at range and will not trigger its trap.",
+});
+
+spell("blade-ward", {
+  name: "Blade Ward",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  effect: { kind: "status", status: { id: "blade-ward", label: "Blade Ward", resistances: ["bludgeoning", "piercing", "slashing"], expiresAtStartOfTurn: true } },
+  description: "Cantrip. Resist bludgeoning, piercing, and slashing damage until your next turn.",
+});
+
+spell("guidance", {
+  name: "Guidance",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  effect: { kind: "status", status: { id: "guidance", label: "Guidance", durationRounds: 1 } },
+  description: "Cantrip. Passive: while known by any active party hero, adds 1d4 to party skill checks.",
+});
+
+spell("sacred-flame", {
+  name: "Sacred Flame",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 60 },
+  target: "enemy",
+  save: { ability: "dex" },
+  effect: { kind: "damage", dice: { count: 1, sides: 8 }, type: "radiant" },
+  description: "Cantrip. DEX save or radiant damage. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("spare-the-dying", {
+  name: "Spare the Dying",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "ally",
+  effect: { kind: "status", status: { id: "spare-the-dying", label: "Stabilized", durationRounds: 1 } },
+  description: "Cantrip. Stabilizes a dying hero.",
+});
+
+spell("produce-flame", {
+  name: "Produce Flame",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 30 },
+  target: "enemy",
+  effect: { kind: "attackDamage", dice: { count: 1, sides: 8 }, type: "fire" },
+  description: "Cantrip. Ranged spell attack for fire damage. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("thorn-whip", {
+  name: "Thorn Whip",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 30 },
+  target: "enemy",
+  effect: { kind: "attackDamage", dice: { count: 1, sides: 6 }, type: "piercing", status: { id: "thorn-whipped", label: "Pulled", speedBonusFeet: -10, expiresAtEndOfTurn: true } },
+  description: "Cantrip. Spell attack for piercing damage and a brief movement penalty. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("fire-bolt", {
+  name: "Fire Bolt",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 120 },
+  target: "enemy",
+  effect: { kind: "attackDamage", dice: { count: 1, sides: 10 }, type: "fire" },
+  description: "Cantrip. Ranged spell attack for fire damage. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("mind-sliver", {
+  name: "Mind Sliver",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 60 },
+  target: "enemy",
+  save: { ability: "int" },
+  effect: { kind: "damage", dice: { count: 1, sides: 6 }, type: "psychic", status: { id: "mind-slivered", label: "Mind Sliver", saveBonus: -2, expiresAtEndOfTurn: true } },
+  description: "Cantrip. INT save or psychic damage and a brief save penalty. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("eldritch-blast", {
+  name: "Eldritch Blast",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 120 },
+  target: "enemy",
+  effect: { kind: "attackDamage", dice: { count: 1, sides: 10 }, type: "force" },
+  description: "Cantrip. Click targets for force beams. Beam count scales at levels 5, 11, and 17.",
+});
+
+spell("thunderclap", {
+  name: "Thunderclap",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "self", feet: 5 },
+  target: "self",
+  area: { shape: "circle", radiusFeet: 5 },
+  save: { ability: "con" },
+  effect: { kind: "damage", dice: { count: 1, sides: 6 }, type: "thunder" },
+  description: "Cantrip. Nearby enemies make a CON save or take thunder damage. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("chill-touch", {
+  name: "Chill Touch",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 120 },
+  target: "enemy",
+  effect: { kind: "attackDamage", dice: { count: 1, sides: 8 }, type: "necrotic" },
+  description: "Cantrip. Ranged spell attack for necrotic damage. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("acid-splash", {
+  name: "Acid Splash",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 60 },
+  target: "point",
+  area: { shape: "circle", radiusFeet: 5 },
+  save: { ability: "dex" },
+  effect: { kind: "damage", dice: { count: 1, sides: 6 }, type: "acid" },
+  description: "Cantrip. DEX save or acid damage in a small splash. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("booming-blade", {
+  name: "Booming Blade",
+  level: 0,
+  cost: 0,
+  resource: weaponRider,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  effect: { kind: "status", status: { id: "booming-blade", label: "Booming Blade", weaponRider: true, damageDice: { count: 1, sides: 8 }, damageType: "thunder", expiresAtEndOfTurn: true } },
+  description: "Cantrip. Your next weapon hit this turn adds thunder damage. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("frostbite", {
+  name: "Frostbite",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 60 },
+  target: "enemy",
+  save: { ability: "con" },
+  effect: { kind: "damage", dice: { count: 1, sides: 6 }, type: "cold", status: { id: "frostbitten", label: "Frostbitten", attackBonus: -2, expiresAtEndOfTurn: true } },
+  description: "Cantrip. CON save or cold damage and a brief attack penalty. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("green-flame-blade", {
+  name: "Green-Flame Blade",
+  level: 0,
+  cost: 0,
+  resource: weaponRider,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  effect: { kind: "status", status: { id: "green-flame-blade", label: "Green-Flame Blade", weaponRider: true, damageDice: { count: 1, sides: 8 }, damageType: "fire", expiresAtEndOfTurn: true } },
+  description: "Cantrip. Your next weapon hit this turn adds fire damage. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("poison-spray", {
+  name: "Poison Spray",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 10 },
+  target: "enemy",
+  save: { ability: "con" },
+  effect: { kind: "damage", dice: { count: 1, sides: 12 }, type: "poison" },
+  description: "Cantrip. CON save or poison damage. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("primal-savagery", {
+  name: "Primal Savagery",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "enemy",
+  effect: { kind: "attackDamage", dice: { count: 1, sides: 10 }, type: "acid" },
+  description: "Cantrip. Melee spell attack for acid damage. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("ray-of-frost", {
+  name: "Ray of Frost",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 60 },
+  target: "enemy",
+  effect: { kind: "attackDamage", dice: { count: 1, sides: 8 }, type: "cold", status: { id: "ray-of-frost", label: "Slowed", speedBonusFeet: -10, expiresAtEndOfTurn: true } },
+  description: "Cantrip. Ranged spell attack for cold damage and a brief slow. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("resistance", {
+  name: "Resistance",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "ally",
+  effect: { kind: "status", status: { id: "resistance", label: "Resistance", saveBonus: 2, expiresAtStartOfTurn: true } },
+  description: "Cantrip. Ally gains a short save bonus.",
+});
+
+spell("shillelagh", {
+  name: "Shillelagh",
+  level: 0,
+  cost: 0,
+  resource: "bonusAction",
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  effect: { kind: "status", status: { id: "shillelagh", label: "Shillelagh", damageBonus: 2, durationRounds: 10 } },
+  description: "Cantrip. Your weapon attacks gain a small damage bonus for the encounter.",
+});
+
+spell("shocking-grasp", {
+  name: "Shocking Grasp",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "enemy",
+  effect: { kind: "attackDamage", dice: { count: 1, sides: 8 }, type: "lightning", status: { id: "shocked", label: "Shocked", attackBonus: -1, expiresAtEndOfTurn: true } },
+  description: "Cantrip. Melee spell attack for lightning damage. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("toll-the-dead", {
+  name: "Toll the Dead",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 60 },
+  target: "enemy",
+  save: { ability: "wis" },
+  effect: { kind: "damage", dice: { count: 1, sides: 8 }, type: "necrotic" },
+  description: "Cantrip. WIS save or necrotic damage. Damage scales at levels 5, 11, and 17.",
+});
+
 const spellAliases = {
   cure_wounds: "cure-wounds",
   healing_word: "healing-word",
@@ -844,6 +1144,10 @@ const spellAliases = {
   fog_cloud: "fog-cloud",
   cordon_of_arrows: "cordon-of-arrows",
   hypnotic_pattern: "hypnotic-pattern",
+  thunder_clap: "thunderclap",
+  "thunder-clap": "thunderclap",
+  eldritch_blast: "eldritch-blast",
+  hellish_rebuke: "hellish-rebuke",
 };
 
 for (const [alias, sourceId] of Object.entries(spellAliases)) {

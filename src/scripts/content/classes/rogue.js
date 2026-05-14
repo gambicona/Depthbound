@@ -16,6 +16,8 @@ window.DungeonContent.register("classes", "rogue", {
   damage: { count: 1, sides: 8, bonus: 2, type: "piercing", label: "1d8 + 2 piercing" },
   initiativeBonus: 2,
   speedFeet: 30,
+  armorProficiencies: ["light"],
+  weaponProficiencies: ["simple", "crossbow-hand", "longsword", "rapier", "shortsword"],
   token: "G",
   classFeatures: [
     { level: 1, name: "Sneak Attack" },
@@ -26,10 +28,32 @@ window.DungeonContent.register("classes", "rogue", {
   ],
   abilities: [
     { id: "cunningActionDash", name: "Cunning Action: Dash", level: 2, refresh: "turn", uses: 1, resource: "bonusAction", description: "Dash as a quick action." },
-    { id: "uncannyDodge", name: "Uncanny Dodge", level: 5, refresh: "shortRest", uses: 1, resource: "bonusAction", description: "Reduce incoming pressure with a defensive reaction." },
+    { id: "steadyAim", name: "Steady Aim", level: 1, refresh: "turn", uses: 1, resource: "bonusAction", description: "Spend your bonus action and movement for advantage on your next attack, enabling Sneak Attack." },
+    { id: "uncannyDodge", name: "Uncanny Dodge", level: 5, refresh: "turn", uses: 1, resource: "reaction", description: "Reaction: halve the damage from one attack that hits you." },
   ],
   equipment: { mainHand: "rapier", torso: "leather" },
   inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["rapier", "shortbow", "arrows-20", "leather"] },
-  startingGear: { fixed: true, equipment: { mainHand: "rapier", torso: "leather", quiver: "arrows-20" }, inventory: ["rapier", "shortbow", "arrows-20", "leather"] },
+  startingGear: {
+    equipment: { torso: "leather" },
+    inventory: ["leather"],
+    steps: [
+      {
+        title: "Starting Weapon",
+        message: "Choose your rogue weapon.",
+        choices: [
+          { value: "rapier", label: "Rapier", equipment: { mainHand: "rapier" }, inventory: ["rapier"] },
+          { value: "shortsword", label: "Shortsword", equipment: { mainHand: "shortsword" }, inventory: ["shortsword"] },
+        ],
+      },
+      {
+        title: "Secondary Weapon",
+        message: "Choose your rogue secondary weapon.",
+        choices: [
+          { value: "shortbow", label: "Shortbow and 20 Arrows", inventory: ["shortbow", "arrows-20"], quiver: "arrows-20" },
+          { value: "shortsword", label: "Shortsword", inventory: ["shortsword"] },
+        ],
+      },
+    ],
+  },
 });
 })();

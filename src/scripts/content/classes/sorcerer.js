@@ -18,9 +18,12 @@ window.DungeonContent.register("classes", "sorcerer", {
   damage: { count: 1, sides: 6, bonus: 2, type: "bludgeoning", label: "1d6 + 2 bludgeoning" },
   initiativeBonus: 2,
   speedFeet: 30,
+  armorProficiencies: [],
+  weaponProficiencies: ["dagger", "dart", "sling", "quarterstaff", "crossbow-light"],
   spellcastingAbility: "cha",
   spellPointProgression: fullCasterSpellPoints,
   spellList: ["magic_missile", "shield", "mage_armor", "burning_hands", "thunderwave", "scorching_ray", "mirror_image", "misty_step", "fireball", "lightning_bolt"],
+  cantripList: ["mage-hand", "blade-ward", "fire-bolt", "mind-sliver", "thunderclap", "chill-touch", "acid-splash", "booming-blade", "frostbite", "green-flame-blade", "poison-spray", "ray-of-frost", "shocking-grasp"],
   spells: [],
   token: "S",
   classFeatures: [
@@ -29,10 +32,32 @@ window.DungeonContent.register("classes", "sorcerer", {
     { level: 3, name: "Metamagic" },
   ],
   abilities: [
-    { id: "empoweredSpell", name: "Empowered Spell", level: 3, refresh: "longRest", uses: 3, usesByLevel: [{ level: 6, uses: 6 }, { level: 12, uses: 12 }, { level: 20, uses: 20 }], resource: "bonusAction", description: "Empower the next spell or attack with raw arcane force." },
+    { id: "empoweredSpell", name: "Empowered Spell", level: 3, refresh: "longRest", uses: 3, resourcePool: "metamagic", resource: "bonusAction", description: "Spend metamagic to empower the next spell or attack with raw arcane force." },
   ],
   equipment: { mainHand: "quarterstaff", torso: null },
   inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["quarterstaff"] },
-  startingGear: { fixed: true, equipment: { mainHand: "quarterstaff", torso: null }, inventory: ["quarterstaff"] },
+  startingGear: {
+    steps: [
+      {
+        title: "Starting Weapon",
+        message: "Choose your sorcerer weapon.",
+        choices: [
+          { value: "light-crossbow", label: "Light Crossbow and 20 Bolts", equipment: { mainHand: "crossbow-light" }, inventory: ["crossbow-light", "bolts-20"], quiver: "bolts-20" },
+          {
+            value: "simple",
+            label: "Any simple weapon",
+            select: { pool: "simpleWeapons", title: "Choose Simple Weapon", message: "Select a simple weapon.", label: "Weapon", slot: "mainHand" },
+          },
+        ],
+      },
+      {
+        title: "Daggers",
+        message: "Your sorcerer also starts with two daggers.",
+        choices: [
+          { value: "daggers", label: "Two Daggers", inventory: ["dagger", "dagger"] },
+        ],
+      },
+    ],
+  },
 });
 })();

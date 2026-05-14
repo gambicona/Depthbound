@@ -18,6 +18,8 @@ window.DungeonContent.register("classes", "paladin", {
   damage: { count: 1, sides: 8, bonus: 3, type: "slashing", label: "1d8 + 3 slashing" },
   initiativeBonus: 0,
   speedFeet: 30,
+  armorProficiencies: ["light", "medium", "heavy", "shield"],
+  weaponProficiencies: ["simple", "martial"],
   spellcastingAbility: "cha",
   spellPointProgression: halfCasterSpellPoints,
   spellList: ["bless", "cure_wounds", "divine_favor", "shield_of_faith", "compelled_duel", "heroism", "thunderous_smite", "wrathful_smite", "aid", "branding_smite"],
@@ -30,11 +32,46 @@ window.DungeonContent.register("classes", "paladin", {
     { level: 6, name: "Aura of Protection" },
   ],
   abilities: [
-    { id: "layOnHands", name: "Lay on Hands", level: 1, refresh: "longRest", uses: 1, resource: "action", description: "Heal yourself for 5 HP per paladin level." },
-    { id: "divineSmite", name: "Divine Smite", level: 2, refresh: "turn", uses: 1, resource: "bonusAction", description: "Charge your next weapon hit with radiant damage." },
+    { id: "layOnHands", name: "Lay on Hands", level: 1, refresh: "longRest", uses: 5, resourcePool: "layOnHands", resource: "action", description: "Spend your Lay on Hands pool to heal yourself." },
+    { id: "divineSmite", name: "Divine Smite", level: 2, refresh: "turn", uses: 1, resource: "bonusAction", description: "Spend spell points to charge your next weapon hit with radiant damage." },
   ],
   equipment: { mainHand: "longsword", offHand: "shield", torso: "chain-mail" },
   inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["longsword", "shield", "chain-mail"] },
-  startingGear: { fixed: true, equipment: { mainHand: "longsword", offHand: "shield", torso: "chain-mail" }, inventory: ["longsword", "shield", "chain-mail"] },
+  startingGear: {
+    equipment: { torso: "chain-mail" },
+    inventory: ["chain-mail"],
+    steps: [
+      {
+        title: "Primary Weapon Loadout",
+        message: "Choose your paladin weapon loadout.",
+        choices: [
+          {
+            value: "weapon-shield",
+            label: "One martial weapon and a shield",
+            equipment: { offHand: "shield" },
+            inventory: ["shield"],
+            select: { pool: "oneHandedMartialWeapons", title: "Choose Martial Weapon", message: "Select a martial weapon.", label: "Weapon", slot: "mainHand" },
+          },
+          {
+            value: "two-weapons",
+            label: "Two martial weapons",
+            selectTwo: { pool: "oneHandedMartialWeapons", title: "Choose Two Martial Weapons", message: "Select two martial weapons.", labels: ["First Weapon", "Second Weapon"], slots: ["mainHand", "offHand"] },
+          },
+        ],
+      },
+      {
+        title: "Secondary Weapons",
+        message: "Choose your additional paladin weapons.",
+        choices: [
+          { value: "javelins", label: "Five Javelins", inventory: ["javelin", "javelin", "javelin", "javelin", "javelin"] },
+          {
+            value: "simple-melee",
+            label: "Any simple melee weapon",
+            select: { pool: "simpleMeleeWeapons", title: "Choose Simple Melee Weapon", message: "Select a simple melee weapon.", label: "Weapon", slot: "" },
+          },
+        ],
+      },
+    ],
+  },
 });
 })();

@@ -18,6 +18,8 @@ window.DungeonContent.register("classes", "cleric", {
   damage: { count: 1, sides: 6, bonus: 1, type: "bludgeoning", label: "1d6 + 1 bludgeoning" },
   initiativeBonus: 1,
   speedFeet: 30,
+  armorProficiencies: ["light", "medium", "shield"],
+  weaponProficiencies: ["simple"],
   spellcastingAbility: "wis",
   spellPointProgression: fullCasterSpellPoints,
   spellList: [
@@ -32,6 +34,7 @@ window.DungeonContent.register("classes", "cleric", {
     "spirit_guardians",
     "mass_healing_word",
   ],
+  cantripList: ["guidance", "sacred-flame", "spare-the-dying", "resistance", "toll-the-dead"],
   spells: [],
   token: "C",
   classFeatures: [
@@ -61,9 +64,39 @@ window.DungeonContent.register("classes", "cleric", {
     items: ["mace", "shield", "scale-mail"],
   },
   startingGear: {
-    fixed: true,
-    equipment: { mainHand: "mace", offHand: "shield", torso: "scale-mail" },
-    inventory: ["mace", "shield", "scale-mail"],
+    equipment: { offHand: "shield" },
+    inventory: ["shield"],
+    steps: [
+      {
+        title: "Starting Weapon",
+        message: "Choose your cleric weapon.",
+        choices: [
+          { value: "mace", label: "Mace", equipment: { mainHand: "mace" }, inventory: ["mace"] },
+          { value: "warhammer", label: "Warhammer", equipment: { mainHand: "warhammer" }, inventory: ["warhammer"], requiresWeaponProficiency: "warhammer" },
+        ],
+      },
+      {
+        title: "Starting Armor",
+        message: "Choose your cleric armor.",
+        choices: [
+          { value: "scale-mail", label: "Scale Mail", equipment: { torso: "scale-mail" }, inventory: ["scale-mail"] },
+          { value: "leather", label: "Leather Armor", equipment: { torso: "leather" }, inventory: ["leather"] },
+          { value: "chain-mail", label: "Chain Mail", equipment: { torso: "chain-mail" }, inventory: ["chain-mail"], requiresArmorProficiency: "chain-mail" },
+        ],
+      },
+      {
+        title: "Secondary Gear",
+        message: "Choose your cleric's additional gear.",
+        choices: [
+          { value: "light-crossbow", label: "Light Crossbow and 20 Bolts", inventory: ["crossbow-light", "bolts-20"], quiver: "bolts-20" },
+          {
+            value: "simple",
+            label: "Any simple weapon",
+            select: { pool: "simpleWeapons", title: "Choose Simple Weapon", message: "Select a simple weapon.", label: "Weapon", slot: "" },
+          },
+        ],
+      },
+    ],
   },
 });
 })();
