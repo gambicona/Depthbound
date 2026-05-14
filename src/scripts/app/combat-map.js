@@ -160,6 +160,7 @@ async function rollDeathSave(hero) {
   hero.deathSaves = hero.deathSaves ?? { successes: 0, failures: 0 };
   if (hero.deathSaves.successes >= 3) {
     addLog(`${hero.name} is stable at 0 HP.`, "important");
+    await maybeFinishEncounterAfterHeroRecovery();
     return;
   }
   const roll = await showDeathSaveMenu(hero);
@@ -169,6 +170,7 @@ async function rollDeathSave(hero) {
     hero.deathSaves = { successes: 0, failures: 0 };
     addLog(`${hero.name} rolls a 20 death save and gets back up with 1 HP.`, "important");
     recordD20OutcomeForFighter(hero, true);
+    await maybeFinishEncounterAfterHeroRecovery();
     return;
   }
   if (roll === 1) hero.deathSaves.failures += 2;
@@ -181,6 +183,7 @@ async function rollDeathSave(hero) {
     hero.alive = true;
     hero.deathSaves = { successes: 3, failures: 0 };
     addLog(`${hero.name} stabilizes.`, "important");
+    await maybeFinishEncounterAfterHeroRecovery();
   }
 }
 
@@ -1192,6 +1195,12 @@ async function finishEncounterAfterLastMonsterFalls() {
     addLog("The room falls quiet. Exploration resumes.", "important");
   }
   return true;
+}
+
+async function maybeFinishEncounterAfterHeroRecovery() {
+  if (state.mode !== "combat" || !state.combatStarted || combatMonsters().length > 0) return false;
+  if (unstableDyingPartyHeroes().length > 0 || partyDefeatedOrDying()) return false;
+  return finishEncounterAfterLastMonsterFalls();
 }
 
 async function opportunityAttack(attacker, defender) {
@@ -2821,6 +2830,7 @@ function applySpellHealing(caster, target, spell) {
   const bonus = spell.effect?.abilityBonus === "spellcasting" ? abilityMod(caster, spellcastingAbility(caster)) : spell.effect?.bonus ?? 0;
   const healed = applyHealingToHero(target, Math.max(0, roll.total + bonus));
   addLog(`${caster.name}'s ${spell.name} heals ${target.name} for ${healed} HP (${roll.rolls.join(" + ")} ${abilityLabel(bonus)}).`, "heal");
+  void maybeFinishEncounterAfterHeroRecovery();
 }
 
 async function applySpellAttack(caster, target, spell) {
@@ -2943,9 +2953,9 @@ async function applySpellStatus(caster, target, spell, options = {}) {
     effect.damageBonus = (effect.damageBonus ?? 0) + Math.max(0, spellCastLevel(spell) - spellBaseLevel(spell)) * spell.upcast.damageBonusPerLevel;
   }
   if (effect.id === "spare-the-dying" && isPartyHeroId(target.id) && target.hp <= 0) {
-    target.deathSaveSuccesses = 3;
-    target.deathSaveFailures = 0;
+    target.deathSaves = { successes: 3, failures: 0 };
     addLog(`${target.name} is stabilized by ${spell.name}.`, "important");
+    await maybeFinishEncounterAfterHeroRecovery();
   }
   if ((target.id?.startsWith("boss-") || target.tags?.includes("boss")) && effect.actionLocked) {
     delete effect.actionLocked;

@@ -2536,6 +2536,7 @@ function useCombatAction(action, targetId = null) {
       target.alive = true;
       target.deathSaves = { successes: 3, failures: 0 };
       addLog(`${target.name} is stabilized at 0 HP.`, "heal");
+      void maybeFinishEncounterAfterHeroRecovery();
     } else {
       addLog(`${fighter.name} cannot stabilize ${target.name} yet.`);
     }
@@ -3005,6 +3006,7 @@ function useBeltItem(itemId, targetId = null) {
     const targetText = target.id === hero.id ? "" : ` on ${target.name}`;
     addLog(`${hero.name} uses ${item.name}${targetText} and heals ${healed} HP (${healingRoll.rolls.join(" + ")} + ${item.use.bonus ?? 0}).`, "heal");
     if (item.use?.consume !== false && !item.use?.charges) consumeEquippedItem(itemId);
+    void maybeFinishEncounterAfterHeroRecovery();
   } else {
     if (!spendItemCharge(item)) return;
     addLog(`${hero.name} uses ${item.name}.`, "important");
@@ -3146,6 +3148,7 @@ async function useFighterAbility(abilityId) {
     hero.abilityUses[ability.id] = abilityMaxUses(hero, ability);
     const targetText = target.id === hero.id ? "" : ` on ${target.name}`;
     addLog(`${hero.name} uses Lay on Hands${targetText} and heals ${healed} HP.`, "heal");
+    await maybeFinishEncounterAfterHeroRecovery();
   }
 
   if (ability.id === "divineSmite") {
