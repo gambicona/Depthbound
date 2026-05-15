@@ -61,6 +61,7 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
     shortRestLimit: theme?.rest?.shortRestLimit ?? 3,
     chest: [],
     chestMoney: { cp: 0, sp: 0, gp: 0 },
+    campaignProgress: {},
     lootPiles: [],
     dungeonObjects,
     party: {
@@ -141,6 +142,193 @@ function createDungeonStateForParty(partyMembers, previousState, themeId = defau
   nextState.d20Mode = normalizeD20Mode(previousState?.d20Mode);
   nextState.d20FailureStreak = previousState?.d20FailureStreak ?? 0;
   return nextState;
+}
+
+function itemInstancesFromIds(itemIds = [], prefix = "object") {
+  return itemIds
+    .map((itemId) => createItemInstance(itemId, prefix))
+    .filter(Boolean);
+}
+
+function customRoomForPosition(dungeon, position) {
+  return (dungeon?.rooms ?? []).find((room) => roomHasCell(room, position)) ?? null;
+}
+
+function createCustomDungeonObject(templateObject, index) {
+  const template = objectTemplate(templateObject.type);
+  if (!template) return null;
+  const lockComponent = objectComponent(templateObject.type, "lock");
+  const lockDc = templateObject.lockDc ?? lockComponent?.dc;
+  const locked =
+    typeof templateObject.locked === "boolean"
+      ? templateObject.locked
+      : lockComponent
+        ? Math.random() < (lockComponent.chance ?? 0.5)
+        : undefined;
+  return {
+    id: templateObject.id ?? `${templateObject.type}-${index + 1}`,
+    type: templateObject.type,
+    position: { ...(templateObject.position ?? { x: 0, y: 0 }) },
+    width: templateObject.width ?? template.width ?? 1,
+    height: templateObject.height ?? template.height ?? 1,
+    ...(templateObject.pairId ? { pairId: templateObject.pairId } : {}),
+    ...(templateObject.trap ? { trap: { ...templateObject.trap } } : {}),
+    ...(lockDc ? { lockDc } : {}),
+    ...(typeof locked === "boolean" ? { locked } : {}),
+    items: itemInstancesFromIds(templateObject.items ?? [], "object"),
+  };
+}
+
+function createCustomDungeonMonsters(template, dungeon, hero) {
+  const monsters = {};
+  for (const [index, entry] of (template.monsters ?? []).entries()) {
+    const monsterTemplate = getMonsterTemplate(entry.monsterId);
+    if (!monsterTemplate) continue;
+    const idPrefix = entry.isBoss ? "boss" : "monster";
+    const id = entry.id ?? `${idPrefix}-custom-${index + 1}`;
+    const monster = createCombatant({
+      ...monsterTemplate,
+      ...(entry.overrides ?? {}),
+      id,
+      name: entry.name || monsterTemplate.name,
+      extraLoot: (entry.extraLoot ?? []).map((itemId) => ({ kind: "item", itemId })),
+    });
+    for (const itemId of Object.values(entry.overrides?.equipment ?? {}).filter(Boolean)) {
+      if (!(monster.inventory?.items ?? []).some((item) => item.baseItemId === itemId || item.id === itemId)) {
+        const item = createItemInstance(itemId, "monster");
+        if (item) monster.inventory.items.push(item);
+      }
+    }
+    monster.baseMonsterId = entry.customized ? entry.id : entry.monsterId;
+    if (entry.isBoss) {
+      monster.customBoss = true;
+      monster.tags = Array.from(new Set([...(monster.tags ?? []), "boss"]));
+    }
+    applyMonsterCategoryScaling(monster, hero);
+    monster.position = { ...(entry.position ?? dungeon.startPosition) };
+    monster.roomId = entry.roomId ?? customRoomForPosition(dungeon, monster.position)?.id ?? dungeon.entranceRoomId;
+    monsters[monster.id] = monster;
+  }
+  return monsters;
+}
+
+function customDungeonMonsterSummary(monsters = {}) {
+  const summary = {};
+  for (const monster of Object.values(monsters)) {
+    const baseId = monster.baseMonsterId ?? monster.templateId ?? monster.id;
+    summary[baseId] = (summary[baseId] ?? 0) + 1;
+  }
+  return summary;
+}
+
+function createCustomDungeonStateFromTemplate(partyMembers, previousState, template) {
+  if (!template) return null;
+  for (const item of template.customItems ?? []) {
+    window.DungeonContent.register("items", item.id, item);
+  }
+  const theme = getContentDefinition("themes", template.themeId) ?? getContentDefinition("themes", defaultContent.theme);
+  const dungeon = ensureCorridorPassages(template.dungeon);
+  const leader = partyMembers[0] ?? previousState?.fighters?.hero;
+  const partyDifficulty = {
+    ...(leader ?? {}),
+    level: averagePartyLevel({ level: leader?.level ?? 1 }),
+    partySize: partyMembers.length,
+  };
+  const objects = (template.objects ?? []).map(createCustomDungeonObject).filter(Boolean);
+  const monsters = createCustomDungeonMonsters(template, dungeon, partyDifficulty);
+  const blockedKeys = new Set(objects.filter(objectBlocksMovement).flatMap(objectCells).map(positionKey));
+  const positions = dungeonStartPositions(dungeon, partyMembers.length, blockedKeys);
+  const partyIds = new Set(partyMembers.map((hero) => hero.id));
+  const previousRosterIds = previousState?.party?.rosterIds ?? partyMembers.map((hero) => hero.id);
+  const previousRoster = previousRosterIds.map((id) => previousState?.fighters?.[id]).filter(Boolean);
+  const heroes = {};
+  partyMembers.forEach((hero, index) => {
+    const position = positions[index] ?? dungeon.startPosition;
+    refreshItemChargesForFighter(hero, "newDungeon");
+    heroes[hero.id] = refreshDerivedStats({
+      ...hero,
+      position: { ...position },
+      hp: hero.maxHp,
+      hitDiceRemaining: hero.level ?? 1,
+      movementLeft: Math.floor(hero.speedFeet / feetPerSquare),
+      hasAction: true,
+      hasBonusAction: true,
+      alive: true,
+    });
+    resetFighterAbilityUses(heroes[hero.id]);
+  });
+  previousRoster
+    .filter((hero) => !partyIds.has(hero.id))
+    .forEach((hero) => {
+      heroes[hero.id] = {
+        ...hero,
+        position: { x: -1, y: -1 },
+        alive: false,
+      };
+    });
+
+  return {
+    themeId: template.themeId ?? defaultContent.theme,
+    customDungeonId: template.id,
+    campaignId: template.campaignId ?? null,
+    campaignIndex: template.campaignIndex ?? null,
+    customDungeon: {
+      id: template.id,
+      name: template.name,
+      goal: template.goal ?? { type: "reachExit" },
+      monsterSummary: customDungeonMonsterSummary(monsters),
+      intro: template.intro ?? { text: "", images: [] },
+      outro: template.outro ?? { text: "", images: [] },
+    },
+    combatStarted: false,
+    mode: "exploration",
+    round: 0,
+    activeIndex: 0,
+    initiative: [],
+    room: {
+      id: dungeon.id,
+      name: template.name,
+      gridSize: dungeon.gridSize,
+      tileSizePx,
+    },
+    dungeon,
+    exploration: {
+      discoveredRoomIds: [dungeon.entranceRoomId],
+      openedDoorKeys: [],
+      openedCorridorKeys: [],
+    },
+    exit: template.exit,
+    completed: false,
+    d20Mode: normalizeD20Mode(previousState?.d20Mode),
+    d20FailureStreak: previousState?.d20FailureStreak ?? 0,
+    shortRestsUsed: 0,
+    shortRestLimit: theme?.rest?.shortRestLimit ?? 3,
+    chest: previousState?.chest ?? [],
+    chestMoney: normalizeMoney(previousState?.chestMoney ?? {}),
+    campaignProgress: cloneData(previousState?.campaignProgress ?? {}),
+    lootPiles: [],
+    dungeonObjects: objects,
+    party: {
+      activeHeroId: partyMembers[0]?.id ?? "hero",
+      heroIds: partyMembers.map((hero) => hero.id).slice(0, 4),
+      rosterIds: previousRosterIds,
+    },
+    saveSlotId: previousState?.saveSlotId ?? activeSaveSlot,
+    fighters: {
+      ...heroes,
+      ...monsters,
+    },
+    log: [
+      {
+        text: `${partyMembers.map((hero) => hero.name).join(", ")} enter ${template.name}.`,
+        type: "important",
+      },
+    ],
+  };
+}
+
+function createCustomDungeonStateForParty(partyMembers, previousState, customDungeonId) {
+  return createCustomDungeonStateFromTemplate(partyMembers, previousState, window.DungeonCustom?.get(customDungeonId));
 }
 
 function homeHeroPositions(heroIds) {
@@ -235,6 +423,7 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
     shortRestLimit: 3,
     chest,
     chestMoney: normalizeMoney(chestMoney),
+    campaignProgress: cloneData(partyData?.campaignProgress ?? {}),
     lootPiles: [],
     dungeonObjects: [],
     party: {
@@ -843,6 +1032,18 @@ function skillCheckBonus(fighter, ability, skillId) {
   return abilityMod(fighter, ability) + prof + expert;
 }
 
+function thievesToolsTraining(fighter) {
+  const expertTools = new Set(fighter?.expertiseTools ?? []);
+  const proficientTools = new Set(fighter?.toolProficiencies ?? []);
+  if (expertTools.has("thieves-tools") || fighter?.classId === "rogue") return 2;
+  if (proficientTools.has("thieves-tools") || ["bard", "ranger"].includes(fighter?.classId)) return 1;
+  return 0;
+}
+
+function thievesToolsCheckBonus(fighter) {
+  return abilityMod(fighter, "dex") + thievesToolsTraining(fighter) * proficiencyBonus(fighter);
+}
+
 function firstSubraceId(raceId) {
   return Object.keys(speciesDefinitions[raceId]?.subraces ?? {})[0] ?? "";
 }
@@ -989,6 +1190,11 @@ function applyHeroCreationOptions(template, options = {}) {
     armorProficiencies: proficiencyEntries([...(settings.armorProficiencies ?? []), ...raceTraits.armorProficiencies]),
     skillProficiencies: uniqueValues([...(settings.skillProficiencies ?? []), ...raceTraits.skillProficiencies]),
     expertiseSkills: settings.expertiseSkills ?? (["rogue", "bard"].includes(classId) ? uniqueValues([...(settings.skillProficiencies ?? []), ...raceTraits.skillProficiencies]).slice(0, 2) : []),
+    toolProficiencies: uniqueValues([
+      ...(settings.toolProficiencies ?? []),
+      ...(["rogue", "bard", "ranger"].includes(classId) ? ["thieves-tools"] : []),
+    ]),
+    expertiseTools: uniqueValues([...(settings.expertiseTools ?? []), ...(classId === "rogue" ? ["thieves-tools"] : [])]),
     abilityScores,
     abilityMods,
     baseAttackAbilityMod: template.abilityMods?.str ?? 0,
@@ -1334,7 +1540,6 @@ function objectCanInspect(object) {
   return Boolean(
     template.inspectable ||
       objectHasComponent(object, "hiddenLoot") ||
-      objectHasComponent(object, "definedLootContainer") ||
       objectHasComponent(object, "ambushOnInspect") ||
       objectHasComponent(object, "harvestableResource") ||
       objectHasComponent(object, "interactableToggle") ||
@@ -1519,6 +1724,12 @@ function createFeatureObject(type, position, id, themeId = currentThemeId()) {
   };
   const lootComponent = objectComponent(type, "definedLootContainer");
   if (lootComponent) object.items = rollFeatureLoot(lootComponent, "object");
+
+  const lockComponent = objectComponent(type, "lock");
+  if (lockComponent) {
+    object.lockDc = lockComponent.dc ?? 12;
+    object.locked = Math.random() < (lockComponent.chance ?? 0.5);
+  }
 
   const trapComponent = objectComponent(type, "trap");
   if (trapComponent) {
@@ -2665,6 +2876,7 @@ function normalizeLoadedState(loadedState) {
     shortRestLimit: loadedState.shortRestLimit ?? 3,
     chest: Array.isArray(loadedState.chest) ? loadedState.chest.map(normalizeItem) : [],
     chestMoney: normalizeMoney(loadedState.chestMoney ?? {}),
+    campaignProgress: cloneData(loadedState.campaignProgress ?? freshState.campaignProgress ?? {}),
     lootPiles: Array.isArray(loadedState.lootPiles) ? loadedState.lootPiles : [],
     dungeonObjects: Array.isArray(loadedState.dungeonObjects) ? loadedState.dungeonObjects : [],
     log: Array.isArray(loadedState.log) ? loadedState.log : [],

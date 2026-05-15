@@ -11,5 +11,9 @@ build/
 
 # Logs and local env files
 *.log
+.edge-profile/
+debug-edge.js
+edge-dom.txt
+edge-log.txt
 .env
 .env.*

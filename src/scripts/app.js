@@ -88,6 +88,17 @@ els.heroCard.addEventListener("contextmenu", (event) => {
 els.newGame.addEventListener("click", () => {
   showMainMenu();
 });
+els.showDungeonIntro?.addEventListener("click", () => {
+  const intro = state.customDungeon?.intro;
+  if (!intro?.text && !(intro?.images ?? []).length) return;
+  void showDungeonStoryDialog({
+    title: state.customDungeon?.name ?? state.room.name,
+    text: intro.text,
+    images: intro.images,
+    actionLabel: "Close",
+    goalText: customGoalStatus().text,
+  });
+});
 els.tutorial.addEventListener("click", showTutorial);
 els.mainTutorial?.addEventListener("click", startInteractiveTutorial);
 els.tutorialTourBack?.addEventListener("click", () => {
@@ -186,6 +197,9 @@ els.fighterInfo.addEventListener("click", (event) => {
   if (button.dataset.action === "take-object-item") {
     takeObjectItem(button.dataset.object, button.dataset.item);
   }
+  if (button.dataset.action === "pick-lock") {
+    pickObjectLock(button.dataset.object);
+  }
   if (button.dataset.action === "disarm-trap") {
     disarmTrap(button.dataset.object);
   }
@@ -227,6 +241,11 @@ els.fighterInfo.addEventListener("click", (event) => {
   if (button.dataset.action === "make-main-hero") {
     makeMainHero(button.dataset.hero);
   }
+  if (button.dataset.action === "toggle-inspect-admin") {
+    const details = button.closest(".fighter-info-body")?.querySelector(".inspect-admin-details");
+    details?.classList.toggle("hidden");
+    button.classList.toggle("active", !details?.classList.contains("hidden"));
+  }
 });
 els.fighterInfo.addEventListener("change", (event) => {
   const d20Select = event.target.closest("select[data-action='d20-mode']");
@@ -247,6 +266,8 @@ els.closeAbilities.addEventListener("click", hideAbilitiesMenu);
 els.closeHomeMenu.addEventListener("click", hideHomeMenu);
 els.closeStore.addEventListener("click", hideStoreMenu);
 els.goStore.addEventListener("click", showStoreMenu);
+els.goBarrowCrown?.addEventListener("click", () => void startCampaignDungeon("barrow-crown"));
+els.goThornwoodPact?.addEventListener("click", () => void startCampaignDungeon("thornwood-pact"));
 els.goNewDungeon.addEventListener("click", startNewDungeonWithHero);
 els.levelUp.addEventListener("click", levelUpHero);
 els.storeMenu.addEventListener("click", (event) => {

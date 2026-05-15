@@ -27,9 +27,9 @@ window.DungeonContent.register("classes", "druid", {
   spells: [],
   token: "D",
   classFeatures: [
-    { level: 1, name: "Spellcasting" },
-    { level: 2, name: "Wild Shape" },
-    { level: 18, name: "Beast Spells" },
+    { level: 1, name: "Spellcasting", description: "You can shape class magic into prepared or known spells." },
+    { level: 2, name: "Wild Shape", description: "Transform into beasts for exploration and combat utility." },
+    { level: 18, name: "Beast Spells", description: "Cast many spells even while transformed by Wild Shape." },
   ],
   abilities: [
     { id: "wildShape", name: "Wild Shape", level: 2, refresh: "shortRest", uses: 2, resourcePool: "wildShape", resource: "bonusAction", description: "Take a combat beast stance for temporary HP and melee pressure." },

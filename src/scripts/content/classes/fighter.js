@@ -20,10 +20,10 @@ window.DungeonContent.register("classes", "fighter", {
   weaponProficiencies: ["simple", "martial"],
   token: "M",
   classFeatures: [
-    { level: 1, name: "Second Wind" },
-    { level: 2, name: "Action Surge" },
-    { level: 5, name: "Extra Attack" },
-    { level: 9, name: "Indomitable" },
+    { level: 1, name: "Second Wind", description: "Draw on your reserves to restore your own hit points." },
+    { level: 2, name: "Action Surge", description: "Push beyond normal limits to take an additional action." },
+    { level: 5, name: "Extra Attack", description: "Attack more than once when you take the Attack action." },
+    { level: 9, name: "Indomitable", description: "Reroll a failed saving throw through sheer resolve." },
   ],
   abilities: [
     {

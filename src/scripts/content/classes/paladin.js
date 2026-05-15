@@ -26,10 +26,10 @@ window.DungeonContent.register("classes", "paladin", {
   spells: [],
   token: "P",
   classFeatures: [
-    { level: 1, name: "Lay on Hands" },
-    { level: 2, name: "Divine Smite" },
-    { level: 5, name: "Extra Attack" },
-    { level: 6, name: "Aura of Protection" },
+    { level: 1, name: "Lay on Hands", description: "Use a healing pool to restore allies or purge poison and disease." },
+    { level: 2, name: "Divine Smite", description: "Spend spell power on a weapon hit to unleash radiant damage." },
+    { level: 5, name: "Extra Attack", description: "Attack more than once when you take the Attack action." },
+    { level: 6, name: "Aura of Protection", description: "Nearby allies benefit from your force of presence on saving throws." },
   ],
   abilities: [
     { id: "layOnHands", name: "Lay on Hands", level: 1, refresh: "longRest", uses: 5, resourcePool: "layOnHands", resource: "action", description: "Spend your Lay on Hands pool to heal yourself." },

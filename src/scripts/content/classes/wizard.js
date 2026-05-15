@@ -27,11 +27,11 @@ window.DungeonContent.register("classes", "wizard", {
   spells: [],
   token: "W",
   classFeatures: [
-    { level: 1, name: "Spellcasting" },
-    { level: 1, name: "Spellbook" },
-    { level: 1, name: "Arcane Recovery" },
-    { level: 18, name: "Spell Mastery" },
-    { level: 20, name: "Signature Spells" },
+    { level: 1, name: "Spellcasting", description: "You can shape class magic into prepared or known spells." },
+    { level: 1, name: "Spellbook", description: "Keep wizard spells in a written book and expand them over time." },
+    { level: 1, name: "Arcane Recovery", description: "Recover some spent magical energy after a short rest." },
+    { level: 18, name: "Spell Mastery", description: "Cast chosen low-level wizard spells without spending resources." },
+    { level: 20, name: "Signature Spells", description: "Choose favored spells that are always ready and easier to cast." },
   ],
   abilities: [
     { id: "arcaneRecovery", name: "Arcane Recovery", level: 1, refresh: "longRest", uses: 1, resourcePool: "arcaneRecovery", resource: "none", description: "Recover spell points equal to half wizard level, rounded up." },

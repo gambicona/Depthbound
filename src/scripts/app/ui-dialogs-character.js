@@ -538,6 +538,50 @@ function showChoiceDialog({ title, message, choices, actor = null }) {
   });
 }
 
+function storyImageMarkup(images = []) {
+  return images
+    .slice(0, 2)
+    .map((image) => `<img class="story-image" src="${escapeAttribute(image)}" alt="" />`)
+    .join("");
+}
+
+function customGoalStatusForTemplate(template) {
+  const goal = template?.goal;
+  if (!goal || goal.type === "reachExit") return { text: "Reach the exit." };
+  if (goal.type === "collectItem") return { text: `Collect ${getItemTemplate(goal.itemId)?.name ?? goal.itemId ?? "the required object"}.` };
+  if (goal.type === "killBoss") return { text: "Defeat the boss monster." };
+  if (goal.type === "killMonsterType") {
+    const target = Math.max(1, Number(goal.count) || 1);
+    const monster = getMonsterTemplate(goal.monsterId);
+    return { text: `Defeat ${target} ${monster?.name ?? goal.monsterId ?? "chosen monster"}${target === 1 ? "" : "s"} (0/${target}).` };
+  }
+  return { text: "Complete the dungeon goal." };
+}
+
+function showDungeonStoryDialog({ title, text = "", images = [], actionLabel = "Continue", goalText = "" }) {
+  return new Promise((resolve) => {
+    els.gameDialogTitle.textContent = title;
+    els.gameDialogMessage.innerHTML = `
+      ${storyImageMarkup(images)}
+      ${text ? `<p>${escapeHtml(text)}</p>` : ""}
+      ${goalText ? `<p class="story-goal"><b>Goal:</b> ${escapeHtml(goalText)}</p>` : ""}
+    `;
+    els.gameDialogField.classList.add("hidden");
+    els.gameDialogActions.innerHTML = `<button type="button" data-story-continue>${escapeHtml(actionLabel)}</button>`;
+    const button = els.gameDialogActions.querySelector("[data-story-continue]");
+    const cleanup = () => {
+      button.removeEventListener("click", cleanup);
+      els.gameDialog.classList.add("hidden");
+      activeDialogCancel = null;
+      resolve(true);
+    };
+    button.addEventListener("click", cleanup);
+    activeDialogCancel = cleanup;
+    els.gameDialog.classList.remove("hidden");
+    button.focus();
+  });
+}
+
 function showReactionPrompt({ actor = null, title = "Reaction", message = "", acceptLabel = "Use Reaction", declineLabel = "Skip" } = {}) {
   return new Promise((resolve) => {
     const existing = document.querySelector(".reaction-prompt");
@@ -1436,7 +1480,7 @@ function switchInteractiveTutorialScene(scene) {
   const chestMoney = state.chestMoney ?? {};
   const party = state.party;
   if (scene === "home") {
-    state = createHomeState(heroes, chest, chestMoney, party);
+    state = createHomeState(heroes, chest, chestMoney, { ...party, campaignProgress: loadedState.campaignProgress ?? {} });
     state.isTutorial = true;
     state.tutorialScene = "home";
     selectedHeroIds = new Set([state.party.activeHeroId]);
@@ -1863,7 +1907,8 @@ async function startNewAdventure() {
   heroOptions.tokenArt = chosenTokenArt;
   heroOptions.raceSelection = raceSelection;
   showDungeonLayout = false;
-  state = createInitialState(chosenName, null, heroOptions);
+  const initialDungeonState = createInitialState(chosenName, null, heroOptions);
+  state = createHomeState([initialDungeonState.fighters.hero], [], { cp: 0, sp: 0, gp: 0 }, initialDungeonState.party);
   state.saveSlotId = slotId;
   activeSaveSlot = slotId;
   await saveAdventure(slotId, { skipOverwriteWarning: true });
@@ -1885,13 +1930,22 @@ function availableDungeonThemes() {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-async function chooseDungeonThemeId() {
+function availableCustomDungeons() {
+  return window.DungeonCustom?.list?.() ?? [];
+}
+
+async function chooseDungeonChoice() {
   const themes = availableDungeonThemes();
-  if (themes.length <= 1) return themes[0]?.id ?? defaultContent.theme;
+  const customDungeons = availableCustomDungeons();
+  const choices = [
+    ...themes.map((theme) => ({ value: `theme:${theme.id}`, label: theme.name })),
+    ...customDungeons.map((dungeon) => ({ value: `custom:${dungeon.id}`, label: `Custom: ${dungeon.name}` })),
+  ];
+  if (choices.length <= 1) return choices[0]?.value ?? `theme:${defaultContent.theme}`;
   return showChoiceDialog({
     title: "Choose Dungeon",
     message: "Where do you want to venture next?",
-    choices: themes.map((theme) => ({ value: theme.id, label: theme.name })),
+    choices,
   });
 }
 
@@ -1903,9 +1957,30 @@ async function startNewDungeonWithHero() {
     render();
     return;
   }
-  const themeId = await chooseDungeonThemeId();
-  if (!themeId) return;
-  state = createDungeonStateForParty(partyMembers, state, themeId);
+  const choice = await chooseDungeonChoice();
+  if (!choice) return;
+  const previousState = state;
+  const customTemplate = choice.startsWith("custom:") ? window.DungeonCustom?.get(choice.slice("custom:".length)) : null;
+  if (customTemplate?.intro?.text || customTemplate?.intro?.images?.length) {
+    await showDungeonStoryDialog({
+      title: customTemplate.name,
+      text: customTemplate.intro.text,
+      images: customTemplate.intro.images,
+      actionLabel: `Venture into the ${customTemplate.name}`,
+      goalText: customGoalStatusForTemplate(customTemplate).text,
+    });
+  }
+  if (choice.startsWith("custom:")) {
+    state = createCustomDungeonStateForParty(partyMembers, state, choice.slice("custom:".length));
+  } else {
+    state = createDungeonStateForParty(partyMembers, state, choice.replace(/^theme:/, ""));
+  }
+  if (!state) {
+    state = previousState;
+    addLog("That custom dungeon could not be loaded.", "important");
+    render();
+    return;
+  }
   try {
     await saveQuickstart(state);
   } catch (error) {
@@ -1913,7 +1988,74 @@ async function startNewDungeonWithHero() {
   }
   roomIsBuilt = false;
   hideHomeMenu();
-  addLog(`${partyMembers.map((hero) => hero.name).join(", ")} leave home for ${getContentDefinition("themes", themeId)?.name ?? "a new dungeon"}.`, "important");
+  addLog(`${partyMembers.map((hero) => hero.name).join(", ")} leave home for ${state.customDungeon?.name ?? getContentDefinition("themes", state.themeId)?.name ?? "a new dungeon"}.`, "important");
+  render();
+  centerViewOnHero();
+}
+
+async function showCampaignMenu(campaignId) {
+  const campaign = window.DungeonCampaigns?.get(campaignId);
+  if (!campaign) return;
+  const completed = state.campaignProgress?.[campaign.id] ?? 0;
+  const entries = await Promise.all(Array.from({ length: campaign.count }, (_, index) => window.DungeonCampaigns.dungeon(campaign.id, index + 1)));
+  return new Promise((resolve) => {
+    els.gameDialogTitle.textContent = campaign.name;
+    els.gameDialogMessage.textContent = campaign.description;
+    els.gameDialogField.classList.add("hidden");
+    els.gameDialogActions.innerHTML = entries
+      .map((entry, index) => {
+        const number = index + 1;
+        const unlocked = number <= completed + 1;
+        return `<button type="button" data-campaign-dungeon="${number}" ${unlocked ? "" : "disabled"}>${number}. ${escapeHtml(entry?.name ?? `Dungeon ${number}`)}${number <= completed ? " ✓" : unlocked ? "" : " 🔒"}</button>`;
+      })
+      .join("");
+    const cleanup = (value) => {
+      els.gameDialogActions.removeEventListener("click", handleClick);
+      els.gameDialog.classList.add("hidden");
+      activeDialogCancel = null;
+      resolve(value);
+    };
+    const handleClick = (event) => {
+      const button = event.target.closest("[data-campaign-dungeon]");
+      if (!button || button.disabled) return;
+      cleanup(Number(button.dataset.campaignDungeon));
+    };
+    els.gameDialogActions.addEventListener("click", handleClick);
+    activeDialogCancel = () => cleanup(null);
+    els.gameDialog.classList.remove("hidden");
+  });
+}
+
+async function startCampaignDungeon(campaignId) {
+  const dungeonIndex = await showCampaignMenu(campaignId);
+  if (!dungeonIndex) return;
+  const template = await window.DungeonCampaigns?.dungeon(campaignId, dungeonIndex);
+  if (!template) return;
+  const partyIds = state.party?.heroIds ?? ["hero"];
+  const partyMembers = partyIds.map((id) => state.fighters[id]).filter((hero) => hero && !hero.dead);
+  if (template.intro?.text || template.intro?.images?.length) {
+    await showDungeonStoryDialog({
+      title: template.name,
+      text: template.intro.text,
+      images: template.intro.images,
+      actionLabel: `Venture into the ${template.name}`,
+      goalText: customGoalStatusForTemplate(template).text,
+    });
+  }
+  const previousState = state;
+  state = createCustomDungeonStateFromTemplate(partyMembers, state, template);
+  if (!state) {
+    state = previousState;
+    return;
+  }
+  try {
+    await saveQuickstart(state);
+  } catch (error) {
+    updateSaveStatus(error?.message ?? "Could not write the dungeon restart save.");
+  }
+  roomIsBuilt = false;
+  hideHomeMenu();
+  addLog(`${partyMembers.map((hero) => hero.name).join(", ")} leave home for ${template.name}.`, "important");
   render();
   centerViewOnHero();
 }
@@ -1941,7 +2083,7 @@ async function returnHomeEarly() {
   addMoney(hero.inventory.money, -lostCoins);
 
   const saveSlotId = state.saveSlotId ?? activeSaveSlot;
-  state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, state.party);
+  state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, { ...state.party, campaignProgress: state.campaignProgress ?? {} });
   state.saveSlotId = saveSlotId;
   roomIsBuilt = false;
   const lostItemText = lostItems.length ? lostItems.map((item) => item.name).join(", ") : "no items";

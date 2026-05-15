@@ -91,6 +91,22 @@ button:disabled {
   opacity: 0.45;
 }
 
+.button-link,
+.menu-actions a,
+.creator-topbar a {
+  align-items: center;
+  border: 1px solid #7c5738;
+  border-radius: 8px;
+  color: #fff1d7;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  text-decoration: none;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;
@@ -124,6 +140,12 @@ button:disabled {
   gap: 16px;
   justify-content: space-between;
   padding: 22px 24px 14px;
+}
+
+.dungeon-intro-button {
+  margin-top: 6px;
+  min-height: 28px;
+  padding: 4px 10px;
 }
 
 .eyebrow {
@@ -940,7 +962,8 @@ h1 {
   font-weight: 900;
   height: var(--token-size);
   justify-content: center;
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: auto;
   position: absolute;
   transform: translate(-50%, -50%);
   transition: left var(--token-slide-ms) ease, top var(--token-slide-ms) ease, opacity 200ms ease;
@@ -1355,6 +1378,56 @@ h1 {
   display: grid;
   gap: 14px;
   padding: 14px;
+  position: relative;
+}
+
+.player-stat-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.inspect-section {
+  display: grid;
+  gap: 8px;
+}
+
+.inspect-section h3 {
+  margin: 0;
+}
+
+.inspect-section p {
+  margin: 0;
+}
+
+.inspect-admin-toggle {
+  align-items: center;
+  background: linear-gradient(180deg, #9d4b48, #6d2c2d);
+  border-color: rgba(214, 93, 74, 0.8);
+  border-radius: 999px;
+  bottom: 12px;
+  color: #ffe5df;
+  display: inline-flex;
+  font-style: italic;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0;
+  position: sticky;
+  justify-self: end;
+  width: 28px;
+}
+
+.inspect-admin-toggle.active {
+  box-shadow: 0 0 0 2px rgba(214, 93, 74, 0.32);
+}
+
+.inspect-admin-details {
+  border-top: 1px solid rgba(214, 93, 74, 0.34);
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.furniture-inspect-art img {
+  object-fit: contain;
 }
 
 .inventory-stats {
@@ -2262,7 +2335,24 @@ h1 {
 }
 
 .home-actions {
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1fr;
+}
+
+.home-actions hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 0;
+  width: 100%;
+}
+
+.home-actions button {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.home-actions small {
+  color: var(--gold);
 }
 
 .store-wallet {
@@ -2552,8 +2642,21 @@ h1 {
 
   .slot-ring-one,
   .slot-ring-two {
-    margin: 0;
-  }
+  margin: 0;
+}
+
+.story-image {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: block;
+  max-height: 180px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.story-goal {
+  color: var(--accent);
+}
 }
 
 .token.monster-token {

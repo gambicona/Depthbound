@@ -14,6 +14,7 @@
         <div class="menu-actions">
           <button id="start-adventure" type="button">Start New Adventure</button>
           <button id="choose-save-folder" class="ghost-button" type="button">Choose Save Folder</button>
+          <a class="ghost-button" href="dungeon-creator.html">Dungeon Creator</a>
           <button id="main-tutorial" class="ghost-button" type="button">Tutorial</button>
         </div>
         <div id="save-slots" class="save-slots" aria-label="Save slots"></div>
@@ -27,6 +28,7 @@
           <div>
             <p class="eyebrow">Depthbound</p>
             <h1 id="room-title">Old Guardroom</h1>
+            <button id="show-dungeon-intro" class="ghost-button dungeon-intro-button hidden" type="button">Intro</button>
           </div>
           <div class="top-actions">
             <div class="zoom-controls" aria-label="Dungeon zoom controls">
@@ -157,8 +159,12 @@
           <button id="close-home-menu" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
         </div>
         <div class="fighter-info-body home-actions">
-          <button id="go-store" type="button">Store</button>
-          <button id="go-new-dungeon" type="button">New Dungeon</button>
+          <button id="go-store" type="button">General Merchant</button>
+          <hr />
+          <button id="go-new-dungeon" type="button">Random Dungeon</button>
+          <hr />
+          <button id="go-barrow-crown" type="button"><span>The Barrow Crown</span><small data-campaign-progress>0/7</small></button>
+          <button id="go-thornwood-pact" type="button"><span>The Thornwood Pact</span><small data-campaign-progress>0/8</small></button>
         </div>
       </div>
     </div>
@@ -235,6 +241,8 @@
     <script src="src/scripts/dice.js" defer></script>
     <script src="src/scripts/grid.js" defer></script>
     <script src="src/scripts/dungeon.js" defer></script>
+    <script src="src/scripts/custom-dungeons.js" defer></script>
+    <script src="src/scripts/campaigns.js" defer></script>
     <script src="src/scripts/save.js" defer></script>
     <script src="src/scripts/app/bootstrap.js" defer></script>
     <script src="src/scripts/app/game-state.js" defer></script>

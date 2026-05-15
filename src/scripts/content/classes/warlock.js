@@ -27,12 +27,12 @@ window.DungeonContent.register("classes", "warlock", {
   spells: [],
   token: "Wk",
   classFeatures: [
-    { level: 1, name: "Pact Magic" },
-    { level: 1, name: "Eldritch Blast" },
-    { level: 2, name: "Eldritch Invocations" },
-    { level: 3, name: "Pact Boon" },
-    { level: 11, name: "Mystic Arcanum" },
-    { level: 20, name: "Eldritch Master" },
+    { level: 1, name: "Pact Magic", description: "Cast warlock spells through pact-granted power that refreshes quickly." },
+    { level: 1, name: "Eldritch Blast", description: "Hurl a signature beam of force at your enemies." },
+    { level: 2, name: "Eldritch Invocations", description: "Learn occult gifts that reshape your warlock talents." },
+    { level: 3, name: "Pact Boon", description: "Receive a defining gift from your patron." },
+    { level: 11, name: "Mystic Arcanum", description: "Learn a powerful high-level spell you can invoke once each day." },
+    { level: 20, name: "Eldritch Master", description: "Restore pact magic through a brief appeal to your patron." },
   ],
   abilities: [
     { id: "eldritchMaster", name: "Eldritch Master", level: 20, refresh: "longRest", uses: 1, resource: "action", description: "Restore pact spell points." },

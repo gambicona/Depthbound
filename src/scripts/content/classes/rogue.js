@@ -20,11 +20,11 @@ window.DungeonContent.register("classes", "rogue", {
   weaponProficiencies: ["simple", "crossbow-hand", "longsword", "rapier", "shortsword"],
   token: "G",
   classFeatures: [
-    { level: 1, name: "Sneak Attack" },
-    { level: 2, name: "Cunning Action" },
-    { level: 5, name: "Uncanny Dodge" },
-    { level: 7, name: "Evasion" },
-    { level: 11, name: "Reliable Talent" },
+    { level: 1, name: "Sneak Attack", description: "Deal extra damage when you strike with precision at the right opening." },
+    { level: 2, name: "Cunning Action", description: "Use quick bonus actions to Dash, Disengage, or Hide." },
+    { level: 5, name: "Uncanny Dodge", description: "Use your reaction to halve damage from an attack you can see." },
+    { level: 7, name: "Evasion", description: "Slip through dangerous effects, taking less or no damage on Dexterity saves." },
+    { level: 11, name: "Reliable Talent", description: "Treat poor proficient skill rolls as competent results." },
   ],
   abilities: [
     { id: "cunningActionDash", name: "Cunning Action: Dash", level: 2, refresh: "turn", uses: 1, resource: "bonusAction", description: "Dash as a quick action." },

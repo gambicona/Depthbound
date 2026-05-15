@@ -20,12 +20,12 @@ window.DungeonContent.register("classes", "monk", {
   weaponProficiencies: ["simple", "shortsword"],
   token: "K",
   classFeatures: [
-    { level: 1, name: "Martial Arts" },
-    { level: 2, name: "Ki" },
-    { level: 2, name: "Unarmored Movement" },
-    { level: 5, name: "Extra Attack" },
-    { level: 5, name: "Stunning Strike" },
-    { level: 20, name: "Perfect Self" },
+    { level: 1, name: "Martial Arts", description: "Fight effectively with unarmed strikes and monk weapons." },
+    { level: 2, name: "Ki", description: "Spend inner energy on special martial techniques." },
+    { level: 2, name: "Unarmored Movement", description: "Move faster while unarmored and unshielded." },
+    { level: 5, name: "Extra Attack", description: "Attack more than once when you take the Attack action." },
+    { level: 5, name: "Stunning Strike", description: "Channel ki through a hit to try to stun a foe." },
+    { level: 20, name: "Perfect Self", description: "Recover a little ki when you begin a fight empty." },
   ],
   abilities: [
     { id: "flurryOfBlows", name: "Flurry of Blows", level: 2, refresh: "shortRest", uses: 2, resourcePool: "ki", resource: "bonusAction", description: "Spend 1 ki to make a quick unarmed strike." },

@@ -211,10 +211,12 @@ async function moveFightersAlongPathsTogether(plans) {
   const stoppedBeforeTrap = new Set();
   for (let stepIndex = 0; stepIndex < maxLength; stepIndex += 1) {
     for (const plan of activePlans) {
+      if (plan.stoppedBeforeTrap) continue;
       const step = plan.path[stepIndex];
       if (!step || !plan.hero.alive) continue;
       const stepKey = positionKey(step);
       if (blockedTrapKeys.has(stepKey)) {
+        plan.stoppedBeforeTrap = true;
         stoppedBeforeTrap.add(plan.hero.id);
         continue;
       }

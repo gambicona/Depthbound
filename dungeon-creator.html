@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Depthbound Dungeon Creator</title>
+    <link rel="stylesheet" href="src/styles/main.css" />
+    <style>
+      body {
+        overflow: hidden;
+      }
+
+      .creator-shell {
+        background: var(--bg);
+        color: var(--text);
+        display: grid;
+        grid-template-columns: 320px minmax(0, 1fr) 360px;
+        height: 100vh;
+      }
+
+      .creator-panel {
+        background: var(--panel);
+        border-right: 1px solid var(--line);
+        min-height: 0;
+        overflow: auto;
+        padding: 14px;
+      }
+
+      .creator-panel.right {
+        border-left: 1px solid var(--line);
+        border-right: 0;
+      }
+
+      .creator-stage {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+      }
+
+      .creator-topbar {
+        align-items: center;
+        background: var(--panel2);
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+        padding: 10px 14px;
+      }
+
+      .creator-topbar h1 {
+        font-size: 1rem;
+        margin: 0;
+      }
+
+      .creator-grid-wrap {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        padding: 18px;
+      }
+
+      .creator-grid {
+        background: #08090b;
+        border: 1px solid var(--line);
+        display: grid;
+        gap: 1px;
+        width: max-content;
+      }
+
+      .creator-cell {
+        align-items: center;
+        background: #111317;
+        border: 0;
+        color: var(--muted);
+        display: flex;
+        font-size: 0.58rem;
+        font-weight: 900;
+        height: 22px;
+        justify-content: center;
+        min-height: 22px;
+        padding: 0;
+        position: relative;
+        width: 22px;
+      }
+
+      .creator-cell.axis-x::before,
+      .creator-cell.axis-y::after {
+        color: rgba(255, 255, 255, 0.42);
+        font-size: 0.46rem;
+        font-weight: 800;
+        position: absolute;
+      }
+
+      .creator-cell.axis-x::before {
+        content: attr(data-axis-x);
+        top: 1px;
+      }
+
+      .creator-cell.axis-y::after {
+        content: attr(data-axis-y);
+        left: 1px;
+        bottom: 1px;
+      }
+
+      .creator-cell.room {
+        background: #2d2928;
+      }
+
+      .creator-cell.corridor {
+        background: #1f2425;
+      }
+
+      .creator-cell.door {
+        box-shadow: inset 0 0 0 2px rgba(215, 168, 79, 0.72);
+      }
+
+      .creator-cell.exit {
+        background: #315d3a;
+      }
+
+      .creator-cell.portal {
+        background: #25315f;
+      }
+
+      .creator-cell.selected-room {
+        outline: 2px solid var(--accent);
+        outline-offset: -2px;
+      }
+
+      .room-move-controls {
+        display: grid;
+        gap: 6px;
+        grid-template-columns: repeat(3, 1fr);
+        margin-top: 8px;
+      }
+
+      .room-move-controls button {
+        min-height: 32px;
+        padding: 4px 6px;
+      }
+
+      .creator-cell:hover {
+        filter: brightness(1.25);
+      }
+
+      .creator-form,
+      .creator-section {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+
+      .creator-form label,
+      .creator-section label {
+        color: var(--muted);
+        display: grid;
+        font-size: 0.78rem;
+        font-weight: 800;
+        gap: 4px;
+      }
+
+      .creator-form input,
+      .creator-form select,
+      .creator-form textarea,
+      .creator-section input,
+      .creator-section select,
+      .creator-section textarea {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--text);
+        padding: 7px 8px;
+      }
+
+      .creator-form textarea,
+      .creator-section textarea {
+        min-height: 110px;
+        resize: vertical;
+      }
+
+      .creator-row {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .tool-grid {
+        display: grid;
+        gap: 6px;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .tool-grid button.active {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent);
+      }
+
+      .catalogue {
+        display: grid;
+        gap: 6px;
+        max-height: 220px;
+        overflow: auto;
+      }
+
+      .catalogue button {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--text);
+        padding: 7px 8px;
+        text-align: left;
+      }
+
+      .catalogue button.active {
+        border-color: var(--accent);
+      }
+
+      .selected-card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px;
+      }
+
+      .small-note {
+        color: var(--muted);
+        font-size: 0.78rem;
+        line-height: 1.35;
+      }
+
+      .creator-list {
+        display: grid;
+        gap: 7px;
+      }
+
+      .creator-list-item {
+        align-items: center;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        display: grid;
+        gap: 6px;
+        grid-template-columns: 1fr auto;
+        padding: 8px;
+      }
+
+      .creator-status {
+        color: var(--accent);
+        font-size: 0.78rem;
+        min-height: 1.2em;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="creator-shell">
+      <aside class="creator-panel">
+        <section class="creator-section">
+          <h2>Dungeon</h2>
+          <label>
+            Name
+            <input id="creator-name" value="Custom Dungeon" />
+          </label>
+          <label>
+            Theme
+            <select id="creator-theme"></select>
+          </label>
+          <label>
+            Grid size
+            <input id="creator-grid-size" type="number" min="16" max="72" value="36" />
+          </label>
+          <button id="new-dungeon" type="button">New Blank Dungeon</button>
+        </section>
+
+        <section class="creator-section">
+          <h2>Tools</h2>
+          <div class="tool-grid" id="tool-grid">
+            <button type="button" data-tool="select">Select</button>
+            <button type="button" data-tool="connect">Connect Rooms</button>
+            <button type="button" data-tool="hallway">Draw Hallway</button>
+            <button type="button" data-tool="furniture">Place Furniture</button>
+            <button type="button" data-tool="trap">Place Trap</button>
+            <button type="button" data-tool="monster">Place Monster</button>
+            <button type="button" data-tool="exit">Set Exit</button>
+            <button type="button" data-tool="portal">Linked Portals</button>
+            <button type="button" data-tool="erase">Erase</button>
+          </div>
+          <p class="small-note">Rooms are added with coordinates below. Use Connect Rooms, then click two rooms to carve a hallway.</p>
+        </section>
+
+        <section class="creator-section">
+          <h2>Add Room</h2>
+          <div class="creator-row">
+            <label>X <input id="room-x" type="number" value="3" /></label>
+            <label>Y <input id="room-y" type="number" value="3" /></label>
+          </div>
+          <div class="creator-row">
+            <label>Width <input id="room-w" type="number" min="3" value="7" /></label>
+            <label>Height <input id="room-h" type="number" min="3" value="6" /></label>
+          </div>
+          <label>
+            Room name
+            <input id="room-name" value="Dungeon Room" />
+          </label>
+          <button id="add-room" type="button">Add Room</button>
+        </section>
+
+        <section class="creator-section">
+          <h2>Goal</h2>
+          <label>
+            Completion condition
+            <select id="goal-type">
+              <option value="reachExit">Reach the exit</option>
+              <option value="collectItem">Collect specific item</option>
+              <option value="killBoss">Kill boss monster</option>
+              <option value="killMonsterType">Kill X monsters of a type</option>
+              <option value="escortNpc">Escort NPC to exit (reserved)</option>
+            </select>
+          </label>
+          <label>
+            Goal item
+            <select id="goal-item"></select>
+          </label>
+          <label>
+            Goal monster
+            <select id="goal-monster"></select>
+          </label>
+          <label>
+            Count
+            <input id="goal-count" type="number" min="1" value="1" />
+          </label>
+        </section>
+
+        <section class="creator-section">
+          <h2>Story</h2>
+          <label>
+            Intro text
+            <textarea id="intro-text" placeholder="What the party sees before entering..."></textarea>
+          </label>
+          <label>
+            Intro image URLs
+            <textarea id="intro-images" placeholder="One image URL per line"></textarea>
+          </label>
+          <label>
+            Outro text
+            <textarea id="outro-text" placeholder="What appears after victory..."></textarea>
+          </label>
+          <label>
+            Outro image URLs
+            <textarea id="outro-images" placeholder="One image URL per line"></textarea>
+          </label>
+        </section>
+      </aside>
+
+      <section class="creator-stage">
+        <div class="creator-topbar">
+          <h1>Depthbound Dungeon Creator</h1>
+          <div>
+            <a class="ghost-button" href="index.html">Open Game</a>
+            <a class="ghost-button" href="Furniture-Feature-Implementation-Notes.txt">Notes</a>
+          </div>
+        </div>
+        <div class="creator-grid-wrap">
+          <div id="creator-grid" class="creator-grid" aria-label="Dungeon creator grid"></div>
+        </div>
+      </section>
+
+      <aside class="creator-panel right">
+        <section class="creator-section">
+          <h2>Furniture Catalogue</h2>
+          <input id="furniture-search" type="search" placeholder="Search furniture" />
+          <div id="furniture-catalogue" class="catalogue"></div>
+        </section>
+
+        <section class="creator-section">
+          <h2>Monster Catalogue</h2>
+          <input id="monster-search" type="search" placeholder="Search monsters" />
+          <label>
+            <input id="monster-is-boss" type="checkbox" />
+            Place as boss
+          </label>
+          <div id="monster-catalogue" class="catalogue"></div>
+        </section>
+
+        <section class="creator-section">
+          <h2>Selected</h2>
+          <div id="selected-card" class="selected-card small-note">Nothing selected.</div>
+          <label>
+            Add loot item
+            <select id="loot-item"></select>
+          </label>
+          <button id="add-loot" type="button">Add Loot To Selected</button>
+          <button id="delete-selected" class="ghost-button" type="button">Delete Selected</button>
+        </section>
+
+        <section class="creator-section">
+          <h2>Create Dungeon Item</h2>
+          <label>
+            Template item
+            <select id="custom-item-template"></select>
+          </label>
+          <label>Name <input id="custom-item-name" /></label>
+          <label>Description <textarea id="custom-item-description"></textarea></label>
+          <div class="creator-row">
+            <label>Type <input id="custom-item-type" /></label>
+            <label>Weight lb <input id="custom-item-weight" type="number" step="0.1" /></label>
+          </div>
+          <button id="create-custom-item" type="button">Create Local Item</button>
+        </section>
+
+        <section class="creator-section">
+          <h2>Saved Custom Dungeons</h2>
+          <div id="saved-dungeons" class="creator-list"></div>
+          <button id="save-dungeon" type="button">Save Dungeon For Game</button>
+          <p id="creator-status" class="creator-status"></p>
+        </section>
+
+        <section class="creator-section">
+          <h2>Import / Export</h2>
+          <textarea id="export-json" spellcheck="false"></textarea>
+          <button id="copy-json" type="button">Refresh Export JSON</button>
+          <button id="import-json" class="ghost-button" type="button">Import JSON</button>
+        </section>
+      </aside>
+    </main>
+
+    <script src="src/scripts/config.js" defer></script>
+    <script src="src/scripts/content/registry.js" defer></script>
+    <script src="src/scripts/content/items/equipment.js" defer></script>
+    <script src="src/scripts/content/items/treasure.js" defer></script>
+    <script src="src/scripts/content/items/magic_items.js" defer></script>
+    <script src="src/scripts/content/items/magic_accessories.js" defer></script>
+    <script src="src/scripts/content/spells/core-spells.js" defer></script>
+    <script src="src/scripts/content/classes/barbarian.js" defer></script>
+    <script src="src/scripts/content/classes/fighter.js" defer></script>
+    <script src="src/scripts/content/classes/monk.js" defer></script>
+    <script src="src/scripts/content/classes/rogue.js" defer></script>
+    <script src="src/scripts/content/classes/cleric.js" defer></script>
+    <script src="src/scripts/content/classes/druid.js" defer></script>
+    <script src="src/scripts/content/classes/wizard.js" defer></script>
+    <script src="src/scripts/content/classes/bard.js" defer></script>
+    <script src="src/scripts/content/classes/sorcerer.js" defer></script>
+    <script src="src/scripts/content/classes/paladin.js" defer></script>
+    <script src="src/scripts/content/classes/ranger.js" defer></script>
+    <script src="src/scripts/content/classes/warlock.js" defer></script>
+    <script src="src/scripts/content/monsters/skeletal-undead-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/zombie-undead-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/forest-beast-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/beast-biome-pack.js" defer></script>
+    <script src="src/scripts/content/furniture/dungeon-furniture-pack.js" defer></script>
+    <script src="src/scripts/content/traps/chest-traps.js" defer></script>
+    <script src="src/scripts/content/dungeons/generated-old-guardroom.js" defer></script>
+    <script src="src/scripts/content/loot/basic-dungeon.js" defer></script>
+    <script src="src/scripts/content/themes/old-guardroom.js" defer></script>
+    <script src="src/scripts/content/themes/forest-of-the-beasts.js" defer></script>
+    <script src="src/scripts/dice.js" defer></script>
+    <script src="src/scripts/grid.js" defer></script>
+    <script src="src/scripts/dungeon.js" defer></script>
+    <script src="src/scripts/custom-dungeons.js" defer></script>
+    <script src="src/scripts/save.js" defer></script>
+    <script src="src/scripts/dungeon-creator.js" defer></script>
+  </body>
+</html>

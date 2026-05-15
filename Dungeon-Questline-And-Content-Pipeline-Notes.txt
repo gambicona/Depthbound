@@ -1,0 +1,60 @@
+Future dungeon content pipeline
+
+Current behavior:
+- Custom dungeons created in the browser are stored in localStorage.
+- Their JSON can be copied from the Dungeon Creator export textarea, then imported into another browser copy of the game.
+- Relative image paths such as assets/story/crypt-intro.png will work on GitHub Pages if the files are committed into the repo.
+
+Needed future upgrade:
+- Add a repo-backed dungeon content folder, for example:
+  src/scripts/content/custom-dungeons/
+  or a JSON-based equivalent that is loaded by the game at startup.
+- This should let authored dungeons ship with every build automatically instead of requiring manual browser import.
+
+Planned main questline system:
+- Support an ordered dungeon storyline where:
+  - Dungeon 1 is available at the beginning.
+  - Dungeon 2 unlocks only after Dungeon 1 is completed.
+  - Later dungeons unlock in sequence.
+- The Home Door / dungeon selection flow should show:
+  - available dungeons,
+  - locked dungeons,
+  - completion state,
+  - possibly story grouping / chapter labels.
+- Questline progression should persist in save data.
+
+Planned DLC / side-story structure:
+- Support multiple named dungeon storylines in the same style as the main questline.
+- Each storyline can define:
+  - id,
+  - display name,
+  - description,
+  - ordered dungeon ids,
+  - unlock rules,
+  - optional intro/outro presentation metadata.
+- Examples:
+  - main campaign,
+  - DLC campaign,
+  - faction storyline,
+  - seasonal or challenge chain.
+
+Likely data shape to explore later:
+- dungeon definition:
+  - id
+  - name
+  - intro / outro
+  - dungeon layout
+  - goal
+  - unlock metadata
+- storyline definition:
+  - id
+  - name
+  - description
+  - dungeonIds[]
+  - unlockRules
+  - sortOrder
+
+Design principle:
+- Browser-authored dungeons should be easy to prototype locally.
+- Repo-backed dungeons should be easy to publish globally.
+- Storylines should compose from dungeon ids rather than duplicating dungeon data.

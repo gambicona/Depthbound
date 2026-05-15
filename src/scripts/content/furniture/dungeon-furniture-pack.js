@@ -39,6 +39,7 @@ const C = {
     ...options,
   }),
   loot: (options = {}) => ({ type: "definedLootContainer", ...(options.items || options.item ? {} : { reward: "chestLoot" }), ...options }),
+  lock: (options = {}) => ({ type: "lock", dc: options.dc ?? 12, chance: options.chance ?? 0.5, ...options }),
   trap: (options = {}) => ({ type: "trap", ...options }),
   ambush: (options = {}) => ({ type: "ambushOnInspect", ...options }),
   hazardEnter: (options = {}) => ({ type: "hazardOnEnter", damage: { count: 1, sides: 4, type: "damage" }, ...options }),
@@ -224,9 +225,8 @@ feature("chest", "Dungeon Chest", ["container", "loot", "chest", "dungeon", "for
   symbol: "C",
   spawnChance: 0.2,
   placement: "wall-adjacent",
-  inspectable: true,
   description: "A sturdy dungeon chest placed beside a wall. It can hold treasure.",
-  components: [C.loot(), C.trap({ source: "container" })],
+  components: [C.loot(), C.lock({ dc: 12 }), C.trap({ source: "container" })],
 });
 
 feature("portal", "Paired Portal", ["portal", "magic", "arcane", "old-guardroom"], {
@@ -251,7 +251,7 @@ feature("trap", "Spike Trap", ["trap", "hazard", "floor", "spike", "piercing", "
 });
 
 [
-  ["iron-banded-chest", "Iron-Banded Chest", ["dungeon", "crypt", "ruin", "container", "loot"], { blocksMovement: true, inspectable: true, placement: "wall-adjacent", symbol: "C", components: [C.loot({ count: 3 }), C.trap({ source: "container", chance: 1, spotDc: 15 })] }],
+  ["iron-banded-chest", "Iron-Banded Chest", ["dungeon", "crypt", "ruin", "container", "loot"], { blocksMovement: true, placement: "wall-adjacent", symbol: "C", components: [C.loot({ count: 3 }), C.lock({ dc: 15 }), C.trap({ source: "container", chance: 1, spotDc: 15 })] }],
   ["stone-sarcophagus", "Stone Sarcophagus", ["dungeon", "crypt", "ruin"], { blocksMovement: true, inspectable: true, symbol: "S", components: [C.loot({ count: 1 }), C.ambush({ chance: 0.2 }), C.cover("half")] }],
   ["broken-sarcophagus", "Broken Sarcophagus", ["dungeon", "crypt", "ruin"], { blocksMovement: true, inspectable: true, symbol: "S", components: [C.hiddenLoot({ dc: 12, chance: 0.6 }), C.ambush({ chance: 0.18 })] }],
   ["offering-bowl", "Offering Bowl", ["dungeon", "crypt", "ruin", "temple"], { inspectable: true, symbol: "o", components: [C.hiddenLoot({ dc: 10, reward: "smallGold" }), C.trap({ chance: 0.15, damage: { count: 1, sides: 4, type: "necrotic" } })] }],
@@ -268,7 +268,7 @@ feature("trap", "Spike Trap", ["trap", "hazard", "floor", "spike", "piercing", "
   ["iron-maiden", "Iron Maiden", ["dungeon", "crypt"], { blocksMovement: true, blocksLineOfSight: true, inspectable: true, symbol: "I", components: [C.trap({ chance: 1 }), C.hiddenLoot({ dc: 13, chance: 0.5 })] }],
   ["cracked-statue", "Cracked Statue", ["dungeon", "crypt", "ruin", "temple"], { blocksMovement: true, blocksLineOfSight: true, inspectable: true, symbol: "S", components: [C.hiddenLoot({ dc: 14, item: "crystal-shard" }), C.hazardEnter({ damage: { count: 1, sides: 6, type: "bludgeoning" }, once: true })] }],
   ["bookshelf", "Bookshelf", ["dungeon", "ruin", "arcane", "temple"], { blocksMovement: true, inspectable: true, symbol: "B", components: [C.hiddenLoot({ dc: 12, item: "crystal-shard" }), C.ambush({ chance: 0.1 }), C.cover("half")] }],
-  ["sealed-reliquary", "Sealed Reliquary", ["dungeon", "crypt", "temple"], { blocksMovement: true, inspectable: true, placement: "wall-adjacent", symbol: "R", components: [C.loot({ count: 3 }), C.trap({ chance: 1, spotDc: 16 })] }],
+  ["sealed-reliquary", "Sealed Reliquary", ["dungeon", "crypt", "temple"], { blocksMovement: true, inspectable: true, placement: "wall-adjacent", symbol: "R", components: [C.loot({ count: 3 }), C.lock({ dc: 16, chance: 1 }), C.trap({ chance: 1, spotDc: 16 })] }],
   ["barricade", "Barricade", ["dungeon", "ruin"], { blocksMovement: true, symbol: "X", components: [C.cover("half"), C.destructible(10, 12)] }],
 ].forEach(([id, name, tags, options]) => feature(id, name, tags, { spawnChance: 0.035, ...options }));
 
@@ -349,7 +349,7 @@ feature("trap", "Spike Trap", ["trap", "hazard", "floor", "spike", "piercing", "
   ["hanging-moss", "Hanging Moss", ["swamp", "bog", "rot"], { symbol: "m", components: [C.concealment(), C.hazardEnter({ damage: { count: 1, sides: 4, type: "poison" } })] }],
   ["leech-patch", "Leech Patch", ["swamp", "bog", "rot"], { symbol: "l", components: [C.difficult, C.hazardMove({ damage: { count: 1, sides: 4, type: "necrotic" } })] }],
   ["reed-cluster", "Reed Cluster", ["swamp", "bog", "rot"], { symbol: "r", components: [C.concealment()] }],
-  ["sunken-chest", "Sunken Chest", ["swamp", "bog", "rot", "container", "loot"], { blocksMovement: true, inspectable: true, symbol: "C", components: [C.loot({ count: 2 }), C.trap({ source: "container", chance: 0.3, damage: { count: 1, sides: 4, type: "poison" } })] }],
+  ["sunken-chest", "Sunken Chest", ["swamp", "bog", "rot", "container", "loot"], { blocksMovement: true, symbol: "C", components: [C.loot({ count: 2 }), C.lock({ dc: 12 }), C.trap({ source: "container", chance: 0.3, damage: { count: 1, sides: 4, type: "poison" } })] }],
   ["floating-corpse", "Floating Corpse", ["swamp", "bog", "rot"], { inspectable: true, symbol: "c", components: [C.hiddenLoot({ dc: 12 }), C.ambush({ chance: 0.2 })] }],
   ["crocodile-nest", "Crocodile Nest", ["swamp", "bog"], { inspectable: true, symbol: "n", components: [C.hiddenLoot({ dc: 12 }), C.ambush({ chance: 0.35 })] }],
   ["witch-totem", "Witch Totem", ["swamp", "bog", "rot"], { blocksMovement: true, inspectable: true, symbol: "W", components: [C.trap({ chance: 1, damage: { count: 1, sides: 6, type: "necrotic" } }), C.hiddenLoot({ dc: 13, item: "bitter-root" })] }],

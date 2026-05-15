@@ -38,10 +38,10 @@ window.DungeonContent.register("classes", "cleric", {
   spells: [],
   token: "C",
   classFeatures: [
-    { level: 1, name: "Spellcasting" },
-    { level: 2, name: "Channel Divinity" },
-    { level: 8, name: "Blessed Strike" },
-    { level: 10, name: "Divine Intervention" },
+    { level: 1, name: "Spellcasting", description: "You can shape class magic into prepared or known spells." },
+    { level: 2, name: "Channel Divinity", description: "Call on divine power for potent sacred effects." },
+    { level: 8, name: "Blessed Strike", description: "Your attacks or cantrips carry extra divine force." },
+    { level: 10, name: "Divine Intervention", description: "Appeal directly to your deity for miraculous aid." },
   ],
   abilities: [
     { id: "channelDivinity", name: "Channel Divinity", level: 2, refresh: "shortRest", uses: 1, usesByLevel: [{ level: 6, uses: 2 }, { level: 18, uses: 3 }], resource: "action", description: "Radiant divine burst against nearby enemies." },

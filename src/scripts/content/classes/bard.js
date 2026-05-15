@@ -27,9 +27,9 @@ window.DungeonContent.register("classes", "bard", {
   spells: [],
   token: "B",
   classFeatures: [
-    { level: 1, name: "Bardic Inspiration" },
-    { level: 2, name: "Jack of All Trades" },
-    { level: 5, name: "Font of Inspiration" },
+    { level: 1, name: "Bardic Inspiration", description: "Use music or words to bolster an ally with a helpful die." },
+    { level: 2, name: "Jack of All Trades", description: "Add a little of your proficiency to ability checks you have not mastered." },
+    { level: 5, name: "Font of Inspiration", description: "Your bardic inspiration returns more often after rest." },
   ],
   abilities: [
     { id: "bardicInspiration", name: "Bardic Inspiration", level: 1, refresh: "longRest", uses: 3, resourcePool: "bardicInspiration", resource: "bonusAction", description: "Give a hero an inspiration die they can add to a missed attack or save." },

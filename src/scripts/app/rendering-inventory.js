@@ -163,6 +163,12 @@ function combatantArtworkMarkup(fighter, className = "combatant-art") {
   return `<div class="${className} empty"><span>${escapeHtml(fighter.token ?? tokenFromName(fighter.name, "M"))}</span></div>`;
 }
 
+function furnitureArtworkMarkup(template, object) {
+  const art = furnitureIconPath(template, object.type);
+  if (art) return `<div class="inspect-art furniture-inspect-art"><img src="${escapeAttribute(art)}" alt="${escapeAttribute(template.name)} artwork" /></div>`;
+  return "";
+}
+
 function ensureCombatantToken(fighter) {
   if (els.room.querySelector(`[data-combatant="${fighter.id}"]`)) return;
   els.room.querySelector(".token-layer")?.prepend(createCombatantToken(fighter));
@@ -227,6 +233,12 @@ function buildRoom() {
   const exitToken = document.createElement("div");
   exitToken.className = "exit-token";
   exitToken.dataset.exit = "dungeon";
+  exitToken.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (canHeroUseHomeExit(activeHero())) showHomeMenu();
+  });
   exitToken.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -239,7 +251,7 @@ function buildRoom() {
       return;
     }
     const hero = activeHero();
-    if (canHeroUseHomeExit(hero) && distance(hero.position, state.exit.position) <= 1) {
+    if (canHeroUseHomeExit(hero)) {
       showHomeMenu();
       return;
     }
@@ -258,6 +270,10 @@ function buildRoom() {
     }
     if (pendingEldritchBlast) {
       void confirmPendingEldritchBlast(state.exit.position);
+      return;
+    }
+    if (canHeroUseHomeExit(activeHero())) {
+      showHomeMenu();
       return;
     }
     showDungeonObjectInfo({
@@ -789,56 +805,127 @@ async function renameHero() {
 
 function showCombatantInfo(fighter) {
   refreshDerivedStats(fighter);
+  const heroView = isPartyHeroId(fighter.id) || isRosterHeroId(fighter.id);
   const hpPercent = Math.max(0, Math.round((fighter.hp / fighter.maxHp) * 100));
   const weapon = activeWeapon(fighter);
+  const torso = equippedItem(fighter, "torso");
   const profileRange = fighter.damage?.range ?? weapon?.range ?? { kind: "melee", feet: 5 };
   const range = `${profileRange.kind}${profileRange.feet ? ` ${profileRange.feet} ft` : ""}`;
   const weaponName = weapon?.name ?? fighter.damage?.weaponName ?? fighter.baseDamage?.weaponName ?? "Natural weapon";
   const abilities = ["str", "dex", "con", "int", "wis", "cha"];
-  const traitLines = [
-    fighter.speciesName ? `${fighter.speciesName}${fighter.subraceName ? ` - ${fighter.subraceName}` : ""}` : "",
-    ...activeRaceFeatureLinesForFighter(fighter).slice(2),
-  ].filter(Boolean);
+  const heroTemplate = heroView ? getHeroTemplate(fighter.classId) : null;
+  const racialTraits = heroView ? activeRaceFeatureLinesForFighter(fighter).slice(2) : [];
+  const classFeatures = heroView
+    ? Array.from(
+        new Map(
+          [
+            ...(heroTemplate?.classFeatures ?? [])
+              .filter((feature) => (feature.level ?? 1) <= (fighter.level ?? 1))
+              .map((feature) => {
+                const ability = fighterAbilityDefinitions(fighter).find((entry) => entry.name === feature.name);
+                return [feature.name, { name: feature.name, description: feature.description ?? ability?.description ?? "" }];
+              }),
+            ...fighterAbilityDefinitions(fighter)
+              .filter((ability) => (ability.level ?? 1) <= (fighter.level ?? 1))
+              .map((ability) => [ability.name, { name: ability.name, description: ability.description ?? "" }]),
+          ],
+        ).values(),
+      )
+    : [];
+  const spells = heroView
+    ? (fighter.spells ?? [])
+        .map((spellId) => getContentDefinition("spells", spellId))
+        .filter(Boolean)
+    : [];
   els.fighterInfoName.textContent = fighter.name;
   els.fighterInfoBody.innerHTML = `
     ${combatantArtworkMarkup(fighter, "inspect-art")}
     <div class="fighter-role">${escapeHtml(combatantRoleLabel(fighter))}</div>
-    <div class="hp-line">
-      <div class="hp-text"><span>HP</span><span>${fighter.hp} / ${fighter.maxHp}</span></div>
-      <div class="hp-bar"><div class="hp-fill" style="width: ${hpPercent}%"></div></div>
-    </div>
-    <div class="stat-grid">
-      <div class="stat-pill"><b>${fighter.ac}</b><span>AC</span></div>
-      <div class="stat-pill"><b>${abilityLabel(attackBonus(fighter))}</b><span>Attack</span></div>
-      <div class="stat-pill"><b>${fighter.damage.label}</b><span>Damage</span></div>
-      <div class="stat-pill"><b>${fighter.speedFeet} ft</b><span>Speed</span></div>
-      <div class="stat-pill"><b>${fighter.movementLeft * feetPerSquare} ft</b><span>Move Left</span></div>
-      <div class="stat-pill"><b>${abilityLabel(fighter.initiativeBonus)}</b><span>Init</span></div>
-      <div class="stat-pill"><b>${fighter.hasAction ? "Yes" : "No"}</b><span>Action</span></div>
-      <div class="stat-pill"><b>${fighter.hasBonusAction ? "Yes" : "No"}</b><span>Bonus</span></div>
-      <div class="stat-pill"><b>${fighter.alive ? "Yes" : "No"}</b><span>Alive</span></div>
-      <div class="stat-pill"><b>${fighter.level ?? 1}</b><span>Level</span></div>
-      <div class="stat-pill"><b>${fighter.xp ?? 0}</b><span>XP</span></div>
-    </div>
-    <div class="stat-grid ability-grid">
-      ${abilities
-        .map(
-          (ability) => `
-            <div class="stat-pill">
-              <b>${abilityScore(fighter, ability)}</b>
-              <span>${ability.toUpperCase()} ${abilityLabel(abilityMod(fighter, ability))}</span>
-            </div>
-          `,
-        )
-        .join("")}
-    </div>
-    <div class="equipment-summary">
-      <div><b>Weapon</b><span>${escapeHtml(weaponName)}</span></div>
-      <div><b>Damage</b><span>${escapeHtml(fighter.damage.label)}</span></div>
-      <div><b>Range</b><span>${escapeHtml(range)}</span></div>
-      ${traitLines.length ? `<div><b>Species</b><span>${escapeHtml(traitLines.join(" "))}</span></div>` : ""}
-    </div>
-    <div class="wallet-line">Money: ${escapeHtml(moneyText(fighter.inventory.money))} - Hero Tokens: ${fighter.inventory.heroTokens ?? 0}</div>
+    ${
+      heroView
+        ? `
+          <div class="hp-line">
+            <div class="hp-text"><span>HP</span><span>${fighter.hp} / ${fighter.maxHp}</span></div>
+            <div class="hp-bar"><div class="hp-fill" style="width: ${hpPercent}%"></div></div>
+          </div>
+          <div class="stat-grid player-stat-grid">
+            <div class="stat-pill"><b>${fighter.ac}</b><span>AC</span></div>
+            <div class="stat-pill"><b>${abilityLabel(attackBonus(fighter))}</b><span>To Hit</span></div>
+            <div class="stat-pill"><b>${escapeHtml(fighter.damage.label)}</b><span>Damage</span></div>
+          </div>
+          <div class="equipment-summary">
+            <div><b>Race</b><span>${escapeHtml([fighter.speciesName, fighter.subraceName].filter(Boolean).join(" - ") || "Unknown")}</span></div>
+            <div><b>Class</b><span>${escapeHtml(fighter.className ?? "Adventurer")} ${fighter.level ?? 1}</span></div>
+            <div><b>Weapon</b><span>${escapeHtml(weaponName)}</span></div>
+          </div>
+          <div class="stat-grid ability-grid">
+            ${abilities
+              .map(
+                (ability) => `
+                  <div class="stat-pill">
+                    <b>${abilityScore(fighter, ability)}</b>
+                    <span>${ability.toUpperCase()} ${abilityLabel(abilityMod(fighter, ability))}</span>
+                  </div>
+                `,
+              )
+              .join("")}
+          </div>
+          ${
+            racialTraits.length || classFeatures.length
+              ? `
+                <section class="inspect-section">
+                  <h3>Traits</h3>
+                  ${racialTraits.map((trait) => `<p><b>Racial</b> ${escapeHtml(trait)}</p>`).join("")}
+                  ${classFeatures
+                    .map(
+                      (feature) =>
+                        `<p><b>${escapeHtml(feature.name)}</b>${feature.description ? ` ${escapeHtml(feature.description)}` : ""}</p>`,
+                    )
+                    .join("")}
+                </section>
+              `
+              : ""
+          }
+          ${
+            spells.length
+              ? `
+                <section class="inspect-section">
+                  <h3>Spells</h3>
+                  ${spells.map((spell) => `<p><b>${escapeHtml(spell.name)}</b>${spell.description ? ` ${escapeHtml(spell.description)}` : ""}</p>`).join("")}
+                </section>
+              `
+              : ""
+          }
+        `
+        : `
+          <p class="empty-note">${escapeHtml(fighter.description ?? fighter.role ?? "A hostile creature.")}</p>
+          <div class="equipment-summary">
+            <div><b>Armor</b><span>${escapeHtml(torso?.name ?? "None")}</span></div>
+            <div><b>Weapon</b><span>${escapeHtml(weaponName)}</span></div>
+          </div>
+        `
+    }
+    <button type="button" class="inspect-admin-toggle" data-action="toggle-inspect-admin" aria-label="Show technical details">i</button>
+    <section class="inspect-admin-details hidden">
+      <div class="stat-grid">
+        <div class="stat-pill"><b>${fighter.ac}</b><span>AC</span></div>
+        <div class="stat-pill"><b>${abilityLabel(attackBonus(fighter))}</b><span>Attack</span></div>
+        <div class="stat-pill"><b>${fighter.damage.label}</b><span>Damage</span></div>
+        <div class="stat-pill"><b>${fighter.speedFeet} ft</b><span>Speed</span></div>
+        <div class="stat-pill"><b>${fighter.movementLeft * feetPerSquare} ft</b><span>Move Left</span></div>
+        <div class="stat-pill"><b>${abilityLabel(fighter.initiativeBonus)}</b><span>Init</span></div>
+        <div class="stat-pill"><b>${fighter.hasAction ? "Yes" : "No"}</b><span>Action</span></div>
+        <div class="stat-pill"><b>${fighter.hasBonusAction ? "Yes" : "No"}</b><span>Bonus</span></div>
+        <div class="stat-pill"><b>${fighter.alive ? "Yes" : "No"}</b><span>Alive</span></div>
+        <div class="stat-pill"><b>${fighter.level ?? 1}</b><span>Level</span></div>
+        <div class="stat-pill"><b>${fighter.xp ?? 0}</b><span>XP</span></div>
+      </div>
+      <div class="equipment-summary">
+        <div><b>Range</b><span>${escapeHtml(range)}</span></div>
+        <div><b>ID</b><span>${escapeHtml(fighter.id ?? "")}</span></div>
+      </div>
+      ${heroView ? `<div class="wallet-line">Money: ${escapeHtml(moneyText(fighter.inventory.money))} - Hero Tokens: ${fighter.inventory.heroTokens ?? 0}</div>` : ""}
+    </section>
   `;
   els.fighterInfo.classList.remove("hidden");
 }
@@ -862,12 +949,18 @@ function showDungeonObjectInfo(object) {
         : objectCells(object).some((cell) => distance(hero.position, cell) === 1);
   const canActInCombat = state.mode !== "combat" || activeFighter()?.id === hero?.id;
   const isHomeChest = object.type === "homeChest";
-  const canLootObject = (objectHasLoot(object) || isHomeChest) && objectAdjacent && canActInCombat;
+  const objectLocked = !isHomeChest && object.locked === true;
+  const canLootObject = (objectHasLoot(object) || isHomeChest) && objectAdjacent && canActInCombat && !objectLocked;
+  const heroTriedLock = Boolean(object.lockAttemptsByHero?.[hero.id]);
+  const canPickLock = objectLocked && objectAdjacent && canActInCombat && !heroTriedLock;
+  const disarmTarget = object.trap ?? object;
+  const heroTriedDisarm = Boolean(disarmTarget.disarmAttemptsByHero?.[hero.id]);
   const canDisarm =
     state.mode !== "combat" &&
     objectAdjacent &&
     ((objectIsTrap(object) && object.detected && object.armed !== false && !object.disarmed) ||
-      (object.trap?.detected && !object.trap.disarmAttempted));
+      object.trap?.detected) &&
+    !heroTriedDisarm;
   const canInvestigate = state.mode !== "combat" && objectCanInspect(object) && objectAdjacent && !object.investigated;
   const chestItems = object.type === "chest" || isHomeChest ? object.items ?? [] : [];
   const objectItems = objectHasLoot(object) || isHomeChest ? object.items ?? [] : [];
@@ -877,19 +970,17 @@ function showDungeonObjectInfo(object) {
 
   els.fighterInfoName.textContent = template.name;
   els.fighterInfoBody.innerHTML = `
-    <div class="fighter-role">${escapeHtml(template.kind)}</div>
+    ${furnitureArtworkMarkup(template, object)}
     <p class="empty-note">${escapeHtml(template.description)}</p>
     ${object.lastResult ? `<p class="object-result">${escapeHtml(object.lastResult)}</p>` : ""}
-    <div class="stat-grid">
-      <div class="stat-pill"><b>${object.width ?? template.width}x${object.height ?? template.height}</b><span>Size</span></div>
-      <div class="stat-pill"><b>${objectBlocksMovement(object) ? "No" : "Yes"}</b><span>Crossable</span></div>
-      <div class="stat-pill"><b>${template.interactable ? "Yes" : "No"}</b><span>Interactable</span></div>
-      ${componentLabels ? `<div class="stat-pill"><b>${escapeHtml(componentLabels)}</b><span>Features</span></div>` : ""}
-      ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.armed === false ? "Spent" : "Armed"}</b><span>State</span></div>` : ""}
-      ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.spotDc ?? 12}</b><span>Spot DC</span></div>` : ""}
-      ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.detected ? "Spotted" : "Hidden"}</b><span>Detection</span></div>` : ""}
-      ${object.trap?.detected ? `<div class="stat-pill"><b>${object.trap.spotDc ?? 12}</b><span>Trap DC</span></div>` : ""}
-    </div>
+    ${
+      objectLocked
+        ? `<p class="empty-note">Locked. Contents hidden until the lock is picked.</p>
+           <button type="button" data-action="pick-lock" data-object="${escapeAttribute(object.id)}" ${canPickLock ? "" : "disabled"}>${
+             heroTriedLock ? "Lock Attempt Spent" : `Pick Lock (DC ${object.lockDc ?? 12})`
+           }</button>`
+        : ""
+    }
     ${
       objectCanInspect(object)
         ? `<button type="button" data-action="investigate-object" data-object="${escapeAttribute(object.id)}" ${canInvestigate ? "" : "disabled"}>${
@@ -903,7 +994,7 @@ function showDungeonObjectInfo(object) {
         : ""
     }
     ${
-      objectHasLoot(object)
+      objectHasLoot(object) && !objectLocked
         ? `
           ${
             object.trap?.detected
@@ -1002,6 +1093,21 @@ function showDungeonObjectInfo(object) {
         `
         : ""
     }
+    <button type="button" class="inspect-admin-toggle" data-action="toggle-inspect-admin" aria-label="Show technical details">i</button>
+    <section class="inspect-admin-details hidden">
+      <div class="stat-grid">
+        <div class="stat-pill"><b>${object.width ?? template.width}x${object.height ?? template.height}</b><span>Size</span></div>
+        <div class="stat-pill"><b>${objectBlocksMovement(object) ? "No" : "Yes"}</b><span>Crossable</span></div>
+        <div class="stat-pill"><b>${template.interactable ? "Yes" : "No"}</b><span>Interactable</span></div>
+        ${componentLabels ? `<div class="stat-pill"><b>${escapeHtml(componentLabels)}</b><span>Features</span></div>` : ""}
+        ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.armed === false ? "Spent" : "Armed"}</b><span>State</span></div>` : ""}
+        ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.spotDc ?? 12}</b><span>Spot DC</span></div>` : ""}
+        ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.detected ? "Spotted" : "Hidden"}</b><span>Detection</span></div>` : ""}
+        ${object.trap?.detected ? `<div class="stat-pill"><b>${object.trap.spotDc ?? 12}</b><span>Trap DC</span></div>` : ""}
+        ${object.lockDc ? `<div class="stat-pill"><b>${object.locked ? "Locked" : "Open"}</b><span>Lock</span></div>` : ""}
+        ${object.lockDc ? `<div class="stat-pill"><b>${object.lockDc}</b><span>Lock DC</span></div>` : ""}
+      </div>
+    </section>
   `;
   els.fighterInfo.classList.remove("hidden");
 }
@@ -1010,9 +1116,8 @@ function dungeonObjectForId(objectId) {
   return (state.dungeonObjects ?? []).find((object) => object.id === objectId) ?? null;
 }
 
-function triggerChestTrap(chest) {
+function triggerChestTrap(chest, hero = activeHero()) {
   const trap = chest.trap;
-  const hero = activeHero();
   if (!trap) return false;
 
   const damageRoll = rollDice(trap.damage.count ?? 1, trap.damage.sides ?? 4);
@@ -1253,6 +1358,11 @@ function takeObjectItem(objectId, itemId) {
 
   const object = dungeonObjectForId(objectId);
   if (!object || !objectHasLoot(object)) return;
+  if (object.locked) {
+    object.lastResult = `${objectTemplate(object.type)?.name ?? "The container"} is locked.`;
+    showDungeonObjectInfo(object);
+    return;
+  }
   const hero = activeHero();
   if ((state.mode === "combat" && activeFighter()?.id !== hero.id) || !objectCells(object).some((cell) => distance(hero.position, cell) === 1)) {
     addLog(`${hero.name} needs to be next to ${objectTemplate(object.type)?.name ?? "it"} to loot it${state.mode === "combat" ? " on their turn" : ""}.`);
@@ -1285,6 +1395,41 @@ function takeObjectItem(objectId, itemId) {
   showDungeonObjectInfo(object);
 }
 
+function pickObjectLock(objectId) {
+  const object = dungeonObjectForId(objectId);
+  const hero = activeHero();
+  if (!object || !object.locked) return;
+  if ((state.mode === "combat" && activeFighter()?.id !== hero.id) || !objectCells(object).some((cell) => distance(hero.position, cell) === 1)) {
+    addLog(`${hero.name} needs to be next to ${objectTemplate(object.type)?.name ?? "it"} to pick the lock${state.mode === "combat" ? " on their turn" : ""}.`);
+    renderLog();
+    return;
+  }
+
+  const roll = rollD20ForFighter(hero).roll;
+  const bonus = thievesToolsCheckBonus(hero);
+  const total = roll + bonus;
+  const dc = object.lockDc ?? 12;
+  const training = thievesToolsTraining(hero);
+  const trainingLabel = training === 2 ? " with thieves' tools expertise" : training === 1 ? " with thieves' tools proficiency" : "";
+  const attemptText = `${hero.name} picks the lock${trainingLabel}: DEX ${roll} ${abilityLabel(bonus)} = ${total} vs DC ${dc}.`;
+  object.lockAttemptsByHero ??= {};
+  object.lockAttemptsByHero[hero.id] = true;
+  object.lastResult = attemptText;
+  addLog(attemptText, "important");
+  if (total >= dc) {
+    object.locked = false;
+    object.lastResult += " The lock clicks open.";
+    addLog("The lock clicks open.", "important");
+    recordD20OutcomeForFighter(hero, true);
+  } else {
+    object.lastResult += " The lock holds.";
+    addLog("The lock holds.");
+    recordD20OutcomeForFighter(hero, false);
+  }
+  render();
+  showDungeonObjectInfo(object);
+}
+
 function storeHomeChestItem(itemId) {
   moveInventoryItemToChest(itemId);
   showHomeChestInfo();
@@ -1311,19 +1456,29 @@ function disarmTrap(objectId) {
 
   const trap = object.trap ?? object;
   if (!trap || !trap.detected || trap.armed === false || trap.disarmed) return;
+  trap.disarmAttemptsByHero ??= {};
+  if (trap.disarmAttemptsByHero[hero.id]) return;
 
   const roll = rollD20ForFighter(hero).roll;
   const bonus = skillCheckBonus(hero, "int", "disarm");
   const guidance = guidanceSkillBonus();
   const total = roll + bonus + guidance;
   const dc = trap.spotDc ?? 12;
-  if (trap.disarmAttempted) return;
-  trap.disarmAttempted = true;
+  trap.disarmAttemptsByHero[hero.id] = true;
   const guidanceText = guidance ? ` + Guidance ${guidance}` : "";
   const attemptText = `${hero.name} attempts to disarm the trap: INT ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${dc}.`;
   object.lastResult = attemptText;
   addLog(attemptText, "important");
-  if (total >= dc) {
+  if (roll === 1) {
+    recordD20OutcomeForFighter(hero, false);
+    object.lastResult += " Critical failure — the trap triggers.";
+    addLog("Critical failure — the trap triggers.", "important");
+    if (object.trap) {
+      triggerChestTrap(object, hero);
+    } else {
+      triggerTrapAtPosition(hero, object.position);
+    }
+  } else if (total >= dc) {
     recordD20OutcomeForFighter(hero, true);
     if (object.trap) {
       delete object.trap;
@@ -2669,6 +2824,10 @@ function hideAbilitiesMenu() {
 
 function showHomeMenu() {
   els.levelUp.disabled = !canLevelUp(activeHero());
+  const barrowCompleted = state.campaignProgress?.["barrow-crown"] ?? 0;
+  const thornwoodCompleted = state.campaignProgress?.["thornwood-pact"] ?? 0;
+  els.goBarrowCrown?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${barrowCompleted}/7`));
+  els.goThornwoodPact?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${thornwoodCompleted}/8`));
   els.homeMenu.classList.remove("hidden");
 }
 
@@ -3643,6 +3802,7 @@ function renderControls() {
     els.selectParty.disabled = !gameHasStarted || state.mode === "combat" || selectableCount <= 1;
   }
   if (els.roomTitle) els.roomTitle.textContent = state.mode === "home" ? "Home" : state.room.name;
+  els.showDungeonIntro?.classList.toggle("hidden", !state.customDungeon?.intro?.text && !(state.customDungeon?.intro?.images ?? []).length);
   els.roundLabel.textContent = state.mode === "combat" ? `Round ${state.round}` : "Out of turn order";
 
   if (state.completed) {

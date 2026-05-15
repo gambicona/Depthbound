@@ -26,10 +26,10 @@ window.DungeonContent.register("classes", "ranger", {
   spells: [],
   token: "R",
   classFeatures: [
-    { level: 1, name: "Favored Foe" },
-    { level: 2, name: "Fighting Style" },
-    { level: 3, name: "Ranger Companion" },
-    { level: 5, name: "Extra Attack" },
+    { level: 1, name: "Favored Foe", description: "Mark a chosen enemy and punish it with extra damage." },
+    { level: 2, name: "Fighting Style", description: "Adopt a martial specialty that improves how you fight." },
+    { level: 3, name: "Ranger Companion", description: "Gain a loyal companion trained to aid you in battle." },
+    { level: 5, name: "Extra Attack", description: "Attack more than once when you take the Attack action." },
   ],
   abilities: [
     { id: "rangerCompanion", name: "Ranger Companion", level: 3, refresh: "shortRest", uses: 1, resource: "bonusAction", description: "Command a companion strike in simplified form." },

@@ -1290,6 +1290,49 @@ function canHeroUseHomeExit(hero = activeHero()) {
   return state.mode === "home" && hero?.alive && isPartyHeroId(hero.id);
 }
 
+function partyHasBaseItem(itemId) {
+  if (!itemId) return false;
+  return partyHeroes().some((hero) => (hero.inventory?.items ?? []).some((item) => item.baseItemId === itemId || item.id === itemId)) ||
+    (state.chest ?? []).some((item) => item.baseItemId === itemId || item.id === itemId);
+}
+
+function customGoalStatus() {
+  const goal = state.customDungeon?.goal;
+  if (!goal || goal.type === "reachExit") return { met: true, text: "Reach the exit." };
+  if (goal.type === "collectItem") {
+    const item = getItemTemplate(goal.itemId);
+    return {
+      met: partyHasBaseItem(goal.itemId),
+      text: `Collect ${item?.name ?? goal.itemId ?? "the required object"}.`,
+    };
+  }
+  if (goal.type === "killBoss") {
+    return {
+      met: !aliveMonsters().some((monster) => monster.customBoss || monster.id?.startsWith("boss-") || monster.tags?.includes("boss")),
+      text: "Defeat the boss monster.",
+    };
+  }
+  if (goal.type === "killMonsterType") {
+    const initial = state.customDungeon?.monsterSummary?.[goal.monsterId] ?? 0;
+    const alive = aliveMonsters().filter((monster) => (monster.baseMonsterId ?? monster.templateId ?? monster.id) === goal.monsterId).length;
+    const killed = Math.max(0, initial - alive);
+    const target = Math.max(1, Number(goal.count) || 1);
+    const monster = getMonsterTemplate(goal.monsterId);
+    return {
+      met: killed >= target,
+      text: `Defeat ${target} ${monster?.name ?? goal.monsterId ?? "chosen monster"}${target === 1 ? "" : "s"} (${killed}/${target}).`,
+    };
+  }
+  if (goal.type === "escortNpc") {
+    return { met: false, text: "Find the NPC and bring them to the exit. This goal type is reserved for the NPC escort system." };
+  }
+  return { met: false, text: "Complete the dungeon goal." };
+}
+
+function dungeonGoalMet() {
+  return customGoalStatus().met;
+}
+
 function checkDungeonCompletion(hero = activeHero()) {
   if (canHeroUseHomeExit(hero) && isExitPosition(hero.position)) {
     showHomeMenu();
@@ -1297,18 +1340,46 @@ function checkDungeonCompletion(hero = activeHero()) {
   }
   if (state.completed || !hero || !isExitPosition(hero.position)) return false;
   if (monstersInRoom(state.exit.roomId).length > 0) return false;
+  if (!dungeonGoalMet()) {
+    const status = customGoalStatus();
+    if (state.lastExitGoalWarning !== status.text) {
+      addLog(`The exit is not ready: ${status.text}`, "important");
+      state.lastExitGoalWarning = status.text;
+      renderLog();
+    }
+    return false;
+  }
 
   const tokenAward = categoryForHeroLevel(hero.level ?? 1);
   for (const partyHero of partyHeroes()) {
     partyHero.inventory.heroTokens = (partyHero.inventory.heroTokens ?? 0) + tokenAward;
   }
   playSoundEffect("exitReached");
-  state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, state.party);
-  state.combatStarted = false;
-  roomIsBuilt = false;
-  addLog(`${hero.name} reaches the exit. Dungeon complete. The party gained ${tokenAward} Hero Token${tokenAward === 1 ? "" : "s"} each.`, "important");
-  render();
-  centerViewOnHero();
+  const outro = state.customDungeon?.outro;
+  const finishDungeon = () => {
+    const completedCampaign = state.campaignId && state.campaignIndex ? { ...state.campaignProgress } : state.campaignProgress;
+    if (state.campaignId && state.campaignIndex) {
+      completedCampaign[state.campaignId] = Math.max(completedCampaign[state.campaignId] ?? 0, state.campaignIndex);
+    }
+    state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, { ...state.party, campaignProgress: completedCampaign });
+    state.combatStarted = false;
+    roomIsBuilt = false;
+    addLog(`${hero.name} reaches the exit. Dungeon complete. The party gained ${tokenAward} Hero Token${tokenAward === 1 ? "" : "s"} each.`, "important");
+    render();
+    centerViewOnHero();
+  };
+  state.completed = true;
+  if (outro?.text || outro?.images?.length) {
+    void showDungeonStoryDialog({
+      title: state.customDungeon?.name ?? "Dungeon Complete",
+      text: outro.text,
+      images: outro.images,
+      actionLabel: "Return Home",
+      goalText: customGoalStatus().text,
+    }).then(finishDungeon);
+  } else {
+    finishDungeon();
+  }
   return true;
 }
 

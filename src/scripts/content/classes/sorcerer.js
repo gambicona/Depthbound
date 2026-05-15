@@ -27,9 +27,9 @@ window.DungeonContent.register("classes", "sorcerer", {
   spells: [],
   token: "S",
   classFeatures: [
-    { level: 1, name: "Spellcasting" },
-    { level: 2, name: "Font of Magic" },
-    { level: 3, name: "Metamagic" },
+    { level: 1, name: "Spellcasting", description: "You can shape class magic into prepared or known spells." },
+    { level: 2, name: "Font of Magic", description: "Convert magical power into flexible sorcery points." },
+    { level: 3, name: "Metamagic", description: "Twist spells with special sorcerous modifications." },
   ],
   abilities: [
     { id: "empoweredSpell", name: "Empowered Spell", level: 3, refresh: "longRest", uses: 3, resourcePool: "metamagic", resource: "bonusAction", description: "Spend metamagic to empower the next spell or attack with raw arcane force." },

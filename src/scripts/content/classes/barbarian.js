@@ -20,12 +20,12 @@ window.DungeonContent.register("classes", "barbarian", {
   weaponProficiencies: ["simple", "martial"],
   token: "B",
   classFeatures: [
-    { level: 1, name: "Rage" },
-    { level: 1, name: "Unarmored Defense" },
-    { level: 2, name: "Reckless Attack" },
-    { level: 5, name: "Extra Attack" },
-    { level: 5, name: "Fast Movement" },
-    { level: 20, name: "Primal Champion" },
+    { level: 1, name: "Rage", description: "Enter a battle fury that hardens you against harm and strengthens your melee blows." },
+    { level: 1, name: "Unarmored Defense", description: "While not wearing armor, your toughness and reflexes help protect you." },
+    { level: 2, name: "Reckless Attack", description: "Trade defense for offense, striking with abandon to improve your attacks." },
+    { level: 5, name: "Extra Attack", description: "Attack more than once when you take the Attack action." },
+    { level: 5, name: "Fast Movement", description: "Your speed increases while you are not wearing heavy armor." },
+    { level: 20, name: "Primal Champion", description: "Your physical might reaches legendary heights." },
   ],
   abilities: [
     { id: "rage", name: "Rage", level: 1, refresh: "longRest", uses: 2, usesByLevel: [{ level: 3, uses: 3 }, { level: 6, uses: 4 }, { level: 12, uses: 5 }, { level: 17, uses: 6 }, { level: 20, uses: 99 }], resource: "bonusAction", description: "Enter Rage: gain physical toughness and melee damage for the encounter. Cannot be used in heavy armor." },
