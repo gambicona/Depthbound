@@ -549,6 +549,11 @@ function customGoalStatusForTemplate(template) {
   const goal = template?.goal;
   if (!goal || goal.type === "reachExit") return { text: "Reach the exit." };
   if (goal.type === "collectItem") return { text: `Collect ${getItemTemplate(goal.itemId)?.name ?? goal.itemId ?? "the required object"}.` };
+  if (goal.type === "collectItemCount") {
+    const target = Math.max(1, Number(goal.count) || 1);
+    const item = getItemTemplate(goal.itemId);
+    return { text: `Collect ${target} ${item?.name ?? goal.itemId ?? "required item"}${target === 1 ? "" : "s"} (0/${target}).` };
+  }
   if (goal.type === "killBoss") return { text: "Defeat the boss monster." };
   if (goal.type === "killMonsterType") {
     const target = Math.max(1, Number(goal.count) || 1);
@@ -1999,9 +2004,12 @@ async function showCampaignMenu(campaignId) {
   const completed = state.campaignProgress?.[campaign.id] ?? 0;
   const entries = await Promise.all(Array.from({ length: campaign.count }, (_, index) => window.DungeonCampaigns.dungeon(campaign.id, index + 1)));
   return new Promise((resolve) => {
+    els.gameDialogForm.classList.add("campaign-dialog");
     els.gameDialogTitle.textContent = campaign.name;
     els.gameDialogMessage.textContent = campaign.description;
+    els.gameDialogMessage.classList.add("campaign-dialog-message");
     els.gameDialogField.classList.add("hidden");
+    els.gameDialogActions.classList.add("campaign-dungeon-list");
     els.gameDialogActions.innerHTML = entries
       .map((entry, index) => {
         const number = index + 1;
@@ -2011,6 +2019,9 @@ async function showCampaignMenu(campaignId) {
       .join("");
     const cleanup = (value) => {
       els.gameDialogActions.removeEventListener("click", handleClick);
+      els.gameDialogForm.classList.remove("campaign-dialog");
+      els.gameDialogMessage.classList.remove("campaign-dialog-message");
+      els.gameDialogActions.classList.remove("campaign-dungeon-list");
       els.gameDialog.classList.add("hidden");
       activeDialogCancel = null;
       resolve(value);

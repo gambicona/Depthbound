@@ -9,6 +9,7 @@ const els = {
   grid: document.querySelector("#creator-grid"),
   toolGrid: document.querySelector("#tool-grid"),
   addRoom: document.querySelector("#add-room"),
+  roomList: document.querySelector("#room-list"),
   roomX: document.querySelector("#room-x"),
   roomY: document.querySelector("#room-y"),
   roomW: document.querySelector("#room-w"),
@@ -63,6 +64,7 @@ const state = {
   pendingPortalId: "",
   hallwayStart: null,
   hallwayCells: [],
+  roomDrag: null,
   exit: null,
 };
 
@@ -139,10 +141,10 @@ function edgeKey(a, b) {
   return [key(a), key(b)].sort().join("|");
 }
 
-function makeCorridorPassage(id, cells) {
+function makeCorridorPassage(id, cells, options = {}) {
   const edges = [];
   for (let index = 1; index < cells.length; index += 1) edges.push(edgeKey(cells[index - 1], cells[index]));
-  return { id: `corridor-${id}`, cells: cells.map((cell) => ({ ...cell })), edges };
+  return { id: `corridor-${id}`, cells: cells.map((cell) => ({ ...cell })), edges, ...options };
 }
 
 function uniqueCells(cells) {
@@ -175,6 +177,7 @@ function buildDungeon() {
 function goalFromForm() {
   const type = els.goalType.value;
   if (type === "collectItem") return { type, itemId: els.goalItem.value };
+  if (type === "collectItemCount") return { type, itemId: els.goalItem.value, count: Math.max(1, Number(els.goalCount.value) || 1) };
   if (type === "killMonsterType") return { type, monsterId: els.goalMonster.value, count: Math.max(1, Number(els.goalCount.value) || 1) };
   if (type === "killBoss") return { type };
   if (type === "escortNpc") return { type };
@@ -309,6 +312,43 @@ function roomCellsForRect(x, y, width, height) {
   return cells;
 }
 
+function nextUniqueRoomNumber() {
+  const usedNumbers = new Set(
+    state.rooms
+      .map((room) => /^room-(\d+)$/.exec(room.id ?? "")?.[1])
+      .filter(Boolean)
+      .map(Number),
+  );
+  let number = 1;
+  while (usedNumbers.has(number)) number += 1;
+  return number;
+}
+
+function repairDuplicateRoomIds() {
+  const seen = new Set();
+  for (const room of state.rooms) {
+    if (!seen.has(room.id)) {
+      seen.add(room.id);
+      continue;
+    }
+    const oldId = room.id;
+    const newId = `room-${nextUniqueRoomNumber()}`;
+    room.id = newId;
+    seen.add(newId);
+    state.objects
+      .filter((object) => object.roomId === oldId && cellInRoom(room, object.position))
+      .forEach((object) => {
+        object.roomId = newId;
+      });
+    state.monsters
+      .filter((monster) => monster.roomId === oldId && cellInRoom(room, monster.position))
+      .forEach((monster) => {
+        monster.roomId = newId;
+      });
+    if (state.exit?.roomId === oldId && cellInRoom(room, state.exit.position)) state.exit.roomId = newId;
+  }
+}
+
 function renderGrid() {
   const roomMap = roomCellMap();
   const corridorKeys = new Set(state.corridors.map(key));
@@ -411,6 +451,20 @@ function renderSelected() {
   `;
 }
 
+function renderRoomList() {
+  els.roomList.innerHTML = state.rooms.length
+    ? state.rooms
+        .map(
+          (room) => `
+            <button type="button" data-room-select="${room.id}" class="${room.id === state.selectedId ? "active" : ""}">
+              <b>${room.name}</b><br><span class="small-note">${room.id} at ${room.x}, ${room.y}</span>
+            </button>
+          `,
+        )
+        .join("")
+    : `<p class="small-note">No rooms yet.</p>`;
+}
+
 function renderSavedDungeons() {
   const entries = window.DungeonCustom?.list?.() ?? [];
   els.savedDungeons.innerHTML = entries.length
@@ -431,10 +485,12 @@ function renderExport() {
 }
 
 function renderAll() {
+  repairDuplicateRoomIds();
   renderTools();
   renderFurnitureCatalogue();
   renderMonsterCatalogue();
   renderGrid();
+  renderRoomList();
   renderSelected();
   renderSavedDungeons();
   renderExport();
@@ -445,11 +501,12 @@ function addRoom() {
   const y = Number(els.roomY.value) || 1;
   const width = Math.max(3, Number(els.roomW.value) || 5);
   const height = Math.max(3, Number(els.roomH.value) || 5);
-  const id = `room-${state.rooms.length + 1}`;
+  const roomNumber = nextUniqueRoomNumber();
+  const id = `room-${roomNumber}`;
   const cells = roomCellsForRect(x, y, width, height);
   state.rooms.push({
     id,
-    name: `${els.roomName.value || "Dungeon Room"} ${state.rooms.length + 1}`,
+    name: `${els.roomName.value || "Dungeon Room"} ${roomNumber}`,
     shape: "rectangle",
     x,
     y,
@@ -469,7 +526,7 @@ function connectRooms(a, b) {
   const bConnection = nearestBoundaryDoor(b, roomCenter(a));
   if (!aConnection || !bConnection) return;
   const cells = carvePath(aConnection.outside, bConnection.outside);
-  const passage = makeCorridorPassage(state.corridorPassages.length, cells);
+  const passage = makeCorridorPassage(state.corridorPassages.length, cells, { roomIds: [a.id, b.id] });
   state.corridors = uniqueCells([...state.corridors, ...cells]);
   state.corridorPassages.push(passage);
   a.doors.push({ ...aConnection.door, corridor: { ...aConnection.outside }, to: b.id });
@@ -484,28 +541,35 @@ function uniqueValues(values) {
 }
 
 function addManualHallway(start, end, cells) {
-  if (!start || !end || start.room.id === end.room.id || cells.length === 0) return;
+  if (!start || !end || cells.length === 0) return;
+  if (start.room && end.room && start.room.id === end.room.id) return;
   const path = uniqueCells(cells);
   state.corridors = uniqueCells([...state.corridors, ...path]);
-  state.corridorPassages.push(makeCorridorPassage(state.corridorPassages.length, path));
-  start.room.doors.push({ ...start.position, corridor: { ...path[0] }, to: end.room.id });
-  end.room.doors.push({ ...end.position, corridor: { ...path.at(-1) }, to: start.room.id });
-  start.room.connections = uniqueValues([...(start.room.connections ?? []), end.room.id]);
-  end.room.connections = uniqueValues([...(end.room.connections ?? []), start.room.id]);
+  state.corridorPassages.push(makeCorridorPassage(state.corridorPassages.length, path, { roomIds: [start.room?.id, end.room?.id].filter(Boolean) }));
+  if (start.room) start.room.doors.push({ ...start.position, corridor: { ...path[0] }, ...(end.room ? { to: end.room.id } : {}) });
+  if (end.room) end.room.doors.push({ ...end.position, corridor: { ...path.at(-1) }, ...(start.room ? { to: start.room.id } : {}) });
+  if (start.room && end.room) {
+    start.room.connections = uniqueValues([...(start.room.connections ?? []), end.room.id]);
+    end.room.connections = uniqueValues([...(end.room.connections ?? []), start.room.id]);
+  }
 }
 
 function handleHallwayClick(position) {
   const room = roomAt(position);
+  const onCorridor = state.corridors.some((cell) => key(cell) === key(position));
   if (!state.hallwayStart) {
-    if (!room || !isBoundaryCell(room, position)) return;
-    state.hallwayStart = { room, position: { ...position } };
+    if ((!room || !isBoundaryCell(room, position)) && !onCorridor) return;
+    state.hallwayStart = { room: room && isBoundaryCell(room, position) ? room : null, position: { ...position } };
     state.hallwayCells = [];
-    setStatus("Hallway started. Click adjacent tiles, then finish on a wall tile of another room.");
+    setStatus("Hallway started. Click adjacent tiles, then finish on another room wall or an existing hallway.");
     return;
   }
-  if (room) {
-    if (!isBoundaryCell(room, position) || room.id === state.hallwayStart.room.id || state.hallwayCells.length === 0) return;
-    addManualHallway(state.hallwayStart, { room, position: { ...position } }, state.hallwayCells);
+  if ((room && isBoundaryCell(room, position)) || onCorridor) {
+    if (room && state.hallwayStart.room && room.id === state.hallwayStart.room.id) return;
+    if (state.hallwayCells.length === 0) return;
+    const previous = state.hallwayCells.at(-1) ?? state.hallwayStart.position;
+    if (distance(previous, position) !== 1) return;
+    addManualHallway(state.hallwayStart, { room: room && isBoundaryCell(room, position) ? room : null, position: { ...position } }, state.hallwayCells);
     state.hallwayStart = null;
     state.hallwayCells = [];
     setStatus("Hallway added.");
@@ -564,6 +628,70 @@ function moveSelectedRoom(dx, dy) {
   }
   rebuildAllCorridors();
   renderAll();
+}
+
+function previewDraggedRoom(room, dx, dy) {
+  const nextX = room.x + dx;
+  const nextY = room.y + dy;
+  const nextCells = roomCellsForRect(nextX, nextY, room.width, room.height);
+  if (nextCells.length !== room.width * room.height) return null;
+  const ownKeys = new Set(room.cells.map(key));
+  const overlapsOtherRoom = nextCells.some((cell) => {
+    const occupant = roomAt(cell);
+    return occupant && occupant.id !== room.id && !ownKeys.has(key(cell));
+  });
+  return overlapsOtherRoom ? null : { x: nextX, y: nextY, cells: nextCells };
+}
+
+function beginRoomDrag(position) {
+  if (state.tool !== "select") return;
+  const room = roomAt(position);
+  if (!room || monsterAt(position) || objectAt(position)) return;
+  state.selectedId = room.id;
+  state.roomDrag = {
+    roomId: room.id,
+    startPointer: { ...position },
+    origin: { x: room.x, y: room.y },
+    lastDelta: { x: 0, y: 0 },
+  };
+  renderAll();
+}
+
+function updateRoomDrag(position) {
+  const drag = state.roomDrag;
+  if (!drag) return;
+  const room = state.rooms.find((entry) => entry.id === drag.roomId);
+  if (!room) return;
+  const dx = position.x - drag.startPointer.x;
+  const dy = position.y - drag.startPointer.y;
+  if (dx === drag.lastDelta.x && dy === drag.lastDelta.y) return;
+  drag.lastDelta = { x: dx, y: dy };
+  const preview = previewDraggedRoom(room, dx, dy);
+  if (!preview) return;
+  room.x = preview.x;
+  room.y = preview.y;
+  room.cells = preview.cells;
+  renderGrid();
+  renderRoomList();
+  renderSelected();
+}
+
+function finishRoomDrag() {
+  const drag = state.roomDrag;
+  if (!drag) return;
+  const room = state.rooms.find((entry) => entry.id === drag.roomId);
+  if (!room) {
+    state.roomDrag = null;
+    return;
+  }
+  const dx = room.x - drag.origin.x;
+  const dy = room.y - drag.origin.y;
+  room.x = drag.origin.x;
+  room.y = drag.origin.y;
+  room.cells = roomCellsForRect(room.x, room.y, room.width, room.height);
+  state.roomDrag = null;
+  if (dx || dy) moveSelectedRoom(dx, dy);
+  else renderAll();
 }
 
 function moveSelectedObject(dx, dy) {
@@ -667,6 +795,19 @@ function eraseAt(position) {
     return;
   }
   if (state.exit && key(state.exit.position) === key(position)) state.exit = null;
+  const passage = state.corridorPassages.find((entry) => (entry.cells ?? []).some((cell) => key(cell) === key(position)));
+  if (passage) {
+    const removedKeys = new Set((passage.cells ?? []).map(key));
+    state.corridorPassages = state.corridorPassages.filter((entry) => entry.id !== passage.id);
+    state.corridors = uniqueCells(state.corridorPassages.flatMap((entry) => entry.cells ?? []));
+    state.rooms.forEach((room) => {
+      room.doors = (room.doors ?? []).filter((door) => !removedKeys.has(key(door.corridor ?? door)));
+      if (Array.isArray(passage.roomIds) && passage.roomIds.length === 2 && passage.roomIds.includes(room.id)) {
+        room.connections = (room.connections ?? []).filter((id) => !passage.roomIds.includes(id));
+      }
+    });
+    setStatus("Hallway removed.");
+  }
 }
 
 function handleGridClick(position) {
@@ -751,6 +892,7 @@ function loadTemplate(template) {
   state.monsters = clone(template.monsters ?? []);
   state.customItems = clone(template.customItems ?? []);
   state.exit = clone(template.exit ?? null);
+  repairDuplicateRoomIds();
   state.selectedId = "";
   state.connectFromRoomId = "";
   state.pendingPortalId = "";
@@ -804,6 +946,26 @@ function init() {
     const cell = event.target.closest("[data-x]");
     if (!cell) return;
     handleGridClick({ x: Number(cell.dataset.x), y: Number(cell.dataset.y) });
+  });
+  els.grid.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    const cell = event.target.closest("[data-x]");
+    if (!cell) return;
+    beginRoomDrag({ x: Number(cell.dataset.x), y: Number(cell.dataset.y) });
+  });
+  els.grid.addEventListener("pointermove", (event) => {
+    if (!state.roomDrag) return;
+    const cell = event.target.closest("[data-x]");
+    if (!cell) return;
+    updateRoomDrag({ x: Number(cell.dataset.x), y: Number(cell.dataset.y) });
+  });
+  window.addEventListener("pointerup", finishRoomDrag);
+  els.roomList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-room-select]");
+    if (!button) return;
+    state.selectedId = button.dataset.roomSelect;
+    setTool("select");
+    renderAll();
   });
   els.addRoom.addEventListener("click", addRoom);
   els.newDungeon.addEventListener("click", newBlankDungeon);

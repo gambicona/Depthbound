@@ -1296,6 +1296,13 @@ function partyHasBaseItem(itemId) {
     (state.chest ?? []).some((item) => item.baseItemId === itemId || item.id === itemId);
 }
 
+function partyBaseItemCount(itemId) {
+  if (!itemId) return 0;
+  const partyItems = partyHeroes().flatMap((hero) => hero.inventory?.items ?? []);
+  const allItems = [...partyItems, ...(state.chest ?? [])];
+  return allItems.filter((item) => item.baseItemId === itemId || item.id === itemId).length;
+}
+
 function customGoalStatus() {
   const goal = state.customDungeon?.goal;
   if (!goal || goal.type === "reachExit") return { met: true, text: "Reach the exit." };
@@ -1304,6 +1311,15 @@ function customGoalStatus() {
     return {
       met: partyHasBaseItem(goal.itemId),
       text: `Collect ${item?.name ?? goal.itemId ?? "the required object"}.`,
+    };
+  }
+  if (goal.type === "collectItemCount") {
+    const item = getItemTemplate(goal.itemId);
+    const target = Math.max(1, Number(goal.count) || 1);
+    const collected = partyBaseItemCount(goal.itemId);
+    return {
+      met: collected >= target,
+      text: `Collect ${target} ${item?.name ?? goal.itemId ?? "required item"}${target === 1 ? "" : "s"} (${collected}/${target}).`,
     };
   }
   if (goal.type === "killBoss") {

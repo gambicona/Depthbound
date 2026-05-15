@@ -285,7 +285,7 @@
             <button type="button" data-tool="portal">Linked Portals</button>
             <button type="button" data-tool="erase">Erase</button>
           </div>
-          <p class="small-note">Rooms are added with coordinates below. Use Connect Rooms, then click two rooms to carve a hallway.</p>
+          <p class="small-note">Rooms are added with coordinates below. Use Draw Hallway to connect rooms or branch from existing corridors. Erase on a corridor tile removes that hallway.</p>
         </section>
 
         <section class="creator-section">
@@ -306,12 +306,18 @@
         </section>
 
         <section class="creator-section">
+          <h2>Rooms</h2>
+          <div id="room-list" class="creator-list"></div>
+        </section>
+
+        <section class="creator-section">
           <h2>Goal</h2>
           <label>
             Completion condition
             <select id="goal-type">
               <option value="reachExit">Reach the exit</option>
               <option value="collectItem">Collect specific item</option>
+              <option value="collectItemCount">Collect X of a specific item</option>
               <option value="killBoss">Kill boss monster</option>
               <option value="killMonsterType">Kill X monsters of a type</option>
               <option value="escortNpc">Escort NPC to exit (reserved)</option>
