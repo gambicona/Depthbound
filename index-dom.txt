@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en" style="--bg: #0d0b0c; --panel: #191517; --panel-2: #241f20; --line: #4b3d38; --gold: #d7a84f; --green: #70ad66; --floor: #302b2a; --floor-alt: #272324; --room-bg: #171314; --room-border: #5a4335; --tile-bg: #120f10; --tile-bg-alt: #161112; --hidden-tile: #0c090a; --wall: #100d0e; --wall-line: rgba(246, 234, 216, 0.05); --wall-detail: rgba(246, 234, 216, 0.075); --wall-edge: rgba(188, 174, 154, 0.34); --door: rgba(215, 168, 79, 0.38); --door-border: rgba(246, 234, 216, 0.24); --door-open: rgba(120, 152, 173, 0.4); --reachable: rgba(215, 168, 79, 0.18); --reachable-border: rgba(215, 168, 79, 0.46); --reachable-hover: #4a3731; --path-preview: #3d4a3d; --path-preview-dot: rgba(112, 173, 102, 0.3); --path-preview-border: rgba(180, 226, 169, 0.72); --object-bg: rgba(13, 10, 11, 0.72); --object-border: rgba(215, 168, 79, 0.44); --table-bg: linear-gradient(145deg, #6b4a32, #3d271d); --chest-bg: linear-gradient(145deg, #8f6237, #4d2e1f); --rock-bg: linear-gradient(145deg, #4e5249, #252a25); --trap-bg: linear-gradient(145deg, #4b3d38, #181315); --portal-bg: radial-gradient(circle, #86f0ff, #4a3c9d 58%, #24174a);"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Depthbound</title>
+    <link rel="stylesheet" href="src/styles/main.css">
+  </head>
+  <body data-button-theme="verdigris" class="menu-active">
+    <section id="main-menu" class="main-menu" aria-label="Main menu" style="--main-menu-bg: url(&quot;http://127.0.0.1:8000/assets/backgrounds/Ruined%20armory%20of%20the%20undead.png&quot;);">
+      <div class="main-menu-inner">
+        <img class="main-menu-title" src="assets/backgrounds/title.png" alt="Depthbound">
+        <div class="menu-panel">
+          <div class="menu-actions">
+            <button id="start-adventure" type="button">Start New Adventure</button>
+            <button id="load-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="save-slots">Load</button>
+            <button id="main-tutorial" class="ghost-button" type="button">Tutorial</button>
+            <button id="settings-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="main-settings">Settings</button>
+          </div>
+          <button id="main-menu-back" class="ghost-button menu-back hidden" type="button">Back</button>
+          <div id="save-slots" class="save-slots hidden" aria-label="Save slots">
+        <div class="save-slot active" data-slot="1">
+          <div class="save-slot-main">
+            <label for="save-slot-name-1">Slot 1</label>
+            <input id="save-slot-name-1" type="text" value="Save Slot 1" maxlength="32">
+            <span>Empty</span>
+          </div>
+          <div class="save-slot-actions">
+            <button type="button" data-action="save-slot" data-slot="1" disabled="">Save</button>
+            <button type="button" data-action="load-slot" data-slot="1" disabled="">Load</button>
+            <button class="delete-save" type="button" data-action="delete-slot" data-slot="1" disabled="">Delete</button>
+          </div>
+        </div>
+      
+        <div class="save-slot" data-slot="2">
+          <div class="save-slot-main">
+            <label for="save-slot-name-2">Slot 2</label>
+            <input id="save-slot-name-2" type="text" value="Save Slot 2" maxlength="32">
+            <span>Empty</span>
+          </div>
+          <div class="save-slot-actions">
+            <button type="button" data-action="save-slot" data-slot="2" disabled="">Save</button>
+            <button type="button" data-action="load-slot" data-slot="2" disabled="">Load</button>
+            <button class="delete-save" type="button" data-action="delete-slot" data-slot="2" disabled="">Delete</button>
+          </div>
+        </div>
+      
+        <div class="save-slot" data-slot="3">
+          <div class="save-slot-main">
+            <label for="save-slot-name-3">Slot 3</label>
+            <input id="save-slot-name-3" type="text" value="Save Slot 3" maxlength="32">
+            <span>Empty</span>
+          </div>
+          <div class="save-slot-actions">
+            <button type="button" data-action="save-slot" data-slot="3" disabled="">Save</button>
+            <button type="button" data-action="load-slot" data-slot="3" disabled="">Load</button>
+            <button class="delete-save" type="button" data-action="delete-slot" data-slot="3" disabled="">Delete</button>
+          </div>
+        </div>
+      
+        <div class="save-slot" data-slot="4">
+          <div class="save-slot-main">
+            <label for="save-slot-name-4">Slot 4</label>
+            <input id="save-slot-name-4" type="text" value="Save Slot 4" maxlength="32">
+            <span>Empty</span>
+          </div>
+          <div class="save-slot-actions">
+            <button type="button" data-action="save-slot" data-slot="4" disabled="">Save</button>
+            <button type="button" data-action="load-slot" data-slot="4" disabled="">Load</button>
+            <button class="delete-save" type="button" data-action="delete-slot" data-slot="4" disabled="">Delete</button>
+          </div>
+        </div>
+      </div>
+          <div id="main-settings" class="main-settings hidden" aria-label="Settings">
+            <label class="volume-controls menu-volume" aria-label="Sound volume">
+              <span class="volume-text">Volume</span>
+              <span class="volume-label">50%</span>
+              <input class="volume-slider" type="range" min="0" max="100" step="1" value="50">
+            </label>
+            <label class="menu-setting-field">
+              <span>Button Theme</span>
+              <select id="button-theme-select">
+                <option value="verdigris">Verdigris</option>
+                <option value="ember">Classic Ember</option>
+                <option value="steel">Dungeon Steel</option>
+                <option value="royal">Royal Violet</option>
+              </select>
+            </label>
+            <button id="choose-save-folder" class="ghost-button" type="button">Choose Save Folder</button>
+            <button id="manage-token-art" class="ghost-button" type="button">Manage Token Pictures</button>
+            <a class="ghost-button" href="dungeon-creator.html">Dungeon Creator</a>
+          </div>
+          <p id="save-status" class="save-status">Choose a save folder to use JSON file saves. No saved adventure found.</p>
+        </div>
+      </div>
+    </section>
+
+    <main class="app-shell">
+      <section class="arena" aria-label="Dungeon room">
+        <div class="topbar">
+          <div>
+            <p class="eyebrow">Depthbound</p>
+            <h1 id="room-title">Old Guardroom</h1>
+            <button id="show-dungeon-intro" class="ghost-button dungeon-intro-button hidden" type="button">Intro</button>
+          </div>
+          <div class="top-actions">
+            <div class="zoom-controls" aria-label="Dungeon zoom controls">
+              <button id="zoom-out" class="icon-button ghost-button" type="button" title="Zoom out" aria-label="Zoom out">-</button>
+              <span id="zoom-label">100%</span>
+              <input id="zoom-slider" type="range" min="50" max="200" step="5" value="100" aria-label="Dungeon zoom">
+              <button id="zoom-in" class="icon-button ghost-button" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+            </div>
+            <label class="volume-controls dungeon-volume" aria-label="Sound volume">
+              <span class="volume-text">Volume</span>
+              <span class="volume-label">50%</span>
+              <input class="volume-slider" type="range" min="0" max="100" step="1" value="50">
+            </label>
+            <button id="toggle-admin-mode" class="ghost-button admin-mode-button" type="button" disabled="">Adminmode</button>
+            <button id="toggle-layout" class="ghost-button debug-button hidden" type="button" disabled="">Show Dungeon Layout</button>
+            <button id="debug-kill" class="ghost-button debug-button hidden" type="button" disabled="">Kill all visible Monsters</button>
+            <button id="save-game" class="ghost-button" type="button" disabled="">Save</button>
+            <button id="new-game" class="ghost-button" type="button">Main Menu</button>
+            <button id="tutorial" class="ghost-button" type="button">Tutorial</button>
+          </div>
+        </div>
+        <div class="room-scroll">
+          <div class="room-wrap">
+            <div id="room" class="room" aria-label="Tactical grid" style="--grid-size: 72; --tile-size: 32px; --room-size: 2304px; --token-size: 20px; --token-slide-ms: 140ms;"><div class="tile-layer"><button class="tile walkable" type="button" data-x="32" data-y="33" data-tile-key="32,33" style="left: 1024px; top: 1056px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="33" data-y="33" data-tile-key="33,33" style="left: 1056px; top: 1056px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="34" data-y="33" data-tile-key="34,33" style="left: 1088px; top: 1056px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="35" data-y="33" data-tile-key="35,33" style="left: 1120px; top: 1056px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="36" data-y="33" data-tile-key="36,33" style="left: 1152px; top: 1056px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="37" data-y="33" data-tile-key="37,33" style="left: 1184px; top: 1056px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="38" data-y="33" data-tile-key="38,33" style="left: 1216px; top: 1056px;" disabled="" title=""></button><button class="tile" type="button" data-x="39" data-y="33" data-tile-key="39,33" style="left: 1248px; top: 1056px;" disabled="" title=""></button><button class="tile walkable door door-west" type="button" data-x="32" data-y="34" data-tile-key="32,34" style="left: 1024px; top: 1088px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="33" data-y="34" data-tile-key="33,34" style="left: 1056px; top: 1088px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="34" data-y="34" data-tile-key="34,34" style="left: 1088px; top: 1088px;" disabled="" title=""></button><button class="tile" type="button" data-x="35" data-y="34" data-tile-key="35,34" style="left: 1120px; top: 1088px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="36" data-y="34" data-tile-key="36,34" style="left: 1152px; top: 1088px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="37" data-y="34" data-tile-key="37,34" style="left: 1184px; top: 1088px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="38" data-y="34" data-tile-key="38,34" style="left: 1216px; top: 1088px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="39" data-y="34" data-tile-key="39,34" style="left: 1248px; top: 1088px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="32" data-y="35" data-tile-key="32,35" style="left: 1024px; top: 1120px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="33" data-y="35" data-tile-key="33,35" style="left: 1056px; top: 1120px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="34" data-y="35" data-tile-key="34,35" style="left: 1088px; top: 1120px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="35" data-y="35" data-tile-key="35,35" style="left: 1120px; top: 1120px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="36" data-y="35" data-tile-key="36,35" style="left: 1152px; top: 1120px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="37" data-y="35" data-tile-key="37,35" style="left: 1184px; top: 1120px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="38" data-y="35" data-tile-key="38,35" style="left: 1216px; top: 1120px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="39" data-y="35" data-tile-key="39,35" style="left: 1248px; top: 1120px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="32" data-y="36" data-tile-key="32,36" style="left: 1024px; top: 1152px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="33" data-y="36" data-tile-key="33,36" style="left: 1056px; top: 1152px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="34" data-y="36" data-tile-key="34,36" style="left: 1088px; top: 1152px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="35" data-y="36" data-tile-key="35,36" style="left: 1120px; top: 1152px;" title="Open door"></button><button class="tile walkable" type="button" data-x="36" data-y="36" data-tile-key="36,36" style="left: 1152px; top: 1152px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="37" data-y="36" data-tile-key="37,36" style="left: 1184px; top: 1152px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="38" data-y="36" data-tile-key="38,36" style="left: 1216px; top: 1152px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="39" data-y="36" data-tile-key="39,36" style="left: 1248px; top: 1152px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="32" data-y="37" data-tile-key="32,37" style="left: 1024px; top: 1184px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="33" data-y="37" data-tile-key="33,37" style="left: 1056px; top: 1184px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="34" data-y="37" data-tile-key="34,37" style="left: 1088px; top: 1184px;" disabled="" title=""></button><button class="tile walkable door door-south" type="button" data-x="35" data-y="37" data-tile-key="35,37" style="left: 1120px; top: 1184px;" title="Open door"></button><button class="tile walkable" type="button" data-x="36" data-y="37" data-tile-key="36,37" style="left: 1152px; top: 1184px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="37" data-y="37" data-tile-key="37,37" style="left: 1184px; top: 1184px;" disabled="" title=""></button><button class="tile walkable" type="button" data-x="38" data-y="37" data-tile-key="38,37" style="left: 1216px; top: 1184px;" disabled="" title=""></button><button class="tile walkable door door-east" type="button" data-x="39" data-y="37" data-tile-key="39,37" style="left: 1248px; top: 1184px;" disabled="" title=""></button></div><div class="wall-edge-layer"><div class="wall-edge wall-edge-north" style="left: 1024px; top: 1056px; width: 34px;"></div><div class="wall-edge wall-edge-west" style="left: 1024px; top: 1056px; height: 34px;"></div><div class="wall-edge wall-edge-north" style="left: 1056px; top: 1056px; width: 34px;"></div><div class="wall-edge wall-edge-north" style="left: 1088px; top: 1056px; width: 34px;"></div><div class="wall-edge wall-edge-north" style="left: 1120px; top: 1056px; width: 34px;"></div><div class="wall-edge wall-edge-north" style="left: 1152px; top: 1056px; width: 34px;"></div><div class="wall-edge wall-edge-north" style="left: 1184px; top: 1056px; width: 34px;"></div><div class="wall-edge wall-edge-north" style="left: 1216px; top: 1056px; width: 34px;"></div><div class="wall-edge wall-edge-east" style="left: 1280px; top: 1056px; height: 34px;"></div><div class="wall-edge wall-edge-north" style="left: 1248px; top: 1056px; width: 34px;"></div><div class="wall-edge wall-edge-east" style="left: 1280px; top: 1088px; height: 34px;"></div><div class="wall-edge wall-edge-west" style="left: 1024px; top: 1120px; height: 34px;"></div><div class="wall-edge wall-edge-east" style="left: 1280px; top: 1120px; height: 34px;"></div><div class="wall-edge wall-edge-west" style="left: 1024px; top: 1152px; height: 34px;"></div><div class="wall-edge wall-edge-east" style="left: 1280px; top: 1152px; height: 34px;"></div><div class="wall-edge wall-edge-south" style="left: 1024px; top: 1216px; width: 34px;"></div><div class="wall-edge wall-edge-west" style="left: 1024px; top: 1184px; height: 34px;"></div><div class="wall-edge wall-edge-south" style="left: 1056px; top: 1216px; width: 34px;"></div><div class="wall-edge wall-edge-south" style="left: 1088px; top: 1216px; width: 34px;"></div><div class="wall-edge wall-edge-south" style="left: 1152px; top: 1216px; width: 34px;"></div><div class="wall-edge wall-edge-south" style="left: 1184px; top: 1216px; width: 34px;"></div><div class="wall-edge wall-edge-south" style="left: 1216px; top: 1216px; width: 34px;"></div><div class="wall-edge wall-edge-south" style="left: 1248px; top: 1216px; width: 34px;"></div></div><div class="token-layer"><div class="token hero active-hero" data-combatant="hero" title="Mira Vale - Fighter" style="--token-ring-color: #664627; left: 1136px; top: 1168px;"><img class="token-art hidden" alt="Mira Vale" draggable="false"><span class="token-label">M</span><div class="token-hp"><div class="token-hp-fill" style="width: 100%;"></div></div></div><div class="exit-token hidden" data-exit="dungeon" title="Dungeon exit" style="left: 2192px; top: 2128px;">E</div><button class="home-move-out-button hidden" type="button" style="left: 2219.2px; top: 2128px;">Move Out</button><button class="chest-token hidden" type="button" title="Home chest">C</button><button class="planning-table-token hidden" type="button" title="Planning Table">PT</button><div class="loot-layer"></div><div class="object-layer"><button class="dungeon-object chest feature-defined-loot-container feature-lock feature-trap has-furniture-icon" type="button" title="Dungeon Chest" style="left: 1248px; top: 1056px; width: 32px; height: 32px;"><img class="dungeon-object-icon" alt="" draggable="false" src="assets/furniture/dungeon-chest.png"><span class="dungeon-object-label hidden">C</span></button><button class="dungeon-object collapsed-pillar feature-cover feature-pushable-object has-furniture-icon" type="button" title="Collapsed Pillar" style="left: 1120px; top: 1088px; width: 32px; height: 32px;"><img class="dungeon-object-icon" alt="" draggable="false" src="assets/furniture/collapsed-pillar.png"><span class="dungeon-object-label hidden">P</span></button></div></div></div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="side-panel" aria-label="Character and combat state">
+        <section class="status-panel">
+          <div class="combat-state">
+            <span id="round-label">Out of turn order</span>
+            <strong id="turn-label">Exploration</strong>
+          </div>
+          <div id="initiative-list" class="initiative-list"></div>
+        </section>
+
+        <section class="fighters">
+          <article id="hero-card" class="fighter-card">
+    <div class="fighter-top">
+      <div class="sidebar-hero-art empty"><span>M</span></div>
+      <div>
+        <div class="fighter-name">Mira Vale</div>
+        <div class="fighter-role">Level 1 Human Fighter</div>
+      </div>
+      <div class="card-actions">
+        <button class="icon-button open-inventory" type="button" title="Inventory and equipment" aria-label="Inventory and equipment">I</button>
+        <button class="icon-button rename-hero" type="button" title="Rename character" aria-label="Rename character">...</button>
+      </div>
+    </div>
+    <div class="hp-line">
+      <div class="hp-text"><span>HP</span><span>14 / 14</span></div>
+      <div class="hp-bar"><div class="hp-fill" style="width: 100%"></div></div>
+    </div>
+    <div class="loadout-line">
+      <span>AC 16</span>
+      <span>Longsword / Chain Mail</span>
+    </div>
+    <div class="status-line">
+      
+      
+      
+      
+      
+      
+    </div>
+    <button class="temporary-effects-button" type="button" disabled="">
+      Temporary effects <span>0</span>
+    </button>
+    <div class="wallet-line">XP: 0 / 300 - Hit Dice: 1/1 - Rests: 0/3 - Inventory: 0 gp - Hero Tokens: 0</div>
+  </article>
+        </section>
+
+        <section class="level-panel">
+          <button id="level-up" type="button" disabled="">Level Up</button>
+        </section>
+
+        <section class="log-panel">
+          <div class="panel-heading">
+            <h2>Combat Log</h2>
+            <div class="panel-actions">
+              <button id="expand-log" class="icon-button" type="button" title="Expand log" aria-label="Expand log" aria-expanded="false">+</button>
+              <button id="clear-log" class="icon-button" type="button" title="Clear log" aria-label="Clear log">x</button>
+            </div>
+          </div>
+          <ol id="combat-log" class="combat-log" aria-live="polite"><li class="important">Generated 10 rooms for Old Guardroom. Mira Vale starts at the entrance of Entrance Hall.</li></ol>
+        </section>
+      </aside>
+    </main>
+
+    <nav class="action-dock" aria-label="Combat actions">
+      <button id="roll-initiative" type="button" disabled="">Roll Initiative [R]</button>
+      <button id="select-party" type="button" disabled="">Select Party [Q]</button>
+      <div class="dock-action">
+        <button id="attack" type="button" disabled="" style="display: none;">
+          <span>Attack [T]</span>
+          <small id="attack-note">Longsword</small>
+        </button>
+      </div>
+      <div class="dock-action">
+        <button id="action-button" type="button" disabled="" style="display: none;">Other [X]</button>
+      </div>
+      <button id="use-item" type="button" disabled="">Use Item [U]</button>
+      <button id="abilities" type="button" disabled="">Abilities [B]</button>
+      <button id="short-rest" type="button" disabled="">Short Rest</button>
+      <button id="return-home" type="button" disabled="" title="">Return Home [H]</button>
+      <button id="end-turn" type="button" disabled="" style="display: none;">End Turn [E]</button>
+    </nav>
+
+    <div id="fighter-info" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="fighter-info-name">
+      <div class="fighter-info-panel">
+        <div class="panel-heading">
+          <h2 id="fighter-info-name">Fighter</h2>
+          <button id="close-fighter-info" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div id="fighter-info-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+
+    <div id="inventory-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="inventory-title">
+      <div class="fighter-info-panel inventory-panel">
+        <div class="panel-heading">
+          <h2 id="inventory-title">Inventory</h2>
+          <button id="close-inventory" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div id="inventory-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+
+    <div id="use-item-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="use-item-title">
+      <div class="fighter-info-panel">
+        <div class="panel-heading">
+          <h2 id="use-item-title">Use Item</h2>
+          <button id="close-use-item" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div id="use-item-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+
+    <div id="action-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="action-menu-title">
+      <div class="fighter-info-panel">
+        <div class="panel-heading">
+          <h2 id="action-menu-title">Other</h2>
+          <button id="close-action-menu" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div id="action-menu-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+
+    <div id="abilities-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="abilities-title">
+      <div class="fighter-info-panel">
+        <div class="panel-heading">
+          <h2 id="abilities-title">Abilities</h2>
+          <button id="close-abilities" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div id="abilities-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+
+    <div id="home-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="home-menu-title">
+      <div class="fighter-info-panel">
+        <div class="panel-heading">
+          <h2 id="home-menu-title">Home Door</h2>
+          <button id="close-home-menu" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div class="fighter-info-body home-actions">
+          <button id="go-store" type="button">General Merchant</button>
+          <button id="build-home" type="button">Build Your Home</button>
+          <hr>
+          <button id="go-new-dungeon" type="button">Random Dungeon</button>
+          <hr>
+          <button id="go-barrow-crown" type="button"><span>The Barrow Crown</span><small data-campaign-progress="">0/7</small></button>
+          <button id="go-thornwood-pact" type="button"><span>The Thornwood Pact</span><small data-campaign-progress="">0/8</small></button>
+        </div>
+      </div>
+    </div>
+
+    <div id="store-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="store-title">
+      <div class="fighter-info-panel store-panel">
+        <div class="panel-heading">
+          <h2 id="store-title">Store</h2>
+          <button id="close-store" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div id="store-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+
+    <div id="game-dialog" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="game-dialog-title">
+      <form id="game-dialog-form" class="fighter-info-panel dialog-panel">
+        <div class="panel-heading">
+          <h2 id="game-dialog-title">Dialog</h2>
+        </div>
+        <div class="fighter-info-body">
+          <p id="game-dialog-message" class="dialog-message"></p>
+          <label id="game-dialog-field" class="dialog-field hidden">
+            <span id="game-dialog-label">Name</span>
+            <input id="game-dialog-input" type="text" autocomplete="off">
+          </label>
+          <div id="game-dialog-actions" class="dialog-actions"></div>
+        </div>
+      </form>
+    </div>
+
+    <div id="tutorial-tour" class="tutorial-tour hidden" aria-live="polite">
+      <div id="tutorial-highlight" class="tutorial-highlight hidden"></div>
+      <section class="tutorial-tour-card" aria-label="Interactive tutorial">
+        <p id="tutorial-tour-step" class="eyebrow">Tutorial</p>
+        <h2 id="tutorial-tour-title">Tour</h2>
+        <p id="tutorial-tour-body"></p>
+        <div class="tutorial-tour-actions">
+          <button id="tutorial-tour-back" class="ghost-button" type="button">Back</button>
+          <button id="tutorial-tour-next" type="button">Next</button>
+          <button id="tutorial-tour-close" class="ghost-button" type="button">Finish</button>
+        </div>
+      </section>
+    </div>
+
+    <script src="src/scripts/config.js" defer=""></script>
+    <script src="src/scripts/content/registry.js" defer=""></script>
+    <script src="src/scripts/content/items/equipment.js" defer=""></script>
+    <script src="src/scripts/content/items/treasure.js" defer=""></script>
+    <script src="src/scripts/content/items/magic_items.js" defer=""></script>
+    <script src="src/scripts/content/items/magic_accessories.js" defer=""></script>
+    <script src="src/scripts/content/spells/core-spells.js" defer=""></script>
+    <script src="src/scripts/content/classes/barbarian.js" defer=""></script>
+    <script src="src/scripts/content/classes/fighter.js" defer=""></script>
+    <script src="src/scripts/content/classes/monk.js" defer=""></script>
+    <script src="src/scripts/content/classes/rogue.js" defer=""></script>
+    <script src="src/scripts/content/classes/cleric.js" defer=""></script>
+    <script src="src/scripts/content/classes/druid.js" defer=""></script>
+    <script src="src/scripts/content/classes/wizard.js" defer=""></script>
+    <script src="src/scripts/content/classes/bard.js" defer=""></script>
+    <script src="src/scripts/content/classes/sorcerer.js" defer=""></script>
+    <script src="src/scripts/content/classes/paladin.js" defer=""></script>
+    <script src="src/scripts/content/classes/ranger.js" defer=""></script>
+    <script src="src/scripts/content/classes/warlock.js" defer=""></script>
+    <script src="src/scripts/content/classes/sidekick-warrior.js" defer=""></script>
+    <script src="src/scripts/content/classes/sidekick-expert.js" defer=""></script>
+    <script src="src/scripts/content/classes/sidekick-spellcaster.js" defer=""></script>
+    <script src="src/scripts/content/monsters/skeletal-undead-pack.js" defer=""></script>
+    <script src="src/scripts/content/monsters/zombie-undead-pack.js" defer=""></script>
+    <script src="src/scripts/content/monsters/forest-beast-pack.js" defer=""></script>
+    <script src="src/scripts/content/monsters/beast-biome-pack.js" defer=""></script>
+    <script src="src/scripts/content/furniture/dungeon-furniture-pack.js" defer=""></script>
+    <script src="src/scripts/content/traps/chest-traps.js" defer=""></script>
+    <script src="src/scripts/content/dungeons/generated-old-guardroom.js" defer=""></script>
+    <script src="src/scripts/content/loot/basic-dungeon.js" defer=""></script>
+    <script src="src/scripts/content/themes/old-guardroom.js" defer=""></script>
+    <script src="src/scripts/content/themes/forest-of-the-beasts.js" defer=""></script>
+    <script src="src/scripts/dice.js" defer=""></script>
+    <script src="src/scripts/grid.js" defer=""></script>
+    <script src="src/scripts/dungeon.js" defer=""></script>
+    <script src="src/scripts/custom-dungeons.js" defer=""></script>
+    <script src="src/scripts/campaigns.js" defer=""></script>
+    <script src="src/scripts/save.js" defer=""></script>
+    <script src="src/scripts/app/bootstrap.js" defer=""></script>
+    <script src="src/scripts/app/game-state.js" defer=""></script>
+    <script src="src/scripts/app/ui-dialogs-character.js" defer=""></script>
+    <script src="src/scripts/app/combat-map.js" defer=""></script>
+    <script src="src/scripts/app/movement-ai-input.js" defer=""></script>
+    <script src="src/scripts/app/rendering-inventory.js" defer=""></script>
+    <script src="src/scripts/app/home-comfort-bonuses.js" defer=""></script>
+    <script src="src/scripts/app.js" defer=""></script>
+  
+
+<div id="perf-overlay" style="position: fixed; left: 12px; top: 12px; z-index: 50; padding: 8px 10px; background: rgba(12, 10, 8, 0.86); color: rgb(243, 231, 204); border: 1px solid rgba(215, 168, 79, 0.45); border-radius: 6px; font: 12px / 1.35 monospace; pointer-events: none; white-space: pre; display: none;"></div></body></html>

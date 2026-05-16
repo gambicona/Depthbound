@@ -166,6 +166,7 @@ els.toggleAdminMode.addEventListener("click", () => {
   if (!adminMode) disableAdminModeOptions();
   addLog(adminMode ? "Adminmode enabled." : "Adminmode disabled.", "important");
   render();
+  if (isHomeBuilderOpen()) renderHomeBuilder();
 });
 els.toggleLayout.addEventListener("click", () => {
   if (!adminEnabled()) return;
@@ -252,13 +253,13 @@ els.fighterInfo.addEventListener("click", (event) => {
     freeCaptiveCreature(button.dataset.object);
   }
   if (button.dataset.action === "home-store-item") {
-    storeHomeChestItem(button.dataset.item);
+    storeHomeChestItem(button.dataset.item, button.dataset.object ?? "home-chest");
   }
   if (button.dataset.action === "home-store-all-items") {
-    storeAllHomeChestItems();
+    storeAllHomeChestItems(button.dataset.object ?? "home-chest");
   }
   if (button.dataset.action === "home-take-all-items") {
-    takeAllHomeChestItems();
+    takeAllHomeChestItems(button.dataset.object ?? "home-chest");
   }
   if (button.dataset.action === "home-deposit-custom-coins") {
     moveCustomMoneyFromHomeChestPanel("deposit");
@@ -273,6 +274,48 @@ els.fighterInfo.addEventListener("click", (event) => {
   if (button.dataset.action === "home-withdraw-all-coins") {
     moveMoneyBetweenHeroAndChest("withdraw", moneyToCp(state.chestMoney ?? {}));
     showHomeChestInfo();
+  }
+  if (button.dataset.action === "open-monster-compendium") {
+    openMonsterCompendium();
+  }
+  if (button.dataset.action === "open-library-tutorial") {
+    showHomeLibraryTutorial(button.dataset.topic);
+  }
+  if (button.dataset.action === "library-tutorial-step") {
+    showHomeLibraryTutorial(button.dataset.topic, button.dataset.step);
+  }
+  if (button.dataset.action === "preview-monster-art") {
+    showMonsterArtPreview(button.dataset.art, button.dataset.name);
+  }
+  if (button.dataset.action === "cook-home-meal") {
+    cookHomeMeal();
+  }
+  if (button.dataset.action === "harvest-home-herbs") {
+    harvestHomeHerbs();
+  }
+  if (button.dataset.action === "home-build-tool") {
+    homeBuildTool = button.dataset.tool ?? "floor";
+    homeMoveSelection = null;
+    renderHomeBuilder();
+  }
+  if (button.dataset.action === "home-build-furniture") {
+    homeBuildFurnitureId = button.dataset.furniture ?? homeBuildFurnitureId;
+    homeBuildTool = "furniture";
+    homeMoveSelection = null;
+    renderHomeBuilder();
+  }
+  if (button.dataset.action === "home-paint-color") {
+    homeBuildPaintColor = button.dataset.color ?? homeBuildPaintColor;
+    renderHomeBuilder();
+  }
+  if (button.dataset.action === "home-save-build") {
+    saveHomeBuilderChanges();
+  }
+  if (button.dataset.action === "home-restore-build") {
+    restoreHomeBuilderChanges();
+  }
+  if (button.dataset.action === "show-bed-range") {
+    showHomeBedRange(button.dataset.object);
   }
   if (button.dataset.action === "create-roster-hero") {
     createRosterHero();
@@ -312,10 +355,27 @@ els.fighterInfo.addEventListener("change", (event) => {
     showPlanningTableInfo();
     return;
   }
+  const bedSelect = event.target.closest("select[data-action='assign-home-bed']");
+  if (bedSelect) {
+    assignHomeBed(bedSelect.dataset.object, bedSelect.value);
+    return;
+  }
   const select = event.target.closest("select[data-action='party-role']");
   if (!select) return;
   setHeroRole(select.dataset.hero, select.value);
   showPlanningTableInfo();
+});
+els.fighterInfo.addEventListener("input", (event) => {
+  if (event.target.id === "home-build-search") {
+    homeBuildSearch = event.target.value;
+    renderHomeBuilder();
+    const searchInput = els.fighterInfo.querySelector("#home-build-search");
+    searchInput?.focus();
+    searchInput?.setSelectionRange(searchInput.value.length, searchInput.value.length);
+  }
+  if (event.target.id === "home-paint-color") {
+    homeBuildPaintColor = event.target.value;
+  }
 });
 els.closeInventory.addEventListener("click", hideInventoryMenu);
 els.closeUseItem.addEventListener("click", hideUseItemMenu);
@@ -324,6 +384,7 @@ els.closeAbilities.addEventListener("click", hideAbilitiesMenu);
 els.closeHomeMenu.addEventListener("click", hideHomeMenu);
 els.closeStore.addEventListener("click", hideStoreMenu);
 els.goStore.addEventListener("click", showStoreMenu);
+els.buildHome?.addEventListener("click", showHomeBuilder);
 els.goBarrowCrown?.addEventListener("click", () => void startCampaignDungeon("barrow-crown"));
 els.goThornwoodPact?.addEventListener("click", () => void startCampaignDungeon("thornwood-pact"));
 els.goNewDungeon.addEventListener("click", startNewDungeonWithHero);

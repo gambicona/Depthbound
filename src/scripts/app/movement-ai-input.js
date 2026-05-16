@@ -410,6 +410,7 @@ function handleTileClick(position) {
     void confirmPendingEldritchBlast(position);
     return;
   }
+  if (applyHomeBuildAt(position)) return;
   if (movementInProgress || dragPath) return;
   if (adminEnabled() && adminTeleportEnabled) {
     adminTeleportHero(position);
@@ -424,6 +425,8 @@ function handleTileClick(position) {
   }
 
   if (state.completed) return;
+
+  if (toggleHomeDoor(position, hero)) return;
 
   const door = canOpenDoor(position);
   if (door) {
@@ -1223,6 +1226,7 @@ function handleMapPanPointerDown(event) {
     return;
   }
   if (adminEnabled() && adminTeleportEnabled && event.target.closest(".tile")) return;
+  if (isHomeBuilderOpen() && event.target.closest(".tile")) return;
   if (event.target.closest(".token, .chest-token, .topbar, button:not(.tile)")) return;
   if (event.target === els.roomScroll) return;
   if (isPointerOnRoomScrollbar(event)) return;

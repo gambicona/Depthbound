@@ -202,6 +202,78 @@ feature("chest", "Dungeon Chest", ["container", "loot", "chest", "dungeon", "for
   components: [C.loot(), C.lock({ dc: 12 }), C.trap({ source: "container" })],
 });
 
+feature("home-bookshelf", "Home Bookshelf", ["home", "library", "bookshelf", "compendium"], {
+  kind: "feature",
+  blocksMovement: true,
+  symbol: "B",
+  placement: "home",
+  interactable: true,
+  description: "A growing library for rules notes and the monster compendium.",
+});
+
+feature("home-cooking-pot", "Cooking Pot", ["home", "kitchen", "cooking", "buff"], {
+  kind: "feature",
+  blocksMovement: true,
+  symbol: "P",
+  placement: "home",
+  interactable: true,
+  description: "A warm kitchen pot. For now it can prepare a free hearty meal before an adventure.",
+});
+
+feature("home-herb-garden", "Medicinal Herb Garden", ["home", "garden", "herbs", "healing"], {
+  kind: "feature",
+  width: 2,
+  blocksMovement: false,
+  symbol: "H",
+  placement: "home",
+  interactable: true,
+  description: "A small herb bed for medicinal plants. Later it can grow ingredients over time.",
+});
+
+feature("shabby-hay-bed", "Shabby Hay Bed", ["home", "bed", "utility", "comfort"], {
+  kind: "feature",
+  blocksMovement: true,
+  inspectable: true,
+  interactable: true,
+  symbol: "b",
+  placement: "home",
+  description: "A simple bundle of hay and cloth. Better than sleeping on bare stone.",
+  components: [{ type: "homeBed", comfort: 1, priceCp: 1, range: 1 }],
+});
+
+feature("broken-wooden-bed", "Broken Wooden Bed", ["home", "bed", "utility", "comfort"], {
+  kind: "feature",
+  blocksMovement: true,
+  inspectable: true,
+  interactable: true,
+  symbol: "b",
+  placement: "home",
+  description: "A repaired wooden bed that still creaks at every honest breath.",
+  components: [{ type: "homeBed", comfort: 2, priceCp: 10, range: 2 }],
+});
+
+feature("comfortable-bed", "Comfortable Bed", ["home", "bed", "utility", "comfort"], {
+  kind: "feature",
+  blocksMovement: true,
+  inspectable: true,
+  interactable: true,
+  symbol: "B",
+  placement: "home",
+  description: "A proper bed with clean bedding and enough softness to matter.",
+  components: [{ type: "homeBed", comfort: 5, priceCp: 50, range: 3 }],
+});
+
+feature("luxury-bed", "Luxury Bed", ["home", "bed", "utility", "comfort"], {
+  kind: "feature",
+  blocksMovement: true,
+  inspectable: true,
+  interactable: true,
+  symbol: "B",
+  placement: "home",
+  description: "A lavish bed fit for deep sleep and extremely smug mornings.",
+  components: [{ type: "homeBed", comfort: 10, priceCp: 1000, range: 4 }],
+});
+
 feature("portal", "Paired Portal", ["portal", "magic", "arcane", "old-guardroom"], {
   kind: "portal",
   symbol: "P",

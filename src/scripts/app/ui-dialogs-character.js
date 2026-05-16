@@ -1607,9 +1607,15 @@ const interactiveTutorialSteps = [
     },
   },
   {
+    title: "Bookshelf Lessons",
+    body: "Inspect the bookshelf at home to open the Monster Compendium and short lessons about home expansion, comfort zones, and comfort levels.",
+    selector: ".dungeon-object.home-bookshelf",
+    enter: () => switchInteractiveTutorialScene("home"),
+  },
+  {
     title: "Home Door",
-    body: "Step onto the home door space, or click the door token while adjacent, to open choices for the merchant or venturing into another dungeon.",
-    selector: ".exit-token",
+    body: "March onto the home door space, or click the Move Out button beside it, to open choices for the merchant, Build Your Home, or venturing into another dungeon.",
+    selector: ".exit-token, .home-move-out-button",
     enter: () => switchInteractiveTutorialScene("home"),
   },
   {
@@ -1700,7 +1706,7 @@ function switchInteractiveTutorialScene(scene) {
   const chestMoney = state.chestMoney ?? {};
   const party = state.party;
   if (scene === "home") {
-    state = createHomeState(heroes, chest, chestMoney, { ...party, campaignProgress: loadedState.campaignProgress ?? {} });
+    state = createHomeState(heroes, chest, chestMoney, { ...party, campaignProgress: state.campaignProgress ?? {} });
     state.isTutorial = true;
     state.tutorialScene = "home";
     selectedHeroIds = new Set([state.party.activeHeroId]);
@@ -1744,17 +1750,23 @@ function tutorialTargetRect(selector) {
 
 function updateInteractiveTutorial() {
   if (!interactiveTutorialActive || !els.tutorialTour) return;
-  const step = interactiveTutorialSteps[interactiveTutorialStep];
-  if (!step) return;
+  if (interactiveTutorialUpdating) return;
+  interactiveTutorialUpdating = true;
+  const stepIndex = interactiveTutorialStep;
+  const step = interactiveTutorialSteps[stepIndex];
+  if (!step) {
+    interactiveTutorialUpdating = false;
+    return;
+  }
 
-  step.enter?.();
-  els.tutorialTourStep.textContent = `Tutorial ${interactiveTutorialStep + 1} / ${interactiveTutorialSteps.length}`;
+  els.tutorialTourStep.textContent = `Tutorial ${stepIndex + 1} / ${interactiveTutorialSteps.length}`;
   els.tutorialTourTitle.textContent = step.title;
   els.tutorialTourBody.textContent = step.body;
-  els.tutorialTourBack.disabled = interactiveTutorialStep === 0;
-  els.tutorialTourNext.textContent = interactiveTutorialStep === interactiveTutorialSteps.length - 1 ? "Done" : "Next";
+  els.tutorialTourBack.disabled = stepIndex === 0;
+  els.tutorialTourNext.textContent = stepIndex === interactiveTutorialSteps.length - 1 ? "Done" : "Next";
 
-  window.requestAnimationFrame(() => {
+  const updateHighlight = () => {
+    if (!interactiveTutorialActive || stepIndex !== interactiveTutorialStep) return;
     const rect = tutorialTargetRect(step.selector);
     if (!rect) {
       els.tutorialHighlight.classList.add("hidden");
@@ -1765,7 +1777,19 @@ function updateInteractiveTutorial() {
     els.tutorialHighlight.style.top = `${Math.max(8, rect.top - 8)}px`;
     els.tutorialHighlight.style.width = `${rect.width + 16}px`;
     els.tutorialHighlight.style.height = `${rect.height + 16}px`;
-  });
+  };
+
+  if (interactiveTutorialEnteredStep !== stepIndex) {
+    interactiveTutorialEnteredStep = stepIndex;
+    window.requestAnimationFrame(() => {
+      if (!interactiveTutorialActive || stepIndex !== interactiveTutorialStep) return;
+      step.enter?.();
+      window.requestAnimationFrame(updateHighlight);
+    });
+  } else {
+    window.requestAnimationFrame(updateHighlight);
+  }
+  interactiveTutorialUpdating = false;
 }
 
 function startInteractiveTutorial() {
@@ -1777,6 +1801,8 @@ function startInteractiveTutorial() {
   roomIsBuilt = false;
   interactiveTutorialActive = true;
   interactiveTutorialStep = 0;
+  interactiveTutorialEnteredStep = -1;
+  interactiveTutorialUpdating = false;
   hideMainMenu();
   hideFighterInfo();
   hideInventoryMenu();
@@ -1792,6 +1818,8 @@ function startInteractiveTutorial() {
 
 function finishInteractiveTutorial() {
   interactiveTutorialActive = false;
+  interactiveTutorialEnteredStep = -1;
+  interactiveTutorialUpdating = false;
   els.tutorialTour?.classList.add("hidden");
   els.tutorialHighlight?.classList.add("hidden");
   hideInventoryMenu();
@@ -2360,6 +2388,7 @@ async function startNewDungeonWithHero() {
   const choice = await chooseDungeonChoice();
   if (!choice) return;
   const previousState = state;
+  const comfortScores = homeComfortScoresForActiveParty(state);
   const customTemplate = choice.startsWith("custom:") ? window.DungeonCustom?.get(choice.slice("custom:".length)) : null;
   if (customTemplate?.intro?.text || customTemplate?.intro?.images?.length) {
     await showDungeonStoryDialog({
@@ -2381,6 +2410,7 @@ async function startNewDungeonWithHero() {
     render();
     return;
   }
+  applyHomeComfortBonusesToDungeonState(state, comfortScores);
   try {
     await saveQuickstart(state);
   } catch (error) {
@@ -2439,6 +2469,7 @@ async function startCampaignDungeon(campaignId) {
   if (!template) return;
   const partyIds = state.party?.heroIds ?? ["hero"];
   const partyMembers = partyIds.map((id) => state.fighters[id]).filter((hero) => hero && !hero.dead);
+  const comfortScores = homeComfortScoresForActiveParty(state);
   if (template.intro?.text || template.intro?.images?.length) {
     await showDungeonStoryDialog({
       title: template.name,
@@ -2454,6 +2485,7 @@ async function startCampaignDungeon(campaignId) {
     state = previousState;
     return;
   }
+  applyHomeComfortBonusesToDungeonState(state, comfortScores);
   try {
     await saveQuickstart(state);
   } catch (error) {
@@ -2489,7 +2521,12 @@ async function returnHomeEarly() {
   addMoney(hero.inventory.money, -lostCoins);
 
   const saveSlotId = state.saveSlotId ?? activeSaveSlot;
-  state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, { ...state.party, campaignProgress: state.campaignProgress ?? {} });
+  state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, {
+    ...state.party,
+    campaignProgress: state.campaignProgress ?? {},
+    home: state.home,
+    monsterCompendium: state.monsterCompendium,
+  });
   state.saveSlotId = saveSlotId;
   roomIsBuilt = false;
   const lostItemText = lostItems.length ? lostItems.map((item) => item.name).join(", ") : "no items";

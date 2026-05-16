@@ -445,7 +445,7 @@ registerMagicAccessory("magic-boots-elven-step", "Boots of Elven Step", "boots",
 registerMagicAccessory("magic-boots-striding", "Boots of Striding", "boots", "uncommon", 2200, {
   weightLb: 1,
   effects: { speedBonusFeet: 10 },
-  description: "Grants +10 ft. speed. Later this can also improve pit-jump distance.",
+  description: "Grants +10 ft. speed.",
   implementation: "Also add +5 ft. or advantage-equivalent to pit crossing checks if that system is implemented.",
 });
 

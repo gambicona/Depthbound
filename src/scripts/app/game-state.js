@@ -61,6 +61,8 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
     shortRestLimit: theme?.rest?.shortRestLimit ?? 3,
     chest: [],
     chestMoney: { cp: 0, sp: 0, gp: 0 },
+    home: createDefaultHomeLayout(),
+    monsterCompendium: {},
     campaignProgress: {},
     lootPiles: [],
     dungeonObjects,
@@ -139,6 +141,8 @@ function createDungeonStateForParty(partyMembers, previousState, themeId = defau
   nextState.saveSlotId = previousState?.saveSlotId ?? activeSaveSlot;
   nextState.chest = previousState?.chest ?? [];
   nextState.chestMoney = normalizeMoney(previousState?.chestMoney ?? {});
+  nextState.home = normalizeHomeData(previousState?.home);
+  nextState.monsterCompendium = normalizeMonsterCompendium(previousState?.monsterCompendium);
   nextState.d20Mode = normalizeD20Mode(previousState?.d20Mode);
   nextState.d20FailureStreak = previousState?.d20FailureStreak ?? 0;
   return nextState;
@@ -305,6 +309,8 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
     shortRestLimit: theme?.rest?.shortRestLimit ?? 3,
     chest: previousState?.chest ?? [],
     chestMoney: normalizeMoney(previousState?.chestMoney ?? {}),
+    home: normalizeHomeData(previousState?.home),
+    monsterCompendium: normalizeMonsterCompendium(previousState?.monsterCompendium),
     campaignProgress: cloneData(previousState?.campaignProgress ?? {}),
     lootPiles: [],
     dungeonObjects: objects,
@@ -332,7 +338,220 @@ function createCustomDungeonStateForParty(partyMembers, previousState, customDun
 }
 
 function homeHeroPositions(heroIds) {
-  return heroIds.map((id, index) => ({ id, position: { x: 3 + (index % 4), y: 5 + Math.floor(index / 4) } }));
+  return heroIds.map((id, index) => ({ id, position: { x: 13 + (index % 4), y: 15 + Math.floor(index / 4) } }));
+}
+
+function defaultHomeCells() {
+  return Array.from({ length: 100 }, (_, index) => ({ x: 10 + (index % 10), y: 10 + Math.floor(index / 10) }));
+}
+
+function createDefaultHomeLayout() {
+  return {
+    gridSize: 30,
+    cells: defaultHomeCells(),
+    doors: [{ x: 19, y: 15, edge: "east", corridor: { x: 20, y: 15 }, roomId: "home-room", to: "outside" }],
+    herbsReady: true,
+    specialPositions: {
+      chest: { x: 18, y: 11 },
+      planningTable: { x: 14, y: 18 },
+    },
+    floorColors: {},
+    wallColors: {},
+    unlockedFurniture: [],
+    objects: [
+      { id: "home-bookshelf", type: "home-bookshelf", position: { x: 11, y: 11 }, width: 1, height: 1, homePlaced: true },
+      { id: "home-starter-bed", type: "shabby-hay-bed", position: { x: 10, y: 19 }, width: 1, height: 1, homePlaced: true, assignedHeroId: "hero" },
+    ],
+  };
+}
+
+function normalizeHomeData(home = null) {
+  const fallback = createDefaultHomeLayout();
+  const legacySmallHome = Boolean(home) && Math.floor(home?.gridSize ?? 0) <= 14 && (!Array.isArray(home?.cells) || home.cells.length <= 120);
+  const legacyGeneratedLargeHome =
+    Boolean(home) &&
+    Math.floor(home?.gridSize ?? 0) === 24 &&
+    Array.isArray(home?.cells) &&
+    home.cells.length >= 300 &&
+    home.cells.every((cell) => cell.x >= 0 && cell.x < 18 && cell.y >= 0 && cell.y < 18);
+  const useFreshDefault = legacySmallHome || legacyGeneratedLargeHome;
+  const gridSize = useFreshDefault ? fallback.gridSize : Math.max(10, Math.min(30, Math.floor(home?.gridSize ?? fallback.gridSize)));
+  const sourceDoors = useFreshDefault ? fallback.doors : Array.isArray(home?.doors) ? home.doors : fallback.doors;
+  const outsideDoor = sourceDoors.map((door) => normalizeHomeDoor(door)).find((door) => door?.to === "outside") ?? fallback.doors[0];
+  const reservedNoFloorKeys = reservedHomeNoFloorKeys(outsideDoor, gridSize);
+  const seen = new Set();
+  const sourceCells = useFreshDefault
+    ? fallback.cells
+    : Array.isArray(home?.cells) && home.cells.length
+      ? home.cells
+      : fallback.cells;
+  const cells = sourceCells
+    .map((cell) => ({ x: Math.floor(cell.x), y: Math.floor(cell.y) }))
+    .filter((cell) => cell.x >= 0 && cell.y >= 0 && cell.x < gridSize && cell.y < gridSize)
+    .filter((cell) => !reservedNoFloorKeys.has(positionKey(cell)))
+    .filter((cell) => {
+      const key = positionKey(cell);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  const cellKeys = new Set(cells.map(positionKey));
+  const doors = sourceDoors
+    .map((door) => normalizeHomeDoor(door))
+    .filter(Boolean)
+    .filter((door) => cellKeys.has(positionKey(door)))
+    .filter((door) => door.to === "outside" || cellKeys.has(positionKey(door.corridor)));
+  if (!doors.some((door) => door.to === "outside") && cellKeys.has(positionKey(fallback.doors[0]))) {
+    doors.push({ ...fallback.doors[0] });
+  }
+  const specialPositions = {
+    chest: normalizeHomeSpecialPosition(home?.specialPositions?.chest, fallback.specialPositions.chest, cellKeys),
+    planningTable: normalizeHomeSpecialPosition(home?.specialPositions?.planningTable, fallback.specialPositions.planningTable, cellKeys),
+  };
+  const sourceObjects = useFreshDefault ? fallback.objects : Array.isArray(home?.objects) ? home.objects : fallback.objects;
+  const objects = sourceObjects
+    .map((object, index) => {
+      const template = objectTemplate(object.type);
+      if (!template) return null;
+      return {
+        ...object,
+        id: object.id ?? `home-object-${index + 1}`,
+        position: { x: Math.floor(object.position?.x ?? 0), y: Math.floor(object.position?.y ?? 0) },
+        width: object.width ?? template.width ?? 1,
+        height: object.height ?? template.height ?? 1,
+        homePlaced: true,
+        items: Array.isArray(object.items) ? object.items.map(normalizeItem) : [],
+      };
+    })
+    .filter(Boolean)
+    .filter((object) => objectCells(object).every((cell) => cellKeys.has(positionKey(cell))));
+  const floorColors = normalizeHomeColorMap(home?.floorColors, cellKeys);
+  const wallColors = normalizeHomeWallColorMap(home?.wallColors, cellKeys, gridSize);
+  const unlockedFurniture = uniqueValues((home?.unlockedFurniture ?? []).filter((id) => typeof id === "string" && objectTemplate(id)));
+  return { gridSize, cells, doors, objects, specialPositions, floorColors, wallColors, unlockedFurniture, herbsReady: home?.herbsReady !== false };
+}
+
+function normalizeHomeColorMap(map = {}, allowedKeys = null) {
+  const normalized = {};
+  for (const [key, color] of Object.entries(map ?? {})) {
+    if (allowedKeys && !allowedKeys.has(key)) continue;
+    const normalizedColor = normalizeHomeColor(color);
+    if (normalizedColor) normalized[key] = normalizedColor;
+  }
+  return normalized;
+}
+
+function normalizeHomeColor(color) {
+  const value = String(color ?? "").trim();
+  return /^#[0-9a-fA-F]{6}$/.test(value) ? value.toLowerCase() : null;
+}
+
+function normalizeHomeWallColorMap(map = {}, cellKeys = new Set(), gridSize = 30) {
+  const normalized = {};
+  for (const [key, color] of Object.entries(map ?? {})) {
+    const [rawX, rawY, edge] = key.split(",");
+    const x = Number(rawX);
+    const y = Number(rawY);
+    if (!Number.isInteger(x) || !Number.isInteger(y) || !["north", "east", "south", "west"].includes(edge)) continue;
+    if (!cellKeys.has(positionKey({ x, y }))) continue;
+    const neighbor =
+      edge === "north"
+        ? { x, y: y - 1 }
+        : edge === "east"
+          ? { x: x + 1, y }
+          : edge === "south"
+            ? { x, y: y + 1 }
+            : { x: x - 1, y };
+    if (neighbor.x < 0 || neighbor.y < 0 || neighbor.x >= gridSize || neighbor.y >= gridSize || cellKeys.has(positionKey(neighbor))) continue;
+    const normalizedColor = normalizeHomeColor(color);
+    if (normalizedColor) normalized[key] = normalizedColor;
+  }
+  return normalized;
+}
+
+function normalizeHomeSpecialPosition(position, fallback, cellKeys) {
+  const normalized = { x: Math.floor(position?.x ?? fallback.x), y: Math.floor(position?.y ?? fallback.y) };
+  return cellKeys.has(positionKey(normalized)) ? normalized : { ...fallback };
+}
+
+function normalizeHomeDoor(door) {
+  const x = Math.floor(door?.x);
+  const y = Math.floor(door?.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  const edge = ["north", "east", "south", "west"].includes(door.edge) ? door.edge : door.corridor?.y < y ? "north" : door.corridor?.x > x ? "east" : door.corridor?.y > y ? "south" : "west";
+  const delta = edge === "north" ? { x: 0, y: -1 } : edge === "east" ? { x: 1, y: 0 } : edge === "south" ? { x: 0, y: 1 } : { x: -1, y: 0 };
+  return {
+    x,
+    y,
+    edge,
+    corridor: { x: x + delta.x, y: y + delta.y },
+    roomId: "home-room",
+    to: door.to ?? "home-room",
+  };
+}
+
+function reservedHomeNoFloorKeys(door, gridSize = 30) {
+  const keys = new Set();
+  const edge = door?.edge ?? "east";
+  const forward = edge === "north" ? { x: 0, y: -1 } : edge === "east" ? { x: 1, y: 0 } : edge === "south" ? { x: 0, y: 1 } : { x: -1, y: 0 };
+  const side = edge === "north" || edge === "south" ? { x: 1, y: 0 } : { x: 0, y: 1 };
+  for (let depth = 1; depth <= 3; depth += 1) {
+    for (let offset = -1; offset <= 1; offset += 1) {
+      const cell = {
+        x: door.x + forward.x * depth + side.x * offset,
+        y: door.y + forward.y * depth + side.y * offset,
+      };
+      if (cell.x >= 0 && cell.y >= 0 && cell.x < gridSize && cell.y < gridSize) keys.add(positionKey(cell));
+    }
+  }
+  return keys;
+}
+
+function homeWithRegrownResources(home) {
+  return { ...normalizeHomeData(home), herbsReady: true };
+}
+
+function normalizeMonsterCompendium(compendium = {}) {
+  const normalized = {};
+  for (const [monsterId, entry] of Object.entries(compendium ?? {})) {
+    if (!getMonsterTemplate(monsterId)) continue;
+    normalized[monsterId] = {
+      encountered: Boolean(entry?.encountered),
+      kills: Math.max(0, Math.floor(entry?.kills ?? 0)),
+    };
+  }
+  return normalized;
+}
+
+function monsterCatalogId(monster) {
+  const id = monster?.baseMonsterId ?? monster?.templateId ?? monster?.monsterId ?? monster?.id;
+  if (getMonsterTemplate(id)) return id;
+  const normalizedName = String(monster?.name ?? "").replace(/\s+\d+$/, "").trim().toLowerCase();
+  if (!normalizedName) return null;
+  return window.DungeonContent
+    .list("monsters")
+    .find((template) => String(template.name ?? "").trim().toLowerCase() === normalizedName)?.id ?? null;
+}
+
+function recordMonsterEncounter(monster) {
+  const monsterId = monsterCatalogId(monster);
+  if (!monsterId || !state) return false;
+  state.monsterCompendium = normalizeMonsterCompendium(state.monsterCompendium);
+  state.monsterCompendium[monsterId] ??= { encountered: false, kills: 0 };
+  state.monsterCompendium[monsterId].encountered = true;
+  return true;
+}
+
+function recordMonsterKill(monster) {
+  const monsterId = monsterCatalogId(monster);
+  if (!monsterId || !state) return false;
+  if (monster.compendiumKillRecorded) return false;
+  state.monsterCompendium = normalizeMonsterCompendium(state.monsterCompendium);
+  state.monsterCompendium[monsterId] ??= { encountered: true, kills: 0 };
+  state.monsterCompendium[monsterId].encountered = true;
+  state.monsterCompendium[monsterId].kills = Math.max(0, Math.floor(state.monsterCompendium[monsterId].kills ?? 0)) + 1;
+  monster.compendiumKillRecorded = true;
+  return true;
 }
 
 function partyMemberKind(fighter) {
@@ -451,6 +670,14 @@ function removeLegacyTestingBeastAllyFromPartyData(partyData = null) {
 
 function prepareRestedHero(hero, position) {
   if (isWildShaped(hero)) revertWildShape(hero);
+  if (hero.baseSpellPointMaxBeforeComfort !== undefined) {
+    hero.spellPointMax = hero.baseSpellPointMaxBeforeComfort;
+    delete hero.baseSpellPointMaxBeforeComfort;
+  }
+  delete hero.comfortSpellPointBonus;
+  hero.abilities = (hero.abilities ?? []).filter((ability) => !ability.homeComfortGranted);
+  hero.extraResourcePoolUses = {};
+  hero.extraSneakAttackDice = 0;
   hero.statusEffects = (hero.statusEffects ?? []).filter((effect) => !effect.expiresAtHome);
   refreshItemChargesForFighter(hero, "home");
   refreshItemChargesForFighter(hero, "longRest");
@@ -459,6 +686,7 @@ function prepareRestedHero(hero, position) {
     return refreshDerivedStats({
       ...hero,
       hp: 0,
+      temporaryHp: 0,
       position: { ...position },
       alive: false,
       stableAtZero: false,
@@ -468,6 +696,10 @@ function prepareRestedHero(hero, position) {
   const restedHero = refreshDerivedStats({
     ...hero,
     hp: hero.maxHp,
+    temporaryHp: 0,
+    extraAbilityUses: {},
+    extraResourcePoolUses: {},
+    extraSneakAttackDice: 0,
     hitDiceRemaining: hero.level ?? 1,
     position: { ...position },
     movementLeft: Math.floor(hero.speedFeet / feetPerSquare),
@@ -485,8 +717,9 @@ function prepareRestedHero(hero, position) {
 }
 
 function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, gp: 0 }, partyData = null) {
-  const cells = Array.from({ length: 100 }, (_, index) => ({ x: index % 10, y: Math.floor(index / 10) }));
-  const homeDoor = { x: 9, y: 5, roomId: "home-room", to: "outside" };
+  const home = normalizeHomeData(partyData ? partyData.home : state?.home);
+  const cells = home.cells;
+  const homeDoor = home.doors.find((door) => door.to === "outside") ?? { x: 19, y: 15, roomId: "home-room", to: "outside" };
   const normalizedPartyData = partyData ? { ...partyData, heroIds: [...(partyData.heroIds ?? [])], rosterIds: [...(partyData.rosterIds ?? [])] } : null;
   removeLegacyTestingBeastAllyFromPartyData(normalizedPartyData);
   const incomingHeroes = (Array.isArray(heroOrHeroes) ? heroOrHeroes : [heroOrHeroes]).filter((hero) => !isLegacyTestingBeastAlly(hero));
@@ -515,20 +748,20 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
     room: {
       id: "home",
       name: "Home",
-      gridSize: 10,
+      gridSize: home.gridSize,
       tileSizePx,
     },
     dungeon: {
       id: "home",
       roomCount: 1,
-      gridSize: 10,
-      rooms: [{ id: "home-room", name: "Home", cells, doors: [homeDoor] }],
+      gridSize: home.gridSize,
+      rooms: [{ id: "home-room", name: "Home", cells, doors: home.doors }],
       walkable: cells,
       corridors: [],
-      doors: [homeDoor],
+      doors: home.doors,
       corridorPassages: [],
       entranceRoomId: "home-room",
-      startPosition: { x: 4, y: 5 },
+      startPosition: { x: 13, y: 15 },
     },
     exploration: {
       discoveredRoomIds: ["home-room"],
@@ -546,9 +779,11 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
     shortRestLimit: 3,
     chest,
     chestMoney: normalizeMoney(chestMoney),
+    home,
+    monsterCompendium: normalizeMonsterCompendium(partyData ? normalizedPartyData?.monsterCompendium : state?.monsterCompendium),
     campaignProgress: cloneData(normalizedPartyData?.campaignProgress ?? {}),
     lootPiles: [],
-    dungeonObjects: [],
+    dungeonObjects: home.objects,
     party: {
       activeHeroId,
       heroIds: heroIds.filter((id) => fighters[id] && !fighters[id].dead),
@@ -701,29 +936,31 @@ function promoteMainHero(heroId) {
 
 function normalizeHomeLayout(gameState) {
   if (gameState?.mode !== "home") return;
-  const cells = Array.from({ length: 100 }, (_, index) => ({ x: index % 10, y: Math.floor(index / 10) }));
-  const homeDoor = { x: 9, y: 5, roomId: "home-room", to: "outside" };
+  const home = normalizeHomeData(gameState.home);
+  const cells = home.cells;
+  const homeDoor = home.doors.find((door) => door.to === "outside") ?? { x: 19, y: 15, roomId: "home-room", to: "outside" };
+  gameState.home = home;
   gameState.combatStarted = false;
   gameState.activeIndex = 0;
   gameState.initiative = [];
   gameState.room = {
     id: "home",
     name: "Home",
-    gridSize: 10,
+    gridSize: home.gridSize,
     tileSizePx,
   };
   gameState.dungeon = {
     ...(gameState.dungeon ?? {}),
     id: "home",
     roomCount: 1,
-    gridSize: 10,
-    rooms: [{ id: "home-room", name: "Home", cells, doors: [homeDoor] }],
+    gridSize: home.gridSize,
+    rooms: [{ id: "home-room", name: "Home", cells, doors: home.doors }],
     walkable: cells,
     corridors: [],
-    doors: [homeDoor],
+    doors: home.doors,
     corridorPassages: [],
     entranceRoomId: "home-room",
-    startPosition: { x: 4, y: 5 },
+    startPosition: { x: 13, y: 15 },
   };
   gameState.exit = { roomId: "home-room", position: { ...homeDoor } };
   gameState.exploration = {
@@ -732,7 +969,7 @@ function normalizeHomeLayout(gameState) {
     openedDoorKeys: [],
     openedCorridorKeys: [],
   };
-  gameState.dungeonObjects = [];
+  gameState.dungeonObjects = home.objects;
   gameState.lootPiles = [];
   const rosterIds = new Set(gameState.party?.rosterIds ?? gameState.party?.heroIds ?? ["hero"]);
   for (const fighterId of Object.keys(gameState.fighters ?? {})) {
@@ -1232,17 +1469,18 @@ function racialCantripSpellIdsForFighter(fighter = state?.fighters?.hero) {
 
 function abilityMaxUses(fighter, ability) {
   const level = fighter.level ?? 1;
-  if (ability.resourcePool === "ki") return Math.max(0, level);
-  if (ability.resourcePool === "bardicInspiration") return Math.max(1, abilityMod(fighter, "cha"));
-  if (ability.resourcePool === "wildShape") return 2;
-  if (ability.resourcePool === "layOnHands") return Math.max(0, level * 5);
-  if (ability.resourcePool === "arcaneRecovery") return 1;
-  if (ability.resourcePool === "metamagic") return Math.max(0, level);
+  const poolBonus = ability.resourcePool ? fighter?.extraResourcePoolUses?.[ability.resourcePool] ?? 0 : 0;
+  if (ability.resourcePool === "ki") return Math.max(0, level) + poolBonus;
+  if (ability.resourcePool === "bardicInspiration") return Math.max(1, abilityMod(fighter, "cha")) + poolBonus;
+  if (ability.resourcePool === "wildShape") return 2 + poolBonus;
+  if (ability.resourcePool === "layOnHands") return Math.max(0, level * 5) + poolBonus;
+  if (ability.resourcePool === "arcaneRecovery") return 1 + poolBonus;
+  if (ability.resourcePool === "metamagic") return Math.max(0, level) + poolBonus;
   let uses = ability.uses ?? 1;
   for (const entry of ability.usesByLevel ?? []) {
     if (level >= entry.level) uses = entry.uses;
   }
-  return uses;
+  return uses + (fighter?.extraAbilityUses?.[ability.id] ?? 0);
 }
 
 function canonicalSpellId(spellId) {
@@ -1257,7 +1495,7 @@ function spellPointMaximum(fighter) {
   for (const [entryLevel, value] of Object.entries(progression)) {
     if (level >= Number(entryLevel)) points = value;
   }
-  return Math.max(0, Number(points) || 0);
+  return Math.max(0, (Number(points) || 0) + (fighter?.comfortSpellPointBonus ?? 0));
 }
 
 function classSpellListForFighter(fighter = state?.fighters?.hero) {
@@ -1358,7 +1596,8 @@ function skillCheckBonus(fighter, ability, skillId) {
   const expertise = new Set(fighter?.expertiseSkills ?? []);
   const prof = proficiencies.has(skillId) ? proficiencyBonus(fighter) : 0;
   const expert = expertise.has(skillId) ? proficiencyBonus(fighter) : 0;
-  return abilityMod(fighter, ability) + prof + expert;
+  const statusBonus = (fighter?.statusEffects ?? []).reduce((sum, effect) => sum + (effect.skillBonus ?? 0), 0);
+  return abilityMod(fighter, ability) + prof + expert + statusBonus;
 }
 
 function thievesToolsTraining(fighter) {
@@ -1879,6 +2118,7 @@ function normalizeObjectComponent(component) {
 }
 
 function objectComponents(objectOrType) {
+  if (typeof objectOrType !== "string" && objectOrType?.homePlaced) return [];
   const template =
     typeof objectOrType === "string"
       ? objectTemplate(objectOrType)
@@ -1926,6 +2166,7 @@ function objectIsTrap(object) {
 function objectCanInspect(object) {
   const template = objectTemplate(object?.type);
   if (!template) return false;
+  if (object?.homePlaced) return false;
   return Boolean(
     template.inspectable ||
       objectHasComponent(object, "hiddenLoot") ||
@@ -3311,6 +3552,8 @@ function safeRoomSpawnCell(room, origin, blockedKeys = new Set(), gridSize = cur
 function createMonsterForRoom(monsterTemplate, room, position, id, name, hero) {
   const monster = createCombatant({
     ...monsterTemplate,
+    baseMonsterId: monsterTemplate.id,
+    templateId: monsterTemplate.id,
     id,
     name,
   });
@@ -3363,6 +3606,8 @@ function createDungeonMonsters(dungeon, heroPosition, hero, exitRoomId = "", dun
     if (bossTemplate && bossRoom) {
       const boss = createCombatant({
         ...bossTemplate,
+        baseMonsterId: bossTemplate.id,
+        templateId: bossTemplate.id,
         id: `boss-${bossRoom.id}`,
         name: bossTemplate.name,
       });
@@ -3478,6 +3723,8 @@ function normalizeLoadedState(loadedState) {
     shortRestLimit: loadedState.shortRestLimit ?? 3,
     chest: Array.isArray(loadedState.chest) ? loadedState.chest.map(normalizeItem) : [],
     chestMoney: normalizeMoney(loadedState.chestMoney ?? {}),
+    home: normalizeHomeData(loadedState.home ?? freshState.home),
+    monsterCompendium: normalizeMonsterCompendium(loadedState.monsterCompendium ?? freshState.monsterCompendium),
     campaignProgress: cloneData(loadedState.campaignProgress ?? freshState.campaignProgress ?? {}),
     lootPiles: Array.isArray(loadedState.lootPiles) ? loadedState.lootPiles : [],
     dungeonObjects: Array.isArray(loadedState.dungeonObjects) ? loadedState.dungeonObjects : [],

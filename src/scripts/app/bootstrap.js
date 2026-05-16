@@ -44,6 +44,8 @@ let initiativePromptOpen = false;
 let fledMonsterIds = new Set();
 let interactiveTutorialActive = false;
 let interactiveTutorialStep = 0;
+let interactiveTutorialEnteredStep = -1;
+let interactiveTutorialUpdating = false;
 let predefinedHeroTokenArt = [];
 let renderedTileKeys = new Set();
 let pathfindingJobsThisTurn = 0;
@@ -220,7 +222,7 @@ const speciesDefinitions = {
       abilityBonuses: { dex: 2 },
       speedFeet: 30,
       skillProficiencies: ["perception"],
-      traits: ["Keen Senses stored as Perception proficiency.", "Fey Ancestry stored for future charm/sleep handling."],
+      traits: ["Keen Senses: Perception proficiency.", "Fey Ancestry stored for future charm/sleep handling."],
     },
     subraces: {
       drow: {
@@ -488,6 +490,7 @@ const els = {
   homeMenu: document.querySelector("#home-menu"),
   closeHomeMenu: document.querySelector("#close-home-menu"),
   goStore: document.querySelector("#go-store"),
+  buildHome: document.querySelector("#build-home"),
   goBarrowCrown: document.querySelector("#go-barrow-crown"),
   goThornwoodPact: document.querySelector("#go-thornwood-pact"),
   goNewDungeon: document.querySelector("#go-new-dungeon"),

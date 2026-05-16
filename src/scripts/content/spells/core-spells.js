@@ -422,7 +422,7 @@ spell("bless", {
   effect: { kind: "status", status: { id: "blessed", label: "Blessed", attackBonus: 2, saveBonus: 2, durationRounds: 3 } },
   upcast: { targetsPerLevel: 1 },
   aiCategory: "buff-opener",
-  description: "Concentration, 3 rounds. Ally gains +2 attacks and saves. Upcast: +1 target later.",
+  description: "Concentration, 3 rounds. Ally gains +2 attacks and saves. Upcast: +1 target.",
 });
 
 spell("bane", {
@@ -436,7 +436,7 @@ spell("bane", {
   effect: { kind: "status", status: { id: "baned", label: "Baned", attackBonus: -2, saveBonus: -2, durationRounds: 3 } },
   upcast: { targetsPerLevel: 1 },
   aiCategory: "control-cluster",
-  description: "Concentration, 3 rounds. WIS save or -2 attacks and saves. Upcast: +1 target later.",
+  description: "Concentration, 3 rounds. WIS save or -2 attacks and saves. Upcast: +1 target.",
 });
 
 spell("shield-of-faith", {
@@ -449,7 +449,7 @@ spell("shield-of-faith", {
   effect: { kind: "status", status: { id: "shield-of-faith", label: "Shield of Faith", acBonus: 2, durationRounds: 3 } },
   upcast: { targetsPerLevel: 1 },
   aiCategory: "defensive-reaction",
-  description: "Concentration, 3 rounds. Ally gains +2 AC. Upcast: +1 target later.",
+  description: "Concentration, 3 rounds. Ally gains +2 AC. Upcast: +1 target.",
 });
 
 spell("spiritual-weapon", {
@@ -488,7 +488,7 @@ spell("spirit-guardians", {
   ...concentration3,
   effect: { kind: "status", status: { id: "spirit-guardians", label: "Spirit Guardians", aura: { radiusFeet: 15, damage: { count: 3, sides: 8, type: "radiant" }, save: "wis" }, durationRounds: 3 } },
   aiCategory: "control-cluster",
-  description: "Concentration aura for 3 rounds. Nearby enemies are slowed and take radiant damage in later full implementation.",
+  description: "Concentration aura for 3 rounds. Nearby enemies make WIS saves and take radiant damage.",
 });
 
 spell("mass-healing-word", {

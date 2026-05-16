@@ -266,6 +266,20 @@ function createTileButton(position) {
   tile.type = "button";
   tile.dataset.x = String(position.x);
   tile.dataset.y = String(position.y);
+  tile.addEventListener("pointerdown", (event) => {
+    if (!isHomeBuilderOpen()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    homePaintPointerId = event.pointerId;
+    document.addEventListener("pointerup", clearHomePaintPointer, { once: true });
+    document.addEventListener("pointercancel", clearHomePaintPointer, { once: true });
+    applyHomeBuildAt(position, event);
+  });
+  tile.addEventListener("pointerenter", (event) => {
+    if (!isHomeBuilderOpen() || homePaintPointerId === null) return;
+    if (!["floor", "erase", "paintFloor", "paintWall"].includes(homeBuildTool)) return;
+    applyHomeBuildAt(position, event);
+  });
   tile.addEventListener("click", () => handleTileClick(position));
   tile.addEventListener("mouseenter", () => hoverSpellTarget(position));
   tile.addEventListener("contextmenu", (event) => {
@@ -282,9 +296,13 @@ function createTileButton(position) {
       return;
     }
     const table = planningTablePosition();
-    if (state.mode === "home" && position.y === table.y && position.x >= table.x && position.x < table.x + 2) {
+    if (!isHomeBuilderOpen() && state.mode === "home" && position.y === table.y && position.x >= table.x && position.x < table.x + 2) {
       event.preventDefault();
       showPlanningTableInfo();
+      return;
+    }
+    if (state.mode === "home" && toggleHomeDoor(position, activeHero())) {
+      event.preventDefault();
     }
   });
   return tile;
@@ -323,11 +341,13 @@ function buildRoom() {
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
+    if (isHomeBuilderOpen()) return;
     if (canHeroUseHomeExit(activeHero())) showHomeMenu();
   });
   exitToken.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
+    if (isHomeBuilderOpen()) return;
     if (pendingSpellTargeting) {
       void confirmPendingSpellTarget(state.exit.position);
       return;
@@ -350,6 +370,7 @@ function buildRoom() {
   exitToken.addEventListener("contextmenu", (event) => {
     event.preventDefault();
     event.stopPropagation();
+    if (isHomeBuilderOpen()) return;
     if (pendingSpellTargeting) {
       clearPendingSpellTargeting();
       return;
@@ -380,6 +401,7 @@ function buildRoom() {
   homeMoveOutButton.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
+    if (isHomeBuilderOpen()) return;
     showHomeMenu();
   });
   tokenLayer.append(homeMoveOutButton);
@@ -392,6 +414,8 @@ function buildRoom() {
   const openChest = (event) => {
     event?.preventDefault();
     event?.stopPropagation();
+    if (selectHomeMoveTarget({ kind: "special", id: "chest", label: "Home Chest" })) return;
+    if (isHomeBuilderOpen()) return;
     const hero = activeHero();
     if (state.mode === "home" && hero) {
       showHomeChestInfo();
@@ -400,6 +424,7 @@ function buildRoom() {
   const inspectChest = (event) => {
     event?.preventDefault();
     event?.stopPropagation();
+    if (isHomeBuilderOpen()) return;
     if (pendingSpellTargeting) {
       clearPendingSpellTargeting();
       return;
@@ -424,6 +449,7 @@ function buildRoom() {
   planningToken.addEventListener("contextmenu", (event) => {
     event.preventDefault();
     event.stopPropagation();
+    if (isHomeBuilderOpen()) return;
     if (pendingSpellTargeting) {
       clearPendingSpellTargeting();
       return;
@@ -436,6 +462,9 @@ function buildRoom() {
   });
   planningToken.addEventListener("click", (event) => {
     event.preventDefault();
+    event.stopPropagation();
+    if (selectHomeMoveTarget({ kind: "special", id: "planningTable", label: "Planning Table" })) return;
+    if (isHomeBuilderOpen()) return;
     if (state.mode === "home") showPlanningTableInfo();
   });
   tokenLayer.append(planningToken);
@@ -461,6 +490,11 @@ function renderWallEdges() {
   for (const segment of wallEdgeSegments()) {
     const edge = document.createElement("div");
     edge.className = `wall-edge wall-edge-${segment.direction}`;
+    const homeWallColor = state.mode === "home" ? state.home?.wallColors?.[homeWallEdgeKey(segment.position, segment.direction)] : null;
+    if (homeWallColor) {
+      edge.classList.add("home-painted-wall");
+      edge.style.setProperty("--home-wall-color", homeWallColor);
+    }
     if (segment.direction === "east" || segment.direction === "west") {
       edge.style.left = `${(segment.position.x + 1) * scaledTileSizePx}px`;
       if (segment.direction === "west") edge.style.left = `${segment.position.x * scaledTileSizePx}px`;
@@ -615,6 +649,11 @@ function renderDungeonObjects() {
     element.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (isHomeBuilderOpen() && homeBuildTool === "move" && object.homePlaced) {
+        selectHomeMoveTarget({ kind: "object", id: object.id, label: template.name });
+        return;
+      }
+      if (applyHomeBuildAt(object.position)) return;
       if (pendingSpellTargeting) {
         void confirmPendingSpellTarget(object.position);
         return;
@@ -632,6 +671,7 @@ function renderDungeonObjects() {
     element.addEventListener("contextmenu", (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (isHomeBuilderOpen()) return;
       if (pendingSpellTargeting) {
         clearPendingSpellTargeting();
         return;
@@ -666,11 +706,11 @@ function placeExitToken() {
 }
 
 function homeChestPosition() {
-  return { x: 8, y: 1 };
+  return { ...(state.home?.specialPositions?.chest ?? { x: 18, y: 11 }) };
 }
 
 function planningTablePosition() {
-  return { x: 4, y: 8 };
+  return { ...(state.home?.specialPositions?.planningTable ?? { x: 14, y: 18 }) };
 }
 
 function placeHomeChestToken() {
@@ -755,7 +795,7 @@ function placeToken(fighter) {
   token.classList.toggle("selected-hero", heroToken && selectedHeroIds.has(fighter.id));
   token.classList.toggle("in-attack-range", !heroToken && attackTargets().some((target) => target.id === fighter.id));
   token.classList.toggle("selected-target", !heroToken && selectedAttackTarget()?.id === fighter.id);
-  const spellTargeting = currentPendingSpellTargeting();
+    const spellTargeting = currentPendingSpellTargeting();
   token.classList.toggle("spell-click-target", isSpellTokenTargetable(spellTargeting, fighter));
   const art = combatantTokenArt(fighter);
   setCombatantTokenArt(token, art);
@@ -771,7 +811,9 @@ function renderableFighters(activeTiles = activeTileKeys()) {
   return Object.values(state.fighters).filter((fighter) => {
     if (isRosterHeroId(fighter.id)) return true;
     if (!fighter.alive) return false;
-    return showDungeonLayout || initiativeIds.has(fighter.id) || activeTiles.has(positionKey(fighter.position));
+    const visible = showDungeonLayout || initiativeIds.has(fighter.id) || activeTiles.has(positionKey(fighter.position));
+    if (visible) recordMonsterEncounter(fighter);
+    return visible;
   });
 }
 
@@ -785,11 +827,15 @@ function renderRoom() {
   els.room.style.setProperty("--room-size", `${mapGridSize * scaledTileSizePx}px`);
   els.room.style.setProperty("--token-size", `${Math.round(scaledTileSizePx * 0.62)}px`);
   els.room.style.setProperty("--token-slide-ms", `${tokenSlideMs}ms`);
+  els.room.classList.toggle("home-room", state.mode === "home");
 
   const hero = activeHero();
   const heroTurn = state.mode === "combat" && activeFighter()?.id === hero?.id && isPlayerControlledPartyFighter(hero) && combatNeedsHeroTurns();
   const activeTiles = activeTileKeys();
-  const rememberedTiles = rememberedTileKeys();
+  const rememberedTiles =
+    isHomeBuilderOpen()
+      ? new Set(Array.from({ length: mapGridSize * mapGridSize }, (_, index) => positionKey({ x: index % mapGridSize, y: Math.floor(index / mapGridSize) })))
+      : rememberedTileKeys();
   renderTileButtons(rememberedTiles);
   const walkable = currentWalkable();
   const doorKeys = new Set((state.dungeon?.doors ?? []).map(positionKey));
@@ -821,14 +867,17 @@ function renderRoom() {
     const isActiveTile = activeTiles.has(key);
     const isReachable = reachable.has(key);
     const isWalkable = walkable.has(key);
-    const door = doorAt(position);
-    const isDoor = doorKeys.has(key);
+    const doorsHere = (state.dungeon?.doors ?? []).filter((door) => positionKey(door) === key);
+    const renderableDoorsHere = doorsHere.filter((entry) => entry.edge || entry.corridor);
+    const door = renderableDoorsHere[0] ?? null;
+    const isDoor = renderableDoorsHere.length > 0 || (doorKeys.has(key) && Boolean(door));
     const isKnown = isKnownTile(position);
     const isSeenWall = !isWalkable && visibleWalls.has(key);
     const pathIndex = dragPathIndexByKey.get(key) ?? -1;
     const isAdminTeleportTarget = canAdminTeleportTo(position);
     const spellTargetAtTile = fighterAtPosition(position);
     const isSpellAffected = spellPreview.has(key);
+    const isHomeBuildTarget = isHomeBuilderOpen();
     const isPersistentSpellArea = persistentAreas.has(key);
     const isSpellOrigin = spellTargeting?.hoverPosition && positionKey(spellTargeting.hoverPosition) === key;
     const isSpellTargetable =
@@ -842,10 +891,10 @@ function renderRoom() {
     tile.classList.toggle("hidden-tile", !isKnown && !isSeenWall);
     tile.classList.toggle("seen-wall", isSeenWall);
     tile.classList.toggle("door", isDoor && isKnown);
-    tile.classList.toggle("door-north", isDoor && isKnown && door?.corridor?.y < position.y);
-    tile.classList.toggle("door-east", isDoor && isKnown && door?.corridor?.x > position.x);
-    tile.classList.toggle("door-south", isDoor && isKnown && door?.corridor?.y > position.y);
-    tile.classList.toggle("door-west", isDoor && isKnown && door?.corridor?.x < position.x);
+    tile.classList.toggle("door-north", isDoor && isKnown && renderableDoorsHere.some((entry) => homeDoorDirection(entry, position) === "north"));
+    tile.classList.toggle("door-east", isDoor && isKnown && renderableDoorsHere.some((entry) => homeDoorDirection(entry, position) === "east"));
+    tile.classList.toggle("door-south", isDoor && isKnown && renderableDoorsHere.some((entry) => homeDoorDirection(entry, position) === "south"));
+    tile.classList.toggle("door-west", isDoor && isKnown && renderableDoorsHere.some((entry) => homeDoorDirection(entry, position) === "west"));
     tile.classList.toggle("open-door", isKnown && openedDoorKeys.has(key));
     tile.classList.toggle("reachable", isReachable && !(adminEnabled() && adminTeleportEnabled));
     tile.classList.toggle("path-preview", pathIndex >= 0);
@@ -854,14 +903,26 @@ function renderRoom() {
     tile.classList.toggle("spell-aoe-preview", isSpellAffected);
     tile.classList.toggle("persistent-spell-area", isPersistentSpellArea);
     tile.classList.toggle("spell-affected-occupied", isSpellAffected && Boolean(spellTargetAtTile));
+    tile.classList.toggle("home-comfort-range", state.mode === "home" && homeComfortRangePreviewKeys.has(key));
+    const homeFloorColor = state.mode === "home" ? state.home?.floorColors?.[key] : null;
+    tile.classList.toggle("home-painted-floor", Boolean(homeFloorColor && isWalkable && isKnown));
+    if (homeFloorColor && isWalkable && isKnown) {
+      tile.style.setProperty("--home-floor-color", homeFloorColor);
+    } else {
+      tile.style.removeProperty("--home-floor-color");
+    }
     tile.textContent = pathIndex >= 0 ? String(pathIndex + 1) : "";
     const openableDoor = isActiveTile && Boolean(canOpenDoor(position));
+    const homeDoorToggleTarget =
+      state.mode === "home" && !isHomeBuilderOpen() && Boolean(doorCandidateForPosition(position, hero)) && distance(hero.position, doorCandidateForPosition(position, hero)) <= 1;
     tile.classList.toggle("openable-door", openableDoor && state.mode === "combat");
-    tile.disabled = spellTargeting || pendingEldritchBlast
+    tile.disabled = isHomeBuildTarget
+      ? false
+      : spellTargeting || pendingEldritchBlast
       ? false
       : adminEnabled() && adminTeleportEnabled
         ? !isAdminTeleportTarget
-        : ((!isReachable && !openableDoor) || !isKnown) && !dragPath;
+        : ((!isReachable && !openableDoor && !homeDoorToggleTarget) || !isKnown) && !dragPath;
     tile.title = pendingEldritchBlast
       ? "Target Eldritch Blast"
       : spellTargeting
@@ -870,6 +931,10 @@ function renderRoom() {
         : isSpellTargetable
           ? `Cast ${spellTargeting.spell.name} here`
           : ""
+      : isHomeBuildTarget
+        ? `Build: ${homeBuildTool}`
+      : homeDoorToggleTarget
+        ? "Open or close door"
       : isAdminTeleportTarget
         ? "Admin teleport here"
         : openableDoor
@@ -902,6 +967,7 @@ function renderRoom() {
 function renderHeroStatusCard(element, fighter) {
   refreshDerivedStats(fighter);
   const hpPercent = Math.max(0, Math.round((fighter.hp / fighter.maxHp) * 100));
+  const temporaryHpText = (fighter.temporaryHp ?? 0) > 0 ? ` <small>(+${fighter.temporaryHp} temp)</small>` : "";
   const weapon = activeWeapon(fighter);
   const armor = equippedItem(fighter, "torso");
   const beast = wildShapeBeastById(fighter.wildShapeState?.beastFormId);
@@ -922,7 +988,7 @@ function renderHeroStatusCard(element, fighter) {
       </div>
     </div>
     <div class="hp-line">
-      <div class="hp-text"><span>HP</span><span>${fighter.hp} / ${fighter.maxHp}</span></div>
+      <div class="hp-text"><span>HP</span><span>${fighter.hp} / ${fighter.maxHp}${temporaryHpText}</span></div>
       <div class="hp-bar"><div class="hp-fill" style="width: ${hpPercent}%"></div></div>
     </div>
     <div class="loadout-line">
@@ -961,9 +1027,15 @@ function temporaryEffectDetails(effect) {
   if (effect.acBonus) parts.push(`${abilityLabel(effect.acBonus)} AC`);
   if (effect.attackBonus) parts.push(`${abilityLabel(effect.attackBonus)} attack`);
   if (effect.damageBonus) parts.push(`${abilityLabel(effect.damageBonus)} damage`);
+  if (effect.skillBonus) parts.push(`${abilityLabel(effect.skillBonus)} skill checks`);
   if (effect.saveBonus) parts.push(`${abilityLabel(effect.saveBonus)} saves`);
   if (effect.speedBonusFeet) parts.push(`${abilityLabel(effect.speedBonusFeet)} ft speed`);
   if (effect.maxHpBonus) parts.push(`${abilityLabel(effect.maxHpBonus)} max HP`);
+  if (effect.extraHitDice) parts.push(`${abilityLabel(effect.extraHitDice)} hit dice`);
+  if (effect.secondWindBonus) parts.push(`${abilityLabel(effect.secondWindBonus)} Second Wind use`);
+  if (effect.spellPointBonus && !effect.classBonusLines?.length) parts.push(`${abilityLabel(effect.spellPointBonus)} spell points`);
+  if (effect.sneakAttackDiceBonus) parts.push(`${abilityLabel(effect.sneakAttackDiceBonus)} Sneak Attack dice`);
+  if (effect.classBonusLines?.length) parts.push(...effect.classBonusLines);
   if (effect.attackAdvantage) parts.push("attack advantage");
   if (effect.speedLocked) parts.push("movement locked");
   if (effect.actionLocked) parts.push("action locked");
@@ -1105,6 +1177,7 @@ function showCombatantInfo(fighter) {
   refreshDerivedStats(fighter);
   const heroView = (isClassHero(fighter) || isSidekickWarrior(fighter)) && (isPartyHeroId(fighter.id) || isRosterHeroId(fighter.id));
   const hpPercent = Math.max(0, Math.round((fighter.hp / fighter.maxHp) * 100));
+  const temporaryHpText = (fighter.temporaryHp ?? 0) > 0 ? ` <small>(+${fighter.temporaryHp} temp)</small>` : "";
   const weapon = activeWeapon(fighter);
   const torso = equippedItem(fighter, "torso");
   const profileRange = fighter.damage?.range ?? weapon?.range ?? { kind: "melee", feet: 5 };
@@ -1143,7 +1216,7 @@ function showCombatantInfo(fighter) {
       heroView
         ? `
           <div class="hp-line">
-            <div class="hp-text"><span>HP</span><span>${fighter.hp} / ${fighter.maxHp}</span></div>
+            <div class="hp-text"><span>HP</span><span>${fighter.hp} / ${fighter.maxHp}${temporaryHpText}</span></div>
             <div class="hp-bar"><div class="hp-fill" style="width: ${hpPercent}%"></div></div>
           </div>
           <div class="stat-grid player-stat-grid">
@@ -1234,6 +1307,7 @@ function showCombatantInfo(fighter) {
 }
 
 function showDungeonObjectInfo(object) {
+  els.fighterInfo.classList.remove("home-builder-dock");
   const template =
     object.type === "homeChest"
       ? { name: "Home Chest", kind: "container", width: 1, height: 1, blocksMovement: true, interactable: true, description: "Your home storage chest." }
@@ -1253,8 +1327,11 @@ function showDungeonObjectInfo(object) {
         : objectCells(object).some(objectInteractionAdjacent);
   const canActInCombat = state.mode !== "combat" || activeFighter()?.id === hero?.id;
   const isHomeChest = object.type === "homeChest";
+  const isHomePlacedContainer = homeObjectIsStorage(object, template);
+  const isHomeStorage = isHomeChest || isHomePlacedContainer;
+  const homeBed = state.mode === "home" && object.homePlaced ? objectComponent(object.type, "homeBed") : null;
   const objectLocked = !isHomeChest && object.locked === true;
-  const canLootObject = (objectHasLoot(object) || isHomeChest) && objectAdjacent && canActInCombat && !objectLocked;
+  const canLootObject = (objectHasLoot(object) || isHomeChest || isHomePlacedContainer) && objectAdjacent && canActInCombat && !objectLocked;
   const heroTriedLock = Boolean(object.lockAttemptsByHero?.[hero.id]);
   const canPickLock = objectLocked && objectAdjacent && canActInCombat && !heroTriedLock;
   const disarmTarget = object.trap ?? object;
@@ -1275,8 +1352,8 @@ function showDungeonObjectInfo(object) {
     canActInCombat &&
     (state.mode !== "combat" || activeFighter()?.hasAction) &&
     isObjectInAttackRangeWithProfile(hero, object, damageProfile(hero));
-  const chestItems = object.type === "chest" || isHomeChest ? object.items ?? [] : [];
-  const objectItems = objectHasLoot(object) || isHomeChest ? object.items ?? [] : [];
+  const chestItems = object.type === "chest" || isHomeChest || isHomePlacedContainer ? object.items ?? [] : [];
+  const objectItems = objectHasLoot(object) || isHomeChest || isHomePlacedContainer ? object.items ?? [] : [];
   const componentLabels = objectComponents(object)
     .map((component) => component.label ?? component.type.replace(/([A-Z])/g, " $1").toLowerCase())
     .join(", ");
@@ -1286,6 +1363,38 @@ function showDungeonObjectInfo(object) {
     ${furnitureArtworkMarkup(template, object)}
     <p class="empty-note">${escapeHtml(template.description)}</p>
     ${object.lastResult ? `<p class="object-result">${escapeHtml(object.lastResult)}</p>` : ""}
+    ${
+      object.type === "home-bookshelf"
+        ? `<div class="object-actions">
+            <button type="button" data-action="open-monster-compendium">Open Compendium</button>
+            <button type="button" data-action="open-library-tutorial" data-topic="homeExpansion">Home Expansion Guide</button>
+            <button type="button" data-action="open-library-tutorial" data-topic="comfortZones">Comfort Zones Guide</button>
+          </div>`
+        : object.type === "home-cooking-pot"
+          ? `<button type="button" data-action="cook-home-meal">Cook Hearty Meal</button>`
+          : object.type === "home-herb-garden"
+            ? `<button type="button" data-action="harvest-home-herbs">Harvest Medicinal Herbs</button>`
+            : ""
+    }
+    ${
+      homeBed
+        ? `<section class="object-inventory">
+            <h3>Assigned Hero</h3>
+            <p class="empty-note">Comfort: ${homeBed.comfort ?? 0}. Nearby furnishings within a ${homeBed.range ?? 4}-square room box may add more.</p>
+            <label class="inline-transfer">
+              <span>Hero</span>
+              <select data-action="assign-home-bed" data-object="${escapeAttribute(object.id)}">
+                <option value="">Unassigned</option>
+                ${rosterHeroes()
+                  .filter((hero) => isClassHero(hero) && !hero.dead)
+                  .map((hero) => `<option value="${escapeAttribute(hero.id)}" ${object.assignedHeroId === hero.id ? "selected" : ""}>${escapeHtml(hero.name)}</option>`)
+                  .join("")}
+              </select>
+            </label>
+            <button type="button" data-action="show-bed-range" data-object="${escapeAttribute(object.id)}">Show Range</button>
+          </section>`
+        : ""
+    }
     ${
       captive
         ? `<p class="empty-note">A ${escapeHtml(captiveName)} is trapped inside. Freeing it requires ${escapeHtml(skillName(captive.skill ?? "animal-handling"))} DC ${captive.dc ?? 13}; failure releases it hostile.</p>
@@ -1321,7 +1430,7 @@ function showDungeonObjectInfo(object) {
         : ""
     }
     ${
-      objectHasLoot(object) && !objectLocked
+      objectHasLoot(object) && !isHomePlacedContainer && !objectLocked
         ? `
           ${
             object.trap?.detected
@@ -1356,31 +1465,35 @@ function showDungeonObjectInfo(object) {
         : ""
     }
     ${
-      isHomeChest
+      isHomeStorage
         ? `
-          <section class="object-inventory">
-            <h3>Stored Coins</h3>
-            <div class="chest-money">
-              <div><b>Carried Coins</b><span>${escapeHtml(moneyText(hero.inventory.money))}</span></div>
-              <div><b>Chest Coins</b><span>${escapeHtml(moneyText(state.chestMoney ?? {}))}</span></div>
-              <div class="chest-coin-fields" aria-label="Coin amount">
-                <label><span>CP</span><input type="number" inputmode="numeric" min="0" step="1" value="0" data-home-coin-input="cp" /></label>
-                <label><span>SP</span><input type="number" inputmode="numeric" min="0" step="1" value="0" data-home-coin-input="sp" /></label>
-                <label><span>GP</span><input type="number" inputmode="numeric" min="0" step="1" value="0" data-home-coin-input="gp" /></label>
-              </div>
-              <p class="chest-money-error" aria-live="polite"></p>
-              <div class="chest-money-actions">
-                <button type="button" data-action="home-deposit-custom-coins">Deposit</button>
-                <button type="button" data-action="home-withdraw-custom-coins">Withdraw</button>
-                <button type="button" data-action="home-deposit-all-coins" ${moneyToCp(hero.inventory.money) > 0 ? "" : "disabled"}>Deposit All</button>
-                <button type="button" data-action="home-withdraw-all-coins" ${moneyToCp(state.chestMoney ?? {}) > 0 ? "" : "disabled"}>Withdraw All</button>
-              </div>
-            </div>
-          </section>
+          ${
+            isHomeChest
+              ? `<section class="object-inventory">
+                  <h3>Stored Coins</h3>
+                  <div class="chest-money">
+                    <div><b>Carried Coins</b><span>${escapeHtml(moneyText(hero.inventory.money))}</span></div>
+                    <div><b>Chest Coins</b><span>${escapeHtml(moneyText(state.chestMoney ?? {}))}</span></div>
+                    <div class="chest-coin-fields" aria-label="Coin amount">
+                      <label><span>CP</span><input type="number" inputmode="numeric" min="0" step="1" value="0" data-home-coin-input="cp" /></label>
+                      <label><span>SP</span><input type="number" inputmode="numeric" min="0" step="1" value="0" data-home-coin-input="sp" /></label>
+                      <label><span>GP</span><input type="number" inputmode="numeric" min="0" step="1" value="0" data-home-coin-input="gp" /></label>
+                    </div>
+                    <p class="chest-money-error" aria-live="polite"></p>
+                    <div class="chest-money-actions">
+                      <button type="button" data-action="home-deposit-custom-coins">Deposit</button>
+                      <button type="button" data-action="home-withdraw-custom-coins">Withdraw</button>
+                      <button type="button" data-action="home-deposit-all-coins" ${moneyToCp(hero.inventory.money) > 0 ? "" : "disabled"}>Deposit All</button>
+                      <button type="button" data-action="home-withdraw-all-coins" ${moneyToCp(state.chestMoney ?? {}) > 0 ? "" : "disabled"}>Withdraw All</button>
+                    </div>
+                  </div>
+                </section>`
+              : ""
+          }
           <section class="object-inventory">
             <h3>Bag</h3>
             <div class="chest-money-actions">
-              <button type="button" data-action="home-store-all-items" ${unequippedInventoryItems(hero).length ? "" : "disabled"}>Deposit All</button>
+              <button type="button" data-action="home-store-all-items" data-object="${escapeAttribute(object.id)}" ${unequippedInventoryItems(hero).length ? "" : "disabled"}>Deposit All</button>
             </div>
             ${
               unequippedInventoryItems(hero).length
@@ -1389,7 +1502,7 @@ function showDungeonObjectInfo(object) {
                       (item) => `
                         <div class="object-inventory-row">
                           <div><b>${escapeHtml(item.name)}</b><span>${escapeHtml(itemDetails(item))}</span></div>
-                          <button type="button" data-action="home-store-item" data-item="${escapeAttribute(item.id)}">Store</button>
+                          <button type="button" data-action="home-store-item" data-object="${escapeAttribute(object.id)}" data-item="${escapeAttribute(item.id)}">Store</button>
                         </div>
                       `,
                     )
@@ -1400,7 +1513,7 @@ function showDungeonObjectInfo(object) {
           <section class="object-inventory">
             <h3>Chest Contents</h3>
             <div class="chest-money-actions">
-              <button type="button" data-action="home-take-all-items" ${chestItems.length ? "" : "disabled"}>Withdraw All</button>
+              <button type="button" data-action="home-take-all-items" data-object="${escapeAttribute(object.id)}" ${chestItems.length ? "" : "disabled"}>Withdraw All</button>
             </div>
             ${
               chestItems.length
@@ -1409,7 +1522,7 @@ function showDungeonObjectInfo(object) {
                       (item) => `
                         <div class="object-inventory-row">
                           <div><b>${escapeHtml(item.name)}</b><span>${escapeHtml(itemDetails(item))}</span></div>
-                          <button type="button" data-action="take-object-item" data-object="home-chest" data-item="${escapeAttribute(item.id)}">Add to Bag</button>
+                          <button type="button" data-action="take-object-item" data-object="${escapeAttribute(object.id)}" data-item="${escapeAttribute(item.id)}">Add to Bag</button>
                         </div>
                       `,
                     )
@@ -1443,6 +1556,18 @@ function showDungeonObjectInfo(object) {
 
 function dungeonObjectForId(objectId) {
   return (state.dungeonObjects ?? []).find((object) => object.id === objectId) ?? null;
+}
+
+function homeStorageObjectForId(objectId) {
+  if (objectId === "home-chest") return homeChestObject();
+  const object = dungeonObjectForId(objectId);
+  const template = object ? objectTemplate(object.type) : null;
+  return object && template && homeObjectIsStorage(object, template) ? object : null;
+}
+
+function homeObjectIsStorage(object, template = objectTemplate(object?.type)) {
+  if (state.mode !== "home" || !object?.homePlaced || !template) return false;
+  return homeObjectTypeIsStorage(object.type, template);
 }
 
 function triggerChestTrap(chest, hero = activeHero()) {
@@ -1479,8 +1604,877 @@ function homeChestObject() {
   };
 }
 
+let homeBuildTool = null;
+let homeBuildFurnitureId = "home-bookshelf";
+let homeBuildSearch = "";
+let homeBuildPaintColor = "#5a4638";
+let homeBuilderSnapshot = null;
+let homeMoveSelection = null;
+let homePaintPointerId = null;
+let homeComfortRangePreviewKeys = new Set();
+const homePaintPalette = ["#5a4638", "#7a5c3a", "#6f7357", "#445f66", "#66465d", "#7f3f35", "#3f4c6b", "#2f2d2b"];
+const homeCatalogueStoryLockedIds = new Set(["home-cooking-pot", "home-herb-garden", "portal"]);
+const homeCatalogueAdminOnlyIds = new Set(["beast-crate", "beast-companion-crate", "undead-crate"]);
+const homeFloorBuildCostCp = 100;
+const homeStorageFurnitureCostCp = 2;
+const homeComfortScores = {
+  chest: 1,
+  "iron-banded-chest": 2,
+  table: 1,
+  "weapon-rack": 2,
+  "armor-stand": 2,
+  "arcane-lectern": 5,
+};
+
+function isHomeBuilderOpen() {
+  return state?.mode === "home" && els.fighterInfo.classList.contains("home-builder-dock");
+}
+
+function clearHomePaintPointer() {
+  homePaintPointerId = null;
+}
+
+function syncHomeLayoutToDungeon() {
+  if (state.mode !== "home") return;
+  state.home = normalizeHomeData({
+    ...(state.home ?? {}),
+    cells: state.home?.cells,
+    doors: state.home?.doors,
+    objects: state.dungeonObjects ?? state.home?.objects,
+    floorColors: state.home?.floorColors,
+    wallColors: state.home?.wallColors,
+  });
+  state.room.gridSize = state.home.gridSize;
+  state.dungeon.gridSize = state.home.gridSize;
+  state.dungeon.rooms = [{ id: "home-room", name: "Home", cells: state.home.cells, doors: state.home.doors }];
+  state.dungeon.walkable = state.home.cells;
+  state.dungeon.doors = state.home.doors;
+  state.dungeonObjects = state.home.objects;
+  state.exploration.discoveredRoomIds = ["home-room"];
+}
+
+function homeCellKeys() {
+  return new Set((state.home?.cells ?? []).map(positionKey));
+}
+
+function homeObjectOverlaps(type, position, ignoreId = null) {
+  const template = objectTemplate(type);
+  if (!template) return true;
+  const width = template.width ?? 1;
+  const height = template.height ?? 1;
+  const keys = homeCellKeys();
+  const cells = Array.from({ length: width * height }, (_, index) => ({ x: position.x + (index % width), y: position.y + Math.floor(index / width) }));
+  if (cells.some((cell) => !keys.has(positionKey(cell)))) return true;
+  return (state.dungeonObjects ?? []).some((object) => object.id !== ignoreId && objectCells({ ...object, type: object.type }).some((cell) => cells.some((candidate) => positionKey(candidate) === positionKey(cell))));
+}
+
+function homeDoorEdgeFromEvent(position, event) {
+  const tile = event?.target?.closest?.(".tile");
+  const rect = tile?.getBoundingClientRect();
+  if (!rect) return "east";
+  const x = (event.clientX - rect.left) / rect.width;
+  const y = (event.clientY - rect.top) / rect.height;
+  const distances = [
+    ["north", y],
+    ["east", 1 - x],
+    ["south", 1 - y],
+    ["west", x],
+  ];
+  return distances.sort((a, b) => a[1] - b[1])[0][0];
+}
+
+function homeDoorForEdge(position, edge, to = "home-room") {
+  const delta = edge === "north" ? { x: 0, y: -1 } : edge === "east" ? { x: 1, y: 0 } : edge === "south" ? { x: 0, y: 1 } : { x: -1, y: 0 };
+  return { ...position, edge, corridor: { x: position.x + delta.x, y: position.y + delta.y }, roomId: "home-room", to };
+}
+
+function homeDoorDirection(door, position = door) {
+  return door.edge ?? (door.corridor?.y < position.y ? "north" : door.corridor?.x > position.x ? "east" : door.corridor?.y > position.y ? "south" : "west");
+}
+
+function homeDoorNeighbor(position, edge) {
+  const delta = edge === "north" ? { x: 0, y: -1 } : edge === "east" ? { x: 1, y: 0 } : edge === "south" ? { x: 0, y: 1 } : { x: -1, y: 0 };
+  return { x: position.x + delta.x, y: position.y + delta.y };
+}
+
+function homeDoorHasSideWalls(position, edge, cells) {
+  const neighbor = homeDoorNeighbor(position, edge);
+  const sideCells =
+    edge === "north" || edge === "south"
+      ? [
+          { x: position.x - 1, y: position.y },
+          { x: neighbor.x - 1, y: neighbor.y },
+          { x: position.x + 1, y: position.y },
+          { x: neighbor.x + 1, y: neighbor.y },
+        ]
+      : [
+          { x: position.x, y: position.y - 1 },
+          { x: neighbor.x, y: neighbor.y - 1 },
+          { x: position.x, y: position.y + 1 },
+          { x: neighbor.x, y: neighbor.y + 1 },
+        ];
+  return sideCells.filter((cell) => !cells.has(positionKey(cell))).length >= 2;
+}
+
+function homeDoorKey(door) {
+  return `${door.x},${door.y},${door.edge ?? "east"}`;
+}
+
+function homeWallEdgeKey(position, edge) {
+  return `${position.x},${position.y},${edge}`;
+}
+
+function homeWallEdgeExists(position, edge, cells = homeCellKeys()) {
+  if (!cells.has(positionKey(position))) return false;
+  const neighbor = homeDoorNeighbor(position, edge);
+  if (neighbor.x < 0 || neighbor.y < 0 || neighbor.x >= (state.home?.gridSize ?? currentGridSize()) || neighbor.y >= (state.home?.gridSize ?? currentGridSize())) return false;
+  return !cells.has(positionKey(neighbor));
+}
+
+function homeExitPosition() {
+  return state.exit?.position ?? (state.home?.doors ?? []).find((door) => door.to === "outside") ?? { x: 19, y: 15 };
+}
+
+function homeReservedNoFloorKeys() {
+  const exitDoor = (state.home?.doors ?? []).find((door) => door.to === "outside") ?? { ...homeExitPosition(), edge: "east" };
+  return reservedHomeNoFloorKeys(exitDoor, state.home?.gridSize ?? currentGridSize());
+}
+
+function isHomeReservedNoFloorPosition(position) {
+  return homeReservedNoFloorKeys().has(positionKey(position));
+}
+
+function homeProtectedKeys(home = state.home) {
+  const keys = new Set([positionKey(homeExitPosition())]);
+  const special = home?.specialPositions ?? {};
+  if (special.chest) keys.add(positionKey(special.chest));
+  if (special.planningTable) {
+    keys.add(positionKey(special.planningTable));
+    keys.add(positionKey({ x: special.planningTable.x + 1, y: special.planningTable.y }));
+  }
+  for (const object of state.dungeonObjects ?? []) {
+    if (object.type === "home-bookshelf") objectCells(object).forEach((cell) => keys.add(positionKey(cell)));
+  }
+  for (const fighter of Object.values(state.fighters ?? {}).filter((entry) => isRosterHeroId(entry.id))) {
+    keys.add(positionKey(fighter.position));
+  }
+  return keys;
+}
+
+function homeReachableFloorKeys(home = state.home) {
+  const cells = new Set((home?.cells ?? []).map(positionKey));
+  const start = positionKey(homeExitPosition());
+  if (!cells.has(start)) return new Set();
+  const reachable = new Set([start]);
+  const queue = [homeExitPosition()];
+  while (queue.length) {
+    const current = queue.shift();
+    for (const next of adjacentCells(current)) {
+      const key = positionKey(next);
+      if (!cells.has(key) || reachable.has(key)) continue;
+      reachable.add(key);
+      queue.push(next);
+    }
+  }
+  return reachable;
+}
+
+function homePositionIsExitReachable(position, home = state.home) {
+  return homeReachableFloorKeys(home).has(positionKey(position));
+}
+
+function canEraseHomeCell(position, cells) {
+  const key = positionKey(position);
+  if (homeProtectedKeys().has(key)) return false;
+  const nextHome = { ...state.home, cells: Array.from(cells.values()).filter((cell) => positionKey(cell) !== key) };
+  const reachable = homeReachableFloorKeys(nextHome);
+  for (const protectedKey of homeProtectedKeys()) {
+    if (!reachable.has(protectedKey)) return false;
+  }
+  return true;
+}
+
+function selectHomeMoveTarget(selection) {
+  if (!isHomeBuilderOpen() || homeBuildTool !== "move") return false;
+  homeMoveSelection = selection;
+  renderHomeBuilder();
+  return true;
+}
+
+function homeFurnitureCatalogueEntries() {
+  const query = homeBuildSearch.trim().toLowerCase();
+  return window.DungeonContent
+    .list("furniture")
+    .filter((entry) => entry.kind !== "trap")
+    .filter(homeCatalogueEntryVisible)
+    .filter((entry) => !query || `${entry.name} ${entry.id} ${(entry.tags ?? []).join(" ")}`.toLowerCase().includes(query))
+    .slice(0, 72);
+}
+
+function homeFurnitureCatalogue() {
+  const groups = new Map([
+    ["homeUtility", { label: "Home Utility", entries: [] }],
+    ["guardroomDecor", { label: "Guardroom Decor", entries: [] }],
+    ["natureDecor", { label: "Nature Decor", entries: [] }],
+    ["misc", { label: "Misc", entries: [] }],
+  ]);
+  for (const entry of homeFurnitureCatalogueEntries()) {
+    groups.get(homeFurnitureCategory(entry)).entries.push(entry);
+  }
+  return Array.from(groups.values()).filter((group) => group.entries.length);
+}
+
+function homeFurnitureCategory(entry) {
+  if (homeObjectTypeIsStorage(entry.id, entry) || entry.tags?.includes("bed") || entry.tags?.includes("home") || objectComponent(entry.id, "homeBed")) return "homeUtility";
+  if (entry.id === "bigRock") return "natureDecor";
+  if (
+    entry.tags?.includes("forest") ||
+    entry.tags?.includes("wilds") ||
+    entry.tags?.includes("underdark") ||
+    entry.tags?.includes("cave") ||
+    entry.tags?.includes("rock")
+  ) return "natureDecor";
+  if (entry.tags?.includes("old-guardroom") || entry.tags?.includes("dungeon") || entry.tags?.includes("crypt") || entry.tags?.includes("ruin")) return "guardroomDecor";
+  return "misc";
+}
+
+function homeCatalogueEntryVisible(entry) {
+  if (adminEnabled()) return true;
+  if (homeCatalogueAdminOnlyIds.has(entry.id) || (entry.id.includes("crate") && objectHasComponent(entry.id, "captiveCreature"))) return false;
+  if (!homeCatalogueStoryLockedIds.has(entry.id)) return true;
+  return (state.home?.unlockedFurniture ?? []).includes(entry.id);
+}
+
+function homeBuilderNewFloorKeys() {
+  if (!homeBuilderSnapshot) return new Set();
+  const snapshotKeys = new Set((homeBuilderSnapshot.cells ?? []).map(positionKey));
+  return new Set((state.home?.cells ?? []).map(positionKey).filter((key) => !snapshotKeys.has(key)));
+}
+
+function homeBuilderCostCp() {
+  if (adminEnabled()) return 0;
+  return homeBuilderNewFloorKeys().size * homeFloorBuildCostCp + homeBuilderNewObjectCostCp();
+}
+
+function homeBuilderCanAfford() {
+  return adminEnabled() || moneyToCp(state.chestMoney ?? {}) >= homeBuilderCostCp();
+}
+
+function homeBuilderNewObjectCostCp() {
+  if (!homeBuilderSnapshot) return 0;
+  const snapshotIds = new Set((homeBuilderSnapshot.objects ?? []).map((object) => object.id));
+  return (state.dungeonObjects ?? [])
+    .filter((object) => object.homePlaced && !snapshotIds.has(object.id))
+    .reduce((sum, object) => sum + homeFurnitureBuildCostCp(object.type), 0);
+}
+
+function homeFurnitureBuildCostCp(type) {
+  const bed = objectComponent(type, "homeBed");
+  if (bed?.priceCp !== undefined) return bed.priceCp;
+  return homeObjectTypeIsStorage(type) ? homeStorageFurnitureCostCp : 0;
+}
+
+function homeObjectTypeIsStorage(type, template = objectTemplate(type)) {
+  const tags = template?.tags ?? [];
+  const storageName = `${type ?? ""} ${template?.name ?? ""}`.toLowerCase();
+  return (
+    template?.kind === "container" ||
+    tags.includes("container") ||
+    tags.includes("loot") ||
+    /\b(chest|crate|locker|cabinet|reliquary|sarcophagus)\b/.test(storageName)
+  );
+}
+
+function renderHomeBuilder() {
+  if (state.mode !== "home") return;
+  const groups = homeFurnitureCatalogue();
+  const entries = groups.flatMap((group) => group.entries);
+  if (!entries.some((entry) => entry.id === homeBuildFurnitureId)) homeBuildFurnitureId = entries[0]?.id ?? "home-bookshelf";
+  const normalizedPaintColor = normalizeHomeColor(homeBuildPaintColor) ?? homePaintPalette[0];
+  const showPaintTools = ["paintFloor", "paintWall"].includes(homeBuildTool);
+  const buildCostCp = homeBuilderCostCp();
+  const canAffordBuild = homeBuilderCanAfford();
+  const costText = buildCostCp > 0 ? moneyText(cpToMoney(buildCostCp)) : "Free";
+  els.fighterInfo.classList.add("home-builder-dock");
+  els.fighterInfoName.textContent = "Build Your Home";
+  els.fighterInfoBody.innerHTML = `
+    <p class="empty-note">Choose a tool. Floor, erase, and color painting can be dragged. Save commits this edit session; restore rolls it back.</p>
+    <section class="home-builder-tools" aria-label="Home building tools">
+      ${[
+        ["floor", "Floor"],
+        ["door", "Door"],
+        ["furniture", "Furniture"],
+        ["move", "Move"],
+        ["erase", "Erase"],
+        ["paintFloor", "Paint Floor"],
+        ["paintWall", "Paint Walls"],
+      ]
+        .map(([tool, label]) => `<button type="button" data-action="home-build-tool" data-tool="${tool}" class="${homeBuildTool === tool ? "active" : ""}">${label}</button>`)
+        .join("")}
+    </section>
+    ${
+      showPaintTools
+        ? `<section class="home-paint-tools" aria-label="Paint colors">
+            <div class="home-paint-swatches">
+              ${homePaintPalette
+                .map(
+                  (color) => `
+                    <button type="button" data-action="home-paint-color" data-color="${escapeAttribute(color)}" class="${normalizedPaintColor === color ? "active" : ""}" style="--swatch-color: ${escapeAttribute(color)}" aria-label="Use color ${escapeAttribute(color)}"></button>
+                  `,
+                )
+                .join("")}
+            </div>
+            <label class="home-color-picker">
+              <span>Custom</span>
+              <input id="home-paint-color" type="color" value="${escapeAttribute(normalizedPaintColor)}" />
+            </label>
+          </section>`
+        : ""
+    }
+    ${homeMoveSelection ? `<p class="empty-note">Moving: ${escapeHtml(homeMoveSelection.label)}. Click a valid floor tile.</p>` : ""}
+    <label class="home-builder-search">
+      <span>Furniture</span>
+      <input id="home-build-search" type="search" value="${escapeAttribute(homeBuildSearch)}" placeholder="Search catalogue" />
+    </label>
+    <section class="home-furniture-catalogue" aria-label="Furniture catalogue">
+      ${groups
+        .map(
+          (group) => `
+            <details class="home-furniture-group" open>
+              <summary>${escapeHtml(group.label)}</summary>
+              <div class="home-furniture-group-list">
+                ${group.entries
+                  .map((entry) => {
+                    const cost = homeFurnitureBuildCostCp(entry.id);
+                    return `
+                      <button type="button" data-action="home-build-furniture" data-furniture="${escapeAttribute(entry.id)}" class="${homeBuildFurnitureId === entry.id ? "active" : ""}">
+                        <b>${escapeHtml(entry.symbol ?? "?")}</b>
+                        <span>${escapeHtml(entry.name)}${cost ? `<small>${escapeHtml(moneyText(cpToMoney(cost)))}</small>` : ""}</span>
+                      </button>
+                    `;
+                  })
+                  .join("")}
+              </div>
+            </details>
+          `,
+        )
+        .join("")}
+    </section>
+    <section class="home-builder-tools home-builder-footer" aria-label="Home save tools">
+      <button type="button" data-action="home-save-build" class="${canAffordBuild ? "home-build-cost-ok" : "home-build-cost-bad"}" ${canAffordBuild ? "" : "disabled"}>Save Home (${escapeHtml(costText)})</button>
+      <button type="button" data-action="home-restore-build">Restore</button>
+    </section>
+  `;
+  els.fighterInfo.classList.remove("hidden");
+}
+
+function showHomeBuilder() {
+  if (state.mode !== "home") return;
+  hideHomeMenu();
+  syncHomeLayoutToDungeon();
+  homeBuilderSnapshot = cloneData(state.home);
+  homeBuildTool = null;
+  homeMoveSelection = null;
+  homePaintPointerId = null;
+  renderHomeBuilder();
+  render();
+}
+
+function saveHomeBuilderChanges() {
+  if (!isHomeBuilderOpen()) return;
+  state.chestMoney = normalizeMoney(state.chestMoney ?? {});
+  const buildCostCp = homeBuilderCostCp();
+  if (buildCostCp > 0 && !spendMoney(state.chestMoney, buildCostCp)) {
+    addLog(`Home chest needs ${moneyText(cpToMoney(buildCostCp))} to save these new floor tiles.`, "important");
+    renderHomeBuilder();
+    return;
+  }
+  syncHomeLayoutToDungeon();
+  homeBuilderSnapshot = cloneData(state.home);
+  addLog(buildCostCp > 0 ? `Home layout saved. Paid ${moneyText(cpToMoney(buildCostCp))} from the home chest.` : "Home layout saved.", "important");
+  renderHomeBuilder();
+  render();
+}
+
+function restoreHomeBuilderChanges() {
+  if (!isHomeBuilderOpen() || !homeBuilderSnapshot) return;
+  state.home = cloneData(homeBuilderSnapshot);
+  state.dungeonObjects = cloneData(state.home.objects ?? []);
+  homeMoveSelection = null;
+  homePaintPointerId = null;
+  syncHomeLayoutToDungeon();
+  addLog("Home layout restored to the state from when the builder opened.", "important");
+  renderHomeBuilder();
+  render();
+}
+
+function homeDoorAt(position) {
+  return (state.home?.doors ?? []).find((door) => positionKey(door) === positionKey(position));
+}
+
+function removeHomeObjectAt(position) {
+  const target = (state.dungeonObjects ?? []).find((object) => object.homePlaced && objectCells(object).some((cell) => positionKey(cell) === positionKey(position)));
+  if (!target) return false;
+  if (target.type === "home-bookshelf") {
+    addLog("The compendium bookshelf can be moved, but not deleted.", "important");
+    return true;
+  }
+  state.dungeonObjects = (state.dungeonObjects ?? []).filter((object) => object.id !== target.id);
+  return true;
+}
+
+function applyHomeBuildAt(position, event = null) {
+  if (!isHomeBuilderOpen()) return false;
+  if (!homeBuildTool) return true;
+  const home = normalizeHomeData(state.home);
+  state.home = home;
+  const key = positionKey(position);
+  const cells = new Map(home.cells.map((cell) => [positionKey(cell), cell]));
+  if (homeBuildTool === "floor") {
+    if (position.x < 0 || position.y < 0 || position.x >= home.gridSize || position.y >= home.gridSize) return true;
+    if (isHomeReservedNoFloorPosition(position)) return true;
+    cells.set(key, { ...position });
+  } else if (homeBuildTool === "door") {
+    if (!cells.has(key)) return true;
+    const edge = homeDoorEdgeFromEvent(position, event);
+    const neighbor = homeDoorNeighbor(position, edge);
+    if (!cells.has(positionKey(neighbor))) return true;
+    if (!homeDoorHasSideWalls(position, edge, cells)) return true;
+    const exitKey = positionKey(homeExitPosition());
+    const door = homeDoorForEdge(position, edge, key === exitKey ? "outside" : "home-room");
+    const doorKey = homeDoorKey(door);
+    const doors = home.doors.filter((entry) => homeDoorKey(entry) !== doorKey);
+    doors.push(door);
+    state.home.doors = doors;
+  } else if (homeBuildTool === "furniture") {
+    if (!cells.has(key) || homeObjectOverlaps(homeBuildFurnitureId, position)) {
+      addLog("That furniture needs open home floor.", "important");
+      renderHomeBuilder();
+      return true;
+    }
+    const template = objectTemplate(homeBuildFurnitureId);
+    const instanceNumber = (state.dungeonObjects ?? []).filter((object) => object.id?.startsWith(`home-${homeBuildFurnitureId}-`)).length + 1;
+    state.dungeonObjects.push({
+      id: `home-${homeBuildFurnitureId}-${Date.now()}-${instanceNumber}`,
+      type: homeBuildFurnitureId,
+      position: { ...position },
+      width: template.width ?? 1,
+      height: template.height ?? 1,
+      homePlaced: true,
+      items: [],
+    });
+  } else if (homeBuildTool === "move") {
+    if (!homeMoveSelection) return true;
+    if (!cells.has(key) || !homePositionIsExitReachable(position, { ...state.home, cells: Array.from(cells.values()) })) {
+      addLog("Protected home pieces must stay on floor connected to the home door.", "important");
+      return true;
+    }
+    if (homeMoveSelection.kind === "special") {
+      const width = homeMoveSelection.id === "planningTable" ? 2 : 1;
+      const targetCells = Array.from({ length: width }, (_, index) => ({ x: position.x + index, y: position.y }));
+      if (targetCells.some((cell) => !cells.has(positionKey(cell)) || !homePositionIsExitReachable(cell, { ...state.home, cells: Array.from(cells.values()) }))) {
+        addLog("That special furniture needs connected home floor.", "important");
+        return true;
+      }
+      state.home.specialPositions = { ...(state.home.specialPositions ?? {}), [homeMoveSelection.id]: { ...position } };
+    } else if (homeMoveSelection.kind === "object") {
+      const object = (state.dungeonObjects ?? []).find((entry) => entry.id === homeMoveSelection.id);
+      if (!object || homeObjectOverlaps(object.type, position, object.id)) {
+        addLog("That furniture needs open home floor.", "important");
+        return true;
+      }
+      object.position = { ...position };
+    }
+    homeMoveSelection = null;
+  } else if (homeBuildTool === "paintFloor") {
+    if (!cells.has(key)) return true;
+    const color = normalizeHomeColor(homeBuildPaintColor);
+    state.home.floorColors = { ...(state.home.floorColors ?? {}) };
+    if (color) state.home.floorColors[key] = color;
+  } else if (homeBuildTool === "paintWall") {
+    const edge = homeDoorEdgeFromEvent(position, event);
+    if (!homeWallEdgeExists(position, edge, cells)) return true;
+    const color = normalizeHomeColor(homeBuildPaintColor);
+    state.home.wallColors = { ...(state.home.wallColors ?? {}) };
+    if (color) state.home.wallColors[homeWallEdgeKey(position, edge)] = color;
+  } else if (homeBuildTool === "erase") {
+    if (!removeHomeObjectAt(position)) {
+      state.home.doors = home.doors.filter((door) => positionKey(door) !== key || door.to === "outside");
+      if (canEraseHomeCell(position, cells)) {
+        cells.delete(key);
+        if (state.home.floorColors) delete state.home.floorColors[key];
+      } else {
+        addLog("That tile supports protected or connected home features.", "important");
+      }
+    }
+  }
+  state.home.cells = Array.from(cells.values());
+  syncHomeLayoutToDungeon();
+  renderHomeBuilder();
+  render();
+  return true;
+}
+
+function openMonsterCompendium() {
+  els.fighterInfo.classList.remove("home-builder-dock");
+  state.monsterCompendium = normalizeMonsterCompendium(state.monsterCompendium);
+  const groups = new Map();
+  for (const monster of window.DungeonContent.list("monsters")) {
+    if (monster.id === "monsterTemplate") continue;
+    const type = monster.tags?.[0] ?? "other";
+    if (!groups.has(type)) groups.set(type, []);
+    groups.get(type).push(monster);
+  }
+  const knownForMonster = (monster) => {
+    const progress = state.monsterCompendium[monster.id] ?? { encountered: false, kills: 0 };
+    return progress.encountered || progress.kills > 0;
+  };
+  els.fighterInfoName.textContent = "Monster Compendium";
+  els.fighterInfoBody.innerHTML = `
+    <p class="empty-note">Names unlock after an encounter. Kills reveal deeper details at 5 and 10.</p>
+    ${Array.from(groups.entries())
+      .sort(([a, aMonsters], [b, bMonsters]) => Number(bMonsters.some(knownForMonster)) - Number(aMonsters.some(knownForMonster)) || a.localeCompare(b))
+      .map(
+        ([type, monsters]) => `
+          <details class="compendium-group" ${monsters.some(knownForMonster) ? "open" : ""}>
+            <summary>${escapeHtml(titleCaseTag(type || "other"))}</summary>
+            ${monsters
+              .sort((a, b) => Number(knownForMonster(b)) - Number(knownForMonster(a)) || a.name.localeCompare(b.name))
+              .map((monster) => {
+                const progress = state.monsterCompendium[monster.id] ?? { encountered: false, kills: 0 };
+                const known = progress.encountered || progress.kills > 0;
+                const kills = progress.kills ?? 0;
+                const hints = monsterDungeonHints(monster);
+                const art = monster.tokenArt ?? monster.art ?? "";
+                return `
+                  <article class="compendium-entry ${known ? "" : "unknown"}">
+                    <h4 class="compendium-entry-title">
+                      ${
+                        known && art
+                          ? `<button type="button" class="compendium-art-button" data-action="preview-monster-art" data-art="${escapeAttribute(art)}" data-name="${escapeAttribute(monster.name)}" aria-label="Enlarge ${escapeAttribute(monster.name)} artwork"><img src="${escapeAttribute(art)}" alt="" /></button>`
+                          : ""
+                      }
+                      <span>${known ? escapeHtml(monster.name) : "????"}</span>
+                    </h4>
+                    <p>${known ? escapeHtml(monster.description ?? "No notes yet.") : `Unencountered creature. ${hints.length ? `Likely found in: ${escapeHtml(hints.join(", "))}.` : "No dungeon hint available yet."}`}</p>
+                    <div class="stat-grid">
+                      <div class="stat-pill"><b>${known ? kills : "?"}</b><span>Kills</span></div>
+                      <div class="stat-pill"><b>${known ? monster.maxHp ?? "?" : "?"}</b><span>HP</span></div>
+                      <div class="stat-pill"><b>${known ? monster.ac ?? "?" : "?"}</b><span>AC</span></div>
+                      <div class="stat-pill"><b>${known ? monster.speedFeet ?? "?" : "?"}</b><span>Speed</span></div>
+                    </div>
+                    ${known && kills >= 5 ? `<p><b>Resistances:</b> ${escapeHtml((monster.resistances ?? []).join(", ") || "None")}<br><b>Vulnerabilities:</b> ${escapeHtml((monster.vulnerabilities ?? []).join(", ") || "None")}</p>` : ""}
+                    ${known && kills >= 10 ? `<p><b>Traits:</b> ${escapeHtml([...(monster.traits ?? []), ...(monster.specialAbility ?? [])].join(", ") || "None recorded.")}</p>` : ""}
+                  </article>
+                `;
+              })
+              .join("")}
+          </details>
+        `,
+      )
+      .join("")}
+  `;
+  els.fighterInfo.classList.remove("hidden");
+}
+
+const homeLibraryTutorials = {
+  homeExpansion: {
+    title: "Home Expansion Guide",
+    steps: [
+      {
+        title: "Open The Builder",
+        body: "Use the home door or Move Out menu to open Build Your Home. The menu stays on the left while the home map remains clickable.",
+      },
+      {
+        title: "Paint New Floor",
+        body: "Select Floor, then click or drag over empty dungeon space. New floor tiles cost 1 gp each when you save the session.",
+      },
+      {
+        title: "Doors Need Real Walls",
+        body: "Select Door and click an edge between two floor squares. A valid door needs floor on both sides and wall space beside the opening.",
+      },
+      {
+        title: "Place And Move Furniture",
+        body: "Select Furniture to place catalogue pieces. Select Move, then click furniture such as the chest, planning table, compendium shelf, or beds and choose a new connected floor tile.",
+      },
+      {
+        title: "Save Or Restore",
+        body: "Save Home commits the current building session and pays its cost from the home chest. Restore returns the home to the state from when the builder was opened.",
+      },
+    ],
+  },
+  comfortZones: {
+    title: "Comfort Zones Guide",
+    steps: [
+      {
+        title: "Beds Create Comfort",
+        body: "Place a bed and assign it to a class hero. The bed gives its own comfort points and also checks nearby furniture.",
+      },
+      {
+        title: "Range Depends On Bed Quality",
+        body: "Shabby hay beds count 1 square around them. Broken wooden beds count 2, comfortable beds count 3, and luxury beds count 4.",
+      },
+      {
+        title: "The Zone Is A Room Box",
+        body: "The comfort zone fills the square box around the bed, but only connected floor counts. It cannot pass through walls or doors.",
+      },
+      {
+        title: "Shared Furniture Splits Value",
+        body: "If one furniture piece supports multiple heroes, its comfort value is split between them and rounded down for each hero.",
+      },
+      {
+        title: "Leaving Home Grants Bonuses",
+        body: "The Planning Table shows each hero's comfort score as x/100. When active heroes leave for a dungeon, their current comfort score grants temporary run bonuses that vanish when they return home.",
+      },
+    ],
+  },
+};
+
+function showHomeLibraryTutorial(topic = "homeExpansion", stepIndex = 0) {
+  const tutorial = homeLibraryTutorials[topic] ?? homeLibraryTutorials.homeExpansion;
+  const index = Math.max(0, Math.min(tutorial.steps.length - 1, Number(stepIndex) || 0));
+  const step = tutorial.steps[index];
+  els.fighterInfo.classList.remove("home-builder-dock");
+  els.fighterInfoName.textContent = tutorial.title;
+  els.fighterInfoBody.innerHTML = `
+    <section class="library-tutorial" aria-live="polite">
+      <div class="library-tutorial-step">Step ${index + 1} / ${tutorial.steps.length}</div>
+      <h3>${escapeHtml(step.title)}</h3>
+      <p>${escapeHtml(step.body)}</p>
+      <div class="library-tutorial-actions">
+        <button type="button" data-action="library-tutorial-step" data-topic="${escapeAttribute(topic)}" data-step="${index - 1}" ${index <= 0 ? "disabled" : ""}>Previous Step</button>
+        <button type="button" data-action="library-tutorial-step" data-topic="${escapeAttribute(topic)}" data-step="${index + 1}" ${index >= tutorial.steps.length - 1 ? "disabled" : ""}>Next Step</button>
+      </div>
+    </section>
+  `;
+  els.fighterInfo.classList.remove("hidden");
+}
+
+function titleCaseTag(tag) {
+  return String(tag ?? "other")
+    .split(/[-\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function monsterDungeonHints(monster) {
+  const hints = window.DungeonContent
+    .list("themes")
+    .filter((theme) => !theme.hidden)
+    .filter((theme) => {
+      if (theme.monsterIds?.includes(monster.id) || theme.bossMonsterIds?.includes(monster.id)) return true;
+      const monsterGroups = normalizeTagGroups(theme.monsterTagGroups, theme.monsterTags);
+      const bossGroups = normalizeTagGroups(theme.bossMonsterTagGroups, theme.bossMonsterTags);
+      return contentMatchesAnyTagGroup(monster, monsterGroups) || contentMatchesAnyTagGroup(monster, bossGroups);
+    })
+    .map((theme) => theme.name ?? theme.id)
+    .filter(Boolean);
+  return Array.from(new Set(hints)).slice(0, 3);
+}
+
+function showMonsterArtPreview(src, name = "Monster") {
+  if (!src) return;
+  hideMonsterArtPreview();
+  const overlay = document.createElement("div");
+  overlay.className = "monster-art-preview";
+  overlay.innerHTML = `
+    <section class="monster-art-preview-panel" role="dialog" aria-modal="true" aria-label="${escapeAttribute(name)} artwork">
+      <button type="button" class="icon-button monster-art-preview-close" data-action="close-monster-art-preview" aria-label="Close">x</button>
+      <img src="${escapeAttribute(src)}" alt="${escapeAttribute(name)} artwork" />
+      <h3>${escapeHtml(name)}</h3>
+    </section>
+  `;
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay || event.target.closest("[data-action='close-monster-art-preview']")) hideMonsterArtPreview();
+  });
+  document.body.append(overlay);
+}
+
+function hideMonsterArtPreview() {
+  document.querySelector(".monster-art-preview")?.remove();
+}
+
+function cookHomeMeal() {
+  for (const hero of rosterHeroes().filter((entry) => !entry.dead)) {
+    hero.statusEffects = (hero.statusEffects ?? []).filter((effect) => effect.id !== "home-hearty-meal");
+    hero.statusEffects.push({ id: "home-hearty-meal", label: "Hearty Meal", maxHpBonus: 2, saveBonus: 1, expiresAtHome: true });
+    refreshDerivedStats(hero);
+  }
+  addLog("The party shares a hearty meal: +2 max HP and +1 saves until returning home.", "important");
+  render();
+  showDungeonObjectInfo(dungeonObjectForId("home-cooking-pot") ?? { type: "home-cooking-pot", position: { x: 2, y: 1 }, homePlaced: true });
+}
+
+function harvestHomeHerbs() {
+  state.home = normalizeHomeData(state.home);
+  if (state.home.herbsReady === false) {
+    addLog("The herb garden has not regrown yet. Clear another dungeon to refresh it.", "important");
+    showDungeonObjectInfo(dungeonObjectForId("home-herb-garden") ?? { type: "home-herb-garden", position: { x: 11, y: 18 }, homePlaced: true });
+    return;
+  }
+  const potion = createItemInstance("potion-healing", "home-garden");
+  if (potion) {
+    addItemToInventory(activeHero(), potion, "home-garden");
+    addLog(`${activeHero().name} harvests herbs and prepares ${potion.name}.`, "important");
+    state.home.herbsReady = false;
+    syncHomeLayoutToDungeon();
+  }
+  render();
+  showDungeonObjectInfo(dungeonObjectForId("home-herb-garden") ?? { type: "home-herb-garden", position: { x: 11, y: 18 }, homePlaced: true });
+}
+
 function showHomeChestInfo() {
   showDungeonObjectInfo(homeChestObject());
+}
+
+function assignHomeBed(objectId, heroId) {
+  const bed = dungeonObjectForId(objectId);
+  if (!bed || !objectComponent(bed.type, "homeBed")) return;
+  const normalizedHeroId = heroId && isClassHero(state.fighters[heroId]) ? heroId : "";
+  for (const object of state.dungeonObjects ?? []) {
+    if (object.id !== objectId && object.assignedHeroId === normalizedHeroId && objectComponent(object.type, "homeBed")) {
+      delete object.assignedHeroId;
+    }
+  }
+  if (normalizedHeroId) {
+    bed.assignedHeroId = normalizedHeroId;
+    addLog(`${objectTemplate(bed.type)?.name ?? "Bed"} assigned to ${state.fighters[normalizedHeroId].name}.`, "important");
+  } else {
+    delete bed.assignedHeroId;
+    addLog(`${objectTemplate(bed.type)?.name ?? "Bed"} is now unassigned.`, "important");
+  }
+  syncHomeLayoutToDungeon();
+  render();
+  showDungeonObjectInfo(dungeonObjectForId(objectId));
+}
+
+function showHomeBedRange(objectId) {
+  const bed = dungeonObjectForId(objectId);
+  const bedComponent = bed ? objectComponent(bed.type, "homeBed") : null;
+  if (!bed || !bedComponent) return;
+  homeComfortRangePreviewKeys = homeComfortReachableKeysFromObject(bed, bedComponent.range ?? 4);
+  hideFighterInfo();
+  render();
+  window.setTimeout(() => {
+    document.addEventListener("pointerdown", clearHomeBedRangePreview, { once: true, capture: true });
+  }, 0);
+}
+
+function clearHomeBedRangePreview() {
+  if (!homeComfortRangePreviewKeys.size) return;
+  homeComfortRangePreviewKeys = new Set();
+  render();
+}
+
+function homeComfortReachableKeysFromObject(object, range = 4) {
+  const floorKeys = homeCellKeys();
+  const objectFloorCells = objectCells(object).filter((cell) => floorKeys.has(positionKey(cell)));
+  if (!objectFloorCells.length) return new Set();
+  const bounds = objectFloorCells.reduce(
+    (box, cell) => ({
+      minX: Math.min(box.minX, cell.x),
+      maxX: Math.max(box.maxX, cell.x),
+      minY: Math.min(box.minY, cell.y),
+      maxY: Math.max(box.maxY, cell.y),
+    }),
+    { minX: objectFloorCells[0].x, maxX: objectFloorCells[0].x, minY: objectFloorCells[0].y, maxY: objectFloorCells[0].y },
+  );
+  const boxKeys = new Set();
+  for (let y = bounds.minY - range; y <= bounds.maxY + range; y += 1) {
+    for (let x = bounds.minX - range; x <= bounds.maxX + range; x += 1) {
+      const key = positionKey({ x, y });
+      if (floorKeys.has(key)) boxKeys.add(key);
+    }
+  }
+  const connected = new Set(objectFloorCells.map(positionKey));
+  const queue = [...objectFloorCells];
+  while (queue.length) {
+    const current = queue.shift();
+    for (const next of adjacentCells(current)) {
+      const key = positionKey(next);
+      if (!boxKeys.has(key) || connected.has(key) || homeDoorBlocksComfortBetween(current, next)) continue;
+      connected.add(key);
+      queue.push(next);
+    }
+  }
+  return new Set([...boxKeys].filter((key) => connected.has(key)));
+}
+
+function homeDoorBlocksComfortBetween(from, to) {
+  const fromKey = positionKey(from);
+  const toKey = positionKey(to);
+  return (state.home?.doors ?? []).some((door) => {
+    const doorKey = positionKey(door);
+    const corridorKey = positionKey(door.corridor ?? homeDoorNeighbor(door, homeDoorDirection(door)));
+    return (fromKey === doorKey && toKey === corridorKey) || (fromKey === corridorKey && toKey === doorKey);
+  });
+}
+
+function homeObjectComfortPoints(object) {
+  const bed = objectComponent(object.type, "homeBed");
+  if (bed) return bed.comfort ?? 0;
+  if (homeComfortScores[object.type] !== undefined) return homeComfortScores[object.type];
+  return homeObjectIsComfortDecor(object) ? 1 : 0;
+}
+
+function homeObjectIsComfortDecor(object) {
+  const template = objectTemplate(object?.type);
+  if (!object?.homePlaced || !template) return false;
+  if (objectComponent(object.type, "homeBed")) return false;
+  if (homeObjectTypeIsStorage(object.type, template)) return false;
+  if (["home-bookshelf", "home-cooking-pot", "home-herb-garden", "portal"].includes(object.type)) return false;
+  if (template.kind === "trap" || objectHasComponent(object.type, "trap") || objectHasComponent(object.type, "captiveCreature")) return false;
+  return true;
+}
+
+function homeComfortContributionData() {
+  const data = new Map();
+  const bedsByHero = new Map();
+  const sharedObjects = new Map();
+  for (const bed of (state.dungeonObjects ?? []).filter((object) => object.assignedHeroId && objectComponent(object.type, "homeBed"))) {
+    const hero = state.fighters[bed.assignedHeroId];
+    if (!hero || !isClassHero(hero)) continue;
+    const bedComponent = objectComponent(bed.type, "homeBed");
+    bedsByHero.set(hero.id, bed);
+    data.get(hero.id)?.contributions ?? data.set(hero.id, { contributions: [] });
+    data.get(hero.id).contributions.push({ name: objectTemplate(bed.type)?.name ?? "Bed", points: bedComponent.comfort ?? 0, basePoints: bedComponent.comfort ?? 0, shared: false });
+    const reachable = homeComfortReachableKeysFromObject(bed, bedComponent.range ?? 4);
+    for (const object of state.dungeonObjects ?? []) {
+      if (object.id === bed.id || objectComponent(object.type, "homeBed")) continue;
+      const points = homeObjectComfortPoints(object);
+      if (points <= 0) continue;
+      if (!objectCells(object).some((cell) => reachable.has(positionKey(cell)))) continue;
+      sharedObjects.set(object.id, {
+        object,
+        basePoints: points,
+        heroIds: new Set([...(sharedObjects.get(object.id)?.heroIds ?? []), hero.id]),
+      });
+    }
+  }
+  for (const { object, basePoints, heroIds } of sharedObjects.values()) {
+    const shareCount = heroIds.size;
+    const awardedPoints = Math.floor(basePoints / shareCount);
+    for (const heroId of heroIds) {
+      data.get(heroId)?.contributions ?? data.set(heroId, { contributions: [] });
+      data.get(heroId).contributions.push({
+        name: objectTemplate(object.type)?.name ?? object.type,
+        points: awardedPoints,
+        basePoints,
+        shared: shareCount > 1,
+        shareCount,
+      });
+    }
+  }
+  for (const [heroId, entry] of data.entries()) {
+    entry.total = entry.contributions.reduce((sum, contribution) => sum + contribution.points, 0);
+    entry.bed = bedsByHero.get(heroId) ?? null;
+  }
+  return data;
+}
+
+function homeComfortDetailsForHero(heroId, data = homeComfortContributionData()) {
+  return data.get(heroId) ?? { total: 0, contributions: [] };
 }
 
 function objectAdjacentToHero(object, hero = activeHero()) {
@@ -1616,6 +2610,7 @@ function roleOptionsMarkup(selectedRole) {
 }
 
 function showPlanningTableInfo() {
+  els.fighterInfo.classList.remove("home-builder-dock");
   const activeIds = state.party?.heroIds ?? ["hero"];
   const rosterIds = state.party?.rosterIds ?? activeIds;
   const allPlanningIds = [...new Set([...activeIds, ...rosterIds])];
@@ -1685,6 +2680,33 @@ function showPlanningTableInfo() {
         })
         .join("")
     : `<p class="empty-note">No reserve heroes yet.</p>`;
+  const comfortData = homeComfortContributionData();
+  const comfortMarkup = rosterIds
+    .map((id) => state.fighters[id])
+    .filter((hero) => hero && isClassHero(hero))
+    .map((hero) => {
+      const comfort = homeComfortDetailsForHero(hero.id, comfortData);
+      return `
+        <details class="comfort-details">
+          <summary><span>${escapeHtml(hero.name)}</span><b>${comfort.total}/100</b></summary>
+          ${
+            comfort.contributions.length
+              ? comfort.contributions
+                  .map(
+                    (entry) => `
+                      <div class="comfort-row">
+                        <span>${escapeHtml(entry.name)}${entry.shared ? ` <small>shared ${entry.basePoints} / ${entry.shareCount}</small>` : ""}</span>
+                        <b>+${entry.points}</b>
+                      </div>
+                    `,
+                  )
+                  .join("")
+              : `<p class="empty-note">No assigned bed or comfort furniture in range.</p>`
+          }
+        </details>
+      `;
+    })
+    .join("");
 
   els.fighterInfoName.textContent = "Planning Table";
   els.fighterInfoBody.innerHTML = `
@@ -1707,6 +2729,10 @@ function showPlanningTableInfo() {
     <section class="planning-party">
       <h3>Hero Roster</h3>
       ${benchMarkup}
+    </section>
+    <section class="planning-party">
+      <h3>Home Comfort</h3>
+      ${comfortMarkup || `<p class="empty-note">No class heroes in the roster.</p>`}
     </section>
     <div class="object-actions">
       <button type="button" data-action="create-roster-hero">Create New Hero</button>
@@ -1885,9 +2911,10 @@ function setD20Mode(mode) {
 }
 
 function takeObjectItem(objectId, itemId) {
-  if (objectId === "home-chest") {
-    moveChestItemToInventory(itemId);
-    showHomeChestInfo();
+  const homeStorage = homeStorageObjectForId(objectId);
+  if (homeStorage) {
+    moveHomeStorageItemToInventory(objectId, itemId);
+    showDungeonObjectInfo(homeStorageObjectForId(objectId));
     return;
   }
 
@@ -1973,23 +3000,24 @@ function pickObjectLock(objectId) {
   showDungeonObjectInfo(object);
 }
 
-function storeHomeChestItem(itemId) {
-  moveInventoryItemToChest(itemId);
-  showHomeChestInfo();
+function storeHomeChestItem(itemId, objectId = "home-chest") {
+  moveInventoryItemToHomeStorage(itemId, objectId);
+  showDungeonObjectInfo(homeStorageObjectForId(objectId) ?? homeChestObject());
 }
 
-function storeAllHomeChestItems() {
+function storeAllHomeChestItems(objectId = "home-chest") {
   unequippedInventoryItems(activeHero())
     .map((item) => item.id)
-    .forEach(moveInventoryItemToChest);
-  showHomeChestInfo();
+    .forEach((itemId) => moveInventoryItemToHomeStorage(itemId, objectId));
+  showDungeonObjectInfo(homeStorageObjectForId(objectId) ?? homeChestObject());
 }
 
-function takeAllHomeChestItems() {
-  (state.chest ?? [])
+function takeAllHomeChestItems(objectId = "home-chest") {
+  const storage = homeStorageObjectForId(objectId);
+  (storage?.items ?? [])
     .map((item) => item.id)
-    .forEach(moveChestItemToInventory);
-  showHomeChestInfo();
+    .forEach((itemId) => moveHomeStorageItemToInventory(objectId, itemId));
+  showDungeonObjectInfo(homeStorageObjectForId(objectId) ?? homeChestObject());
 }
 
 function disarmTrap(objectId) {
@@ -2187,6 +3215,7 @@ function investigateObject(objectId) {
 }
 
 function hideFighterInfo() {
+  els.fighterInfo.classList.remove("home-builder-dock");
   els.fighterInfo.classList.add("hidden");
 }
 
@@ -2701,10 +3730,19 @@ function removeInventoryItem(itemId) {
 }
 
 function moveInventoryItemToChest(itemId) {
+  moveInventoryItemToHomeStorage(itemId, "home-chest");
+}
+
+function moveChestItemToInventory(itemId) {
+  moveHomeStorageItemToInventory("home-chest", itemId);
+}
+
+function moveInventoryItemToHomeStorage(itemId, objectId = "home-chest") {
   if (state.mode !== "home") return;
+  const storage = homeStorageObjectForId(objectId);
   const hero = activeHero();
   const item = itemForId(hero, itemId);
-  if (!item) return;
+  if (!storage || !item) return;
 
   for (const slot of equipmentSlots) {
     if (hero.equipment[slot.id] === itemId) {
@@ -2712,19 +3750,30 @@ function moveInventoryItemToChest(itemId) {
     }
   }
   hero.inventory.items = hero.inventory.items.filter((entry) => entry.id !== itemId);
-  state.chest = [...(state.chest ?? []), item];
+  if (objectId === "home-chest") {
+    state.chest = [...(state.chest ?? []), item];
+  } else {
+    storage.items = [...(storage.items ?? []), item];
+    syncHomeLayoutToDungeon();
+  }
   refreshDerivedStats(hero);
   render();
   renderInventoryMenu();
 }
 
-function moveChestItemToInventory(itemId) {
+function moveHomeStorageItemToInventory(objectId = "home-chest", itemId) {
   if (state.mode !== "home") return;
-  const item = chestItemForId(itemId);
+  const storage = homeStorageObjectForId(objectId);
+  const item = objectId === "home-chest" ? chestItemForId(itemId) : (storage?.items ?? []).find((entry) => entry.id === itemId);
   if (!item) return;
 
-  state.chest = (state.chest ?? []).filter((entry) => entry.id !== itemId);
-  addItemToInventory(activeHero(), item, "chest-stack");
+  if (objectId === "home-chest") {
+    state.chest = (state.chest ?? []).filter((entry) => entry.id !== itemId);
+  } else {
+    storage.items = (storage.items ?? []).filter((entry) => entry.id !== itemId);
+    syncHomeLayoutToDungeon();
+  }
+  addItemToInventory(activeHero(), item, "storage-stack");
   render();
   renderInventoryMenu();
 }
@@ -3673,7 +4722,7 @@ async function trainWarriorSidekick(companion) {
     message: "Choose this warrior's combat focus.",
     choices: [
       { value: "attacker", label: "Attacker", description: "+2 bonus to attack rolls." },
-      { value: "defender", label: "Defender", description: "Future reaction support for nearby allies." },
+      { value: "defender", label: "Defender", description: "Use a reaction to impose disadvantage on an attack against a nearby ally." },
     ],
     actor: companion,
   });

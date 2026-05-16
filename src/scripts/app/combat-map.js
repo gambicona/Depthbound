@@ -89,8 +89,11 @@ function applyDamageToFighter(defender, damage) {
   }
   const wasDown = isPartyHeroId(defender.id) && defender.hp <= 0;
   const previousHp = defender.hp;
-  defender.hp = Math.max(0, defender.hp - damage);
-  checkConcentrationAfterDamage(defender, damage);
+  const temporaryAbsorbed = Math.min(defender.temporaryHp ?? 0, damage);
+  defender.temporaryHp = Math.max(0, (defender.temporaryHp ?? 0) - temporaryAbsorbed);
+  const hpDamage = Math.max(0, damage - temporaryAbsorbed);
+  defender.hp = Math.max(0, defender.hp - hpDamage);
+  checkConcentrationAfterDamage(defender, hpDamage);
   if (!isPartyHeroId(defender.id)) {
     defender.alive = defender.hp > 0;
     return;
@@ -565,7 +568,7 @@ function attacksPerAttackAction(fighter) {
 
 function sneakAttackDice(fighter) {
   if (fighter?.classId !== "rogue") return 0;
-  return Math.ceil((fighter.level ?? 1) / 2);
+  return Math.ceil((fighter.level ?? 1) / 2) + (fighter.extraSneakAttackDice ?? 0);
 }
 
 function canApplySneakAttack(attacker, defender, weapon, rangedAttack) {
@@ -762,7 +765,7 @@ function positionFromKey(tileKey) {
 }
 
 function exposedWallKeys() {
-  const walkable = currentWalkable();
+  const walkable = dungeonFloorKeys();
   const activeKeys = activeTileKeys();
   const walls = new Set();
   for (const tileKey of walkable) {
@@ -780,9 +783,11 @@ function exposedWallKeys() {
 
 function visibleFloorEdgeKeys() {
   const keys = new Set();
-  const walkable = currentWalkable();
-  for (const tileKey of visibleWalkable()) {
-    if (!walkable.has(tileKey)) continue;
+  const floorKeys = dungeonFloorKeys();
+  const activeKeys = activeTileKeys();
+  for (const tileKey of floorKeys) {
+    if (!activeKeys.has(tileKey)) continue;
+    if (!isKnownTile(positionFromKey(tileKey))) continue;
     keys.add(tileKey);
   }
   return keys;
@@ -1048,7 +1053,7 @@ function canTraverseMovementEdge(fighter, from, to, path = []) {
 function hasVisibleWallEdge(position, delta, visibleWallKeys = exposedWallKeys(), visibleFloorKeys = visibleFloorEdgeKeys()) {
   const neighbor = { x: position.x + delta.x, y: position.y + delta.y };
   if (!window.DungeonGrid.isInsideGrid(neighbor, currentGridSize())) return false;
-  const walkable = currentWalkable();
+  const walkable = dungeonFloorKeys();
   const positionWalkable = walkable.has(positionKey(position));
   const neighborWalkable = walkable.has(positionKey(neighbor));
   if (!positionWalkable || !visibleFloorKeys.has(positionKey(position))) return false;
@@ -1060,7 +1065,7 @@ function hasVisibleWallEdge(position, delta, visibleWallKeys = exposedWallKeys()
 
 function wallEdgeSegments() {
   const segments = [];
-  const walkable = currentWalkable();
+  const walkable = dungeonFloorKeys();
   const activeKeys = activeTileKeys();
   const visibleWallKeys = exposedWallKeys();
   const visibleFloorKeys = visibleFloorEdgeKeys();
@@ -1597,7 +1602,7 @@ function checkDungeonCompletion(hero = activeHero()) {
     if (state.campaignId && state.campaignIndex) {
       completedCampaign[state.campaignId] = Math.max(completedCampaign[state.campaignId] ?? 0, state.campaignIndex);
     }
-    state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, { ...state.party, campaignProgress: completedCampaign });
+    state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, { ...state.party, campaignProgress: completedCampaign, home: homeWithRegrownResources(state.home), monsterCompendium: state.monsterCompendium });
     state.combatStarted = false;
     roomIsBuilt = false;
     addLog(`${hero.name} reaches the exit. Dungeon complete. The party gained ${tokenAward} Hero Token${tokenAward === 1 ? "" : "s"} each.`, "important");
@@ -1853,6 +1858,7 @@ function dropLootForHero(hero) {
 }
 
 function awardMonsterXp(monster) {
+  recordMonsterKill(monster);
   const xp = monster.xp ?? 50;
   const participants = partyHeroes();
   const recipients = participants.filter((fighter) => isClassHero(fighter) || isTrainedSidekick(fighter));
@@ -2108,6 +2114,25 @@ function openDoor(door) {
 
   render();
   return true;
+}
+
+function toggleHomeDoor(position, actor = activeHero()) {
+  if (state.mode !== "home" || isHomeBuilderOpen()) return false;
+  const door = doorCandidateForPosition(position, actor);
+  if (!door || door.to === "outside" || !actor || distance(actor.position, door) > 1) return false;
+  const doorKey = positionKey(door);
+  const openedDoorKeys = new Set(state.exploration.openedDoorKeys ?? []);
+  const openedCorridorKeys = new Set(state.exploration.openedCorridorKeys ?? []);
+  if (openedDoorKeys.has(doorKey)) {
+    openedDoorKeys.delete(doorKey);
+    if (door.corridor) openedCorridorKeys.delete(positionKey(door.corridor));
+    state.exploration.openedDoorKeys = Array.from(openedDoorKeys);
+    state.exploration.openedCorridorKeys = Array.from(openedCorridorKeys);
+    addLog(`${actor.name} closes the door.`, "important");
+    render();
+    return true;
+  }
+  return openDoor(door);
 }
 
 function doorCandidateForPosition(position, actor = activeHero()) {
@@ -2748,11 +2773,7 @@ function applyStatusEffect(target, effect) {
   target.statusEffects.push(effect);
   refreshDerivedStats(target);
   if (effect.tempHp) {
-    target.hp = Math.min(target.maxHp, target.hp + effect.tempHp);
-    if (target.hp > 0) {
-      clearStableAtZero(target);
-      resetDeathSaveCounters(target);
-    }
+    target.temporaryHp = Math.max(target.temporaryHp ?? 0, effect.tempHp);
   }
 }
 

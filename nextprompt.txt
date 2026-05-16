@@ -1,14 +1,10 @@
-add the standard item descriptions
 subclasses
-add more monster behaviour (already according to role and int)
-Give type to monsters (undead etc)
 Spell sound effects
 
 Bug report function
 
+Dungeon Creator: make text with choices appear at specific trigger points (open a chest, inspect this furniture, walk into this room, kill this monster…)
 
-Monster Compendium to collect
-build base
 NPCs with (random) quests
 
 ressource points to get ressources (stone pit, con check, get stone, farmable, as configurable file, spawnable in dungeons at walls)
