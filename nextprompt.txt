@@ -1,8 +1,6 @@
 Turn Ranger Companion and summon spells into persistent actors with pet command action economy.
 add roles: pet and support (pet like controllable npc for example ranger pet, support acts on its own)
 
-Destructible objects have AC/HP component data, but there is not yet a dedicated attack/destroy object UI.
-
 
 add the standard item descriptions
 subclasses

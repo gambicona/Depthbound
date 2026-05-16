@@ -1042,6 +1042,14 @@ h1 {
   border-style: dashed;
 }
 
+.dungeon-object.attackable-object {
+  box-shadow: 0 0 0 2px rgba(215, 168, 79, 0.46), 0 8px 18px rgba(0, 0, 0, 0.42);
+}
+
+.dungeon-object.selected-target {
+  box-shadow: 0 0 0 3px rgba(255, 214, 112, 0.76), 0 0 16px rgba(255, 129, 64, 0.46);
+}
+
 .token {
   align-items: center;
   border-radius: 50%;

@@ -106,7 +106,10 @@ els.rollInitiative.addEventListener("click", rollInitiative);
 els.selectParty?.addEventListener("click", selectActivePartyForMovement);
 els.attack.addEventListener("click", () => {
   const target = attackTarget();
-  if (target) makeAttack(activeFighter(), target);
+  if (target) {
+    if (objectIsDestructible(target)) attackDestructibleObject(activeFighter(), target);
+    else makeAttack(activeFighter(), target);
+  }
 });
 els.actionButton.addEventListener("click", showActionMenu);
 els.useItem.addEventListener("click", showUseItemMenu);
@@ -241,6 +244,9 @@ els.fighterInfo.addEventListener("click", (event) => {
   }
   if (button.dataset.action === "investigate-object") {
     investigateObject(button.dataset.object);
+  }
+  if (button.dataset.action === "attack-object") {
+    attackDestructibleObject(state.mode === "combat" ? activeFighter() : activeHero(), dungeonObjectForId(button.dataset.object));
   }
   if (button.dataset.action === "home-store-item") {
     storeHomeChestItem(button.dataset.item);
@@ -577,7 +583,10 @@ window.addEventListener("keydown", (event) => {
   if (key === "t" && !els.attack.disabled) {
     event.preventDefault();
     const targetFighter = attackTarget();
-    if (targetFighter) makeAttack(activeFighter(), targetFighter);
+    if (targetFighter) {
+      if (objectIsDestructible(targetFighter)) attackDestructibleObject(activeFighter(), targetFighter);
+      else makeAttack(activeFighter(), targetFighter);
+    }
   }
   if (key === "u" && !els.useItem.disabled) {
     event.preventDefault();

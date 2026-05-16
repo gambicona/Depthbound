@@ -563,6 +563,8 @@ function renderDungeonObjects() {
       .map((component) => `feature-${component.type.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`)
       .join(" ");
     element.className = `dungeon-object ${object.type} ${behaviorClasses}${object.spent ? " spent" : ""}${object.disarmed ? " disarmed" : ""}${object.detected ? " detected" : ""}`;
+    element.classList.toggle("attackable-object", selectedHeroCanTargetObject(object));
+    element.classList.toggle("selected-target", selectedAttackTarget()?.id === object.id);
     element.type = "button";
     element.title = template.name;
     const fallbackSymbol = template.symbol ?? (objectIsTrap(object) ? "!" : objectHasLoot(object) ? "$" : "?");
@@ -605,6 +607,10 @@ function renderDungeonObjects() {
       }
       if (pendingEldritchBlast) {
         void confirmPendingEldritchBlast(object.position);
+        return;
+      }
+      if (state.mode === "combat" && selectedHeroCanTargetObject(object)) {
+        selectAttackTarget(object.id);
         return;
       }
       showDungeonObjectInfo(object);
@@ -669,6 +675,42 @@ function placePlanningTableToken() {
   token.style.top = `${(position.y + 0.5) * scaledTileSizePx}px`;
   token.style.width = `${2 * scaledTileSizePx}px`;
   token.style.height = `${scaledTileSizePx}px`;
+}
+
+let renderedDragPathKeys = new Set();
+
+function tileElementAt(position) {
+  if (!position) return null;
+  return els.room.querySelector(`.tile[data-x="${position.x}"][data-y="${position.y}"]`);
+}
+
+function clearRenderedDragPathPreview() {
+  for (const key of renderedDragPathKeys) {
+    const tile = tileElementAt(positionFromKey(key));
+    if (!tile) continue;
+    tile.classList.remove("path-preview");
+    tile.textContent = "";
+  }
+  renderedDragPathKeys = new Set();
+}
+
+function renderDragPathPreview() {
+  const path = dragPath ?? [];
+  const nextKeys = new Set(path.map(positionKey));
+  for (const key of renderedDragPathKeys) {
+    if (nextKeys.has(key)) continue;
+    const tile = tileElementAt(positionFromKey(key));
+    if (!tile) continue;
+    tile.classList.remove("path-preview");
+    tile.textContent = "";
+  }
+  path.forEach((step, index) => {
+    const tile = tileElementAt(step);
+    if (!tile) return;
+    tile.classList.add("path-preview");
+    tile.textContent = String(index + 1);
+  });
+  renderedDragPathKeys = nextKeys;
 }
 
 function placeToken(fighter) {
@@ -748,6 +790,7 @@ function renderRoom() {
           canEnterOccupied: (position) => canMoveThroughOccupiedTile(hero, position),
         })
       : new Map();
+  const dragPathIndexByKey = new Map((dragPath ?? []).map((step, index) => [positionKey(step), index]));
 
   perfStats.visibleTiles = rememberedTiles.size;
   perfStats.renderedTiles = renderedTileKeys.size;
@@ -761,7 +804,7 @@ function renderRoom() {
     const isDoor = doorKeys.has(key);
     const isKnown = isKnownTile(position);
     const isSeenWall = !isWalkable && visibleWalls.has(key);
-    const pathIndex = dragPath?.findIndex((step) => positionKey(step) === key) ?? -1;
+    const pathIndex = dragPathIndexByKey.get(key) ?? -1;
     const isAdminTeleportTarget = canAdminTeleportTo(position);
     const spellTargetAtTile = fighterAtPosition(position);
     const isSpellAffected = spellPreview.has(key);
@@ -832,6 +875,7 @@ function renderRoom() {
   renderLootPiles();
   renderDungeonObjects();
   renderWallEdges();
+  renderedDragPathKeys = new Set((dragPath ?? []).map(positionKey));
 }
 
 function renderHeroStatusCard(element, fighter) {
@@ -1055,6 +1099,12 @@ function showDungeonObjectInfo(object) {
       object.trap?.detected) &&
     !heroTriedDisarm;
   const canInvestigate = state.mode !== "combat" && objectCanInspect(object) && objectAdjacent && !object.investigated;
+  const destructible = objectIsDestructible(object) ? ensureDestructibleObjectState(object) : null;
+  const canAttackObject =
+    destructible &&
+    canActInCombat &&
+    (state.mode !== "combat" || activeFighter()?.hasAction) &&
+    isObjectInAttackRangeWithProfile(hero, object, damageProfile(hero));
   const chestItems = object.type === "chest" || isHomeChest ? object.items ?? [] : [];
   const objectItems = objectHasLoot(object) || isHomeChest ? object.items ?? [] : [];
   const componentLabels = objectComponents(object)
@@ -1066,6 +1116,12 @@ function showDungeonObjectInfo(object) {
     ${furnitureArtworkMarkup(template, object)}
     <p class="empty-note">${escapeHtml(template.description)}</p>
     ${object.lastResult ? `<p class="object-result">${escapeHtml(object.lastResult)}</p>` : ""}
+    ${
+      destructible
+        ? `<p class="empty-note">AC ${objectArmorClass(object)} - HP ${object.hp}/${object.maxHp}</p>
+           <button type="button" data-action="attack-object" data-object="${escapeAttribute(object.id)}" ${canAttackObject ? "" : "disabled"}>Attack Object</button>`
+        : ""
+    }
     ${
       objectLocked
         ? `<p class="empty-note">Locked. Contents hidden until the lock is picked.</p>
@@ -1199,6 +1255,8 @@ function showDungeonObjectInfo(object) {
         ${object.trap?.detected ? `<div class="stat-pill"><b>${object.trap.spotDc ?? 12}</b><span>Trap DC</span></div>` : ""}
         ${object.lockDc ? `<div class="stat-pill"><b>${object.locked ? "Locked" : "Open"}</b><span>Lock</span></div>` : ""}
         ${object.lockDc ? `<div class="stat-pill"><b>${object.lockDc}</b><span>Lock DC</span></div>` : ""}
+        ${destructible ? `<div class="stat-pill"><b>${objectArmorClass(object)}</b><span>AC</span></div>` : ""}
+        ${destructible ? `<div class="stat-pill"><b>${object.hp}/${object.maxHp}</b><span>HP</span></div>` : ""}
       </div>
     </section>
   `;
@@ -2777,12 +2835,14 @@ function useCombatAction(action, targetId = null) {
     const target = attackTarget();
     if (!target || !canOffHandAttack(fighter)) return;
     hideActionMenu();
-    void makeAttack(fighter, target, {
+    const options = {
       weaponSlot: "offHand",
       resource: "bonusAction",
       includeDamageModifier: false,
       actionLabel: "makes an off-hand attack",
-    });
+    };
+    if (objectIsDestructible(target)) void attackDestructibleObject(fighter, target, options);
+    else void makeAttack(fighter, target, options);
     return;
   }
 
@@ -3558,7 +3618,8 @@ async function useFighterAbility(abilityId) {
   }
 
   if (ability.id === "rangerCompanion") {
-    const target = attackTarget() ?? visibleMonsters()[0];
+    const selectedTarget = attackTarget();
+    const target = selectedTarget && !objectIsDestructible(selectedTarget) ? selectedTarget : visibleMonsters()[0];
     if (target) {
       const damage = Math.max(1, rollDice(1, 8).total + proficiencyBonus(hero));
       applySpecialDamage(hero, target, damage, "piercing", "Ranger Companion");
@@ -4003,7 +4064,7 @@ function renderControls() {
     const weapon = activeWeapon(actingHero);
     const target = attackTarget();
     els.attackNote.textContent = target
-      ? `${weapon?.name ?? "Unarmed Strike"} -> ${target.name}`
+      ? `${weapon?.name ?? "Unarmed Strike"} -> ${objectIsDestructible(target) ? objectTargetName(target) : target.name}`
       : `${weapon?.name ?? "Unarmed Strike"}`;
   }
   els.actionButton.disabled = movementInProgress || !heroCanUseAction;

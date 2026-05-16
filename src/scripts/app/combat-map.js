@@ -1199,10 +1199,43 @@ function isInAttackRangeWithProfile(attacker, defender, profile) {
   return profile.range?.kind !== "ranged" || hasClearLineOfSight(attacker.position, defender.position);
 }
 
+function objectTargetName(object) {
+  return objectTemplate(object?.type)?.name ?? object?.name ?? "Object";
+}
+
+function objectTargetPosition(object, attacker = activeFighter()) {
+  const cells = objectCells(object);
+  if (!cells.length) return object?.position;
+  if (!attacker?.position) return cells[0];
+  return cells.slice().sort((a, b) => attackGridDistance(attacker.position, a) - attackGridDistance(attacker.position, b))[0];
+}
+
+function isObjectInAttackRangeWithProfile(attacker, object, profile) {
+  if (!objectIsDestructible(object)) return false;
+  const range = profileRangeSquares(profile);
+  const cells = objectCells(object);
+  if (range <= 1) {
+    return cells.some((cell) => attackGridDistance(attacker.position, cell) <= 1);
+  }
+  return cells.some((cell) => attackGridDistance(attacker.position, cell) <= range && hasClearLineOfSight(attacker.position, cell));
+}
+
+function destructibleObjectTargets(hero = activeFighter()) {
+  if (state.mode !== "combat" || !hero || !isPartyHeroId(hero.id)) return [];
+  const profile = damageProfile(hero);
+  return (state.dungeonObjects ?? [])
+    .filter((object) => objectIsDestructible(ensureDestructibleObjectState(object)))
+    .filter((object) => objectCells(object).some((cell) => isKnownTile(cell)))
+    .filter((object) => isObjectInAttackRangeWithProfile(hero, object, profile));
+}
+
 function attackTargets() {
   const hero = activeFighter();
   if (state.mode !== "combat" || !hero || !isPartyHeroId(hero.id) || combatMonsters().length === 0) return [];
-  return visibleMonsters().filter((monster) => isInAttackRange(hero, monster));
+  return [
+    ...visibleMonsters().filter((monster) => isInAttackRange(hero, monster)),
+    ...destructibleObjectTargets(hero),
+  ];
 }
 
 function isValidAttackTargetId(targetId) {
@@ -1232,6 +1265,11 @@ function selectedHeroCanTargetMonster(monster) {
   return Boolean(monster?.alive && hero && isPartyHeroId(hero.id) && isInAttackRange(hero, monster));
 }
 
+function selectedHeroCanTargetObject(object) {
+  const hero = activeFighter();
+  return Boolean(hero && isPartyHeroId(hero.id) && isObjectInAttackRangeWithProfile(hero, object, damageProfile(hero)));
+}
+
 function cycleAttackTarget() {
   const targets = attackTargets();
   if (targets.length <= 1) return false;
@@ -1250,6 +1288,7 @@ function canOffHandAttack(fighter) {
   const target = attackTarget();
   if (!target) return false;
   const profile = damageProfile(fighter, { weapon: offHand, includeDamageModifier: false });
+  if (objectIsDestructible(target)) return isObjectInAttackRangeWithProfile(fighter, target, profile);
   return isInAttackRangeWithProfile(fighter, target, profile);
 }
 
@@ -2252,6 +2291,91 @@ async function rollInitiative() {
 
   render();
   maybeRunMonsterTurn();
+}
+
+function destroyDungeonObject(object, source = activeFighter()) {
+  const name = objectTargetName(object);
+  const position = objectTargetPosition(object, source) ?? object.position;
+  if ((object.items ?? []).length > 0) {
+    addLootPile({
+      id: `loot-object-${object.id}-${Date.now()}`,
+      position: { ...position },
+      money: normalizeMoney(),
+      items: [...object.items],
+    });
+  }
+  state.dungeonObjects = (state.dungeonObjects ?? []).filter((entry) => entry.id !== object.id);
+  if (selectedAttackTargetId === object.id) selectedAttackTargetId = null;
+  addLog(`${name} is destroyed.`, "important");
+}
+
+async function attackDestructibleObject(attacker, object, options = {}) {
+  if (!attacker || !objectIsDestructible(object)) return;
+  ensureDestructibleObjectState(object);
+  const usesCombatAction = state.mode === "combat";
+  const usesBonusAction = options.resource === "bonusAction";
+  if (!heroCanAct(attacker) || (usesCombatAction && (usesBonusAction ? !attacker.hasBonusAction : !attacker.hasAction))) return;
+
+  const weapon = options.weapon ?? (options.weaponSlot ? weaponFromSlot(attacker, options.weaponSlot) : activeWeapon(attacker));
+  const attackDamage = damageProfile(attacker, { weapon, includeDamageModifier: options.includeDamageModifier });
+  if (!isObjectInAttackRangeWithProfile(attacker, object, attackDamage)) {
+    addLog(`${attacker.name} is too far away to attack ${objectTargetName(object)}. Move closer first.`);
+    render();
+    return;
+  }
+
+  if (!itemHasUsableAmmo(attacker, weapon)) {
+    addLog(`${attacker.name} needs ammunition in the quiver to use ${weapon.name}.`);
+    render();
+    return;
+  }
+
+  if (usesCombatAction) {
+    if (usesBonusAction) attacker.hasBonusAction = false;
+    else {
+      attacker.attacksRemaining = Math.max(0, (attacker.attacksRemaining ?? attacksPerAttackAction(attacker)) - 1);
+      attacker.hasAction = attacker.attacksRemaining > 0;
+    }
+  }
+  spendAmmunition(attacker, weapon);
+  const rangedAttack = weaponIsRanged(weapon) || ["ranged", "thrown"].includes(attackDamage.range?.kind);
+  playSoundEffect(rangedAttack ? "rangedAttack" : "meleeAttack");
+
+  const attackRollResult = rollD20ForFighter(attacker);
+  const attackRoll = attackRollResult.roll;
+  const currentAttackBonus = attackBonusForWeapon(attacker, weapon);
+  const targetAc = objectArmorClass(object);
+  const totalAttack = attackRoll + currentAttackBonus;
+  const isCritical = attackRoll === 20;
+  const isMiss = attackRoll === 1 || totalAttack < targetAc;
+  const targetName = objectTargetName(object);
+  addLog(`${attacker.name} attacks ${targetName}: d20 ${attackRoll} ${abilityLabel(currentAttackBonus)} = ${totalAttack} vs AC ${targetAc}.`);
+  addAdminLog(`${attacker.name} object attack breakdown vs ${targetName}: ${d20RollDetail(attackRollResult)} + attack ${abilityLabel(currentAttackBonus)} = ${totalAttack}; target AC ${targetAc}; ${isMiss ? "miss" : isCritical ? "critical hit" : "hit"}.`);
+
+  if (isMiss) {
+    addLog(attackRoll === 1 ? `Natural 1. ${attacker.name} fails to damage ${targetName}.` : `${attacker.name}'s blow glances off ${targetName}.`);
+    recordD20OutcomeForFighter(attacker, false);
+    render();
+    return;
+  }
+  recordD20OutcomeForFighter(attacker, true);
+
+  const damageRoll = attackDamage.flat
+    ? { total: attackDamage.flat, rolls: [attackDamage.flat] }
+    : rollDice(attackDamage.count * (isCritical ? 2 : 1), attackDamage.sides);
+  let totalDamage = Math.max(1, damageRoll.total + attackDamage.bonus);
+  for (const extra of attackDamage.extraDamage ?? []) {
+    const extraRoll = rollDice((extra.count ?? 1) * (isCritical ? 2 : 1), extra.sides ?? 4);
+    totalDamage += Math.max(1, extraRoll.total + (extra.bonus ?? 0));
+  }
+  object.hp = Math.max(0, (object.hp ?? objectMaxHp(object)) - totalDamage);
+  const critText = isCritical ? " Critical hit." : "";
+  addLog(`${attacker.name} hits ${targetName} for ${totalDamage} damage (${damageRoll.rolls.join(" + ")} ${abilityLabel(attackDamage.bonus)}${attackDamage.type ? ` ${attackDamage.type}` : ""}). ${object.hp}/${object.maxHp} HP remains.${critText}`, "damage");
+  const destroyed = object.hp <= 0;
+  if (destroyed) destroyDungeonObject(object, attacker);
+  render();
+  if (destroyed) hideFighterInfo?.();
+  else if (!els.fighterInfo.classList.contains("hidden")) showDungeonObjectInfo(object);
 }
 
 async function makeAttack(attacker, defender, options = {}) {

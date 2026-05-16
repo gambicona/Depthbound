@@ -1755,6 +1755,30 @@ function objectHasComponent(objectOrType, type) {
   return Boolean(objectComponent(objectOrType, type));
 }
 
+function destructibleObjectComponent(objectOrType) {
+  return objectComponent(objectOrType, "destructibleObject");
+}
+
+function objectIsDestructible(object) {
+  return Boolean(object?.id && destructibleObjectComponent(object) && !object.destroyed && (object.hp === undefined || object.hp > 0));
+}
+
+function objectArmorClass(object) {
+  return object?.ac ?? destructibleObjectComponent(object)?.ac ?? 10;
+}
+
+function objectMaxHp(object) {
+  return object?.maxHp ?? destructibleObjectComponent(object)?.hp ?? 1;
+}
+
+function ensureDestructibleObjectState(object) {
+  if (!objectIsDestructible(object)) return object;
+  object.maxHp = Math.max(1, Math.floor(objectMaxHp(object)));
+  object.hp = Math.max(0, Math.min(object.maxHp, Math.floor(object.hp ?? object.maxHp)));
+  object.ac = Math.max(1, Math.floor(objectArmorClass(object)));
+  return object;
+}
+
 function objectIsTrap(object) {
   const trapComponent = objectComponent(object, "trap");
   return objectTemplate(object?.type)?.kind === "trap" || trapComponent?.mode === "floor";
@@ -1954,6 +1978,7 @@ function createFeatureObject(type, position, id, themeId = currentThemeId()) {
   };
   const lootComponent = objectComponent(type, "definedLootContainer");
   if (lootComponent) object.items = rollFeatureLoot(lootComponent, "object");
+  ensureDestructibleObjectState(object);
 
   const lockComponent = objectComponent(type, "lock");
   if (lockComponent) {

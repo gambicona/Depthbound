@@ -902,22 +902,26 @@ function autoPathSegment(fighter, from, to, path) {
   return safeSegment.length ? safeSegment : search(false);
 }
 
+let lastDragHoverKey = "";
+
 function extendDragPath(position) {
   const hero = state.fighters[dragHeroId] ?? activeHero();
   if (!dragPath || !position) return;
 
   const key = positionKey(position);
+  if (key === lastDragHoverKey) return;
+  lastDragHoverKey = key;
   const existingIndex = dragPath.findIndex((step) => positionKey(step) === key);
   if (existingIndex >= 0) {
     dragPath = dragPath.slice(0, existingIndex + 1);
-    renderRoom();
+    renderDragPathPreview();
     return;
   }
 
   const originKey = positionKey(hero.position);
   if (key === originKey) {
     dragPath = [];
-    renderRoom();
+    renderDragPathPreview();
     return;
   }
 
@@ -929,12 +933,12 @@ function extendDragPath(position) {
     if (segment.length === 0) return;
 
     dragPath = [...dragPath, ...segment];
-    renderRoom();
+    renderDragPathPreview();
     return;
   }
 
   dragPath = [...dragPath, position];
-  renderRoom();
+  renderDragPathPreview();
 }
 
 async function finishDragPath() {
@@ -942,7 +946,9 @@ async function finishDragPath() {
   const hero = state.fighters[dragHeroId] ?? activeHero();
   dragPath = null;
   dragHeroId = null;
+  lastDragHoverKey = "";
   suppressNextHeroClick = true;
+  clearRenderedDragPathPreview();
   renderRoom();
   if (path.length === 0) {
     setActiveHero(hero.id);
@@ -966,7 +972,9 @@ async function finishDragPath() {
 function cancelDragPath() {
   dragPath = null;
   dragHeroId = null;
+  lastDragHoverKey = "";
   suppressNextHeroClick = true;
+  clearRenderedDragPathPreview();
   renderRoom();
 }
 
@@ -1018,10 +1026,22 @@ function handleHeroPointerDown(event) {
   event.preventDefault();
   dragPath = [];
   dragHeroId = heroId;
+  lastDragHoverKey = "";
   renderRoom();
 
+  let queuedPointerPosition = null;
+  let dragFrameRequested = false;
   const handlePointerMove = (moveEvent) => {
-    extendDragPath(tilePositionFromPoint(moveEvent.clientX, moveEvent.clientY));
+    queuedPointerPosition = { x: moveEvent.clientX, y: moveEvent.clientY };
+    if (dragFrameRequested) return;
+    dragFrameRequested = true;
+    requestAnimationFrame(() => {
+      dragFrameRequested = false;
+      if (!queuedPointerPosition) return;
+      const pointer = queuedPointerPosition;
+      queuedPointerPosition = null;
+      extendDragPath(tilePositionFromPoint(pointer.x, pointer.y));
+    });
   };
 
   const handlePointerUp = () => {
