@@ -35,6 +35,7 @@
               </select>
             </label>
             <button id="choose-save-folder" class="ghost-button" type="button">Choose Save Folder</button>
+            <button id="manage-token-art" class="ghost-button" type="button">Manage Token Pictures</button>
             <a class="ghost-button" href="dungeon-creator.html">Dungeon Creator</a>
           </div>
           <p id="save-status" class="save-status"></p>
@@ -97,7 +98,10 @@
         <section class="log-panel">
           <div class="panel-heading">
             <h2>Combat Log</h2>
-            <button id="clear-log" class="icon-button" type="button" title="Clear log" aria-label="Clear log">x</button>
+            <div class="panel-actions">
+              <button id="expand-log" class="icon-button" type="button" title="Expand log" aria-label="Expand log">+</button>
+              <button id="clear-log" class="icon-button" type="button" title="Clear log" aria-label="Clear log">x</button>
+            </div>
           </div>
           <ol id="combat-log" class="combat-log" aria-live="polite"></ol>
         </section>

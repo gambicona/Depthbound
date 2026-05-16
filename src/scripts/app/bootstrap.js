@@ -25,6 +25,7 @@ let adminTeleportEnabled = false;
 let adminGodMode = false;
 let inventoryAdminOpen = false;
 let adminMonsterCatalogOpen = false;
+let combatLogExpanded = false;
 let roomScrollAnimation = null;
 let inventoryAdminSearch = "";
 let adminMonsterSearch = "";
@@ -519,7 +520,9 @@ const els = {
   volumeSliders: Array.from(document.querySelectorAll(".volume-slider")),
   volumeLabels: Array.from(document.querySelectorAll(".volume-label")),
   buttonThemeSelect: document.querySelector("#button-theme-select"),
+  manageTokenArt: document.querySelector("#manage-token-art"),
   debugKill: document.querySelector("#debug-kill"),
+  expandLog: document.querySelector("#expand-log"),
   clearLog: document.querySelector("#clear-log"),
   gameDialog: document.querySelector("#game-dialog"),
   gameDialogForm: document.querySelector("#game-dialog-form"),

@@ -158,6 +158,107 @@ async function chooseSaveFolderFromMenu() {
   }
 }
 
+function tokenArtEntryPreviewUrl(entry) {
+  if (entry?.dataUrl) return entry.dataUrl;
+  const art = entry?.tokenArt;
+  if (!art?.path) return "";
+  return art.runtimeUrl ?? window.DungeonSave?.cachedTokenUrl?.(art.path) ?? "";
+}
+
+function tokenArtStorageLabel(entry) {
+  if (entry?.tokenArt?.path) return `Save folder: ${entry.tokenArt.path}`;
+  if (entry?.dataUrl) return "localStorage embedded image";
+  return "No image data";
+}
+
+function clearTokenArtReferences(entry) {
+  if (!entry || !state?.fighters) return;
+  const ids = new Set([entry.id, entry.tokenArt?.id].filter(Boolean));
+  for (const fighter of Object.values(state.fighters)) {
+    const art = fighter?.tokenArt;
+    const artId = art?.id ?? "";
+    const sameString = typeof art === "string" && entry.dataUrl && art === entry.dataUrl;
+    if (ids.has(artId) || sameString) fighter.tokenArt = "";
+  }
+}
+
+async function deleteCustomHeroTokenArtEntry(entry) {
+  if (!entry?.id) return false;
+  if (entry.tokenArt?.path) await window.DungeonSave?.deleteTokenFile?.(entry.tokenArt.path);
+  const entries = loadCustomHeroTokenArt().filter((candidate) => candidate.id !== entry.id);
+  saveCustomHeroTokenArt(entries);
+  clearTokenArtReferences(entry);
+  return true;
+}
+
+function showTokenArtManager() {
+  const renderManager = () => {
+    const entries = loadCustomHeroTokenArt();
+    els.gameDialogForm.classList.add("wide-dialog");
+    els.gameDialogTitle.textContent = "Token Pictures";
+    els.gameDialogField.classList.add("hidden");
+    els.gameDialogMessage.innerHTML = entries.length
+      ? `
+        <div class="token-manager-list">
+          ${entries
+            .map((entry) => {
+              const preview = tokenArtEntryPreviewUrl(entry);
+              return `
+                <div class="token-manager-row" data-token-entry="${escapeAttribute(entry.id)}">
+                  <div class="hero-token-preview ${preview ? "" : "empty"}">
+                    ${preview ? `<img src="${escapeAttribute(preview)}" alt="${escapeAttribute(entry.tokenName ?? entry.name ?? "Token picture")}" />` : `<span>?</span>`}
+                  </div>
+                  <div>
+                    <b>${escapeHtml(entry.tokenName ?? entry.name ?? "Custom token")}</b>
+                    <span>${escapeHtml(tokenArtStorageLabel(entry))}</span>
+                  </div>
+                  <button type="button" class="delete-save" data-delete-token-art="${escapeAttribute(entry.id)}">Delete</button>
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
+      `
+      : `<p class="empty-note">No custom token pictures are stored in localStorage.</p>`;
+    els.gameDialogActions.innerHTML = `<button type="button" data-token-manager-close>Close</button>`;
+    for (const entry of entries) {
+      if (!entry.tokenArt?.path || tokenArtEntryPreviewUrl(entry)) continue;
+      window.DungeonSave?.resolveTokenPath?.(entry.tokenArt.path).then((url) => {
+        if (url && !els.gameDialog.classList.contains("hidden")) renderManager();
+      });
+    }
+  };
+
+  const cleanup = () => {
+    els.gameDialogActions.removeEventListener("click", handleActions);
+    els.gameDialogMessage.removeEventListener("click", handleMessageClick);
+    els.gameDialogForm.classList.remove("wide-dialog");
+    els.gameDialog.classList.add("hidden");
+    activeDialogCancel = null;
+  };
+
+  const handleActions = (event) => {
+    if (!event.target.closest("[data-token-manager-close]")) return;
+    cleanup();
+  };
+
+  const handleMessageClick = async (event) => {
+    const button = event.target.closest("[data-delete-token-art]");
+    if (!button) return;
+    const entry = loadCustomHeroTokenArt().find((candidate) => candidate.id === button.dataset.deleteTokenArt);
+    if (!entry) return;
+    await deleteCustomHeroTokenArtEntry(entry);
+    renderManager();
+    render?.();
+  };
+
+  els.gameDialogActions.addEventListener("click", handleActions);
+  els.gameDialogMessage.addEventListener("click", handleMessageClick);
+  activeDialogCancel = cleanup;
+  renderManager();
+  els.gameDialog.classList.remove("hidden");
+}
+
 async function promptForSaveFolderIfNeeded() {
   const status = window.DungeonSave?.getStatus?.() ?? {};
   if (status.mode === "file" || status.mode === "unsupported") return true;
@@ -370,7 +471,7 @@ function showHeroIdentityDialog({ title, message, nameValue, tokenArt = "", conf
                 : ""
             }
             <button type="button" class="ghost-button" data-action="delete-custom-token" ${selectedValue.startsWith(customHeroTokenArtPrefix) ? "" : "disabled"}>Delete Custom Picture</button>
-            <p class="empty-note">Paste an image while this window is open, or choose an image file. Drag and zoom the picture inside the circle before saving it.</p>
+            <p class="empty-note">Paste an image while this window is open, or choose an image file. Drag and zoom the picture inside the circle. The crop is saved automatically when you confirm this hero.</p>
             <p class="ability-assignment-error" aria-live="polite">${escapeHtml(errorText)}</p>
           </div>
         </div>
@@ -502,7 +603,8 @@ function showHeroIdentityDialog({ title, message, nameValue, tokenArt = "", conf
       }
       const button = event.target.closest("[data-action='delete-custom-token']");
       if (!button) return;
-      if (deleteCustomHeroTokenArt(selectedValue)) {
+      const entry = loadCustomHeroTokenArt().find((candidate) => `${customHeroTokenArtPrefix}${candidate.id}` === selectedValue);
+      if (entry ? await deleteCustomHeroTokenArtEntry(entry) : deleteCustomHeroTokenArt(selectedValue)) {
         selectedValue = noHeroTokenArtValue;
         errorText = "";
         nameValue = currentName();

@@ -186,6 +186,7 @@ els.buttonThemeSelect?.addEventListener("change", (event) => {
   applyButtonTheme(event.target.value);
   renderControls();
 });
+els.manageTokenArt?.addEventListener("click", showTokenArtManager);
 els.debugKill.addEventListener("click", debugKillVisibleMonsters);
 els.saveGame.addEventListener("click", () => void saveAdventure(state.saveSlotId ?? activeSaveSlot));
 els.chooseSaveFolder?.addEventListener("click", () => void chooseSaveFolderFromMenu());
@@ -214,6 +215,10 @@ els.saveSlots.addEventListener("input", (event) => {
 });
 els.clearLog.addEventListener("click", () => {
   state.log = [];
+  renderLog();
+});
+els.expandLog?.addEventListener("click", () => {
+  combatLogExpanded = !combatLogExpanded;
   renderLog();
 });
 els.closeFighterInfo.addEventListener("click", hideFighterInfo);
@@ -323,7 +328,15 @@ els.storeMenu.addEventListener("input", (event) => {
   searchInput?.focus();
   searchInput?.setSelectionRange(searchInput.value.length, searchInput.value.length);
 });
+let gameDialogPointerStartedInside = false;
+els.gameDialog.addEventListener("pointerdown", (event) => {
+  gameDialogPointerStartedInside = event.target !== els.gameDialog;
+});
 els.gameDialog.addEventListener("click", (event) => {
+  if (gameDialogPointerStartedInside) {
+    gameDialogPointerStartedInside = false;
+    return;
+  }
   if (event.target === els.gameDialog && activeDialogCancel) {
     activeDialogCancel();
   }

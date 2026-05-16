@@ -1,0 +1,12 @@
+[1532:15840:0516/111803.465:ERROR:chrome\installer\util\google_update_settings_win.cc:517] Failed opening key Software\Microsoft\EdgeUpdate\ClientStateMedium\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062} to set usagestats; result: 5
+[1532:15840:0516/111803.480:ERROR:chrome\installer\util\google_update_settings_win.cc:550] Failed opening key Software\Microsoft\EdgeUpdate\ClientStateMedium\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062} to set urlstats; result: 5
+[1532:9852:0516/111809.109:ERROR:chrome\installer\util\google_update_settings_win.cc:517] Failed opening key Software\Microsoft\EdgeUpdate\ClientStateMedium\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062} to set usagestats; result: 5
+[1532:3816:0516/111809.109:ERROR:content\browser\gpu\gpu_process_host.cc:1046] GPU process exited unexpectedly: exit_code=-1073741790
+[1532:9852:0516/111809.114:ERROR:chrome\installer\util\google_update_settings_win.cc:550] Failed opening key Software\Microsoft\EdgeUpdate\ClientStateMedium\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062} to set urlstats; result: 5
+[1532:3816:0516/111809.156:ERROR:content\browser\gpu\gpu_process_host.cc:1046] GPU process exited unexpectedly: exit_code=-1073741790
+[1532:3816:0516/111809.204:ERROR:content\browser\gpu\gpu_process_host.cc:1046] GPU process exited unexpectedly: exit_code=-1073741790
+[1532:3816:0516/111809.228:ERROR:components\device_event_log\device_event_log_impl.cc:248] [11:18:09.229] USB: usb_service_win.cc:108 SetupDiGetDeviceProperty({{A45C254E-DF1C-4EFD-8020-67D146A850E0}, 6}) failed: Element nicht gefunden. (0x490)
+[1532:3816:0516/111809.236:ERROR:content\browser\gpu\gpu_process_host.cc:1046] GPU process exited unexpectedly: exit_code=-1073741790
+[1532:3816:0516/111809.253:ERROR:content\browser\gpu\gpu_process_host.cc:1046] GPU process exited unexpectedly: exit_code=-1073741790
+[1532:3816:0516/111809.266:ERROR:content\browser\gpu\gpu_process_host.cc:1046] GPU process exited unexpectedly: exit_code=-1073741790
+[1532:3816:0516/111809.266:FATAL:content\browser\gpu\gpu_data_manager_impl_private.cc:427] GPU process isn't usable. Goodbye.

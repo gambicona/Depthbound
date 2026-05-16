@@ -55,6 +55,19 @@ function killHero(hero) {
 }
 
 function applyDamageToFighter(defender, damage) {
+  if (isWildShaped(defender)) {
+    const previousBeastHp = defender.hp;
+    defender.hp = Math.max(0, defender.hp - damage);
+    defender.wildShapeState.beastCurrentHp = defender.hp;
+    checkConcentrationAfterDamage(defender, damage);
+    if (defender.hp > 0) return;
+    const overflowDamage = Math.max(0, damage - previousBeastHp);
+    const beast = wildShapeBeastById(defender.wildShapeState.beastFormId);
+    addLog(`${defender.name}'s ${beast?.name ?? "beast form"} is broken.`, "important");
+    revertWildShape(defender);
+    if (overflowDamage > 0) applyDamageToFighter(defender, overflowDamage);
+    return;
+  }
   const wasDown = isPartyHeroId(defender.id) && defender.hp <= 0;
   const previousHp = defender.hp;
   defender.hp = Math.max(0, defender.hp - damage);
@@ -229,8 +242,41 @@ function d20RollDetail(rollResult) {
   const rolls = rollResult.rolls ?? [rollResult.roll];
   const rawRolls = rollResult.rawRolls ?? rolls;
   const rawChanged = rawRolls.length === rolls.length && rawRolls.some((roll, index) => roll !== rolls[index]);
-  const adjusted = rawChanged ? ` raw ${rawRolls.join(" / ")} -> adjusted ${rolls.join(" / ")}` : rolls.join(" / ");
-  return rolls.length > 1 ? `d20 ${adjusted} -> ${rollResult.roll}` : `d20 ${adjusted}`;
+  if (rawChanged) {
+    const label = rollResult.mode === "karmic" ? "Karmic outcome" : "adjusted outcome";
+    return `d20 true ${rawRolls.join(" / ")} -> ${label} ${rolls.join(" / ")}${rolls.length > 1 ? ` -> ${rollResult.roll}` : ""}`;
+  }
+  return rolls.length > 1 ? `d20 true ${rolls.join(" / ")} -> ${rollResult.roll}` : `d20 true ${rolls.join(" / ")}`;
+}
+
+function monsterAttackAgainstHero(attacker, defender) {
+  return !playerControlledFighter(attacker) && playerControlledFighter(defender);
+}
+
+function resolveMonsterHeroCritical(attacker, defender, attackRoll) {
+  if (attackRoll !== 20 || !monsterAttackAgainstHero(attacker, defender)) {
+    return { attackRoll, isCritical: attackRoll === 20, doublesDamage: attackRoll === 20, forcedHit: false, note: "" };
+  }
+  const mode = normalizeD20Mode(state?.d20Mode);
+  if (mode === "karmic" && Math.random() < 0.5) {
+    return {
+      attackRoll: 19,
+      isCritical: false,
+      doublesDamage: false,
+      forcedHit: true,
+      note: "Karmic outcome: monster natural 20 becomes a natural 19 hit.",
+    };
+  }
+  if (mode === "tymora") {
+    return {
+      attackRoll,
+      isCritical: true,
+      doublesDamage: false,
+      forcedHit: false,
+      note: "Tymora's Favorite prevents the monster critical from doubling damage.",
+    };
+  }
+  return { attackRoll, isCritical: true, doublesDamage: true, forcedHit: false, note: "" };
 }
 
 function addAdminCheckLog({ actor, label, rollResult, bonus = 0, guidance = 0, total, dc, target = "", success = false, note = "" }) {
@@ -447,6 +493,7 @@ function tickStatusDurations(fighter) {
 }
 
 function attacksPerAttackAction(fighter) {
+  if (isWildShaped(fighter)) return wildShapeHasMultiattack(wildShapeBeastById(fighter.wildShapeState?.beastFormId)) ? 2 : 1;
   const level = fighter?.level ?? 1;
   if (!["barbarian", "fighter", "monk", "paladin", "ranger"].includes(fighter?.classId)) return 1;
   if (fighter.classId === "fighter") return level >= 20 ? 4 : level >= 11 ? 3 : level >= 5 ? 2 : 1;
@@ -1279,22 +1326,26 @@ async function maybeFinishEncounterAfterHeroRecovery() {
 
 async function opportunityAttack(attacker, defender) {
   const profile = opportunityAttackProfile(attacker);
+  playSoundEffect("meleeAttack");
   const attackRollResult = rollD20ForFighter(attacker, { disadvantage: defender.dodging });
   const attackRolls = attackRollResult.rolls;
-  const attackRoll = attackRollResult.roll;
+  const criticalResult = resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll);
+  const attackRoll = criticalResult.attackRoll;
   const currentAttackBonus = profile.weapon ? attackBonusForWeapon(attacker, profile.weapon) : attackBonusForAbility(attacker, profile.attackAbility ?? "str");
   const defenderAc = armorClass(defender);
   let totalAttack = attackRoll + currentAttackBonus;
-  const isCritical = attackRoll === 20;
+  const isCritical = criticalResult.isCritical;
+  const doublesDamage = criticalResult.doublesDamage;
   const inspiration = await maybeUseBardicAttackDie(attacker, totalAttack, defenderAc);
   totalAttack = inspiration.totalAttack;
   const shieldBlocked = attackRoll !== 1 && totalAttack >= defenderAc ? await maybeUseShieldReaction(defender, attacker, totalAttack, defenderAc) : false;
-  const isMiss = attackRoll === 1 || totalAttack < defenderAc || shieldBlocked;
+  const isMiss = attackRoll === 1 || (!criticalResult.forcedHit && totalAttack < defenderAc) || shieldBlocked;
 
   addLog(
-    `${attacker.name} makes an opportunity attack with ${profile.weaponName}${defender.dodging ? " with disadvantage" : ""}: d20 ${defender.dodging ? `${attackRolls.join(" / ")} -> ${attackRoll}` : attackRoll} ${abilityLabel(currentAttackBonus)} = ${totalAttack} vs AC ${defenderAc}.`,
+    `${attacker.name} makes an opportunity attack with ${profile.weaponName}${defender.dodging ? " with disadvantage" : ""}: d20 ${defender.dodging ? `${attackRolls.join(" / ")} -> ${attackRoll}` : attackRoll} ${abilityLabel(currentAttackBonus)} = ${totalAttack} vs AC ${defenderAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`,
     "important",
   );
+  addAdminLog(`${attacker.name} opportunity attack breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)}${criticalResult.attackRoll !== attackRollResult.roll ? ` -> Karmic outcome d20 ${attackRoll}` : ""} + attack ${abilityLabel(currentAttackBonus)}${inspiration.used ? ` + inspiration ${inspiration.roll}` : ""} = ${totalAttack}; target AC ${defenderAc}; ${isMiss ? "miss" : isCritical ? "critical hit" : "hit"}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
 
   if (isMiss) {
     addLog(attackRoll === 1 ? "Natural 1. The opportunity attack misses badly." : `${defender.name} slips away.`);
@@ -1305,7 +1356,7 @@ async function opportunityAttack(attacker, defender) {
 
   const damageRoll = profile.flat
     ? { total: profile.flat, rolls: [profile.flat] }
-    : rollDice(profile.count * (isCritical ? 2 : 1), profile.sides);
+    : rollDice(profile.count * (doublesDamage ? 2 : 1), profile.sides);
   const packets = [
     {
       raw: Math.max(1, damageRoll.total + (profile.bonus ?? 0)),
@@ -1314,7 +1365,7 @@ async function opportunityAttack(attacker, defender) {
     },
   ];
   for (const extra of profile.extraDamage ?? []) {
-    const extraRoll = rollDice((extra.count ?? 1) * (isCritical ? 2 : 1), extra.sides ?? 4);
+    const extraRoll = rollDice((extra.count ?? 1) * (doublesDamage ? 2 : 1), extra.sides ?? 4);
     packets.push({
       raw: Math.max(1, extraRoll.total + (extra.bonus ?? 0)),
       type: extra.type,
@@ -2250,24 +2301,26 @@ async function makeAttack(attacker, defender, options = {}) {
   const hasDisadvantage = rangedDisadvantage || defenderDodge;
   const attackRollResult = rollD20ForFighter(attacker, { advantage: attackAdvantage && !hasDisadvantage, disadvantage: hasDisadvantage && !attackAdvantage });
   const attackRolls = attackRollResult.rolls;
-  const attackRoll = attackRollResult.roll;
+  const criticalResult = resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll);
+  const attackRoll = criticalResult.attackRoll;
   const defenderAc = armorClass(defender);
   const currentAttackBonus = attackBonusForWeapon(attacker, weapon);
   let totalAttack = attackRoll + currentAttackBonus;
-  const isCritical = attackRoll === 20;
+  const isCritical = criticalResult.isCritical;
+  const doublesDamage = criticalResult.doublesDamage;
   const inspiration = await maybeUseBardicAttackDie(attacker, totalAttack, defenderAc);
   totalAttack = inspiration.totalAttack;
   const shieldBlocked = attackRoll !== 1 && totalAttack >= defenderAc ? await maybeUseShieldReaction(defender, attacker, totalAttack, defenderAc) : false;
-  const isMiss = attackRoll === 1 || totalAttack < defenderAc || shieldBlocked;
+  const isMiss = attackRoll === 1 || (!criticalResult.forcedHit && totalAttack < defenderAc) || shieldBlocked;
 
   addLog(
     `${attacker.name} ${options.actionLabel ?? "attacks"}${attackAdvantage && !hasDisadvantage ? " with advantage" : ""}${rangedDisadvantage && !attackAdvantage ? " with disadvantage" : ""}${defenderDodge && !attackAdvantage ? " because the target is dodging" : ""}: d20 ${
       attackRolls.length > 1 ? `${attackRolls.join(" / ")} -> ${attackRoll}` : attackRoll
     } ${abilityLabel(currentAttackBonus)}${inspiration.used ? " + inspiration" : ""} = ${totalAttack} vs AC ${
       defenderAc
-    }.`,
+    }.${criticalResult.note ? ` ${criticalResult.note}` : ""}`,
   );
-  addAdminLog(`${attacker.name} attack breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)} + attack ${abilityLabel(currentAttackBonus)}${inspiration.used ? ` + inspiration ${inspiration.roll}` : ""} = ${totalAttack}; target AC ${defenderAc}; ${isMiss ? "miss" : isCritical ? "critical hit" : "hit"}.`);
+  addAdminLog(`${attacker.name} attack breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)}${criticalResult.attackRoll !== attackRollResult.roll ? ` -> Karmic outcome d20 ${attackRoll}` : ""} + attack ${abilityLabel(currentAttackBonus)}${inspiration.used ? ` + inspiration ${inspiration.roll}` : ""} = ${totalAttack}; target AC ${defenderAc}; ${isMiss ? "miss" : isCritical ? "critical hit" : "hit"}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
 
   if (isMiss) {
     addLog(attackRoll === 1 ? "Natural 1. The attack misses badly." : shieldBlocked ? `${defender.name} blocks the blow with Shield.` : `${defender.name} avoids the blow.`);
@@ -2279,7 +2332,7 @@ async function makeAttack(attacker, defender, options = {}) {
 
   const damageRoll = attackDamage.flat
     ? { total: attackDamage.flat, rolls: [attackDamage.flat] }
-    : rollDice(attackDamage.count * (isCritical ? 2 : 1), attackDamage.sides);
+    : rollDice(attackDamage.count * (doublesDamage ? 2 : 1), attackDamage.sides);
   const packets = [
     {
       raw: Math.max(1, damageRoll.total + attackDamage.bonus),
@@ -2287,7 +2340,7 @@ async function makeAttack(attacker, defender, options = {}) {
       label: `${damageRoll.rolls.join(" + ")} ${abilityLabel(attackDamage.bonus)}${attackDamage.type ? ` ${attackDamage.type}` : ""}`,
     },
   ];
-  if (isCritical && !rangedAttack && attacker.racialTraits?.savageAttacks && attackDamage.sides) {
+  if (doublesDamage && !rangedAttack && attacker.racialTraits?.savageAttacks && attackDamage.sides) {
     const savageRoll = rollDice(1, attackDamage.sides);
     packets.push({
       raw: savageRoll.total,
@@ -2296,7 +2349,7 @@ async function makeAttack(attacker, defender, options = {}) {
     });
   }
   for (const extra of attackDamage.extraDamage ?? []) {
-    const extraRoll = rollDice((extra.count ?? 1) * (isCritical ? 2 : 1), extra.sides ?? 4);
+    const extraRoll = rollDice((extra.count ?? 1) * (doublesDamage ? 2 : 1), extra.sides ?? 4);
     packets.push({
       raw: Math.max(1, extraRoll.total + (extra.bonus ?? 0)),
       type: extra.type,
@@ -2304,7 +2357,7 @@ async function makeAttack(attacker, defender, options = {}) {
     });
   }
   if (canApplySneakAttack(attacker, defender, weapon, rangedAttack)) {
-    const diceCount = sneakAttackDice(attacker) * (isCritical ? 2 : 1);
+    const diceCount = sneakAttackDice(attacker) * (doublesDamage ? 2 : 1);
     const sneakRoll = rollDice(diceCount, 6);
     packets.push({
       raw: sneakRoll.total,
@@ -2335,7 +2388,7 @@ async function makeAttack(attacker, defender, options = {}) {
   applyDamageToFighter(defender, totalDamage);
   defender.lastDamagedById = attacker.id;
   if (!isPartyHeroId(attacker.id)) {
-    await applyMonsterOnHitSpecials(attacker, defender, totalDamage, isCritical);
+    await applyMonsterOnHitSpecials(attacker, defender, totalDamage, doublesDamage);
   }
 
   const critText = isCritical ? " Critical hit." : "";
@@ -2348,6 +2401,7 @@ async function makeAttack(attacker, defender, options = {}) {
     "damage",
   );
   await applyWeaponRiderSecondary(attacker, defender, rider, attackDamage);
+  await applyWildShapeAttackEffects(attacker, defender, attackDamage);
   if (totalDamage > 0) await maybeUseHellishRebuke(defender, attacker);
 
   if (!defender.alive && maybeUseUndeadFortitude(defender, totalDamage)) {
@@ -2516,6 +2570,39 @@ function applySpecialDamage(source, target, damage, type, label) {
   return modified.damage;
 }
 
+function rollWildShapeEffectDamage(damageText) {
+  const match = String(damageText ?? "").match(/(\d+)d(\d+)(?:\s*([+-])\s*(\d+))?/i);
+  if (!match) return 0;
+  const roll = rollDice(Number(match[1]), Number(match[2]));
+  const bonus = Number(match[4] ?? 0) * (match[3] === "-" ? -1 : 1);
+  return Math.max(0, roll.total + bonus);
+}
+
+async function applyWildShapeAttackEffects(attacker, defender, attackDamage) {
+  if (!isWildShaped(attacker) || !defender?.alive) return;
+  for (const effect of attackDamage.effects ?? []) {
+    if (effect.type === "savingThrow") {
+      const save = await rollSavingThrow(defender, effect.ability ?? "str", effect.dc ?? 10, `${attacker.name}'s ${attackDamage.actionName ?? "beast attack"} forces ${defender.name} to make a save.`);
+      const damageText = save.success ? effect.onSuccessDamage : effect.onFailDamage;
+      if (damageText) {
+        const damageType = save.success ? effect.onSuccessDamageType : effect.onFailDamageType;
+        applySpecialDamage(attacker, defender, rollWildShapeEffectDamage(damageText), damageType ?? "poison", attackDamage.actionName ?? "beast attack");
+      }
+      if (!save.success && /prone/i.test(effect.onFail ?? "")) {
+        applyStatusEffect(defender, { id: "prone", label: "Prone", attackBonus: -2, speedBonusFeet: -10, expiresAtEndOfTurn: true });
+        addLog(`${defender.name} is knocked prone.`, "important");
+      }
+    }
+    if (effect.type === "grapple") {
+      const save = await rollSavingThrow(defender, "str", effect.dc ?? 10, `${attacker.name}'s ${attackDamage.actionName ?? "beast attack"} tries to restrain ${defender.name}.`);
+      if (!save.success) {
+        applyStatusEffect(defender, { id: "restrained", label: effect.condition === "restrained" ? "Restrained" : "Grappled", speedLocked: true, attackBonus: -2, durationRounds: 1 });
+        addLog(`${defender.name} is ${effect.condition ?? "grappled"}.`, "important");
+      }
+    }
+  }
+}
+
 function spellcastingAbility(fighter) {
   return fighter?.spellcastingAbility ?? "wis";
 }
@@ -2593,6 +2680,7 @@ function canPaySpellCost(caster, spell) {
 
 function canCastSpell(caster, spell) {
   if (!heroCanAct(caster) || !spell || !canPaySpellCost(caster, spell)) return false;
+  if (isWildShaped(caster) && (caster.level ?? 1) < 18) return false;
   if (spell.id === "dragonborn-breath" && (caster.abilityUses?.dragonbornBreath ?? 0) >= 1) return false;
   if (spell.racialAbilityId) {
     const ability = fighterAbilityDefinitions(caster).find((entry) => entry.id === spell.racialAbilityId);
@@ -3049,19 +3137,20 @@ function applySpellHealing(caster, target, spell) {
 
 async function applySpellAttack(caster, target, spell) {
   const rollResult = rollD20ForFighter(caster);
-  const roll = rollResult.roll;
+  const criticalResult = resolveMonsterHeroCritical(caster, target, rollResult.roll);
+  const roll = criticalResult.attackRoll;
   const bonus = spellAttackBonus(caster, spell);
   const total = roll + bonus;
   const targetAc = armorClass(target);
-  addLog(`${caster.name} casts ${spell.name}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.`, "important");
-  addAdminLog(`${caster.name} spell attack breakdown vs ${target.name}: ${d20RollDetail(rollResult)} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}.`);
-  recordD20OutcomeForFighter(caster, roll !== 1 && total >= targetAc);
-  if (roll === 1 || total < targetAc) {
+  addLog(`${caster.name} casts ${spell.name}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`, "important");
+  addAdminLog(`${caster.name} spell attack breakdown vs ${target.name}: ${d20RollDetail(rollResult)}${criticalResult.attackRoll !== rollResult.roll ? ` -> Karmic outcome d20 ${roll}` : ""} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
+  recordD20OutcomeForFighter(caster, roll !== 1 && (criticalResult.forcedHit || total >= targetAc));
+  if (roll === 1 || (!criticalResult.forcedHit && total < targetAc)) {
     addLog(`${spell.name} misses ${target.name}.`);
     return;
   }
   const dice = scaledSpellDice(spell);
-  const damageRoll = rollDice(dice.count * (roll === 20 ? 2 : 1), dice.sides);
+  const damageRoll = rollDice(dice.count * (criticalResult.doublesDamage ? 2 : 1), dice.sides);
   const extra = spell.effect?.abilityBonus === "spellcasting" ? abilityMod(caster, spell?.attackAbility ?? spell?.saveDcAbility ?? spellcastingAbility(caster)) : 0;
   const rawDamage = Math.max(1, damageRoll.total + (dice.bonus ?? 0) + extra);
   addAdminLog(`${caster.name}'s ${spell.name} hit damage roll: ${damageRoll.rolls.join(" + ")}${dice.bonus ? ` ${abilityLabel(dice.bonus)}` : ""}${extra ? ` + spell ability ${extra}` : ""} = ${rawDamage} ${spell.effect?.type ?? "force"}.`);
@@ -3081,18 +3170,19 @@ async function resolveEldritchBlastBeam(caster, target, beamIndex, beamCount) {
     return false;
   }
   const rollResult = rollD20ForFighter(caster);
-  const roll = rollResult.roll;
+  const criticalResult = resolveMonsterHeroCritical(caster, target, rollResult.roll);
+  const roll = criticalResult.attackRoll;
   const bonus = spellAttackBonus(caster);
   const total = roll + bonus;
   const targetAc = armorClass(target);
-  addLog(`${caster.name}'s Eldritch Blast beam ${beamIndex}/${beamCount}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.`, "important");
-  addAdminLog(`${caster.name} Eldritch Blast beam ${beamIndex}/${beamCount} breakdown: ${d20RollDetail(rollResult)} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}.`);
-  recordD20OutcomeForFighter(caster, roll !== 1 && total >= targetAc);
-  if (roll === 1 || total < targetAc) {
+  addLog(`${caster.name}'s Eldritch Blast beam ${beamIndex}/${beamCount}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`, "important");
+  addAdminLog(`${caster.name} Eldritch Blast beam ${beamIndex}/${beamCount} breakdown: ${d20RollDetail(rollResult)}${criticalResult.attackRoll !== rollResult.roll ? ` -> Karmic outcome d20 ${roll}` : ""} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
+  recordD20OutcomeForFighter(caster, roll !== 1 && (criticalResult.forcedHit || total >= targetAc));
+  if (roll === 1 || (!criticalResult.forcedHit && total < targetAc)) {
     addLog(`Eldritch Blast misses ${target.name}.`);
     return true;
   }
-  const damageRoll = rollDice(roll === 20 ? 2 : 1, 10);
+  const damageRoll = rollDice(criticalResult.doublesDamage ? 2 : 1, 10);
   addAdminLog(`${caster.name}'s Eldritch Blast damage roll: ${damageRoll.rolls.join(" + ")} = ${Math.max(1, damageRoll.total)} force.`);
   applySpecialDamage(caster, target, Math.max(1, damageRoll.total), "force", "Eldritch Blast");
   if (!target.alive) {

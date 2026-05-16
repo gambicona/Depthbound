@@ -96,6 +96,7 @@ function sanitizeTokenValue(value) {
       path: String(value.path),
       id: value.id ? String(value.id) : "",
       name: value.name ? String(value.name) : "Custom token",
+      crop: value.crop && typeof value.crop === "object" ? { ...value.crop } : undefined,
     };
   }
   if (value.dataUrl && typeof value.dataUrl === "string") return value.dataUrl;
@@ -327,6 +328,26 @@ async function resolveTokenPath(path) {
   }
 }
 
+async function deleteTokenFile(path) {
+  if (!path || state.mode !== "file" || !state.directoryHandle) return false;
+  try {
+    const parts = String(path).split("/");
+    const filename = parts.pop();
+    const folder = parts.join("/");
+    const directory = folder ? await state.directoryHandle.getDirectoryHandle(folder) : state.directoryHandle;
+    await directory.removeEntry(filename);
+    const url = state.tokenUrls.get(path);
+    if (url) URL.revokeObjectURL(url);
+    state.tokenUrls.delete(path);
+    return true;
+  } catch (error) {
+    if (error?.name === "NotFoundError") return false;
+    state.lastError = `Could not delete token image: ${path}`;
+    console.warn(state.lastError, error);
+    return false;
+  }
+}
+
 function rememberTokenUrl(path, url) {
   if (path && url) state.tokenUrls.set(path, url);
 }
@@ -340,6 +361,7 @@ window.DungeonSave = {
   getSlots: () => clone(state.slots),
   hasSave: (slotId) => state.slots.some((slot) => slot.id === slotId && slot.hasSave),
   writeTokenFile,
+  deleteTokenFile,
   resolveTokenPath,
   rememberTokenUrl,
   cachedTokenUrl: (path) => state.tokenUrls.get(path) ?? "",

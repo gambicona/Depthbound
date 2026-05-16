@@ -1,3 +1,95 @@
+const heroClassTokenColors = {
+  barbarian: "#e0452d",
+  bard: "#d86df0",
+  cleric: "#f0d56d",
+  druid: "#65c96f",
+  fighter: "#664627",
+  monk: "#59c7c9",
+  paladin: "#e9cd72",
+  ranger: "#7fbf4d",
+  rogue: "#8f96a3",
+  sorcerer: "#ff6f91",
+  warlock: "#9b72ff",
+  wizard: "#6fa8ff",
+};
+
+function heroClassTokenColor(fighter) {
+  return heroClassTokenColors[fighter?.classId] ?? "#c8d7df";
+}
+
+function customHeroTokenEntryMatchesFighter(entry, fighter) {
+  if (!entry || !fighter) return false;
+  const fighterName = String(fighter.name ?? "").trim();
+  if (!fighterName || /^new hero$/i.test(fighterName)) return false;
+  const names = new Set([
+    safeTokenArtName(fighterName, "token"),
+    fighterName.toLowerCase(),
+    String(fighter.id ?? "").trim().toLowerCase(),
+  ].filter(Boolean));
+  return [entry.id, entry.name, entry.tokenName, entry.tokenArt?.id, entry.tokenArt?.name]
+    .map((value) => String(value ?? "").trim().toLowerCase())
+    .some((value) => names.has(value) || [...names].some((name) => value.startsWith(`${name}-`) || value.startsWith(`${name}_`)));
+}
+
+function recoverHeroTokenArtFromLibrary(fighter) {
+  if (!isRosterHeroId(fighter?.id) || fighter?.tokenArt) return "";
+  const entries = loadCustomHeroTokenArt();
+  const matching = entries.filter((entry) => customHeroTokenEntryMatchesFighter(entry, fighter));
+  const entry = matching[0] ?? null;
+  if (!entry) return "";
+  const recovered = entry.tokenArt ?? entry.dataUrl ?? "";
+  if (recovered) {
+    fighter.tokenArt = recovered;
+    addLog(`${fighter.name}'s token picture was restored from the custom token library.`, "important");
+  }
+  return recovered;
+}
+
+function clearAccidentalGenericHeroToken(fighter) {
+  if (!isRosterHeroId(fighter?.id) || !/^new hero$/i.test(String(fighter.name ?? "").trim())) return;
+  const art = fighter.tokenArt;
+  const values = [art?.id, art?.name, art?.path, typeof art === "string" ? art : ""]
+    .map((value) => String(value ?? "").toLowerCase());
+  if (!values.some((value) => value.includes("new_hero_token") || value.includes("new-hero-token"))) return;
+  fighter.tokenArt = "";
+}
+
+function showCombatantTokenArt(token) {
+  const tokenImage = token?.querySelector(".token-art");
+  const tokenLabel = token?.querySelector(".token-label");
+  tokenImage?.classList.remove("hidden");
+  tokenLabel?.classList.add("hidden");
+  token?.classList.add("has-token-art");
+}
+
+function hideCombatantTokenArt(token) {
+  const tokenImage = token?.querySelector(".token-art");
+  const tokenLabel = token?.querySelector(".token-label");
+  tokenImage?.removeAttribute("src");
+  tokenImage?.classList.add("hidden");
+  tokenLabel?.classList.remove("hidden");
+  token?.classList.remove("has-token-art");
+}
+
+function setCombatantTokenArt(token, art) {
+  const tokenImage = token?.querySelector(".token-art");
+  if (!tokenImage) return;
+  if (!art) {
+    hideCombatantTokenArt(token);
+    return;
+  }
+  if (tokenImage.getAttribute("src") !== art) {
+    const tokenLabel = token.querySelector(".token-label");
+    tokenImage.classList.add("hidden");
+    tokenLabel?.classList.remove("hidden");
+    token.classList.remove("has-token-art");
+    tokenImage.src = art;
+  }
+  if (tokenImage.complete && tokenImage.naturalWidth > 0) {
+    showCombatantTokenArt(token);
+  }
+}
+
 function createCombatantToken(combatant) {
   const token = document.createElement("div");
   const heroToken = isRosterHeroId(combatant.id);
@@ -5,7 +97,10 @@ function createCombatantToken(combatant) {
   token.dataset.combatant = combatant.id;
   token.title = combatant.name;
 
-  if (!heroToken) {
+  if (heroToken) {
+    token.style.setProperty("--token-ring-color", heroClassTokenColor(combatant));
+    token.title = `${combatant.name} - ${combatant.className ?? "Hero"}`;
+  } else {
     const category = Math.max(1, Math.min(10, Number(monsterCategory(combatant)) || 1));
 
     token.classList.add(`monster-category-${category}`);
@@ -25,24 +120,11 @@ function createCombatantToken(combatant) {
   tokenLabel.className = "token-label";
   tokenLabel.textContent = combatant.token;
 
-  if (tokenArtPath) {
-    tokenImage.src = tokenArtPath;
-
-    tokenImage.addEventListener("load", () => {
-      tokenImage.classList.remove("hidden");
-      tokenLabel.classList.add("hidden");
-      token.classList.add("has-token-art");
-    });
-
-    tokenImage.addEventListener("error", () => {
-      tokenImage.removeAttribute("src");
-      tokenImage.classList.add("hidden");
-      tokenLabel.classList.remove("hidden");
-      token.classList.remove("has-token-art");
-    });
-  }
+  tokenImage.addEventListener("load", () => showCombatantTokenArt(token));
+  tokenImage.addEventListener("error", () => hideCombatantTokenArt(token));
 
   token.append(tokenImage, tokenLabel);
+  setCombatantTokenArt(token, tokenArtPath);
 
   const hpBar = document.createElement("div");
   hpBar.className = "token-hp";
@@ -136,8 +218,12 @@ function createCombatantToken(combatant) {
   return token;
 }
 function combatantTokenArt(fighter) {
-  const art = fighter.tokenArt ?? fighter.tokenImage ?? fighter.art ?? "";
+  clearAccidentalGenericHeroToken(fighter);
+  let art = fighter.tokenArt ?? fighter.tokenImage ?? fighter.art ?? fighter.portrait ?? fighter.avatar ?? "";
+  if (!art) art = recoverHeroTokenArtFromLibrary(fighter);
   if (art?.type === "custom-file") {
+    const libraryEntry = loadCustomHeroTokenArt().find((entry) => entry.id === art.id || entry.tokenArt?.id === art.id);
+    if (libraryEntry?.dataUrl) return libraryEntry.dataUrl;
     const cached = art.runtimeUrl ?? window.DungeonSave?.cachedTokenUrl?.(art.path) ?? "";
     if (cached) return cached;
     if (window.DungeonSave?.resolveTokenPath && art.path && !art.resolvePending) {
@@ -594,6 +680,10 @@ function placeToken(fighter) {
   token.style.left = `${(fighter.position.x + 0.5) * scaledTileSizePx}px`;
   token.style.top = `${(fighter.position.y + 0.5) * scaledTileSizePx}px`;
   const heroToken = isRosterHeroId(fighter.id);
+  if (heroToken) {
+    token.style.setProperty("--token-ring-color", heroClassTokenColor(fighter));
+    token.title = `${fighter.name} - ${fighter.className ?? "Hero"}`;
+  }
   const visibleHero = heroToken && !fighter.dead && fighter.alive && (state.mode === "home" || isPartyHeroId(fighter.id));
   token.classList.toggle("hidden", heroToken ? !visibleHero : !fighter.alive || !isKnownTile(fighter.position));
   token.classList.toggle("defeated", !fighter.alive);
@@ -605,18 +695,7 @@ function placeToken(fighter) {
   const spellTargeting = currentPendingSpellTargeting();
   token.classList.toggle("spell-click-target", isSpellTokenTargetable(spellTargeting, fighter));
   const art = combatantTokenArt(fighter);
-  const tokenImage = token.querySelector(".token-art");
-  const tokenLabel = token.querySelector(".token-label");
-  if (tokenImage && tokenImage.getAttribute("src") !== art) {
-    if (art) {
-      tokenImage.src = art;
-    } else {
-      tokenImage.removeAttribute("src");
-      tokenImage.classList.add("hidden");
-      tokenLabel?.classList.remove("hidden");
-      token.classList.remove("has-token-art");
-    }
-  }
+  setCombatantTokenArt(token, art);
   const hpFill = token.querySelector(".token-hp-fill");
   if (hpFill) {
     const hpPercent = Math.max(0, Math.round((fighter.hp / fighter.maxHp) * 100));
@@ -656,7 +735,7 @@ function renderRoom() {
   const spellTargeting = currentPendingSpellTargeting();
   const spellPreview = spellPreviewCells(spellTargeting);
   const persistentAreas = persistentAreaTileKeys();
-  const shouldShowReachable = !movementInProgress && !dragPath;
+  const shouldShowReachable = !movementInProgress && heroTurn;
   const reachable = !shouldShowReachable
     ? new Map()
     : heroTurn
@@ -668,17 +747,7 @@ function renderRoom() {
           stateKey: (position, path) => movementStateKey(hero, position, path),
           canEnterOccupied: (position) => canMoveThroughOccupiedTile(hero, position),
         })
-      : state.mode === "exploration" || state.mode === "home"
-        ? reachableTiles(hero, state.fighters, {
-            gridSize: currentGridSize(),
-            walkable: visibleWalkable(),
-            maxCost: currentGridSize() * currentGridSize(),
-            canTraverse: (from, to, path) => canTraverseMovementEdge(hero, from, to, path),
-            moveCost: (_from, to) => movementCostAtPosition(to),
-            stateKey: (position, path) => movementStateKey(hero, position, path),
-            canEnterOccupied: (position) => canMoveThroughOccupiedTile(hero, position),
-          })
-        : new Map();
+      : new Map();
 
   perfStats.visibleTiles = rememberedTiles.size;
   perfStats.renderedTiles = renderedTileKeys.size;
@@ -723,7 +792,7 @@ function renderRoom() {
     tile.classList.toggle("spell-affected-occupied", isSpellAffected && Boolean(spellTargetAtTile));
     tile.textContent = pathIndex >= 0 ? String(pathIndex + 1) : "";
     const openableDoor = isActiveTile && Boolean(canOpenDoor(position));
-    tile.classList.toggle("openable-door", openableDoor);
+    tile.classList.toggle("openable-door", openableDoor && state.mode === "combat");
     tile.disabled = spellTargeting || pendingEldritchBlast
       ? false
       : adminEnabled() && adminTeleportEnabled
@@ -770,6 +839,10 @@ function renderHeroStatusCard(element, fighter) {
   const hpPercent = Math.max(0, Math.round((fighter.hp / fighter.maxHp) * 100));
   const weapon = activeWeapon(fighter);
   const armor = equippedItem(fighter, "torso");
+  const beast = wildShapeBeastById(fighter.wildShapeState?.beastFormId);
+  const loadoutText = isWildShaped(fighter)
+    ? `${escapeHtml(fighter.damage?.weaponName ?? "Beast Attack")} / ${escapeHtml(beast?.name ?? "Beast Form")}`
+    : `${escapeHtml(weapon?.name ?? "Unarmed")} / ${escapeHtml(armor?.name ?? "No armor")}`;
   element.innerHTML = `
     <div class="fighter-top">
       ${combatantArtworkMarkup(fighter, "sidebar-hero-art")}
@@ -788,7 +861,7 @@ function renderHeroStatusCard(element, fighter) {
     </div>
     <div class="loadout-line">
       <span>AC ${fighter.ac}</span>
-      <span>${escapeHtml(weapon?.name ?? "Unarmed")} / ${escapeHtml(armor?.name ?? "No armor")}</span>
+      <span>${loadoutText}</span>
     </div>
     <div class="status-line">
       ${fighter.dodging ? '<span class="status-pill status-dodge">Dodging</span>' : ""}
@@ -810,7 +883,7 @@ async function renameHero() {
     title: "Character Name",
     message: "Rename your adventurer.",
     nameValue: hero.name,
-    tokenArt: combatantTokenArt(hero),
+    tokenArt: hero.tokenArt ?? "",
     confirmText: "Rename",
   });
   if (!identity) return;
@@ -2773,6 +2846,11 @@ function canUseFighterAbility(fighter, ability) {
 
 function fighterAbilityUnavailableReason(fighter, ability) {
   if (!heroCanAct(fighter) || !ability) return "Unable to act.";
+  if (ability.id === "wildShape" && isWildShaped(fighter)) {
+    if (state.mode === "combat" && activeFighter()?.id !== fighter.id) return "Not this hero's turn.";
+    if (state.mode === "combat" && ability.resource === "bonusAction" && !fighter.hasBonusAction) return "Bonus action already used.";
+    return "";
+  }
   if ((fighter.abilityUses?.[ability.id] ?? 0) >= abilityMaxUses(fighter, ability)) return "No uses remaining.";
   if (ability.id === "rage" && fighterWearsHeavyArmor(fighter)) return "Cannot rage while wearing heavy armor.";
   if (ability.id === "layOnHands" && !partyHeroes().some((target) => !target.dead && (target.id === fighter.id || hasMeleeAccess(fighter, target)) && (target.hp ?? 0) < (target.maxHp ?? 0))) {
@@ -2812,6 +2890,7 @@ function renderAbilitiesMenu() {
             const maxUses = abilityMaxUses(hero, ability);
             const unavailableReason = fighterAbilityUnavailableReason(hero, ability);
             const disabled = unavailableReason ? "disabled" : "";
+            const buttonLabel = ability.id === "wildShape" && isWildShaped(hero) ? "Revert" : "Use";
             return `
               <div class="use-item-row">
                 <div>
@@ -2819,7 +2898,7 @@ function renderAbilitiesMenu() {
                   <span>${escapeHtml(ability.description)} Uses: ${used}/${maxUses}.</span>
                   ${unavailableReason ? `<small class="ability-warning">${escapeHtml(unavailableReason)}</small>` : ""}
                 </div>
-                <button type="button" data-action="use-fighter-ability" data-ability="${escapeAttribute(ability.id)}" ${disabled}>Use</button>
+                <button type="button" data-action="use-fighter-ability" data-ability="${escapeAttribute(ability.id)}" ${disabled}>${buttonLabel}</button>
               </div>
             `;
           })
@@ -3258,10 +3337,41 @@ function refundFighterAbilityUse(hero, ability) {
   }
 }
 
+async function chooseWildShapeBeast(hero) {
+  const beasts = wildShapeUnlockedBeasts(hero);
+  if (!beasts.length) return null;
+  const beastId = await showChoiceDialog({
+    title: "Wild Shape",
+    message: "Choose a beast form. Your INT, WIS, and CHA stay your own; equipment and spellcasting are suppressed while transformed.",
+    actor: hero,
+    choices: beasts.map((beast) => {
+      const action = wildShapePrimaryAction(beast);
+      const movement = Object.entries(beast.speed ?? {})
+        .map(([kind, feet]) => `${kind} ${feet} ft`)
+        .join(", ");
+      const multi = wildShapeHasMultiattack(beast) ? " Multiattack." : "";
+      return {
+        value: beast.id,
+        label: beast.name,
+        description: `CR ${beast.cr}. AC ${beast.ac}, HP ${beast.hp}, ${movement}. ${action?.name ?? "Attack"} ${action?.damage ?? ""} ${action?.damageType ?? ""}.${multi}`,
+      };
+    }),
+  });
+  return beastId ? wildShapeBeastById(beastId) : null;
+}
+
 async function useFighterAbility(abilityId) {
   const hero = state.mode === "combat" ? activeFighter() : activeHero();
   const ability = availableFighterAbilities(hero).find((entry) => entry.id === abilityId);
   if (!canUseFighterAbility(hero, ability)) return;
+
+  if (ability.id === "wildShape" && isWildShaped(hero)) {
+    if (state.mode === "combat") hero.hasBonusAction = false;
+    revertWildShape(hero);
+    hideAbilitiesMenu();
+    render();
+    return;
+  }
 
   hero.abilityUses[ability.id] = (hero.abilityUses[ability.id] ?? 0) + 1;
   if (state.mode === "combat" && ability.resource === "bonusAction") {
@@ -3381,8 +3491,14 @@ async function useFighterAbility(abilityId) {
   }
 
   if (ability.id === "wildShape") {
-    applyStatusEffect(hero, { id: "wild-shape", label: "Wild Shape", tempHp: 5 + (hero.level ?? 1), damageBonus: 2, durationRounds: 3 });
-    addLog(`${hero.name} takes on a combat beast shape.`, "important");
+    const beast = await chooseWildShapeBeast(hero);
+    if (!beast) {
+      refundFighterAbilityUse(hero, ability);
+      renderAbilitiesMenu();
+      return;
+    }
+    applyWildShape(hero, beast.id);
+    addLog(`${hero.name} transforms into a ${beast.name}. Wild Shape lasts until Revert, beast HP reaches 0, or the dungeon ends.`, "important");
   }
 
   if (ability.id === "layOnHands") {
@@ -3812,9 +3928,50 @@ function renderInitiative() {
     .join("");
 }
 
+function rollChipMarkup(value) {
+  const roll = Number(value);
+  const criticalClass = roll === 20 ? " nat20" : roll === 1 ? " nat1" : "";
+  return `<span class="roll-chip${criticalClass}">${value}</span>`;
+}
+
+function decorateRollSeries(series) {
+  return series.replace(/\b\d+\b/g, (value) => rollChipMarkup(value));
+}
+
+function decorateParentheticalRolls(text) {
+  return text.replace(/\(([^)]*)\)/g, (match, content) => {
+    if (!/\b\d+\s*\+\s*\d+\b/.test(content)) return match;
+    const decorated = content.replace(/(^|[\s(])(\d+)(?=\s*(?:\+|,|\)|$))/g, (part, prefix, value) => `${prefix}${rollChipMarkup(value)}`);
+    return `(${decorated})`;
+  });
+}
+
+function decorateLeadRolls(text) {
+  return text.replace(/\b(d20(?: true)?|STR|DEX|CON|INT|WIS|CHA)\s+((?:\d+(?:\s*\/\s*\d+)*(?:\s*->\s*(?:Karmic outcome|adjusted outcome)?\s*)?)+)/g, (match, label, series) => {
+    if (!/\d/.test(series)) return match;
+    return `${label} ${decorateRollSeries(series)}`;
+  });
+}
+
+function decorateNamedRolls(text) {
+  return text.replace(/\brolls(?: a)?\s+(\d+)\b/g, (match, value) => match.replace(value, rollChipMarkup(value)));
+}
+
+function combatLogTextMarkup(text) {
+  return decorateParentheticalRolls(decorateNamedRolls(decorateLeadRolls(escapeHtml(text))));
+}
+
 function renderLog() {
+  const panel = els.log?.closest(".log-panel");
+  panel?.classList.toggle("expanded", combatLogExpanded);
+  if (els.expandLog) {
+    els.expandLog.textContent = combatLogExpanded ? "-" : "+";
+    els.expandLog.title = combatLogExpanded ? "Collapse log" : "Expand log";
+    els.expandLog.setAttribute("aria-label", combatLogExpanded ? "Collapse log" : "Expand log");
+    els.expandLog.setAttribute("aria-expanded", String(combatLogExpanded));
+  }
   els.log.innerHTML = state.log
-    .map((entry) => `<li class="${escapeAttribute(entry.type ?? "")}">${escapeHtml(entry.text)}</li>`)
+    .map((entry) => `<li class="${escapeAttribute(entry.type ?? "")}">${combatLogTextMarkup(entry.text)}</li>`)
     .join("");
   els.log.scrollTop = els.log.scrollHeight;
 }

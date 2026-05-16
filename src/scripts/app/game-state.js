@@ -336,6 +336,7 @@ function homeHeroPositions(heroIds) {
 }
 
 function prepareRestedHero(hero, position) {
+  if (isWildShaped(hero)) revertWildShape(hero);
   refreshItemChargesForFighter(hero, "home");
   refreshItemChargesForFighter(hero, "longRest");
   refreshItemChargesForFighter(hero, "newDungeon");
@@ -496,7 +497,7 @@ function rollD20ForFighter(fighter, options = {}) {
   const hiddenBonus = usePlayerMode && mode === "karmic" ? karmicD20Bonus() : 0;
   const rolls = rawRolls.map((roll) => Math.min(20, roll + hiddenBonus));
   const roll = options.disadvantage ? Math.min(...rolls) : options.advantage ? Math.max(...rolls) : rolls[0];
-  return { roll, rolls, rawRolls };
+  return { roll, rolls, rawRolls, mode, hiddenBonus };
 }
 
 function recordD20OutcomeForFighter(fighter, success) {
@@ -1134,6 +1135,7 @@ function classKnownSpellListForFighter(fighter = state?.fighters?.hero) {
 }
 
 function spellDefinitionsForFighter(fighter = state?.fighters?.hero) {
+  if (isWildShaped(fighter) && (fighter.level ?? 1) < 18) return [];
   const spellIds = [...(fighter?.spells ?? []), ...racialCantripSpellIdsForFighter(fighter)];
   return Array.from(new Set(spellIds.map(canonicalSpellId)))
     .map((spellId) => getContentDefinition("spells", canonicalSpellId(spellId)))
@@ -2138,6 +2140,160 @@ function cloneData(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
+function wildShapeBeastById(beastId) {
+  return (window.DungeonDruidWildShape?.beasts ?? []).find((beast) => beast.id === beastId) ?? null;
+}
+
+function wildShapeUnlockedBeasts(fighter) {
+  if (fighter?.classId !== "druid" || (fighter.level ?? 1) < 2) return [];
+  const level = fighter.level ?? 1;
+  const unlockedIds = new Set(
+    (window.DungeonDruidWildShape?.unlocks ?? [])
+      .filter((unlock) => level >= (unlock.druidLevel ?? 1))
+      .flatMap((unlock) => unlock.beastIds ?? []),
+  );
+  return (window.DungeonDruidWildShape?.beasts ?? []).filter((beast) => unlockedIds.has(beast.id));
+}
+
+function wildShapePrimaryAction(beast) {
+  return (beast?.actions ?? []).find((action) => action.type === "meleeWeaponAttack" || action.type === "rangedWeaponAttack") ?? null;
+}
+
+function wildShapeHasMultiattack(beast) {
+  return (beast?.actions ?? []).some((action) => action.name === "Multiattack");
+}
+
+function parseWildShapeDamage(action = {}) {
+  const match = String(action.damage ?? "").match(/(\d+)d(\d+)(?:\s*([+-])\s*(\d+))?/i);
+  if (!match) return { count: 1, sides: 4, bonus: 0, type: action.damageType ?? "bludgeoning" };
+  const bonus = Number(match[4] ?? 0) * (match[3] === "-" ? -1 : 1);
+  return { count: Number(match[1]), sides: Number(match[2]), bonus, type: action.damageType ?? "bludgeoning" };
+}
+
+function wildShapeDamageProfile(beast) {
+  const action = wildShapePrimaryAction(beast);
+  const damage = parseWildShapeDamage(action);
+  const range = action?.type === "rangedWeaponAttack"
+    ? { kind: "ranged", feet: Number(String(action.range ?? "30").split("/")[0]) || 30 }
+    : { kind: "melee", feet: action?.reach ?? 5 };
+  return {
+    ...damage,
+    range,
+    attackType: "weapon",
+    weaponName: action?.name ?? "Beast Attack",
+    actionName: action?.name ?? "Beast Attack",
+    effects: cloneData(action?.effects ?? []),
+    label: formatDamage({ ...damage, range }),
+  };
+}
+
+function wildShapeDurationTurns(fighter) {
+  return null;
+}
+
+function isWildShaped(fighter) {
+  return Boolean(fighter?.wildShapeState?.beastFormId);
+}
+
+function revertWildShape(fighter, options = {}) {
+  const stateData = fighter?.wildShapeState;
+  if (!fighter || !stateData) return false;
+  const overflowDamage = Math.max(0, Math.floor(options.overflowDamage ?? 0));
+  const original = stateData.originalStats ?? {};
+  fighter.hp = Math.max(0, (stateData.originalHp ?? original.hp ?? fighter.hp ?? 0) - overflowDamage);
+  fighter.maxHp = original.maxHp ?? fighter.maxHp;
+  fighter.baseMaxHp = original.baseMaxHp ?? fighter.baseMaxHp;
+  fighter.baseAc = original.baseAc ?? fighter.baseAc;
+  fighter.ac = original.ac ?? fighter.ac;
+  fighter.baseSpeedFeet = original.baseSpeedFeet ?? fighter.baseSpeedFeet;
+  fighter.speedFeet = original.speedFeet ?? fighter.speedFeet;
+  fighter.abilityScores = cloneData(original.abilityScores);
+  fighter.abilityMods = cloneData(original.abilityMods ?? {});
+  fighter.baseDamage = cloneData(original.baseDamage ?? fighter.baseDamage);
+  fighter.damage = cloneData(original.damage ?? fighter.damage);
+  fighter.attackBonus = original.attackBonus ?? fighter.attackBonus;
+  fighter.baseAttackAbilityMod = original.baseAttackAbilityMod ?? fighter.baseAttackAbilityMod;
+  fighter.specialAbility = cloneData(original.specialAbility ?? fighter.specialAbility ?? []);
+  fighter.senses = cloneData(original.senses ?? fighter.senses ?? {});
+  fighter.skills = cloneData(original.skills ?? fighter.skills ?? {});
+  fighter.size = original.size ?? fighter.size;
+  fighter.type = original.type ?? fighter.type;
+  fighter.token = original.token ?? fighter.token;
+  fighter.tokenArt = original.tokenArt ?? fighter.tokenArt;
+  fighter.wildShapeState = null;
+  fighter.statusEffects = (fighter.statusEffects ?? []).filter((effect) => effect.id !== "wild-shape");
+  refreshDerivedStats(fighter);
+  if (overflowDamage > 0) {
+    addLog(`${fighter.name} reverts from Wild Shape and ${overflowDamage} overflow damage carries over.`, "important");
+  } else {
+    addLog(`${fighter.name} reverts from Wild Shape.`, "important");
+  }
+  return true;
+}
+
+function applyWildShape(fighter, beastId) {
+  const beast = wildShapeBeastById(beastId);
+  if (!fighter || !beast || isWildShaped(fighter)) return false;
+  const keepScores = {
+    int: baseAbilityScore(fighter, "int"),
+    wis: baseAbilityScore(fighter, "wis"),
+    cha: baseAbilityScore(fighter, "cha"),
+  };
+  const damage = wildShapeDamageProfile(beast);
+  fighter.wildShapeState = {
+    originalHp: fighter.hp,
+    originalStats: {
+      hp: fighter.hp,
+      maxHp: fighter.maxHp,
+      baseMaxHp: fighter.baseMaxHp,
+      ac: fighter.ac,
+      baseAc: fighter.baseAc,
+      speedFeet: fighter.speedFeet,
+      baseSpeedFeet: fighter.baseSpeedFeet,
+      abilityScores: cloneData(fighter.abilityScores),
+      abilityMods: cloneData(fighter.abilityMods),
+      baseDamage: cloneData(fighter.baseDamage),
+      damage: cloneData(fighter.damage),
+      attackBonus: fighter.attackBonus,
+      baseAttackAbilityMod: fighter.baseAttackAbilityMod,
+      specialAbility: cloneData(fighter.specialAbility ?? []),
+      senses: cloneData(fighter.senses ?? {}),
+      skills: cloneData(fighter.skills ?? {}),
+      size: fighter.size,
+      type: fighter.type,
+      token: fighter.token,
+      tokenArt: fighter.tokenArt,
+    },
+    originalAC: fighter.ac,
+    originalSpeed: fighter.speedFeet,
+    originalActions: cloneData(fighter.actions ?? []),
+    beastFormId: beast.id,
+    beastCurrentHp: beast.hp,
+    remainingDurationTurns: wildShapeDurationTurns(fighter),
+  };
+  fighter.baseMaxHp = beast.hp;
+  fighter.maxHp = beast.hp;
+  fighter.hp = beast.hp;
+  fighter.baseAc = beast.ac;
+  fighter.baseSpeedFeet = beast.speed?.walk ?? 30;
+  fighter.abilityScores = { ...beast.abilityScores, ...keepScores };
+  fighter.abilityMods = abilityModsFromScores(fighter.abilityScores);
+  fighter.attackBonus = wildShapePrimaryAction(beast)?.attackBonus ?? fighter.attackBonus;
+  fighter.baseAttackAbilityMod = abilityMod(fighter, "str");
+  fighter.baseDamage = damage;
+  fighter.damage = damage;
+  fighter.specialAbility = (beast.traits ?? []).map((trait) => trait.name);
+  fighter.senses = cloneData(beast.senses ?? {});
+  fighter.skills = cloneData(beast.skills ?? {});
+  fighter.size = beast.size;
+  fighter.type = beast.type;
+  fighter.statusEffects = (fighter.statusEffects ?? []).filter((effect) => effect.id !== "wild-shape");
+  fighter.statusEffects.push({ id: "wild-shape", label: `Wild Shape: ${beast.name}` });
+  endConcentration(fighter, "Wild Shape");
+  refreshDerivedStats(fighter);
+  return true;
+}
+
 function normalizeItem(item) {
   const templateId = item?.baseItemId ?? item?.itemId;
   const aliasedId = typeof item === "string" ? itemAliases[item] ?? item : itemAliases[templateId] ?? templateId;
@@ -2487,6 +2643,7 @@ function abilityMod(fighter, ability) {
 }
 
 function abilityScore(fighter, ability) {
+  if (isWildShaped(fighter)) return baseAbilityScore(fighter, ability);
   const effects = magicEffects(fighter);
   const value = baseAbilityScore(fighter, ability) + (effects.abilityScoreBonuses[ability] ?? 0) + (effects.abilityScorePenalties[ability] ?? 0);
   const cap = effects.abilityScoreCaps[ability];
@@ -2562,6 +2719,7 @@ function attackBonus(fighter) {
 
 function attackBonusForWeapon(fighter, weapon = activeWeapon(fighter)) {
   const statusBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.attackBonus ?? 0), 0);
+  if (isWildShaped(fighter)) return (fighter.attackBonus ?? 0) + statusBonus;
   const unarmed = !weapon?.damage;
   const ability = abilityMod(fighter, unarmed ? attackAbilityForUnarmed(fighter) : attackAbilityForWeapon(weapon, fighter));
   const magicBonus = (weapon?.magic?.attackBonus ?? 0) + magicEffects(fighter).attackBonus + statusBonus;
@@ -2621,6 +2779,7 @@ function calculateDamageModifiers(target, damage, type) {
 }
 
 function activeWeapon(fighter) {
+  if (isWildShaped(fighter)) return null;
   return equippedItem(fighter, "mainHand") ?? equippedItem(fighter, "offHand");
 }
 
@@ -2676,6 +2835,13 @@ function damageProfile(fighter, options = {}) {
   const weapon = options.weapon ?? activeWeapon(fighter);
   const includeDamageModifier = options.includeDamageModifier !== false;
   const statusDamageBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.damageBonus ?? 0), 0);
+  if (isWildShaped(fighter)) {
+    const damage = {
+      ...(fighter.baseDamage ?? wildShapeDamageProfile(wildShapeBeastById(fighter.wildShapeState?.beastFormId))),
+      bonus: (fighter.baseDamage?.bonus ?? 0) + statusDamageBonus,
+    };
+    return { ...damage, label: formatDamage(damage) };
+  }
   if (!options.forceThrown && !isPartyHeroId(fighter?.id) && weapon?.properties?.includes("thrown") && weapon.range?.kind === "thrown" && !monsterCanThrowWeapon(fighter, weapon)) {
     return {
       ...weapon.damage,
@@ -2755,6 +2921,10 @@ function opportunityAttackProfile(fighter) {
 }
 
 function armorClass(fighter) {
+  if (isWildShaped(fighter)) {
+    const statusAc = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.acBonus ?? 0), 0);
+    return (fighter.baseAc ?? fighter.ac ?? 10) + statusAc;
+  }
   const torso = equippedItem(fighter, "torso");
   const armor = armorStrengthRequirementMet(fighter, torso) && heroHasArmorProficiency(fighter, torso) ? torso?.armor : null;
   const shield = equippedItem(fighter, "offHand");
@@ -2816,9 +2986,11 @@ function refreshDerivedStats(fighter) {
   const effects = magicEffects(fighter);
   const statusSpeedBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.speedBonusFeet ?? 0), 0);
   const statusMaxHpBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.maxHpBonus ?? 0), 0);
-  fighter.maxHp = Math.max(1, fighter.baseMaxHp + (effects.maxHpBonus ?? 0) + statusMaxHpBonus);
+  fighter.maxHp = isWildShaped(fighter) ? Math.max(1, fighter.baseMaxHp + statusMaxHpBonus) : Math.max(1, fighter.baseMaxHp + (effects.maxHpBonus ?? 0) + statusMaxHpBonus);
   if (fighter.hp > fighter.maxHp) fighter.hp = fighter.maxHp;
-  fighter.speedFeet = Math.max(5, (fighter.baseSpeedFeet ?? fighter.speedFeet ?? 30) + (effects.speedBonusFeet ?? 0) + statusSpeedBonus);
+  fighter.speedFeet = isWildShaped(fighter)
+    ? Math.max(5, (fighter.baseSpeedFeet ?? fighter.speedFeet ?? 30) + statusSpeedBonus)
+    : Math.max(5, (fighter.baseSpeedFeet ?? fighter.speedFeet ?? 30) + (effects.speedBonusFeet ?? 0) + statusSpeedBonus);
   if (fighter.abilityScores) {
     fighter.abilityMods = abilityModsFromScores(fighter.abilityScores);
   }
