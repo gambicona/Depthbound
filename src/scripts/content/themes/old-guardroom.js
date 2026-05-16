@@ -86,6 +86,7 @@ window.DungeonContent.register("themes", "oldGuardroom", {
     "hanging-chains": 0.05,
     "bookshelf": 0.06,
     "barricade": 0.08,
+    "undead-crate": 0.018,
   },
   trapTagGroups: [
     ["trap", "old-guardroom"],

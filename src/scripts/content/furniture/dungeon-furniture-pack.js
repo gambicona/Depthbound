@@ -1,35 +1,4 @@
 (() => {
-const gp = (amount) => ({ amount, unit: "gp", text: `${amount} gp` });
-
-function simpleConsumable(id, name, description, use = {}) {
-  if (window.DungeonContent.get?.("items", id)) return;
-  window.DungeonContent.register("items", id, {
-    name,
-    type: "consumable",
-    category: "foraged",
-    cost: gp(0),
-    weightLb: 0,
-    slots: ["belt1", "belt2", "belt3", "belt4", "belt5"],
-    description,
-    use: {
-      kind: use.kind ?? "utility",
-      resource: use.resource ?? "action",
-      consume: true,
-      ...(use.dice ? { dice: use.dice, bonus: use.bonus ?? 0 } : {}),
-    },
-  });
-}
-
-simpleConsumable("berry", "Berry", "A small edible berry. It heals 1 HP when used.", { kind: "healing", resource: "bonusAction", dice: { count: 1, sides: 1 } });
-simpleConsumable("medicinal-herb", "Medicinal Herb", "A field herb that heals 1d4 HP when used.", { kind: "healing", dice: { count: 1, sides: 4 } });
-simpleConsumable("glowcap", "Glowcap", "A faintly glowing mushroom cap that can mark a dark path for a short time.");
-simpleConsumable("bitter-root", "Bitter Root", "A bitter root used as a minor poison-resisting remedy.");
-simpleConsumable("cave-salt", "Cave Salt", "A minor alchemy or crafting ingredient.");
-simpleConsumable("bone-charm", "Bone Charm", "A small charm sometimes used against fear or necrotic magic.");
-simpleConsumable("spider-silk", "Spider Silk", "A sticky crafting material.");
-simpleConsumable("crystal-shard", "Crystal Shard", "A small arcane component or sellable gem shard.");
-simpleConsumable("sacred-ash", "Sacred Ash", "A pinch of ash from a consecrated flame.");
-
 const C = {
   hiddenLoot: (options = {}) => ({
     type: "hiddenLoot",
@@ -53,6 +22,7 @@ const C = {
   light: (radius = 3) => ({ type: "lightSource", radius }),
   spawn: (options = {}) => ({ type: "spawnPoint", ...options }),
   toggle: (options = {}) => ({ type: "interactableToggle", ...options }),
+  captive: (options = {}) => ({ type: "captiveCreature", dc: options.dc ?? 13, skill: options.skill ?? "animal-handling", ability: options.ability ?? "wis", ...options }),
 };
 
 const D = {
@@ -95,6 +65,8 @@ const D = {
   "shallow-stream": "A shallow stream cuts across the floor, clear enough to see stones and glints beneath the surface.",
   "muddy-sinkhole": "A dark patch of mud sags inward. The center looks deeper than the edges admit.",
   "wasp-nest": "A papery nest clings nearby, buzzing with angry movement. Disturbing it would be a bad idea.",
+  "beast-crate": "A rough wooden crate rattles with frightened movement. Something alive is trapped inside, and the slats have been clawed raw.",
+  "beast-companion-crate": "A carefully barred animal crate shakes with nervous breath. The creature inside looks scared rather than savage.",
   stalagmite: "A sharp stone spike rises from the cave floor, natural cover with an ugly point.",
   "stalactite-cluster": "Needle-like stone hangs overhead in a brittle cluster. The floor below is littered with old shards.",
   "crystal-growth": "Crystals jut from the stone in bright growths. A careful hand could harvest useful shards.",
@@ -175,6 +147,7 @@ const D = {
   "conveyor-belt": "A conveyor belt cuts through the room, its surface stiff with grime but still aligned to move.",
   "drill-rig": "A drill rig towers over the floor, its bit aimed like a metal spear.",
   "locked-supply-locker": "A locked supply locker stands against the wall. The door is dented, but the lock remains serious.",
+  "undead-crate": "A chained crate hums with old binding marks. Bone scrapes softly inside, waiting for the latch to fail.",
 };
 
 function feature(id, name, tags, options = {}) {
@@ -293,6 +266,33 @@ feature("trap", "Spike Trap", ["trap", "hazard", "floor", "spike", "piercing", "
   ["shallow-stream", "Shallow Stream", ["forest", "wilds", "swamp"], { inspectable: true, symbol: "~", components: [C.difficult, C.hiddenLoot({ dc: 12, chance: 0.2 })] }],
   ["muddy-sinkhole", "Muddy Sinkhole", ["forest", "wilds", "swamp"], { symbol: "O", components: [C.difficult, C.hazardEnter({ damage: { count: 1, sides: 4, type: "bludgeoning" } })] }],
   ["wasp-nest", "Wasp Nest", ["forest", "wilds", "swamp"], { inspectable: true, symbol: "w", components: [C.ambush({ chance: 1 }), C.hazardEnter({ damage: { count: 1, sides: 4, type: "piercing" } })] }],
+  [
+    "beast-crate",
+    "Beast Crate",
+    ["forest", "wilds", "beast", "container"],
+    {
+      blocksMovement: true,
+      inspectable: true,
+      interactable: true,
+      placement: "wall-adjacent",
+      symbol: "C",
+      components: [C.captive({ dc: 13, skill: "animal-handling", ability: "wis", monsterIds: ["forestWolf", "brambleBoar", "gloomwebSpider", "thornbackHare"], allyKind: "Beast Ally" })],
+    },
+  ],
+  [
+    "beast-companion-crate",
+    "Beast Companion Crate",
+    ["beast", "companion", "container", "custom-placement"],
+    {
+      blocksMovement: true,
+      inspectable: true,
+      interactable: true,
+      placement: "wall-adjacent",
+      spawnChance: 0,
+      symbol: "C",
+      components: [C.captive({ dc: 15, skill: "animal-handling", ability: "wis", monsterIds: ["forestWolf", "brambleBoar", "gloomwebSpider", "thornbackHare"], kind: "companion", control: "player", allyKind: "Beast Companion" })],
+    },
+  ],
 ].forEach(([id, name, tags, options]) => feature(id, name, tags, { spawnChance: 0.035, ...options }));
 
 [
@@ -386,4 +386,14 @@ feature("trap", "Spike Trap", ["trap", "hazard", "floor", "spike", "piercing", "
   ["drill-rig", "Drill Rig", ["forge", "mine", "industrial"], { blocksMovement: true, blocksLineOfSight: true, inspectable: true, symbol: "D", components: [C.hazardEnter({ damage: { count: 1, sides: 6, type: "piercing" } }), C.toggle({ effect: "machine" })] }],
   ["locked-supply-locker", "Locked Supply Locker", ["forge", "mine", "industrial", "container"], { blocksMovement: true, inspectable: true, symbol: "L", components: [C.loot({ count: 2 }), C.trap({ source: "container", chance: 0.25 })] }],
 ].forEach(([id, name, tags, options]) => feature(id, name, tags, { spawnChance: 0.035, ...options }));
+
+feature("undead-crate", "Undead Crate", ["old-guardroom", "dungeon", "crypt", "ruin", "undead", "container"], {
+  blocksMovement: true,
+  inspectable: true,
+  interactable: true,
+  placement: "wall-adjacent",
+  symbol: "C",
+  spawnChance: 0.02,
+  components: [C.captive({ dc: 14, skill: "arcana", ability: "int", monsterIds: ["boneRecruit", "cryptGuard", "guardroomHound", "skeletalSpearman", "skeletonArcher"], allyKind: "Undead Ally" })],
+});
 })();

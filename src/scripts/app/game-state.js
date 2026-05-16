@@ -133,7 +133,7 @@ function createDungeonStateForParty(partyMembers, previousState, themeId = defau
   nextState.fighters = { ...heroes, ...monsters };
   nextState.party = {
     activeHeroId: partyMembers[0]?.id ?? "hero",
-    heroIds: partyMembers.map((hero) => hero.id).slice(0, 4),
+    heroIds: partyMembers.map((hero) => hero.id),
     rosterIds: previousRosterIds,
   };
   nextState.saveSlotId = previousState?.saveSlotId ?? activeSaveSlot;
@@ -310,7 +310,7 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
     dungeonObjects: objects,
     party: {
       activeHeroId: partyMembers[0]?.id ?? "hero",
-      heroIds: partyMembers.map((hero) => hero.id).slice(0, 4),
+      heroIds: partyMembers.map((hero) => hero.id),
       rosterIds: previousRosterIds,
     },
     saveSlotId: previousState?.saveSlotId ?? activeSaveSlot,
@@ -335,8 +335,123 @@ function homeHeroPositions(heroIds) {
   return heroIds.map((id, index) => ({ id, position: { x: 3 + (index % 4), y: 5 + Math.floor(index / 4) } }));
 }
 
+function partyMemberKind(fighter) {
+  return fighter?.partyMemberKind ?? "hero";
+}
+
+function isClassHero(fighter) {
+  return partyMemberKind(fighter) === "hero";
+}
+
+function isClassHeroId(id) {
+  return isClassHero(state?.fighters?.[id]);
+}
+
+function isAutonomousAlly(fighter) {
+  return fighter?.companionControl === "ai" || partyMemberKind(fighter) === "ally";
+}
+
+function fighterCreatureType(fighter) {
+  return String(fighter?.tags?.[0] ?? "").toLowerCase();
+}
+
+function isHumanoidFighter(fighter) {
+  return fighterCreatureType(fighter) === "humanoid";
+}
+
+function isPlayerControlledCompanion(fighter) {
+  return partyMemberKind(fighter) === "companion" && fighter?.companionControl !== "ai";
+}
+
+function isSidekickWarrior(fighter) {
+  return isPlayerControlledCompanion(fighter) && fighter?.classId === "sidekick-warrior";
+}
+
+function isSidekickExpert(fighter) {
+  return isPlayerControlledCompanion(fighter) && fighter?.classId === "sidekick-expert";
+}
+
+function isSidekickSpellcaster(fighter) {
+  return isPlayerControlledCompanion(fighter) && fighter?.classId === "sidekick-spellcaster";
+}
+
+function isTrainedSidekick(fighter) {
+  return isSidekickWarrior(fighter) || isSidekickExpert(fighter) || isSidekickSpellcaster(fighter);
+}
+
+function canTrainAsSidekick(fighter) {
+  return isPlayerControlledCompanion(fighter) && !isTrainedSidekick(fighter) && !fighter.dead;
+}
+
+function fighterSpeaksLanguage(fighter) {
+  return Boolean((fighter?.languages ?? fighter?.languageProficiencies ?? []).length || fighter?.speaks || fighter?.canSpeak);
+}
+
+function canFighterReceiveInventory(fighter) {
+  return Boolean(fighter && (isClassHero(fighter) || isPlayerControlledCompanion(fighter) || isHumanoidFighter(fighter)));
+}
+
+function isPlayerControlledPartyFighter(fighter) {
+  return Boolean(fighter && isPartyHeroId(fighter.id) && !isAutonomousAlly(fighter));
+}
+
+function activeClassHeroIds(ids = state?.party?.heroIds ?? []) {
+  return ids.filter((id) => isClassHeroId(id));
+}
+
+function createFriendlyBeastFromMonster(monsterId, options = {}) {
+  const template = getMonsterTemplate(monsterId);
+  if (!template) return null;
+  const companion = options.kind === "companion";
+  const fighter = createCombatant({
+    ...template,
+    id: options.id ?? `${monsterId}-ally-${Date.now()}`,
+    name: options.name ?? template.name,
+    position: options.position ?? { x: 4, y: 5 },
+    partyMemberKind: options.kind ?? "ally",
+    companionControl: options.control ?? "ai",
+    team: "heroes",
+    friendly: true,
+    renameable: options.renameable ?? true,
+    baseMonsterId: monsterId,
+    classId: options.classId,
+    className: options.className ?? (companion ? "Beast Companion" : "Beast Ally"),
+    level: options.level ?? template.level ?? 1,
+    xp: options.xp ?? 0,
+    followHeroId: options.followHeroId ?? null,
+    followDistanceSquares: Math.max(1, Math.min(5, Number(options.followDistanceSquares ?? 3) || 3)),
+    hitDiceRemaining: options.hitDiceRemaining ?? 1,
+    savingThrowProficiencies: options.savingThrowProficiencies ?? template.savingThrowProficiencies,
+    skillProficiencies: options.skillProficiencies ?? template.skillProficiencies,
+    armorProficiencies: options.armorProficiencies ?? template.armorProficiencies,
+    weaponProficiencies: options.weaponProficiencies ?? template.weaponProficiencies,
+    inventory: options.inventory ?? { money: { cp: 0, sp: 0, gp: 0 }, items: [] },
+    equipment: options.equipment ?? {},
+  });
+  fighter.token = tokenFromName(fighter.name, fighter.token);
+  return fighter;
+}
+
+function isLegacyTestingBeastAlly(fighter) {
+  return Boolean(
+    fighter?.id === "ally-forest-wolf" &&
+      fighter.baseMonsterId === "forestWolf" &&
+      fighter.partyMemberKind === "ally" &&
+      fighter.companionControl === "ai" &&
+      !isTrainedSidekick(fighter),
+  );
+}
+
+function removeLegacyTestingBeastAllyFromPartyData(partyData = null) {
+  if (!partyData) return;
+  partyData.rosterIds = (partyData.rosterIds ?? []).filter((id) => id !== "ally-forest-wolf");
+  partyData.heroIds = (partyData.heroIds ?? []).filter((id) => id !== "ally-forest-wolf");
+  if (partyData.activeHeroId === "ally-forest-wolf") partyData.activeHeroId = partyData.heroIds[0] ?? "hero";
+}
+
 function prepareRestedHero(hero, position) {
   if (isWildShaped(hero)) revertWildShape(hero);
+  hero.statusEffects = (hero.statusEffects ?? []).filter((effect) => !effect.expiresAtHome);
   refreshItemChargesForFighter(hero, "home");
   refreshItemChargesForFighter(hero, "longRest");
   refreshItemChargesForFighter(hero, "newDungeon");
@@ -346,6 +461,7 @@ function prepareRestedHero(hero, position) {
       hp: 0,
       position: { ...position },
       alive: false,
+      stableAtZero: false,
       deathSaves: hero.deathSaves ?? { successes: 0, failures: 3 },
     });
   }
@@ -358,6 +474,7 @@ function prepareRestedHero(hero, position) {
     hasAction: true,
     hasBonusAction: true,
     alive: true,
+    stableAtZero: false,
     deathSaves: { successes: 0, failures: 0 },
     relentlessEnduranceUsed: false,
   });
@@ -370,10 +487,12 @@ function prepareRestedHero(hero, position) {
 function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, gp: 0 }, partyData = null) {
   const cells = Array.from({ length: 100 }, (_, index) => ({ x: index % 10, y: Math.floor(index / 10) }));
   const homeDoor = { x: 9, y: 5, roomId: "home-room", to: "outside" };
-  const incomingHeroes = Array.isArray(heroOrHeroes) ? heroOrHeroes : [heroOrHeroes];
-  const rosterIds = partyData?.rosterIds?.length ? partyData.rosterIds : incomingHeroes.map((hero) => hero.id);
+  const normalizedPartyData = partyData ? { ...partyData, heroIds: [...(partyData.heroIds ?? [])], rosterIds: [...(partyData.rosterIds ?? [])] } : null;
+  removeLegacyTestingBeastAllyFromPartyData(normalizedPartyData);
+  const incomingHeroes = (Array.isArray(heroOrHeroes) ? heroOrHeroes : [heroOrHeroes]).filter((hero) => !isLegacyTestingBeastAlly(hero));
+  const rosterIds = normalizedPartyData?.rosterIds?.length ? normalizedPartyData.rosterIds : incomingHeroes.map((hero) => hero.id);
   const livingRosterIds = rosterIds.filter((id) => !incomingHeroes.find((hero) => hero.id === id)?.dead);
-  const heroIds = (partyData?.heroIds?.length ? partyData.heroIds : livingRosterIds.slice(0, 1)).filter((id) => livingRosterIds.includes(id));
+  const heroIds = (normalizedPartyData?.heroIds?.length ? normalizedPartyData.heroIds : livingRosterIds).filter((id) => livingRosterIds.includes(id));
   const positions = new Map(homeHeroPositions(rosterIds).map((entry) => [entry.id, entry.position]));
   const fighters = Object.fromEntries(
     incomingHeroes.map((hero, index) => {
@@ -382,7 +501,10 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
       return [id, prepareRestedHero({ ...hero, id, partyRole: hero.partyRole ?? (id === "hero" ? "tank" : "dd") }, position)];
     }),
   );
-  const activeHeroId = fighters[partyData?.activeHeroId] && !fighters[partyData.activeHeroId].dead ? partyData.activeHeroId : heroIds.find((id) => fighters[id] && !fighters[id].dead) ?? livingRosterIds[0] ?? "hero";
+  const activeHeroId =
+    fighters[normalizedPartyData?.activeHeroId] && !fighters[normalizedPartyData.activeHeroId].dead && !isAutonomousAlly(fighters[normalizedPartyData.activeHeroId])
+      ? normalizedPartyData.activeHeroId
+      : heroIds.find((id) => fighters[id] && !fighters[id].dead && !isAutonomousAlly(fighters[id])) ?? livingRosterIds.find((id) => fighters[id] && !isAutonomousAlly(fighters[id])) ?? "hero";
 
   return {
     combatStarted: false,
@@ -418,18 +540,18 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
       position: { ...homeDoor },
     },
     completed: false,
-    d20Mode: normalizeD20Mode(partyData?.d20Mode ?? state?.d20Mode ?? defaultD20Mode),
-    d20FailureStreak: partyData?.d20FailureStreak ?? state?.d20FailureStreak ?? 0,
+    d20Mode: normalizeD20Mode(normalizedPartyData?.d20Mode ?? state?.d20Mode ?? defaultD20Mode),
+    d20FailureStreak: normalizedPartyData?.d20FailureStreak ?? state?.d20FailureStreak ?? 0,
     shortRestsUsed: 0,
     shortRestLimit: 3,
     chest,
     chestMoney: normalizeMoney(chestMoney),
-    campaignProgress: cloneData(partyData?.campaignProgress ?? {}),
+    campaignProgress: cloneData(normalizedPartyData?.campaignProgress ?? {}),
     lootPiles: [],
     dungeonObjects: [],
     party: {
       activeHeroId,
-      heroIds: heroIds.filter((id) => fighters[id] && !fighters[id].dead).slice(0, 4),
+      heroIds: heroIds.filter((id) => fighters[id] && !fighters[id].dead),
       rosterIds: rosterIds.filter((id) => fighters[id]),
     },
     fighters,
@@ -462,7 +584,7 @@ function d20ModeOptionsMarkup(selectedMode = state?.d20Mode ?? defaultD20Mode) {
 }
 
 function playerControlledFighter(fighter) {
-  return Boolean(fighter && (isPartyHeroId(fighter.id) || isRosterHeroId(fighter.id) || fighter.friendly || fighter.team === "heroes"));
+  return Boolean(fighter && (isPlayerControlledPartyFighter(fighter) || (state?.mode === "home" && isRosterHeroId(fighter.id) && !isAutonomousAlly(fighter))));
 }
 
 function tymoraD20Roll() {
@@ -513,6 +635,7 @@ function activeHero() {
 function setActiveHero(heroId) {
   if (!state?.fighters?.[heroId] || state.fighters[heroId].dead || !isRosterHeroId(heroId)) return false;
   if (state.mode !== "home" && !isPartyHeroId(heroId)) return false;
+  if (state.mode !== "home" && isAutonomousAlly(state.fighters[heroId])) return false;
   state.party.activeHeroId = heroId;
   selectedHeroIds = new Set([heroId]);
   return true;
@@ -521,7 +644,7 @@ function setActiveHero(heroId) {
 function selectableHeroIds() {
   return new Set(
     (state.mode === "home" ? rosterHeroes() : partyHeroes())
-      .filter((hero) => heroCanAct(hero))
+      .filter((hero) => heroCanAct(hero) && !isAutonomousAlly(hero))
       .map((hero) => hero.id),
   );
 }
@@ -570,8 +693,9 @@ function livingPartyHeroIds() {
 
 function promoteMainHero(heroId) {
   if (!state.fighters[heroId] || state.fighters[heroId].dead) return;
+  if (!isClassHero(state.fighters[heroId])) return;
   const currentIds = (state.party.heroIds ?? ["hero"]).filter((id) => id !== heroId && state.fighters[id] && !state.fighters[id].dead);
-  state.party.heroIds = [heroId, ...currentIds].slice(0, 4);
+  state.party.heroIds = [heroId, ...currentIds];
   state.party.activeHeroId = heroId;
 }
 
@@ -621,9 +745,12 @@ function normalizeHomeLayout(gameState) {
     hero.position = { ...(positions.get(heroId) ?? { x: 4, y: 5 }) };
     if (!hero.dead) hero.alive = true;
   }
-  gameState.party.heroIds = (gameState.party.heroIds ?? ["hero"]).filter((id) => gameState.fighters[id] && !gameState.fighters[id].dead).slice(0, 4);
+  gameState.party.heroIds = (gameState.party.heroIds ?? ["hero"]).filter((id) => gameState.fighters[id] && !gameState.fighters[id].dead);
   if (!gameState.fighters[gameState.party.activeHeroId] || gameState.fighters[gameState.party.activeHeroId].dead) {
-    gameState.party.activeHeroId = gameState.party.heroIds[0] ?? gameState.party.rosterIds.find((id) => gameState.fighters[id] && !gameState.fighters[id].dead) ?? "hero";
+    gameState.party.activeHeroId =
+      gameState.party.heroIds.find((id) => gameState.fighters[id] && !isAutonomousAlly(gameState.fighters[id])) ??
+      gameState.party.rosterIds.find((id) => gameState.fighters[id] && !gameState.fighters[id].dead && !isAutonomousAlly(gameState.fighters[id])) ??
+      "hero";
   }
 }
 
@@ -891,11 +1018,22 @@ async function dataUrlToBlob(dataUrl) {
 
 function combatantRoleLabel(combatant) {
   const species = combatant?.speciesName ? ` ${combatant.speciesName}` : "";
-  if (combatant.id === "hero" || isRosterHeroId(combatant?.id)) return `Level ${combatant.level ?? 1}${species} ${combatant.className ?? "Fighter"}`;
+  if (isClassHero(combatant) && (combatant.id === "hero" || isRosterHeroId(combatant?.id))) return `Level ${combatant.level ?? 1}${species} ${combatant.className ?? "Fighter"}`;
+  if (isTrainedSidekick(combatant)) return `Level ${combatant.level ?? 1} ${combatant.sidekickClassName ?? combatant.className ?? "Sidekick"}`;
   return combatant.role;
 }
 
 function fighterAbilityDefinitions(fighter = state?.fighters?.hero) {
+  if (isTrainedSidekick(fighter)) {
+    const source = [...(getHeroTemplate(fighter.classId).abilities ?? []), ...(fighter?.abilities ?? [])];
+    return source
+      .filter((ability, index, list) => list.findIndex((entry) => entry.id === ability.id) === index)
+      .map((ability) => ({
+        ...ability,
+        usesByLevel: Array.isArray(ability.usesByLevel) ? ability.usesByLevel.map((entry) => ({ ...entry })) : undefined,
+      }));
+  }
+  if (fighter && !isClassHero(fighter)) return [...(fighter.abilities ?? [])];
   const source = [...(fighter?.abilities ?? (isRosterHeroId(fighter?.id) ? getHeroTemplate(fighter?.classId).abilities : []) ?? [])];
   if (fighter?.racialTraits?.dragonDamageType && !source.some((ability) => ability.id === "dragonbornBreath")) {
     source.push({ id: "dragonbornBreath", name: "Breath Weapon", description: "Ancestral 15 ft cone. DEX/CON save by ancestry, half damage on success.", resource: "action", refresh: "shortRest", uses: 1 });
@@ -1159,6 +1297,7 @@ function maxSpellLevelForFighter(fighter) {
   const casterType = casterTypeForFighter(fighter);
   if (casterType === "none") return 0;
   if (casterType === "pact") return level >= 9 ? 5 : level >= 7 ? 4 : level >= 5 ? 3 : level >= 3 ? 2 : 1;
+  if (casterType === "sidekick") return level >= 17 ? 5 : level >= 13 ? 4 : level >= 9 ? 3 : level >= 5 ? 2 : 1;
   if (casterType === "half") return level >= 17 ? 5 : level >= 13 ? 4 : level >= 9 ? 3 : level >= 5 ? 2 : 1;
   return level >= 17 ? 9 : level >= 15 ? 8 : level >= 13 ? 7 : level >= 11 ? 6 : level >= 9 ? 5 : level >= 7 ? 4 : level >= 5 ? 3 : level >= 3 ? 2 : 1;
 }
@@ -1794,7 +1933,8 @@ function objectCanInspect(object) {
       objectHasComponent(object, "harvestableResource") ||
       objectHasComponent(object, "interactableToggle") ||
       objectHasComponent(object, "lightSource") ||
-      objectHasComponent(object, "spawnPoint"),
+      objectHasComponent(object, "spawnPoint") ||
+      objectHasComponent(object, "captiveCreature"),
   );
 }
 
@@ -1997,6 +2137,12 @@ function createFeatureObject(type, position, id, themeId = currentThemeId()) {
       const defaultChance = type === "chest" ? getContentDefinition("themes", themeId)?.traps?.chestChance ?? 0.3 : 1;
       if (Math.random() < (trapComponent.chance ?? defaultChance)) object.trap = createFeatureTrap(trapComponent, themeId);
     }
+  }
+  const captiveComponent = objectComponent(type, "captiveCreature");
+  if (captiveComponent) {
+    const monsterIds = captiveComponent.monsterIds ?? (captiveComponent.monsterId ? [captiveComponent.monsterId] : []);
+    const availableIds = monsterIds.filter((monsterId) => getMonsterTemplate(monsterId));
+    if (availableIds.length) object.captiveMonsterId = availableIds[Math.floor(Math.random() * availableIds.length)];
   }
   return object;
 }
@@ -2319,8 +2465,24 @@ function applyWildShape(fighter, beastId) {
   return true;
 }
 
+function itemTemplateId(item) {
+  if (!item) return null;
+  if (typeof item === "string") return itemAliases[item] ?? item;
+  const explicitId = item.baseItemId ?? item.itemId;
+  if (explicitId) return itemAliases[explicitId] ?? explicitId;
+  if (getItemTemplate(item.id)) return itemAliases[item.id] ?? item.id;
+  const itemId = String(item.id ?? "");
+  const itemName = String(item.name ?? "").toLowerCase();
+  return (
+    (window.DungeonContent.list?.("items") ?? []).find((template) => {
+      const templateId = itemAliases[template.id] ?? template.id;
+      return itemId.includes(`-${templateId}-`) || itemName === String(template.name ?? "").toLowerCase();
+    })?.id ?? null
+  );
+}
+
 function normalizeItem(item) {
-  const templateId = item?.baseItemId ?? item?.itemId;
+  const templateId = itemTemplateId(item);
   const aliasedId = typeof item === "string" ? itemAliases[item] ?? item : itemAliases[templateId] ?? templateId;
   if (typeof item === "string") {
     const template = cloneData(getItemTemplate(aliasedId));
@@ -2334,7 +2496,14 @@ function normalizeItem(item) {
       adminItemInstanceCounter += 1;
       finalId = `item-${aliasedId}-${Date.now()}-${adminItemInstanceCounter}`;
     }
-    return { ...template, ...cloneData(item), id: finalId, baseItemId: aliasedId };
+    const itemData = cloneData(item);
+    return {
+      ...template,
+      ...itemData,
+      id: finalId,
+      baseItemId: aliasedId,
+      use: template.use || itemData.use ? { ...(template.use ?? {}), ...(itemData.use ?? {}), status: itemData.use?.status ?? template.use?.status } : undefined,
+    };
   }
   return cloneData(item);
 }
@@ -2437,6 +2606,7 @@ function updateAmmoStackName(item) {
 
 function addItemToInventory(fighter, item, prefix = "stack") {
   if (!fighter || !item) return [];
+  item = ensureItemCharges(normalizeItem(item));
   if (item.type !== "ammunition" || !item.ammo?.kind) {
     fighter.inventory.items.push(item);
     return [item];
@@ -2513,7 +2683,11 @@ function ensureStarterHeroEquipment(fighter) {
 
 function itemForId(fighter, itemId) {
   if (!itemId) return null;
-  return fighter?.inventory?.items?.find((item) => item.id === itemId) ?? null;
+  const itemIndex = fighter?.inventory?.items?.findIndex((item) => item.id === itemId) ?? -1;
+  if (itemIndex < 0) return null;
+  const item = ensureItemCharges(normalizeItem(fighter.inventory.items[itemIndex]));
+  fighter.inventory.items[itemIndex] = item;
+  return item;
 }
 
 function chestItemForId(itemId) {
@@ -2541,7 +2715,7 @@ function weaponProficiencyAliases(item) {
 
 function heroHasWeaponProficiency(fighter, item) {
   if (!item?.damage || item.type !== "weapon") return true;
-  if (!isPartyHeroId(fighter?.id)) return true;
+  if (!isPartyHeroId(fighter?.id) || !isClassHero(fighter)) return true;
   const proficiencies = new Set(proficiencyEntries(fighter.weaponProficiencies ?? []));
   const training = String(item.category ?? "").split(" ")[0];
   if (training && proficiencies.has(training)) return true;
@@ -2550,7 +2724,7 @@ function heroHasWeaponProficiency(fighter, item) {
 
 function heroHasArmorProficiency(fighter, item) {
   if (item?.type !== "armor") return true;
-  if (!isPartyHeroId(fighter?.id)) return true;
+  if (!isPartyHeroId(fighter?.id) || !isClassHero(fighter)) return true;
   const proficiencies = new Set(proficiencyEntries(fighter.armorProficiencies ?? []));
   const category = String(item.category ?? "").toLowerCase();
   if (category === "shield") return proficiencies.has("shield");
@@ -2701,7 +2875,7 @@ function xpForNextLevel(level) {
 }
 
 function canLevelUp(hero = state.fighters.hero) {
-  return (hero.xp ?? 0) >= xpForNextLevel(hero.level ?? 1);
+  return Boolean(hero && (isClassHero(hero) || isTrainedSidekick(hero)) && (hero.level ?? 1) < 20 && (hero.xp ?? 0) >= xpForNextLevel(hero.level ?? 1));
 }
 
 function attackAbilityForWeapon(weapon, fighter = null) {
@@ -2744,15 +2918,17 @@ function attackBonus(fighter) {
 
 function attackBonusForWeapon(fighter, weapon = activeWeapon(fighter)) {
   const statusBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.attackBonus ?? 0), 0);
+  const sidekickAttackBonus = isSidekickWarrior(fighter) && (fighter.sidekickWarriorRole ?? "attacker") === "attacker" ? 2 : 0;
+  const sidekickProficiencyBonus = isTrainedSidekick(fighter) ? Math.max(0, proficiencyBonus(fighter) - 2) : 0;
   if (isWildShaped(fighter)) return (fighter.attackBonus ?? 0) + statusBonus;
   const unarmed = !weapon?.damage;
   const ability = abilityMod(fighter, unarmed ? attackAbilityForUnarmed(fighter) : attackAbilityForWeapon(weapon, fighter));
-  const magicBonus = (weapon?.magic?.attackBonus ?? 0) + magicEffects(fighter).attackBonus + statusBonus;
+  const magicBonus = (weapon?.magic?.attackBonus ?? 0) + magicEffects(fighter).attackBonus + statusBonus + sidekickAttackBonus + sidekickProficiencyBonus;
   const styleBonus = fighterHasStyle(fighter, "archery") && weaponIsRanged(weapon) ? 2 : 0;
-  if (isPartyHeroId(fighter?.id) && unarmed) {
+  if (isPartyHeroId(fighter?.id) && isClassHero(fighter) && unarmed) {
     return ability + proficiencyBonus(fighter) + magicBonus + styleBonus;
   }
-  if (isPartyHeroId(fighter?.id) && weapon?.type === "weapon") {
+  if (isPartyHeroId(fighter?.id) && isClassHero(fighter) && weapon?.type === "weapon") {
     return ability + (heroHasWeaponProficiency(fighter, weapon) ? proficiencyBonus(fighter) : 0) + magicBonus + styleBonus;
   }
   const baseBonus = fighter.attackBonus ?? 0;
@@ -2867,7 +3043,7 @@ function damageProfile(fighter, options = {}) {
     };
     return { ...damage, label: formatDamage(damage) };
   }
-  if (!options.forceThrown && !isPartyHeroId(fighter?.id) && weapon?.properties?.includes("thrown") && weapon.range?.kind === "thrown" && !monsterCanThrowWeapon(fighter, weapon)) {
+  if (!options.forceThrown && (!isPartyHeroId(fighter?.id) || !isClassHero(fighter)) && weapon?.properties?.includes("thrown") && weapon.range?.kind === "thrown" && !monsterCanThrowWeapon(fighter, weapon)) {
     return {
       ...weapon.damage,
       bonus: (includeDamageModifier ? abilityMod(fighter, "str") : 0) + (weapon.magic?.damageBonus ?? 0) + magicEffects(fighter).damageBonus + statusDamageBonus,
@@ -2880,7 +3056,7 @@ function damageProfile(fighter, options = {}) {
     };
   }
   if (!weapon?.damage) {
-    if (!isPartyHeroId(fighter?.id) && (fighter.baseDamage?.count || fighter.baseDamage?.flat)) {
+    if ((!isPartyHeroId(fighter?.id) || !isClassHero(fighter)) && (fighter.baseDamage?.count || fighter.baseDamage?.flat)) {
       const damage = {
         flat: fighter.baseDamage.flat,
         count: fighter.baseDamage.count ?? 0,
@@ -2946,9 +3122,10 @@ function opportunityAttackProfile(fighter) {
 }
 
 function armorClass(fighter) {
+  const sidekickDefenseBonus = isSidekickWarrior(fighter) && (fighter.level ?? 1) >= 10 ? 1 : 0;
   if (isWildShaped(fighter)) {
     const statusAc = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.acBonus ?? 0), 0);
-    return (fighter.baseAc ?? fighter.ac ?? 10) + statusAc;
+    return (fighter.baseAc ?? fighter.ac ?? 10) + statusAc + sidekickDefenseBonus;
   }
   const torso = equippedItem(fighter, "torso");
   const armor = armorStrengthRequirementMet(fighter, torso) && heroHasArmorProficiency(fighter, torso) ? torso?.armor : null;
@@ -2959,16 +3136,16 @@ function armorClass(fighter) {
   const styleAc = fighterHasStyle(fighter, "defense") && Boolean(torso?.armor?.base) ? 1 : 0;
   const wearingArmor = Boolean(torso?.armor?.base);
   if (!wearingArmor && fighter?.classId === "monk" && !shield?.armor?.bonus) {
-    return 10 + abilityMod(fighter, "dex") + abilityMod(fighter, "wis") + magicAc + statusAc + styleAc;
+    return 10 + abilityMod(fighter, "dex") + abilityMod(fighter, "wis") + magicAc + statusAc + styleAc + sidekickDefenseBonus;
   }
   if (!wearingArmor && fighter?.classId === "barbarian") {
-    return 10 + abilityMod(fighter, "dex") + abilityMod(fighter, "con") + shieldBonus + magicAc + statusAc + styleAc;
+    return 10 + abilityMod(fighter, "dex") + abilityMod(fighter, "con") + shieldBonus + magicAc + statusAc + styleAc + sidekickDefenseBonus;
   }
-  if (!armor?.base) return (fighter.baseAc ?? 10) + abilityMod(fighter, "dex") + shieldBonus + magicAc + statusAc + styleAc;
+  if (!armor?.base) return (fighter.baseAc ?? 10) + abilityMod(fighter, "dex") + shieldBonus + magicAc + statusAc + styleAc + sidekickDefenseBonus;
 
   const dex = abilityMod(fighter, "dex");
   const dexBonus = armor.dex === "full" ? dex : armor.dex === "max2" ? Math.min(2, dex) : 0;
-  return armor.base + dexBonus + shieldBonus + magicAc + statusAc + styleAc;
+  return armor.base + dexBonus + shieldBonus + magicAc + statusAc + styleAc + sidekickDefenseBonus;
 }
 
 function itemRequiresTwoHands(item) {
@@ -3019,7 +3196,7 @@ function refreshDerivedStats(fighter) {
   if (fighter.abilityScores) {
     fighter.abilityMods = abilityModsFromScores(fighter.abilityScores);
   }
-  if (isPartyHeroId(fighter.id)) {
+  if (isPartyHeroId(fighter.id) && isClassHero(fighter)) {
     fighter.initiativeBonus = abilityMod(fighter, "dex") + (effects.initiativeBonus ?? 0);
   }
   fighter.ac = armorClass(fighter);
@@ -3069,7 +3246,7 @@ function createCombatant(template) {
   if (combatant.baseAttackAbilityMod === undefined) {
     combatant.baseAttackAbilityMod = scoreToMod(baseAbilityScore(combatant, attackAbilityForWeapon(activeWeapon(combatant), combatant)));
   }
-  ensureStarterHeroEquipment(combatant);
+  if (isClassHero(combatant)) ensureStarterHeroEquipment(combatant);
   ensureFighterAbilityState(combatant);
   ensureSpellPointState(combatant);
   return refreshDerivedStats(combatant);
@@ -3258,7 +3435,7 @@ function activeFighter() {
 
 function syncActiveHeroToTurn() {
   const fighter = activeFighter();
-  if (!isPartyHeroId(fighter?.id)) return false;
+  if (!isPlayerControlledPartyFighter(fighter)) return false;
   state.party.activeHeroId = fighter.id;
   selectedHeroIds = new Set([fighter.id]);
   return true;
@@ -3327,20 +3504,34 @@ function normalizeLoadedState(loadedState) {
     normalized.fighters.hero.partyRole = normalized.fighters.hero.partyRole ?? "tank";
     normalized.fighters.hero.token = tokenFromName(normalized.fighters.hero.name, normalized.fighters.hero.token);
   }
+  if (isLegacyTestingBeastAlly(normalized.fighters["ally-forest-wolf"])) {
+    delete normalized.fighters["ally-forest-wolf"];
+    removeLegacyTestingBeastAllyFromPartyData(normalized.party);
+  }
   Object.values(normalized.fighters).forEach((fighter) => {
     if (fighter.dead) {
       fighter.hp = 0;
       fighter.alive = false;
+      fighter.stableAtZero = false;
       fighter.deathSaves = fighter.deathSaves ?? { successes: 0, failures: 3 };
     } else if (normalized.party.rosterIds.includes(fighter.id)) {
+      if (fighter.hp > 0) fighter.stableAtZero = false;
+      else fighter.stableAtZero = Boolean(fighter.stableAtZero || (fighter.deathSaves?.successes ?? 0) >= 3);
       fighter.deathSaves = fighter.deathSaves ?? { successes: 0, failures: 0 };
+      if (fighter.stableAtZero) fighter.deathSaves = { successes: 0, failures: 0 };
+    }
+    if (isAutonomousAlly(fighter)) {
+      fighter.followDistanceSquares = Math.max(1, Math.min(5, Number(fighter.followDistanceSquares ?? 3) || 3));
+      if (!normalized.fighters[fighter.followHeroId] || !isClassHero(normalized.fighters[fighter.followHeroId])) fighter.followHeroId = null;
     }
   });
   normalized.party.rosterIds = normalized.party.rosterIds.filter((id) => normalized.fighters[id]);
   if (!normalized.party.rosterIds.includes("hero") && normalized.fighters.hero) normalized.party.rosterIds.unshift("hero");
-  normalized.party.heroIds = normalized.party.heroIds.filter((id) => normalized.fighters[id]).slice(0, 4);
+  normalized.party.heroIds = normalized.party.heroIds.filter((id) => normalized.fighters[id]);
   if (normalized.party.heroIds.length === 0 && normalized.fighters.hero) normalized.party.heroIds = ["hero"];
-  if (!normalized.fighters[normalized.party.activeHeroId]) normalized.party.activeHeroId = normalized.party.heroIds[0] ?? "hero";
+  if (!normalized.fighters[normalized.party.activeHeroId] || isAutonomousAlly(normalized.fighters[normalized.party.activeHeroId])) {
+    normalized.party.activeHeroId = normalized.party.heroIds.find((id) => normalized.fighters[id] && !isAutonomousAlly(normalized.fighters[id])) ?? "hero";
+  }
   for (const heroId of normalized.party.heroIds ?? ["hero"]) {
     if (normalized.fighters[heroId]) {
       normalized.fighters[heroId].partyRole = normalized.fighters[heroId].partyRole ?? (heroId === "hero" ? "tank" : "dd");
@@ -3354,6 +3545,23 @@ function normalizeLoadedState(loadedState) {
     fighter.baseSpeedFeet = fighter.baseSpeedFeet ?? fighter.speedFeet ?? 30;
     fighter.abilityScores = fighter.abilityScores ? { ...fighter.abilityScores } : fighter.abilityScores;
     fighter.abilityMods = { ...(fighter.abilityMods ?? {}) };
+    if (!isClassHero(fighter)) {
+      if (isAutonomousAlly(fighter) && !isHumanoidFighter(fighter) && fighter.renameable === undefined) fighter.renameable = true;
+      fighter.level = fighter.level ?? 1;
+      fighter.xp = fighter.xp ?? 0;
+      fighter.hitDie = fighter.hitDie ?? 10;
+      fighter.hitDiceRemaining = fighter.hitDiceRemaining ?? fighter.level ?? 1;
+      fighter.equipment = normalizeEquipment(fighter.equipment);
+      fighter.inventory = canFighterReceiveInventory(fighter) ? normalizeInventory(fighter.inventory) : normalizeInventory({ money: {}, items: [], heroTokens: 0 });
+      ensureFighterAbilityState(fighter);
+      ensureSpellPointState(fighter);
+      fighter.hasBonusAction = fighter.hasBonusAction ?? true;
+      fighter.dodging = fighter.dodging ?? false;
+      fighter.disengaged = fighter.disengaged ?? false;
+      fighter.canMoveThroughMonsters = fighter.canMoveThroughMonsters ?? false;
+      refreshDerivedStats(fighter);
+      return;
+    }
     fighter.raceSelection = normalizeRaceSelection(fighter.raceSelection ?? { raceId: fighter.race, subraceId: fighter.subrace, dragonAncestryId: fighter.dragonAncestryId });
     const raceTraits = raceTraitsForSelection(fighter.raceSelection);
     fighter.race = fighter.race ?? raceTraits.raceId;

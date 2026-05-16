@@ -2555,6 +2555,17 @@ async function deleteAdventure(slotId) {
   const slot = getSlots().find((entry) => entry.id === slotId);
   if (!slot?.hasSave) return;
 
+  const confirmed = await showGameDialog({
+    title: "Delete Saved Game",
+    message: `Really delete "${slot.name}"? This cannot be undone.`,
+    confirmText: "Delete Save",
+    cancelText: "Keep Save",
+  });
+  if (!confirmed) {
+    updateSaveStatus("Delete cancelled.");
+    return;
+  }
+
   await remove(slotId);
   render();
   updateSaveStatus(`Deleted "${slot.name}".`);

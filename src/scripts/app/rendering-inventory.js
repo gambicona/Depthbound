@@ -370,6 +370,20 @@ function buildRoom() {
   });
   tokenLayer.append(exitToken);
 
+  const homeMoveOutButton = document.createElement("button");
+  homeMoveOutButton.className = "home-move-out-button hidden";
+  homeMoveOutButton.type = "button";
+  homeMoveOutButton.textContent = "Move Out";
+  homeMoveOutButton.addEventListener("pointerdown", (event) => {
+    event.stopPropagation();
+  });
+  homeMoveOutButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showHomeMenu();
+  });
+  tokenLayer.append(homeMoveOutButton);
+
   const chestToken = document.createElement("button");
   chestToken.className = "chest-token hidden";
   chestToken.type = "button";
@@ -642,6 +656,13 @@ function placeExitToken() {
   token.style.left = `${(state.exit.position.x + 0.5) * scaledTileSizePx}px`;
   token.style.top = `${(state.exit.position.y + 0.5) * scaledTileSizePx}px`;
   token.classList.toggle("hidden", state.completed || !isKnownTile(state.exit.position));
+
+  const homeMoveOutButton = els.room.querySelector(".home-move-out-button");
+  if (homeMoveOutButton) {
+    homeMoveOutButton.style.left = `${(state.exit.position.x + 1.35) * scaledTileSizePx}px`;
+    homeMoveOutButton.style.top = `${(state.exit.position.y + 0.5) * scaledTileSizePx}px`;
+    homeMoveOutButton.classList.toggle("hidden", state.mode !== "home" || state.completed);
+  }
 }
 
 function homeChestPosition() {
@@ -766,7 +787,7 @@ function renderRoom() {
   els.room.style.setProperty("--token-slide-ms", `${tokenSlideMs}ms`);
 
   const hero = activeHero();
-  const heroTurn = state.mode === "combat" && activeFighter()?.id === hero?.id && combatNeedsHeroTurns();
+  const heroTurn = state.mode === "combat" && activeFighter()?.id === hero?.id && isPlayerControlledPartyFighter(hero) && combatNeedsHeroTurns();
   const activeTiles = activeTileKeys();
   const rememberedTiles = rememberedTileKeys();
   renderTileButtons(rememberedTiles);
@@ -884,6 +905,7 @@ function renderHeroStatusCard(element, fighter) {
   const weapon = activeWeapon(fighter);
   const armor = equippedItem(fighter, "torso");
   const beast = wildShapeBeastById(fighter.wildShapeState?.beastFormId);
+  const temporaryEffects = temporaryEffectsForFighter(fighter);
   const loadoutText = isWildShaped(fighter)
     ? `${escapeHtml(fighter.damage?.weaponName ?? "Beast Attack")} / ${escapeHtml(beast?.name ?? "Beast Form")}`
     : `${escapeHtml(weapon?.name ?? "Unarmed")} / ${escapeHtml(armor?.name ?? "No armor")}`;
@@ -895,8 +917,8 @@ function renderHeroStatusCard(element, fighter) {
         <div class="fighter-role">${escapeHtml(combatantRoleLabel(fighter))}</div>
       </div>
       <div class="card-actions">
-        <button class="icon-button open-inventory" type="button" title="Inventory and equipment" aria-label="Inventory and equipment">I</button>
-        <button class="icon-button rename-hero" type="button" title="Rename character" aria-label="Rename character">...</button>
+        <button class="icon-button open-inventory" type="button" title="Inventory and equipment" aria-label="Inventory and equipment" ${canFighterReceiveInventory(fighter) ? "" : "disabled"}>I</button>
+        <button class="icon-button rename-hero" type="button" title="Rename character" aria-label="Rename character" ${fighter.renameable === false ? "disabled" : ""}>...</button>
       </div>
     </div>
     <div class="hp-line">
@@ -911,18 +933,158 @@ function renderHeroStatusCard(element, fighter) {
       ${fighter.dodging ? '<span class="status-pill status-dodge">Dodging</span>' : ""}
       ${fighter.disengaged ? '<span class="status-pill status-disengage">Disengaged</span>' : ""}
       ${(fighter.statusEffects ?? []).map((effect) => `<span class="status-pill status-dodge">${escapeHtml(effect.label ?? effect.id)}</span>`).join("")}
-      ${fighter.hp <= 0 && !fighter.dead ? `<span class="status-pill status-dodge">Death saves ${fighter.deathSaves?.successes ?? 0}/3 | ${fighter.deathSaves?.failures ?? 0}/3</span>` : ""}
+      ${fighter.hp <= 0 && !fighter.dead && heroIsStableAtZero(fighter) ? '<span class="status-pill status-dodge">Stable</span>' : ""}
+      ${fighter.hp <= 0 && !fighter.dead && !heroIsStableAtZero(fighter) ? `<span class="status-pill status-dodge">Death saves ${fighter.deathSaves?.successes ?? 0}/3 | ${fighter.deathSaves?.failures ?? 0}/3</span>` : ""}
       ${fighter.dead ? '<span class="status-pill status-disengage">Dead</span>' : ""}
     </div>
+    <button class="temporary-effects-button" type="button" ${temporaryEffects.length ? "" : "disabled"}>
+      Temporary effects <span>${temporaryEffects.length}</span>
+    </button>
     <div class="wallet-line">XP: ${fighter.xp ?? 0} / ${xpForNextLevel(fighter.level ?? 1)} - Hit Dice: ${fighter.hitDiceRemaining ?? 0}/${fighter.level ?? 1}${(fighter.spellPointMax ?? 0) > 0 ? ` - Spell Points: ${fighter.spellPoints ?? 0}/${fighter.spellPointMax ?? 0}` : ""} - Rests: ${state.shortRestsUsed ?? 0}/${state.shortRestLimit ?? 3} - Inventory: ${escapeHtml(moneyText(fighter.inventory.money))} - Hero Tokens: ${fighter.inventory.heroTokens ?? 0}</div>
   `;
 
   element.querySelector(".rename-hero").addEventListener("click", renameHero);
   element.querySelector(".open-inventory").addEventListener("click", showInventoryMenu);
+  element.querySelector(".temporary-effects-button").addEventListener("click", () => showTemporaryEffectsInfo(fighter));
+}
+
+function temporaryEffectDurationText(effect) {
+  if (effect.expiresAtHome) return "Until returning home";
+  if (effect.expiresAtStartOfTurn) return "Until start of turn";
+  if (effect.expiresAtEndOfTurn) return "Until end of turn";
+  if (effect.durationRounds) return `${effect.durationRounds} round${effect.durationRounds === 1 ? "" : "s"}`;
+  return "Temporary";
+}
+
+function temporaryEffectDetails(effect) {
+  const parts = [];
+  if (effect.acBonus) parts.push(`${abilityLabel(effect.acBonus)} AC`);
+  if (effect.attackBonus) parts.push(`${abilityLabel(effect.attackBonus)} attack`);
+  if (effect.damageBonus) parts.push(`${abilityLabel(effect.damageBonus)} damage`);
+  if (effect.saveBonus) parts.push(`${abilityLabel(effect.saveBonus)} saves`);
+  if (effect.speedBonusFeet) parts.push(`${abilityLabel(effect.speedBonusFeet)} ft speed`);
+  if (effect.maxHpBonus) parts.push(`${abilityLabel(effect.maxHpBonus)} max HP`);
+  if (effect.attackAdvantage) parts.push("attack advantage");
+  if (effect.speedLocked) parts.push("movement locked");
+  if (effect.actionLocked) parts.push("action locked");
+  if (effect.resistances?.length) parts.push(`resists ${effect.resistances.join(", ")}`);
+  if (effect.vulnerabilities?.length) parts.push(`vulnerable to ${effect.vulnerabilities.join(", ")}`);
+  if (effect.tempHp) parts.push(`${effect.tempHp} temporary HP`);
+  return parts.join("; ");
+}
+
+function temporaryEffectsForFighter(fighter) {
+  const effects = [];
+  if (!fighter) return effects;
+  if (fighter.hp <= 0 && !fighter.dead) {
+    const stable = heroIsStableAtZero(fighter);
+    effects.push({
+      id: stable ? "stable" : "dying",
+      label: stable ? "Stable" : "Dying",
+      detail: stable
+        ? "Stable at 0 HP."
+        : `Death saves ${fighter.deathSaves?.successes ?? 0}/3 successes, ${fighter.deathSaves?.failures ?? 0}/3 failures.`,
+      duration: "Until healed or death saves resolve",
+    });
+  }
+  if (fighter.dodging) effects.push({ id: "dodging", label: "Dodging", detail: "Incoming attacks have disadvantage.", duration: "Until start of next turn" });
+  if (fighter.disengaged) effects.push({ id: "disengaged", label: "Disengaged", detail: "Movement does not provoke opportunity attacks.", duration: "Until end of turn" });
+  for (const effect of fighter.statusEffects ?? []) {
+    effects.push({
+      id: effect.id,
+      label: effect.label ?? effect.id,
+      detail: temporaryEffectDetails(effect),
+      duration: temporaryEffectDurationText(effect),
+    });
+  }
+  return effects;
+}
+
+function temporaryEffectsMarkup(fighter) {
+  const effects = temporaryEffectsForFighter(fighter);
+  if (!effects.length) return `<p class="empty-note">No active temporary effects.</p>`;
+  return `
+    <section class="temporary-effects-list">
+      ${effects
+        .map(
+          (effect) => `
+            <div class="temporary-effect-row">
+              <b>${escapeHtml(effect.label)}</b>
+              <span>${escapeHtml([effect.detail, effect.duration].filter(Boolean).join(" - "))}</span>
+            </div>
+          `,
+        )
+        .join("")}
+    </section>
+  `;
+}
+
+function showTemporaryEffectsInfo(fighter = activeHero()) {
+  if (!fighter) return;
+  els.fighterInfoName.textContent = `${fighter.name} - Temporary Effects`;
+  els.fighterInfoBody.innerHTML = temporaryEffectsMarkup(fighter);
+  els.fighterInfo.classList.remove("hidden");
+}
+
+function allyFollowControlsMarkup(ally) {
+  if (!isAutonomousAlly(ally) || !isPartyHeroId(ally.id)) return "";
+  const heroes = partyHeroes().filter((fighter) => isClassHero(fighter) && !fighter.dead);
+  if (!heroes.length) return "";
+  const selectedHeroId = heroes.some((hero) => hero.id === ally.followHeroId)
+    ? ally.followHeroId
+    : followLeaderForAlly(ally)?.id ?? heroes[0].id;
+  const selectedDistance = followDistanceForAlly(ally);
+  return `
+    <section class="inspect-section">
+      <h3>Follow</h3>
+      <div class="equipment-summary">
+        <div>
+          <b>Hero</b>
+          <span>
+            <select data-action="ally-follow-hero" data-ally="${escapeAttribute(ally.id)}">
+              ${heroes.map((hero) => `<option value="${escapeAttribute(hero.id)}" ${hero.id === selectedHeroId ? "selected" : ""}>${escapeHtml(hero.name)}</option>`).join("")}
+            </select>
+          </span>
+        </div>
+        <div>
+          <b>Distance</b>
+          <span>
+            <select data-action="ally-follow-distance" data-ally="${escapeAttribute(ally.id)}">
+              ${[1, 2, 3, 4, 5].map((value) => `<option value="${value}" ${value === selectedDistance ? "selected" : ""}>${value} sq</option>`).join("")}
+            </select>
+          </span>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function setAllyFollowHero(allyId, heroId) {
+  const ally = state.fighters[allyId];
+  const hero = state.fighters[heroId];
+  if (!isAutonomousAlly(ally) || !isClassHero(hero) || !isPartyHeroId(hero.id)) return;
+  ally.followHeroId = hero.id;
+  addLog(`${ally.name} now follows ${hero.name}.`, "important");
+  showCombatantInfo(ally);
+  render();
+}
+
+function setAllyFollowDistance(allyId, distanceSquares) {
+  const ally = state.fighters[allyId];
+  if (!isAutonomousAlly(ally)) return;
+  ally.followDistanceSquares = Math.max(1, Math.min(5, Number(distanceSquares) || 3));
+  addLog(`${ally.name} keeps within ${ally.followDistanceSquares} sq of ${state.fighters[ally.followHeroId]?.name ?? followLeaderForAlly(ally)?.name ?? "the party leader"}.`, "important");
+  showCombatantInfo(ally);
+  render();
 }
 
 async function renameHero() {
   const hero = activeHero();
+  if (hero?.renameable === false) {
+    addLog(`${hero.name} cannot be renamed.`, "important");
+    render();
+    return;
+  }
   const identity = await showHeroIdentityDialog({
     title: "Character Name",
     message: "Rename your adventurer.",
@@ -941,7 +1103,7 @@ async function renameHero() {
 
 function showCombatantInfo(fighter) {
   refreshDerivedStats(fighter);
-  const heroView = isPartyHeroId(fighter.id) || isRosterHeroId(fighter.id);
+  const heroView = (isClassHero(fighter) || isSidekickWarrior(fighter)) && (isPartyHeroId(fighter.id) || isRosterHeroId(fighter.id));
   const hpPercent = Math.max(0, Math.round((fighter.hp / fighter.maxHp) * 100));
   const weapon = activeWeapon(fighter);
   const torso = equippedItem(fighter, "torso");
@@ -950,7 +1112,7 @@ function showCombatantInfo(fighter) {
   const weaponName = weapon?.name ?? fighter.damage?.weaponName ?? fighter.baseDamage?.weaponName ?? "Natural weapon";
   const abilities = ["str", "dex", "con", "int", "wis", "cha"];
   const heroTemplate = heroView ? getHeroTemplate(fighter.classId) : null;
-  const racialTraits = heroView ? activeRaceFeatureLinesForFighter(fighter).slice(2) : [];
+  const racialTraits = heroView && isClassHero(fighter) ? activeRaceFeatureLinesForFighter(fighter).slice(2) : [];
   const classFeatures = heroView
     ? Array.from(
         new Map(
@@ -990,7 +1152,7 @@ function showCombatantInfo(fighter) {
             <div class="stat-pill"><b>${escapeHtml(fighter.damage.label)}</b><span>Damage</span></div>
           </div>
           <div class="equipment-summary">
-            <div><b>Race</b><span>${escapeHtml([fighter.speciesName, fighter.subraceName].filter(Boolean).join(" - ") || "Unknown")}</span></div>
+            <div><b>${isSidekickWarrior(fighter) ? "Creature" : "Race"}</b><span>${escapeHtml(isSidekickWarrior(fighter) ? fighterCreatureType(fighter) || "companion" : [fighter.speciesName, fighter.subraceName].filter(Boolean).join(" - ") || "Unknown")}</span></div>
             <div><b>Class</b><span>${escapeHtml(fighter.className ?? "Adventurer")} ${fighter.level ?? 1}</span></div>
             <div><b>Weapon</b><span>${escapeHtml(weaponName)}</span></div>
           </div>
@@ -1041,6 +1203,11 @@ function showCombatantInfo(fighter) {
           </div>
         `
     }
+    <section class="inspect-section">
+      <h3>Temporary Effects</h3>
+      ${temporaryEffectsMarkup(fighter)}
+    </section>
+    ${allyFollowControlsMarkup(fighter)}
     <button type="button" class="inspect-admin-toggle" data-action="toggle-inspect-admin" aria-label="Show technical details">i</button>
     <section class="inspect-admin-details hidden">
       <div class="stat-grid">
@@ -1099,6 +1266,9 @@ function showDungeonObjectInfo(object) {
       object.trap?.detected) &&
     !heroTriedDisarm;
   const canInvestigate = state.mode !== "combat" && objectCanInspect(object) && objectAdjacent && !object.investigated;
+  const captive = captiveCreatureComponent(object);
+  const canFreeCaptive = canFreeCaptiveObject(object);
+  const captiveName = captiveCreatureLabel(object);
   const destructible = objectIsDestructible(object) ? ensureDestructibleObjectState(object) : null;
   const canAttackObject =
     destructible &&
@@ -1116,6 +1286,14 @@ function showDungeonObjectInfo(object) {
     ${furnitureArtworkMarkup(template, object)}
     <p class="empty-note">${escapeHtml(template.description)}</p>
     ${object.lastResult ? `<p class="object-result">${escapeHtml(object.lastResult)}</p>` : ""}
+    ${
+      captive
+        ? `<p class="empty-note">A ${escapeHtml(captiveName)} is trapped inside. Freeing it requires ${escapeHtml(skillName(captive.skill ?? "animal-handling"))} DC ${captive.dc ?? 13}; failure releases it hostile.</p>
+           <button type="button" data-action="free-captive" data-object="${escapeAttribute(object.id)}" ${canFreeCaptive ? "" : "disabled"}>Free ${escapeHtml(captiveName)}</button>`
+        : object.captiveFreed
+          ? `<p class="empty-note">The crate is open and empty.</p>`
+          : ""
+    }
     ${
       destructible
         ? `<p class="empty-note">AC ${objectArmorClass(object)} - HP ${object.hp}/${object.maxHp}</p>
@@ -1305,6 +1483,132 @@ function showHomeChestInfo() {
   showDungeonObjectInfo(homeChestObject());
 }
 
+function objectAdjacentToHero(object, hero = activeHero()) {
+  if (!object || !hero?.position) return false;
+  return objectCells(object).some((cell) => Math.max(Math.abs(hero.position.x - cell.x), Math.abs(hero.position.y - cell.y)) === 1);
+}
+
+function captiveCreatureComponent(object) {
+  return object?.captiveFreed ? null : objectComponent(object, "captiveCreature");
+}
+
+function captiveCreatureMonsterId(object) {
+  const component = captiveCreatureComponent(object);
+  if (!component) return null;
+  if (object.captiveMonsterId) return object.captiveMonsterId;
+  const monsterIds = component.monsterIds ?? (component.monsterId ? [component.monsterId] : []);
+  return monsterIds.find((monsterId) => getMonsterTemplate(monsterId)) ?? null;
+}
+
+function captiveCreatureLabel(object) {
+  const template = getMonsterTemplate(captiveCreatureMonsterId(object));
+  return template?.name ?? "Captive creature";
+}
+
+function canFreeCaptiveObject(object) {
+  const hero = activeHero();
+  return Boolean(
+    captiveCreatureComponent(object) &&
+      captiveCreatureMonsterId(object) &&
+      objectAdjacentToHero(object, hero) &&
+      (state.mode !== "combat" || activeFighter()?.id === hero?.id) &&
+      (state.mode !== "combat" || activeFighter()?.hasAction),
+  );
+}
+
+function addRecruitedAllyToParty(ally) {
+  state.fighters[ally.id] = ally;
+  state.party.rosterIds = [...new Set([...(state.party.rosterIds ?? []), ally.id])];
+  state.party.heroIds = [...new Set([...(state.party.heroIds ?? []), ally.id])];
+  if (state.mode === "combat") addMonsterToInitiative(ally);
+}
+
+function spawnCaptiveHostile(monsterId, object, position) {
+  const template = getMonsterTemplate(monsterId);
+  if (!template) return null;
+  const monster = createCombatant({
+    ...template,
+    id: `captive-hostile-${monsterId}-${Date.now()}`,
+    name: `${template.name} (Freed)`,
+    position,
+  });
+  applyMonsterCategoryScaling(monster, activeHero());
+  monster.roomId = roomForPosition(position)?.id ?? roomForPosition(object.position)?.id ?? "captive";
+  state.fighters[monster.id] = monster;
+  if (state.mode === "combat") addMonsterToInitiative(monster);
+  return monster;
+}
+
+function freeCaptiveCreature(objectId) {
+  const object = dungeonObjectForId(objectId);
+  const hero = activeHero();
+  const component = captiveCreatureComponent(object);
+  const monsterId = captiveCreatureMonsterId(object);
+  const template = monsterId ? getMonsterTemplate(monsterId) : null;
+  if (!object || !component || !template || !hero) return;
+  if (!objectAdjacentToHero(object, hero)) {
+    addLog(`${hero.name} needs to be next to ${objectTemplate(object.type)?.name ?? "the crate"} to open it.`);
+    renderLog();
+    return;
+  }
+  if (state.mode === "combat" && activeFighter()?.id !== hero.id) return;
+  if (state.mode === "combat" && !hero.hasAction) return;
+
+  const position = nearestOpenCellAroundObject(object);
+  if (!position) {
+    object.lastResult = `There is no room to free ${template.name}.`;
+    addLog(object.lastResult, "important");
+    showDungeonObjectInfo(object);
+    return;
+  }
+
+  const rollResult = rollD20ForFighter(hero);
+  const roll = rollResult.roll;
+  const guidance = guidanceSkillBonus();
+  const skillId = component.skill ?? "animal-handling";
+  const ability = component.ability ?? skillDefinitions[skillId]?.ability ?? "wis";
+  const bonus = skillCheckBonus(hero, ability, skillId);
+  const total = roll + bonus + guidance;
+  const dc = component.dc ?? 13;
+  const skillLabel = skillName(skillId);
+  const guidanceText = guidance ? ` + Guidance ${guidance}` : "";
+  const checkText = `${hero.name} frees ${template.name}: ${skillLabel} ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${dc}.`;
+  const success = total >= dc;
+
+  object.captiveFreed = true;
+  object.spent = true;
+  object.lastResult = checkText;
+  if (state.mode === "combat") hero.hasAction = false;
+  addLog(checkText, "important");
+  addAdminCheckLog({ actor: hero, label: `${skillLabel} check to free captive`, target: template.name, rollResult, bonus, guidance, total, dc, success, note: success ? `recruited as ${component.control === "player" ? "player companion" : "AI ally"}` : "released hostile" });
+  recordD20OutcomeForFighter(hero, success);
+
+  if (success) {
+    const ally = createFriendlyBeastFromMonster(monsterId, {
+      id: `ally-${monsterId}-${Date.now()}`,
+      name: template.name,
+      position,
+      kind: component.kind ?? "ally",
+      control: component.control ?? "ai",
+      renameable: true,
+      className: component.allyKind ?? (template.tags?.[0] === "undead" ? "Undead Ally" : "Beast Ally"),
+    });
+    if (ally) {
+      ally.roomId = roomForPosition(position)?.id ?? roomForPosition(object.position)?.id ?? "captive";
+      addRecruitedAllyToParty(ally);
+      object.lastResult += ` ${ally.name} joins the party.`;
+      addLog(`${ally.name} joins the party.`, "important");
+    }
+  } else {
+    const monster = spawnCaptiveHostile(monsterId, object, position);
+    object.lastResult += ` ${monster?.name ?? template.name} turns hostile.`;
+    addLog(`${monster?.name ?? template.name} turns hostile.`, "important");
+  }
+
+  render();
+  showDungeonObjectInfo(object);
+}
+
 function roleOptionsMarkup(selectedRole) {
   return ["tank", "dd", "heal"]
     .map((role) => `<option value="${role}" ${selectedRole === role ? "selected" : ""}>${role.toUpperCase()}</option>`)
@@ -1314,9 +1618,18 @@ function roleOptionsMarkup(selectedRole) {
 function showPlanningTableInfo() {
   const activeIds = state.party?.heroIds ?? ["hero"];
   const rosterIds = state.party?.rosterIds ?? activeIds;
+  const allPlanningIds = [...new Set([...activeIds, ...rosterIds])];
+  const activeClassIds = activeIds.filter((id) => isClassHero(state.fighters[id]));
+  const activeSupportIds = activeIds.filter((id) => state.fighters[id] && !isClassHero(state.fighters[id]));
   const benchIds = rosterIds.filter((id) => !activeIds.includes(id));
+  const canRetireMember = (hero) => Boolean(hero && (!isClassHero(hero) || allPlanningIds.filter((id) => id !== hero.id && isClassHero(state.fighters[id]) && !state.fighters[id].dead).length > 0));
+  const retireButtonMarkup = (hero) => {
+    const disabled = canRetireMember(hero) ? "" : "disabled";
+    const title = disabled ? ` title="Create or keep another class hero before retiring ${escapeAttribute(hero.name)}."` : "";
+    return `<button class="delete-save" type="button" data-action="retire-party-member" data-hero="${escapeAttribute(hero.id)}" ${disabled}${title}>Retire</button>`;
+  };
   const slotMarkup = Array.from({ length: 4 }, (_, index) => {
-    const heroId = activeIds[index];
+    const heroId = activeClassIds[index];
     const hero = heroId ? state.fighters[heroId] : null;
     return `
       <div class="planning-slot">
@@ -1328,25 +1641,45 @@ function showPlanningTableInfo() {
           hero
             ? `<select data-action="party-role" data-hero="${escapeAttribute(hero.id)}">${roleOptionsMarkup(partyRoleFor(hero))}</select>
                <button type="button" data-action="make-main-hero" data-hero="${escapeAttribute(hero.id)}" ${index === 0 || hero.dead ? "disabled" : ""}>Main</button>
-               <button type="button" data-action="remove-party-hero" data-hero="${escapeAttribute(hero.id)}" ${activeIds.length <= 1 ? "disabled" : ""}>Remove</button>`
+               <button type="button" data-action="remove-party-hero" data-hero="${escapeAttribute(hero.id)}" ${activeClassIds.length <= 1 ? "disabled" : ""}>Remove</button>
+               ${retireButtonMarkup(hero)}`
             : ""
         }
       </div>
     `;
   }).join("");
+  const supportMarkup = activeSupportIds.length
+    ? activeSupportIds
+        .map((id) => {
+          const hero = state.fighters[id];
+          return `
+            <div class="planning-slot bench-slot">
+              <div>
+                <b>${escapeHtml(hero.name)}</b>
+                <span>${escapeHtml(hero.className ?? (partyMemberKind(hero) === "companion" ? "Companion" : "Ally"))}${hero.companionControl === "ai" ? " - AI controlled" : " - Player controlled"}</span>
+              </div>
+              <button type="button" data-action="remove-party-hero" data-hero="${escapeAttribute(hero.id)}">Remove</button>
+              ${retireButtonMarkup(hero)}
+            </div>
+          `;
+        })
+        .join("")
+    : `<p class="empty-note">No active allies or companions.</p>`;
   const benchMarkup = benchIds.length
     ? benchIds
         .map((id) => {
           const hero = state.fighters[id];
           if (!hero) return "";
+          const classHero = isClassHero(hero);
           return `
             <div class="planning-slot bench-slot">
               <div>
                 <b>${escapeHtml(hero.name)}</b>
-                <span>${hero.dead ? "Dead" : `Level ${hero.level ?? 1} ${hero.className ?? "Hero"}`}</span>
+                <span>${hero.dead ? "Dead" : classHero ? `Level ${hero.level ?? 1} ${hero.className ?? "Hero"}` : `${escapeHtml(hero.className ?? "Ally")}${hero.companionControl === "ai" ? " - AI controlled" : " - Player controlled"}`}</span>
               </div>
-              <select data-action="party-role" data-hero="${escapeAttribute(hero.id)}">${roleOptionsMarkup(partyRoleFor(hero))}</select>
-              <button type="button" data-action="add-party-hero" data-hero="${escapeAttribute(hero.id)}" ${activeIds.length >= 4 || hero.dead ? "disabled" : ""}>Add</button>
+              ${classHero ? `<select data-action="party-role" data-hero="${escapeAttribute(hero.id)}">${roleOptionsMarkup(partyRoleFor(hero))}</select>` : ""}
+              <button type="button" data-action="add-party-hero" data-hero="${escapeAttribute(hero.id)}" ${(classHero && activeClassIds.length >= 4) || hero.dead ? "disabled" : ""}>Add</button>
+              ${retireButtonMarkup(hero)}
             </div>
           `;
         })
@@ -1364,8 +1697,12 @@ function showPlanningTableInfo() {
       </label>
     </section>
     <section class="planning-party">
-      <h3>Active Party</h3>
+      <h3>Active Class Heroes</h3>
       ${slotMarkup}
+    </section>
+    <section class="planning-party">
+      <h3>Active Allies and Companions</h3>
+      ${supportMarkup}
     </section>
     <section class="planning-party">
       <h3>Hero Roster</h3>
@@ -1460,8 +1797,10 @@ async function createRosterHero() {
 }
 
 function addHeroToParty(heroId) {
-  if (!state.fighters[heroId] || state.fighters[heroId].dead || isPartyHeroId(heroId) || (state.party.heroIds?.length ?? 0) >= 4) return;
-  state.party.heroIds = [...(state.party.heroIds ?? ["hero"]), heroId].slice(0, 4);
+  const hero = state.fighters[heroId];
+  if (!hero || hero.dead || isPartyHeroId(heroId)) return;
+  if (isClassHero(hero) && activeClassHeroIds().length >= 4) return;
+  state.party.heroIds = [...(state.party.heroIds ?? ["hero"]), heroId];
   state.party.activeHeroId = state.party.activeHeroId ?? heroId;
   addLog(`${state.fighters[heroId].name} joins the active party.`, "important");
   render();
@@ -1469,11 +1808,56 @@ function addHeroToParty(heroId) {
 }
 
 function removeHeroFromParty(heroId) {
-  if ((state.party.heroIds ?? []).length <= 1) return;
+  if (isClassHero(state.fighters[heroId]) && activeClassHeroIds().length <= 1) return;
   state.party.heroIds = (state.party.heroIds ?? ["hero"]).filter((id) => id !== heroId);
   if (state.party.heroIds.length === 0) state.party.heroIds = ["hero"];
-  if (state.party.activeHeroId === heroId) state.party.activeHeroId = state.party.heroIds[0];
+  if (state.party.activeHeroId === heroId) state.party.activeHeroId = state.party.heroIds.find((id) => !isAutonomousAlly(state.fighters[id])) ?? state.party.heroIds[0];
   addLog(`${state.fighters[heroId]?.name ?? "Hero"} leaves the active party.`, "important");
+  render();
+  showPlanningTableInfo();
+}
+
+async function retirePartyMember(heroId) {
+  const hero = state.fighters[heroId];
+  if (!hero || state.mode !== "home") return;
+  const allRosterIds = [...new Set([...(state.party?.heroIds ?? []), ...(state.party?.rosterIds ?? [])])];
+  const remainingClassHeroIds = allRosterIds.filter((id) => id !== heroId && isClassHero(state.fighters[id]) && !state.fighters[id].dead);
+  if (isClassHero(hero) && remainingClassHeroIds.length === 0) {
+    addLog("You need at least one class hero in the roster.", "important");
+    showPlanningTableInfo();
+    return;
+  }
+
+  const choice = await showChoiceDialog({
+    title: `Retire ${hero.name}?`,
+    message: `${hero.name} will be permanently removed from the active party and roster. This cannot be undone, and any carried items will be lost.`,
+    choices: [
+      { value: "cancel", label: "Keep" },
+      { value: "retire", label: "Retire" },
+    ],
+    actor: hero,
+  });
+  if (choice !== "retire") {
+    showPlanningTableInfo();
+    return;
+  }
+
+  state.party.heroIds = (state.party.heroIds ?? ["hero"]).filter((id) => id !== heroId);
+  state.party.rosterIds = (state.party.rosterIds ?? state.party.heroIds ?? ["hero"]).filter((id) => id !== heroId);
+  state.initiative = (state.initiative ?? []).filter((entry) => entry.fighterId !== heroId);
+  selectedHeroIds.delete(heroId);
+  delete state.fighters[heroId];
+
+  const fallbackId =
+    state.party.heroIds.find((id) => state.fighters[id] && isPlayerControlledPartyFighter(state.fighters[id])) ??
+    state.party.rosterIds.find((id) => state.fighters[id] && isClassHero(state.fighters[id])) ??
+    remainingClassHeroIds[0] ??
+    "hero";
+  if (!state.party.heroIds.length && state.fighters[fallbackId]) state.party.heroIds = [fallbackId];
+  state.party.activeHeroId = fallbackId;
+  selectedHeroIds = new Set(state.fighters[fallbackId] ? [fallbackId] : []);
+  addLog(`${hero.name} is retired from the roster.`, "important");
+  roomIsBuilt = false;
   render();
   showPlanningTableInfo();
 }
@@ -1850,6 +2234,18 @@ function itemDetails(item) {
   if (item.type === "consumable") {
     if (item.use?.kind === "healing") {
       return `${item.use.dice.count}d${item.use.dice.sides} + ${item.use.bonus} HP; ${item.use.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
+    }
+    if (item.use?.status) {
+      const status = item.use.status;
+      const parts = [];
+      if (status.acBonus) parts.push(`${abilityLabel(status.acBonus)} AC`);
+      if (status.attackBonus) parts.push(`${abilityLabel(status.attackBonus)} attack`);
+      if (status.damageBonus) parts.push(`${abilityLabel(status.damageBonus)} damage`);
+      if (status.saveBonus) parts.push(`${abilityLabel(status.saveBonus)} saves`);
+      if (status.speedBonusFeet) parts.push(`${abilityLabel(status.speedBonusFeet)} ft speed`);
+      if (status.resistances?.length) parts.push(`resist ${status.resistances.join(", ")}`);
+      const duration = status.expiresAtHome ? "until home" : status.durationRounds ? `${status.durationRounds} rounds` : "temporary";
+      return `${parts.join("; ") || item.category || "Consumable"}; ${duration}; ${item.use?.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
     }
     return `${item.category ?? "Consumable"}; ${item.use?.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
   }
@@ -2581,7 +2977,53 @@ function itemTransferTargets(source = activeHero()) {
   const maxSquares = itemTransferRangeFeet() / feetPerSquare;
   return candidates
     .filter((hero) => hero.id !== source.id && hero.alive && !hero.dead)
+    .filter((hero) => canFighterReceiveInventory(hero))
     .filter((hero) => distance(source.position, hero.position) <= maxSquares);
+}
+
+function dropItemBesideFighter(fighter, item) {
+  if (!fighter || !item) return;
+  addLootPile({
+    id: `loot-ally-drop-${item.id}-${Date.now()}`,
+    position: thrownWeaponLandingPosition(fighter.position),
+    money: normalizeMoney(),
+    items: [item],
+  });
+}
+
+function autoEquipHumanoidAllyItem(ally, item) {
+  if (!isAutonomousAlly(ally) || !isHumanoidFighter(ally) || !item || !["weapon", "armor"].includes(item.type)) return false;
+  const usableSlots = equipmentSlots.filter((slot) => itemCanUseSlot(item, slot.id));
+  const preferredSlot = usableSlots.find((slot) => (item.type === "weapon" ? slot.id === "mainHand" : slot.id === "torso")) ?? usableSlots[0];
+  if (!preferredSlot || !itemCanEquipInSlot(ally, item, preferredSlot.id)) return false;
+
+  const oldItemIds = new Set();
+  const equippingHand = isHandSlot(preferredSlot.id);
+  for (const slot of equipmentSlots) {
+    if (ally.equipment[slot.id] === item.id || (equippingHand && isHandSlot(slot.id) && itemRequiresTwoHands(equippedItem(ally, slot.id)))) {
+      ally.equipment[slot.id] = null;
+    }
+  }
+  if (itemRequiresTwoHands(item)) {
+    ["mainHand", "offHand"].forEach((slotId) => {
+      if (ally.equipment[slotId] && ally.equipment[slotId] !== item.id) oldItemIds.add(ally.equipment[slotId]);
+      ally.equipment[slotId] = item.id;
+    });
+  } else {
+    if (ally.equipment[preferredSlot.id] && ally.equipment[preferredSlot.id] !== item.id) oldItemIds.add(ally.equipment[preferredSlot.id]);
+    ally.equipment[preferredSlot.id] = item.id;
+  }
+
+  for (const oldItemId of oldItemIds) {
+    const oldItem = itemForId(ally, oldItemId);
+    if (!oldItem) continue;
+    ally.inventory.items = ally.inventory.items.filter((entry) => entry.id !== oldItemId);
+    dropItemBesideFighter(ally, oldItem);
+    addLog(`${ally.name} drops ${oldItem.name}.`, "important");
+  }
+  refreshDerivedStats(ally);
+  addLog(`${ally.name} equips ${item.name}.`, "important");
+  return true;
 }
 
 function transferControlsForItem(fighter, item) {
@@ -2614,7 +3056,14 @@ function transferInventoryItem(itemId, targetId) {
   }
 
   source.inventory.items = source.inventory.items.filter((entry) => entry.id !== itemId);
+  if (!canFighterReceiveInventory(target)) {
+    addLog(`${target.name} cannot carry items.`, "important");
+    addItemToInventory(source, item, "transfer-stack");
+    renderInventoryMenu();
+    return;
+  }
   addItemToInventory(target, item, "transfer-stack");
+  autoEquipHumanoidAllyItem(target, item);
   addLog(`${source.name} gives ${item.name} to ${target.name}.`, "important");
   refreshDerivedStats(source);
   refreshDerivedStats(target);
@@ -2623,6 +3072,11 @@ function transferInventoryItem(itemId, targetId) {
 }
 
 function showInventoryMenu() {
+  if (!canFighterReceiveInventory(activeHero())) {
+    addLog(`${activeHero().name} cannot carry items.`, "important");
+    render();
+    return;
+  }
   clearHeldMovementKeys();
   renderInventoryMenu();
   els.inventoryMenu.classList.remove("hidden");
@@ -2753,9 +3207,7 @@ function adjacentDyingHeroes(fighter) {
   return partyHeroes().filter(
     (hero) =>
       hero.id !== fighter.id &&
-      hero.alive &&
-      !hero.dead &&
-      hero.hp <= 0 &&
+      heroIsUnstableDying(hero) &&
       hasMeleeAccess(fighter, hero),
   );
 }
@@ -2861,8 +3313,7 @@ function useCombatAction(action, targetId = null) {
     addLog(`${fighter.name} makes a Medicine check for ${target.name}: WIS ${roll} ${abilityLabel(bonus)} = ${total} vs DC 10.`, "important");
     addAdminCheckLog({ actor: fighter, label: "Medicine check to stabilize", target: target.name, rollResult, bonus, total, dc: 10, success: total >= 10 });
     if (total >= 10) {
-      target.alive = true;
-      target.deathSaves = { successes: 3, failures: 0 };
+      markFighterStableAtZero(target);
       addLog(`${target.name} is stabilized at 0 HP.`, "heal");
       void maybeFinishEncounterAfterHeroRecovery();
     } else {
@@ -2918,6 +3369,7 @@ function fighterAbilityUnavailableReason(fighter, ability) {
   }
   if (ability.id === "actionSurge" && state.mode !== "combat") return "Only usable in combat.";
   if (ability.id === "uncannyDodge") return "Triggers as a reaction when this hero is hit.";
+  if (ability.id === "indomitable") return "Triggers automatically when this companion fails a saving throw.";
   if (ability.id === "goliathStoneEndurance") return "Triggers as a reaction when this hero takes damage.";
   if (ability.id === "steadyAim" && state.mode !== "combat") return "Only usable in combat.";
   if (ability.id === "steadyAim" && ((fighter.lastMoveFeet ?? 0) > 0 || (fighter.movementLeft ?? 0) < Math.floor(fighter.speedFeet / feetPerSquare))) return "Steady Aim requires not moving this turn.";
@@ -3003,7 +3455,11 @@ function hideAbilitiesMenu() {
 }
 
 function showHomeMenu() {
-  els.levelUp.disabled = !canLevelUp(activeHero());
+  const hero = activeHero();
+  const canTrain = canTrainAsSidekick(hero);
+  els.levelPanel?.classList.toggle("hidden", isAutonomousAlly(hero));
+  els.levelUp.textContent = canTrain ? "Train" : "Level Up";
+  els.levelUp.disabled = !canTrain && !canLevelUp(hero);
   const barrowCompleted = state.campaignProgress?.["barrow-crown"] ?? 0;
   const thornwoodCompleted = state.campaignProgress?.["thornwood-pact"] ?? 0;
   els.goBarrowCrown?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${barrowCompleted}/7`));
@@ -3134,6 +3590,14 @@ function abilityScoreImprovementLevelsForClass(classId) {
   return classAbilityScoreImprovementLevels[classId] ?? new Set([4, 8, 12, 16, 19]);
 }
 
+function spellcasterSidekickCantripCount(level) {
+  return level >= 10 ? 4 : level >= 4 ? 3 : 2;
+}
+
+function spellcasterSidekickSpellCount(level) {
+  return Math.max(1, Math.ceil(Math.max(1, Math.min(20, level)) / 2));
+}
+
 function classFeatureNames(hero, level) {
   const features = [];
   const template = getHeroTemplate(hero.classId);
@@ -3142,6 +3606,213 @@ function classFeatureNames(hero, level) {
   }
   if (abilityScoreImprovementLevelsForClass(hero.classId).has(level)) features.push("Ability Score Improvement");
   return features;
+}
+
+function sidekickCantripChoiceCountForLevel(hero, level) {
+  if (!isSidekickSpellcaster(hero)) return 0;
+  return Math.max(0, spellcasterSidekickCantripCount(level) - (hero.spells ?? []).filter((spellId) => spellBaseLevel(getContentDefinition("spells", spellId)) === 0).length);
+}
+
+function sidekickSpellChoiceCountForLevel(hero, level) {
+  if (!isSidekickSpellcaster(hero)) return 0;
+  return Math.max(0, spellcasterSidekickSpellCount(level) - (hero.spells ?? []).filter((spellId) => spellBaseLevel(getContentDefinition("spells", spellId)) > 0).length);
+}
+
+const sidekickWarriorSkillChoices = ["acrobatics", "animal-handling", "athletics", "intimidation", "nature", "perception", "survival"];
+const sidekickExpertSaveChoices = ["dex", "int", "cha"];
+const sidekickExpertSkillChoices = allSkillIds;
+const sidekickSpellcasterSaveChoices = ["wis", "int", "cha"];
+const sidekickSpellcasterSkillChoices = ["arcana", "history", "insight", "investigation", "medicine", "performance", "persuasion", "religion"];
+const sidekickSpellLists = {
+  mage: {
+    label: "Mage",
+    ability: "int",
+    cantrips: ["mage-hand", "blade-ward", "fire-bolt", "mind-sliver", "acid-splash", "ray-of-frost", "shocking-grasp", "toll-the-dead"],
+    spells: ["magic-missile", "shield", "burning-hands", "scorching-ray", "misty-step", "web", "grease", "lightning-bolt", "fireball", "haste"],
+  },
+  healer: {
+    label: "Healer",
+    ability: "wis",
+    cantrips: ["guidance", "sacred-flame", "spare-the-dying", "produce-flame", "thorn-whip", "resistance", "shillelagh"],
+    spells: ["cure-wounds", "healing-word", "guiding-bolt", "bless", "bane", "shield-of-faith", "spiritual-weapon", "hold-person", "entangle", "faerie-fire", "barkskin", "moonbeam", "spike-growth", "call-lightning"],
+  },
+  prodigy: {
+    label: "Prodigy",
+    ability: "cha",
+    cantrips: ["vicious-mockery", "mage-hand", "blade-ward", "eldritch-blast", "thunderclap", "mind-sliver", "chill-touch"],
+    spells: ["healing-word", "hold-person", "faerie-fire", "heat-metal", "shatter", "hideous-laughter", "heroism", "hypnotic-pattern", "hellish-rebuke"],
+  },
+};
+
+function sidekickHasWeaponTrainingStatBlock(fighter) {
+  return isHumanoidFighter(fighter) || Boolean(fighter?.baseDamage || fighter?.damage || activeWeapon(fighter)?.type === "weapon");
+}
+
+async function chooseSidekickSavingThrow(title, choices) {
+  const choice = await showChoiceDialog({
+    title,
+    message: "Choose one saving throw proficiency.",
+    choices: choices.map((ability) => ({ value: ability, label: ability.toUpperCase() })),
+  });
+  return choice;
+}
+
+async function trainWarriorSidekick(companion) {
+  const save = await chooseSidekickSavingThrow("Warrior Training", ["str", "dex", "con"]);
+  if (!save) return null;
+  const skills = await chooseUniqueProficiencies({
+    title: "Warrior Skills",
+    message: "Choose Warrior skill proficiencies.",
+    count: 2,
+    choices: sidekickWarriorSkillChoices,
+    selected: companion.skillProficiencies ?? [],
+  });
+  if (!skills) return null;
+  const role = await showChoiceDialog({
+    title: "Martial Role",
+    message: "Choose this warrior's combat focus.",
+    choices: [
+      { value: "attacker", label: "Attacker", description: "+2 bonus to attack rolls." },
+      { value: "defender", label: "Defender", description: "Future reaction support for nearby allies." },
+    ],
+    actor: companion,
+  });
+  if (!role) return null;
+  companion.classId = "sidekick-warrior";
+  companion.className = "Warrior Sidekick";
+  companion.sidekickClassName = "Warrior Sidekick";
+  companion.sidekickWarriorRole = role;
+  companion.savingThrowProficiencies = uniqueValues([...(companion.savingThrowProficiencies ?? []), save]);
+  companion.skillProficiencies = uniqueValues([...(companion.skillProficiencies ?? []), ...skills]);
+  companion.armorProficiencies = proficiencyEntries([...(companion.armorProficiencies ?? []), "light", "medium", "heavy"]);
+  if (sidekickHasWeaponTrainingStatBlock(companion)) {
+    companion.weaponProficiencies = proficiencyEntries([...(companion.weaponProficiencies ?? []), "simple", "martial", "shield"]);
+    companion.armorProficiencies = proficiencyEntries([...(companion.armorProficiencies ?? []), "shield"]);
+  }
+  return `Save: ${save.toUpperCase()}. Skills: ${skills.map(skillName).join(", ")}. Role: ${role}.`;
+}
+
+async function trainExpertSidekick(companion) {
+  const save = await chooseSidekickSavingThrow("Expert Training", sidekickExpertSaveChoices);
+  if (!save) return null;
+  const skills = await chooseUniqueProficiencies({
+    title: "Expert Skills",
+    message: "Choose Expert skill proficiencies.",
+    count: 5,
+    choices: sidekickExpertSkillChoices,
+    selected: companion.skillProficiencies ?? [],
+  });
+  if (!skills) return null;
+  let tools = [];
+  if (isHumanoidFighter(companion) || sidekickHasWeaponTrainingStatBlock(companion)) {
+    tools = await chooseUniqueProficiencies({
+      title: "Expert Tools",
+      message: "Choose tool proficiencies.",
+      count: 2,
+      choices: Object.keys(toolDefinitions),
+      selected: companion.toolProficiencies ?? [],
+      valuePrefix: "tool:",
+    });
+    if (!tools) return null;
+  }
+  companion.classId = "sidekick-expert";
+  companion.className = "Expert Sidekick";
+  companion.sidekickClassName = "Expert Sidekick";
+  companion.savingThrowProficiencies = uniqueValues([...(companion.savingThrowProficiencies ?? []), save]);
+  companion.skillProficiencies = uniqueValues([...(companion.skillProficiencies ?? []), ...skills]);
+  companion.toolProficiencies = uniqueValues([...(companion.toolProficiencies ?? []), ...tools]);
+  companion.armorProficiencies = proficiencyEntries([...(companion.armorProficiencies ?? []), "light"]);
+  if (sidekickHasWeaponTrainingStatBlock(companion)) companion.weaponProficiencies = proficiencyEntries([...(companion.weaponProficiencies ?? []), "simple"]);
+  return `Save: ${save.toUpperCase()}. Skills: ${skills.map(skillName).join(", ")}${tools.length ? `. Tools: ${tools.map(toolName).join(", ")}` : ""}.`;
+}
+
+async function trainSpellcasterSidekick(companion) {
+  const save = await chooseSidekickSavingThrow("Spellcaster Training", sidekickSpellcasterSaveChoices);
+  if (!save) return null;
+  const skills = await chooseUniqueProficiencies({
+    title: "Spellcaster Skills",
+    message: "Choose Spellcaster skill proficiencies.",
+    count: 2,
+    choices: sidekickSpellcasterSkillChoices,
+    selected: companion.skillProficiencies ?? [],
+  });
+  if (!skills) return null;
+  const role = await showChoiceDialog({
+    title: "Spellcasting Role",
+    message: "Choose this sidekick's spell list and casting ability.",
+    choices: Object.entries(sidekickSpellLists).map(([value, entry]) => ({ value, label: entry.label, description: `${entry.ability.toUpperCase()} spellcasting.` })),
+    actor: companion,
+  });
+  if (!role) return null;
+  const list = sidekickSpellLists[role];
+  companion.classId = "sidekick-spellcaster";
+  companion.className = "Spellcaster Sidekick";
+  companion.sidekickClassName = `${list.label} Sidekick`;
+  companion.sidekickSpellcasterRole = role;
+  companion.casterType = "sidekick";
+  companion.spellcastingAbility = list.ability;
+  companion.classCantripList = list.cantrips;
+  companion.classSpellList = list.spells;
+  companion.spellPointProgression = getHeroTemplate("sidekick-spellcaster").spellPointProgression;
+  companion.savingThrowProficiencies = uniqueValues([...(companion.savingThrowProficiencies ?? []), save]);
+  companion.skillProficiencies = uniqueValues([...(companion.skillProficiencies ?? []), ...skills]);
+  companion.armorProficiencies = proficiencyEntries([...(companion.armorProficiencies ?? []), "light"]);
+  if (sidekickHasWeaponTrainingStatBlock(companion)) companion.weaponProficiencies = proficiencyEntries([...(companion.weaponProficiencies ?? []), "simple"]);
+  const cantrips = await chooseClassCantrips(companion, 2, companion.spells ?? []);
+  companion.spells = cantrips.spells;
+  const spells = await chooseClassSpells(companion, 1, companion.spells ?? []);
+  companion.spells = spells.spells;
+  return `Save: ${save.toUpperCase()}. Skills: ${skills.map(skillName).join(", ")}. Role: ${list.label}.`;
+}
+
+async function trainSidekickCompanion() {
+  const companion = activeHero();
+  if (state.mode !== "home" || !canTrainAsSidekick(companion)) return;
+  const classChoices = [
+    { value: "sidekick-warrior", label: "Warrior", description: "Martial sidekick. Always available." },
+  ];
+  if (fighterSpeaksLanguage(companion)) {
+    classChoices.push(
+      { value: "sidekick-expert", label: "Expert", description: "Skillful sidekick. Requires a spoken language." },
+      { value: "sidekick-spellcaster", label: "Spellcaster", description: "Magical sidekick. Requires a spoken language." },
+    );
+  }
+  const classId = await showChoiceDialog({
+    title: `Train ${companion.name}`,
+    message: fighterSpeaksLanguage(companion)
+      ? "Choose a sidekick class."
+      : "This companion cannot speak a language, so only Warrior training is available.",
+    choices: classChoices,
+    actor: companion,
+  });
+  if (!classId) return;
+
+  companion.level = 1;
+  companion.xp = 0;
+  companion.hitDiceRemaining = 1;
+  companion.baseMaxHp = companion.baseMaxHp ?? companion.maxHp;
+  companion.abilityScores = Object.fromEntries(abilities.map((ability) => [ability, baseAbilityScore(companion, ability)]));
+  let summary = null;
+  if (classId === "sidekick-warrior") summary = await trainWarriorSidekick(companion);
+  if (classId === "sidekick-expert") summary = await trainExpertSidekick(companion);
+  if (classId === "sidekick-spellcaster") summary = await trainSpellcasterSidekick(companion);
+  if (!summary) return;
+
+  ensureFighterAbilityState(companion);
+  refreshDerivedStats(companion);
+  companion.hp = companion.maxHp;
+  companion.spellPointMax = spellPointMaximum(companion);
+  companion.spellPoints = companion.spellPointMax;
+  companion.role = combatantRoleLabel(companion);
+  const text = `${companion.name} trains as a level 1 ${companion.sidekickClassName ?? companion.className}. ${summary}`;
+  addLog(text, "important");
+  render();
+  await showChoiceDialog({
+    title: `Level 1 ${companion.sidekickClassName ?? companion.className}`,
+    message: text,
+    choices: [{ value: "ok", label: "Continue" }],
+    actor: companion,
+  });
 }
 
 function rageDamageBonus(hero) {
@@ -3235,10 +3906,17 @@ function showAbilityScoreImprovementDialog(hero) {
 
 async function levelUpHero() {
   const hero = activeHero();
+  if (state.mode === "home" && canTrainAsSidekick(hero)) {
+    await trainSidekickCompanion();
+    return;
+  }
   if (state.mode !== "home" || !canLevelUp(hero)) return;
   const oldConMod = scoreToMod(baseAbilityScore(hero, "con"));
   const racialHpGain = hero.racialHpPerLevel ?? 0;
-  const hpGain = Math.max(1, Math.floor((hero.hitDie ?? 10) / 2) + 1 + oldConMod + racialHpGain);
+  const hpRoll = isTrainedSidekick(hero) ? rollDie(hero.hitDie ?? 8) : null;
+  const hpGain = isTrainedSidekick(hero)
+    ? Math.max(1, hpRoll + oldConMod)
+    : Math.max(1, Math.floor((hero.hitDie ?? 10) / 2) + 1 + oldConMod + racialHpGain);
   hero.level = (hero.level ?? 1) + 1;
   hero.role = combatantRoleLabel(hero);
   hero.baseMaxHp = (hero.baseMaxHp ?? hero.maxHp) + hpGain;
@@ -3261,7 +3939,9 @@ async function levelUpHero() {
   }
   ensureFighterAbilityState(hero);
   let spellText = "";
-  const cantripChoices = cantripChoiceCountForClassLevel(hero.classId, hero.level ?? 1) + (hero.unusedCantripChoiceCredits ?? 0);
+  const cantripChoices =
+    (isSidekickSpellcaster(hero) ? sidekickCantripChoiceCountForLevel(hero, hero.level ?? 1) : cantripChoiceCountForClassLevel(hero.classId, hero.level ?? 1)) +
+    (hero.unusedCantripChoiceCredits ?? 0);
   if (cantripChoices > 0) {
     const result = await chooseClassCantrips(hero, cantripChoices, hero.spells ?? []);
     const gained = result.spells.filter((spellId) => !(hero.spells ?? []).includes(spellId));
@@ -3269,7 +3949,9 @@ async function levelUpHero() {
     hero.unusedCantripChoiceCredits = result.unusedCredits;
     if (gained.length) spellText = ` New cantrip${gained.length === 1 ? "" : "s"}: ${gained.map((spellId) => getContentDefinition("spells", spellId)?.name ?? spellId).join(", ")}.`;
   }
-  const spellChoices = spellChoiceCountForClassLevel(hero.classId, hero.level ?? 1) + (hero.unusedSpellChoiceCredits ?? 0);
+  const spellChoices =
+    (isSidekickSpellcaster(hero) ? sidekickSpellChoiceCountForLevel(hero, hero.level ?? 1) : spellChoiceCountForClassLevel(hero.classId, hero.level ?? 1)) +
+    (hero.unusedSpellChoiceCredits ?? 0);
   if (spellChoices > 0) {
     const result = await chooseClassSpells(hero, spellChoices, hero.spells ?? []);
     const gained = result.spells.filter((spellId) => !(hero.spells ?? []).includes(spellId));
@@ -3277,14 +3959,50 @@ async function levelUpHero() {
     hero.unusedSpellChoiceCredits = result.unusedCredits;
     if (gained.length) spellText += ` New spell${gained.length === 1 ? "" : "s"}: ${gained.map((spellId) => getContentDefinition("spells", spellId)?.name ?? spellId).join(", ")}.`;
   }
-  const expertiseText = await chooseLevelUpExpertise(hero);
+  let expertiseText = isClassHero(hero) ? await chooseLevelUpExpertise(hero) : "";
+  if (isSidekickExpert(hero) && [3, 15].includes(hero.level ?? 1)) {
+    const gained = await chooseExpertiseProficiencies({
+      title: "Expertise",
+      message: `${hero.name}'s expert training improves. Choose skill proficiencies to master.`,
+      count: 2,
+      skillProficiencies: hero.skillProficiencies ?? [],
+      existingSkillExpertise: hero.expertiseSkills ?? [],
+      skillsOnly: true,
+    });
+    if (gained) {
+      hero.expertiseSkills = uniqueValues([...(hero.expertiseSkills ?? []), ...gained.skills]);
+      expertiseText = gained.skills.length ? ` Expertise gained: ${gained.skills.map(skillName).join(", ")}.` : "";
+    }
+  }
+  if (isSidekickExpert(hero) && (hero.level ?? 1) === 18) {
+    const save = await chooseSidekickSavingThrow("Sharp Mind", ["int", "wis", "cha"]);
+    if (save) {
+      hero.savingThrowProficiencies = uniqueValues([...(hero.savingThrowProficiencies ?? []), save]);
+      expertiseText += ` Sharp Mind save: ${save.toUpperCase()}.`;
+    }
+  }
+  if (isSidekickSpellcaster(hero) && (hero.level ?? 1) === 14) {
+    const school = await showChoiceDialog({
+      title: "Empowered Spells",
+      message: "Choose a school of magic to empower.",
+      choices: ["abjuration", "conjuration", "divination", "enchantment", "evocation", "illusion", "necromancy", "transmutation", "combat"].map((value) => ({
+        value,
+        label: value[0].toUpperCase() + value.slice(1),
+      })),
+      actor: hero,
+    });
+    if (school) {
+      hero.empoweredSpellSchool = school;
+      expertiseText += ` Empowered school: ${school}.`;
+    }
+  }
   refreshDerivedStats(hero);
   hero.hp = hero.maxHp;
   hero.spellPointMax = spellPointMaximum(hero);
   hero.spellPoints = hero.spellPointMax;
   const features = classFeatureNames(hero, hero.level);
   const featureText = features.length ? ` New feature${features.length === 1 ? "" : "s"}: ${features.join(", ")}.` : "";
-  const racialHpText = racialHpGain ? ` (${racialHpGain} from Dwarven Toughness)` : "";
+  const racialHpText = isTrainedSidekick(hero) ? ` (${hpRoll} + CON)` : racialHpGain ? ` (${racialHpGain} from Dwarven Toughness)` : "";
   const levelUpText = `${hero.name} reaches level ${hero.level} and gains ${hpGain} max HP${racialHpText}.${featureText}${asiText}${spellText}${expertiseText}`;
   addLog(levelUpText, "important");
   hideHomeMenu();
@@ -3311,7 +4029,8 @@ function applyHealingToHero(target, healing) {
   target.hp = Math.min(target.maxHp, target.hp + healing);
   if (target.hp > 0) {
     target.alive = true;
-    target.deathSaves = { successes: 0, failures: 0 };
+    clearStableAtZero(target);
+    resetDeathSaveCounters(target);
   }
   refreshDerivedStats(target);
   return target.hp - before;
@@ -3347,6 +4066,11 @@ function useBeltItem(itemId, targetId = null) {
     addLog(`${hero.name} uses ${item.name}${targetText} and heals ${healed} HP (${healingRoll.rolls.join(" + ")} + ${item.use.bonus ?? 0}).`, "heal");
     if (item.use?.consume !== false && !item.use?.charges) consumeEquippedItem(itemId);
     void maybeFinishEncounterAfterHeroRecovery();
+  } else if (item.use?.status) {
+    if (!spendItemCharge(item)) return;
+    applyStatusEffect(hero, { ...item.use.status });
+    addLog(`${hero.name} uses ${item.name} and gains ${item.use.status.label ?? item.name}.`, "important");
+    if (item.use?.consume !== false && !item.use?.charges) consumeEquippedItem(itemId);
   } else {
     if (!spendItemCharge(item)) return;
     addLog(`${hero.name} uses ${item.name}.`, "important");
@@ -3445,6 +4169,11 @@ async function useFighterAbility(abilityId) {
     const healing = healingRoll.total + (hero.level ?? 1);
     const before = hero.hp;
     hero.hp = Math.min(hero.maxHp, hero.hp + healing);
+    if (hero.hp > 0) {
+      hero.alive = true;
+      clearStableAtZero(hero);
+      resetDeathSaveCounters(hero);
+    }
     addLog(`${hero.name} uses Second Wind and heals ${hero.hp - before} HP (${healingRoll.rolls[0]} + ${hero.level ?? 1}).`, "heal");
   }
 
@@ -3471,6 +4200,42 @@ async function useFighterAbility(abilityId) {
   if (ability.id === "cunningActionDash") {
     hero.movementLeft = (hero.movementLeft ?? 0) + Math.floor(hero.speedFeet / feetPerSquare);
     addLog(`${hero.name} uses Cunning Action to Dash.`, "important");
+  }
+
+  if (ability.id === "cunningActionDisengage") {
+    hero.disengaged = true;
+    addLog(`${hero.name} uses Cunning Action to Disengage.`, "important");
+  }
+
+  if (ability.id === "cunningActionHide") {
+    applyStatusEffect(hero, { id: "hidden", label: "Hidden", attackAdvantage: true, expiresAtEndOfTurn: true });
+    addLog(`${hero.name} uses Cunning Action to Hide. Their next attack has advantage.`, "important");
+  }
+
+  if (ability.id === "sidekickHelpful") {
+    const target = await chooseAbilityTarget(hero, "Helpful", "Choose an ally to help.");
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      return;
+    }
+    const rangeSquares = (hero.level ?? 1) >= 6 ? 6 : 1;
+    if (target.id !== hero.id && distance(hero.position, target.position) > rangeSquares) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${target.name} is too far away for ${hero.name}'s help.`, "important");
+      render();
+      return;
+    }
+    applyStatusEffect(target, {
+      id: `helped-by-${hero.id}`,
+      label: (hero.level ?? 1) >= 11 ? `Inspired Help ${hero.level >= 20 ? "2d6" : "1d6"}` : "Helped",
+      attackAdvantage: true,
+      expiresAtEndOfTurn: true,
+    });
+    if ((hero.level ?? 1) >= 6) {
+      const roll = rollDice(2, 6);
+      applyStatusEffect(hero, { id: "coordinated-strike", label: "Coordinated Strike", weaponRider: true, damageBonus: roll.total, damageType: hero.damage?.type ?? "damage", expiresAtEndOfTurn: true });
+    }
+    addLog(`${hero.name} helps ${target.name}.`, "important");
   }
 
   if (ability.id === "steadyAim") {
@@ -3656,7 +4421,8 @@ function partyNeedsShortRest() {
 function finishStableHeroesAfterShortRest() {
   for (const hero of stableUnconsciousPartyHeroes()) {
     hero.hp = 1;
-    hero.deathSaves = { successes: 0, failures: 0 };
+    clearStableAtZero(hero);
+    resetDeathSaveCounters(hero);
     refreshDerivedStats(hero);
     addLog(`${hero.name} wakes at the end of the short rest with 1 HP.`, "heal");
   }
@@ -3761,6 +4527,11 @@ function showShortRestMenu() {
       const before = hero.hp;
       hero.hitDiceRemaining = Math.max(0, (hero.hitDiceRemaining ?? 0) - 1);
       hero.hp = Math.min(hero.maxHp, hero.hp + healing);
+      if (hero.hp > 0) {
+        hero.alive = true;
+        clearStableAtZero(hero);
+        resetDeathSaveCounters(hero);
+      }
       addLog(`${hero.name} spends a hit die and heals ${hero.hp - before} HP (${healingRoll.rolls[0]} ${abilityLabel(conHealing)}).`, "heal");
       refreshDerivedStats(hero);
       render();
@@ -4041,7 +4812,7 @@ function renderControls() {
   applyThemePalette();
   const fighter = activeFighter();
   const hero = activeHero();
-  const heroTurn = state.mode === "combat" && fighter && isPartyHeroId(fighter.id) && combatNeedsHeroTurns();
+  const heroTurn = state.mode === "combat" && fighter && isPlayerControlledPartyFighter(fighter) && combatNeedsHeroTurns();
   if (!heroTurn) selectedAttackTargetId = null;
   const actingHero = heroTurn ? fighter : hero;
   const heroCanAttack = heroTurn && actingHero.hasAction && Boolean(attackTarget());
@@ -4110,9 +4881,12 @@ function renderControls() {
   });
   if (els.buttonThemeSelect) els.buttonThemeSelect.value = buttonTheme;
   els.debugKill.disabled = !adminEnabled() || visibleMonsters().length === 0;
-  els.levelUp.disabled = !gameHasStarted || state.mode !== "home" || !canLevelUp(hero);
+  const canTrain = gameHasStarted && state.mode === "home" && canTrainAsSidekick(hero);
+  els.levelPanel?.classList.toggle("hidden", isAutonomousAlly(hero));
+  els.levelUp.textContent = canTrain ? "Train" : "Level Up";
+  els.levelUp.disabled = !gameHasStarted || state.mode !== "home" || (!canTrain && !canLevelUp(hero));
   if (els.selectParty) {
-    const selectableCount = partyHeroes().filter((entry) => heroCanAct(entry)).length;
+    const selectableCount = partyHeroes().filter((entry) => heroCanAct(entry) && !isAutonomousAlly(entry)).length;
     els.selectParty.disabled = !gameHasStarted || state.mode === "combat" || selectableCount <= 1;
   }
   if (els.roomTitle) els.roomTitle.textContent = state.mode === "home" ? "Home" : state.room.name;

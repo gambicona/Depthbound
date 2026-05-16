@@ -248,6 +248,9 @@ els.fighterInfo.addEventListener("click", (event) => {
   if (button.dataset.action === "attack-object") {
     attackDestructibleObject(state.mode === "combat" ? activeFighter() : activeHero(), dungeonObjectForId(button.dataset.object));
   }
+  if (button.dataset.action === "free-captive") {
+    freeCaptiveCreature(button.dataset.object);
+  }
   if (button.dataset.action === "home-store-item") {
     storeHomeChestItem(button.dataset.item);
   }
@@ -280,6 +283,9 @@ els.fighterInfo.addEventListener("click", (event) => {
   if (button.dataset.action === "remove-party-hero") {
     removeHeroFromParty(button.dataset.hero);
   }
+  if (button.dataset.action === "retire-party-member") {
+    retirePartyMember(button.dataset.hero);
+  }
   if (button.dataset.action === "make-main-hero") {
     makeMainHero(button.dataset.hero);
   }
@@ -290,6 +296,16 @@ els.fighterInfo.addEventListener("click", (event) => {
   }
 });
 els.fighterInfo.addEventListener("change", (event) => {
+  const allyFollowHero = event.target.closest("select[data-action='ally-follow-hero']");
+  if (allyFollowHero) {
+    setAllyFollowHero(allyFollowHero.dataset.ally, allyFollowHero.value);
+    return;
+  }
+  const allyFollowDistance = event.target.closest("select[data-action='ally-follow-distance']");
+  if (allyFollowDistance) {
+    setAllyFollowDistance(allyFollowDistance.dataset.ally, allyFollowDistance.value);
+    return;
+  }
   const d20Select = event.target.closest("select[data-action='d20-mode']");
   if (d20Select) {
     setD20Mode(d20Select.value);

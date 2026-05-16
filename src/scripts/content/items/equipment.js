@@ -115,6 +115,26 @@ function healingPotion(id, name, dice, bonus, cost) {
   });
 }
 
+function simpleConsumable(id, name, description, use = {}) {
+  if (window.DungeonContent.get?.("items", id)) return;
+  window.DungeonContent.register("items", id, {
+    name,
+    type: "consumable",
+    category: "foraged",
+    cost: gp(0),
+    weightLb: 0,
+    slots: ["belt1", "belt2", "belt3", "belt4", "belt5"],
+    description,
+    use: {
+      kind: use.kind ?? "utility",
+      resource: use.resource ?? "action",
+      consume: true,
+      ...(use.dice ? { dice: use.dice, bonus: use.bonus ?? 0 } : {}),
+      ...(use.status ? { status: use.status } : {}),
+    },
+  });
+}
+
 weapon("club", "Club", "simple melee", "melee", sp(1), { count: 1, sides: 4, type: "bludgeoning", bonusAbility: "str" }, 2, ["light"]);
 weapon("dagger", "Dagger", "simple melee", "melee", gp(2), { count: 1, sides: 4, type: "piercing", bonusAbility: "str" }, 1, ["finesse", "light", "thrown"], { thrown: { kind: "thrown", normal: 20, long: 60, feet: 20 } });
 weapon("greatclub", "Greatclub", "simple melee", "melee", sp(2), { count: 1, sides: 8, type: "bludgeoning", bonusAbility: "str" }, 10, ["two-handed"]);
@@ -179,6 +199,30 @@ healingPotion("potion-healing", "Potion of Healing", { count: 2, sides: 4 }, 2, 
 healingPotion("potion-greater-healing", "Potion of Greater Healing", { count: 4, sides: 4 }, 4, gp(100));
 healingPotion("potion-superior-healing", "Potion of Superior Healing", { count: 8, sides: 4 }, 8, gp(500));
 healingPotion("potion-supreme-healing", "Potion of Supreme Healing", { count: 10, sides: 4 }, 20, gp(5000));
+
+simpleConsumable("berry", "Berry", "A small edible berry. It heals 1 HP when used.", { kind: "healing", resource: "bonusAction", dice: { count: 1, sides: 1 } });
+simpleConsumable("medicinal-herb", "Medicinal Herb", "A field herb that heals 1d4 HP when used.", { kind: "healing", dice: { count: 1, sides: 4 } });
+simpleConsumable("glowcap", "Glowcap", "A faintly glowing mushroom cap. Use it to move a little faster while it lights your path for the rest of the dungeon.", {
+  status: { id: "glowcap-light", label: "Glowcap", speedBonusFeet: 5, expiresAtHome: true },
+});
+simpleConsumable("bitter-root", "Bitter Root", "A bitter root used as a minor poison-resisting remedy. Use it to resist poison damage for the rest of the dungeon.", {
+  status: { id: "bitter-root", label: "Bitter Root", resistances: ["poison"], expiresAtHome: true },
+});
+simpleConsumable("cave-salt", "Cave Salt", "A sharp pinch of cave salt. Use it to steady yourself with +1 to saving throws for the rest of the dungeon.", {
+  status: { id: "cave-salt", label: "Cave Salt", saveBonus: 1, expiresAtHome: true },
+});
+simpleConsumable("bone-charm", "Bone Charm", "A small charm sometimes used against fear or necrotic magic. Use it to resist necrotic damage for the rest of the dungeon.", {
+  status: { id: "bone-charm", label: "Bone Charm", resistances: ["necrotic"], expiresAtHome: true },
+});
+simpleConsumable("spider-silk", "Spider Silk", "A sticky crafting material. Use it to steady ranged attacks with +1 to attack rolls for the rest of the dungeon.", {
+  status: { id: "spider-silk", label: "Spider Silk", attackBonus: 1, expiresAtHome: true },
+});
+simpleConsumable("crystal-shard", "Crystal Shard", "A small arcane component or sellable gem shard. Use it to add +1 damage to attacks for the rest of the dungeon.", {
+  status: { id: "crystal-shard", label: "Crystal Shard", damageBonus: 1, expiresAtHome: true },
+});
+simpleConsumable("sacred-ash", "Sacred Ash", "A pinch of ash from a consecrated flame. Use it to resist necrotic damage and gain +1 AC for the rest of the dungeon.", {
+  status: { id: "sacred-ash", label: "Sacred Ash", acBonus: 1, resistances: ["necrotic"], expiresAtHome: true },
+});
 
 window.DungeonContent.register("equipmentPacks", "standardEquipment", {
   name: "Standard Weapons and Armor",

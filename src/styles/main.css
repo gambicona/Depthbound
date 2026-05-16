@@ -1139,7 +1139,7 @@ h1 {
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   display: grid;
   gap: 0.5rem;
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: 1fr repeat(4, auto);
   padding: 0.55rem 0;
 }
 
@@ -1151,6 +1151,21 @@ h1 {
 
 .planning-slot select {
   min-width: 88px;
+}
+
+.planning-slot button {
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .planning-slot {
+    align-items: stretch;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .planning-slot > div:first-child {
+    grid-column: 1 / -1;
+  }
 }
 
 .token-label {
@@ -1203,6 +1218,35 @@ h1 {
   transition: left var(--token-slide-ms) ease, top var(--token-slide-ms) ease, opacity 200ms ease;
   width: var(--token-size);
   z-index: 1;
+}
+
+.home-move-out-button {
+  align-items: center;
+  background: linear-gradient(145deg, #d9b178, #7a4d24);
+  border: 2px solid #ffe2a4;
+  border-radius: 6px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.35);
+  color: #28170d;
+  cursor: pointer;
+  display: flex;
+  font-size: 0.72rem;
+  font-weight: 900;
+  justify-content: center;
+  min-height: calc(var(--token-size) * 0.72);
+  padding: 4px 8px;
+  pointer-events: auto;
+  position: absolute;
+  text-transform: uppercase;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  z-index: 7;
+}
+
+.home-move-out-button:hover:not(:disabled) {
+  background: linear-gradient(145deg, #e5be86, #86562b);
+  border-color: #ffe2a4;
+  filter: brightness(1.08);
+  transform: translateY(-50%);
 }
 
 .chest-token {
@@ -1507,6 +1551,54 @@ h1 {
   border-color: rgba(112, 173, 102, 0.4);
 }
 
+.temporary-effects-button {
+  align-items: center;
+  display: flex;
+  font-size: 0.76rem;
+  justify-content: space-between;
+  margin-top: 10px;
+  min-height: 34px;
+  padding: 0 10px;
+  text-transform: uppercase;
+}
+
+.temporary-effects-button span {
+  background: rgba(13, 10, 11, 0.32);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--gold);
+  display: inline-flex;
+  font-size: 0.72rem;
+  justify-content: center;
+  min-width: 24px;
+  padding: 2px 7px;
+}
+
+.temporary-effects-list {
+  display: grid;
+  gap: 8px;
+}
+
+.temporary-effect-row {
+  background: rgba(13, 10, 11, 0.22);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+}
+
+.temporary-effect-row b,
+.temporary-effect-row span {
+  display: block;
+}
+
+.temporary-effect-row span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
 .stat-grid {
   display: grid;
   gap: 8px;
@@ -1592,6 +1684,11 @@ h1 {
   max-width: 420px;
   overflow: auto;
   width: min(100%, 420px);
+}
+
+#fighter-info:has(.planning-party) .fighter-info-panel {
+  max-width: 920px;
+  width: min(100%, 920px);
 }
 
 .inventory-panel {
@@ -1777,7 +1874,7 @@ h1 {
   max-width: min(360px, calc(100vw - 28px));
   padding: 12px;
   position: fixed;
-  right: 18px;
+  left: 18px;
   z-index: 80;
 }
 

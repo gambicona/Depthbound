@@ -643,9 +643,9 @@ function moveSelectedRoom(dx, dy) {
   renderAll();
 }
 
-function previewDraggedRoom(room, dx, dy) {
-  const nextX = room.x + dx;
-  const nextY = room.y + dy;
+function previewDraggedRoom(room, dx, dy, origin = { x: room.x, y: room.y }) {
+  const nextX = origin.x + dx;
+  const nextY = origin.y + dy;
   const nextCells = roomCellsForRect(nextX, nextY, room.width, room.height);
   if (nextCells.length !== room.width * room.height) return null;
   const ownKeys = new Set(room.cells.map(key));
@@ -679,7 +679,7 @@ function updateRoomDrag(position) {
   const dy = position.y - drag.startPointer.y;
   if (dx === drag.lastDelta.x && dy === drag.lastDelta.y) return;
   drag.lastDelta = { x: dx, y: dy };
-  const preview = previewDraggedRoom(room, dx, dy);
+  const preview = previewDraggedRoom(room, dx, dy, drag.origin);
   if (!preview) return;
   room.x = preview.x;
   room.y = preview.y;

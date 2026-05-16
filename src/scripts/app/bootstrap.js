@@ -435,6 +435,9 @@ const fighterAbilityScoreImprovementLevels = new Set([4, 6, 8, 12, 14, 16, 19]);
 const classAbilityScoreImprovementLevels = {
   fighter: new Set([4, 6, 8, 12, 14, 16, 19]),
   rogue: new Set([4, 8, 10, 12, 16, 19]),
+  "sidekick-warrior": new Set([4, 8, 12, 14, 16, 19]),
+  "sidekick-expert": new Set([4, 8, 10, 12, 16, 19]),
+  "sidekick-spellcaster": new Set([4, 8, 12, 16, 18]),
 };
 const classPredefinedAbilityScores = {
   barbarian: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
@@ -488,6 +491,7 @@ const els = {
   goBarrowCrown: document.querySelector("#go-barrow-crown"),
   goThornwoodPact: document.querySelector("#go-thornwood-pact"),
   goNewDungeon: document.querySelector("#go-new-dungeon"),
+  levelPanel: document.querySelector(".level-panel"),
   levelUp: document.querySelector("#level-up"),
   storeMenu: document.querySelector("#store-menu"),
   storeBody: document.querySelector("#store-body"),

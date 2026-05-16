@@ -55,6 +55,10 @@ function canMoveThroughOccupiedTile(fighter, position) {
   return Boolean(fighter.canMoveThroughMonsters && occupant && hostileTo(fighter, occupant));
 }
 
+function canEndMovementOnTile(fighter, position) {
+  return !window.DungeonGrid.isOccupied(position, state.fighters, fighter);
+}
+
 function isValidPathStep(fighter, from, to, path = []) {
   const dx = Math.abs(to.x - from.x);
   const dy = Math.abs(to.y - from.y);
@@ -102,7 +106,7 @@ async function moveFighterAlongPath(fighter, path, silent = false) {
   if (!heroCanAct(fighter) || (state.mode === "combat" && fighter.movementLeft <= 0)) return false;
   const pathCost = (path ?? []).reduce((total, step) => total + movementCostAtPosition(step), 0);
   if (!path || path.length === 0 || pathCost > movementLimitFor(fighter)) return false;
-  if (window.DungeonGrid.isOccupied(path.at(-1), state.fighters, fighter)) return false;
+  if (!canEndMovementOnTile(fighter, path.at(-1))) return false;
 
   let previous = fighter.position;
   for (const step of path) {
@@ -131,6 +135,7 @@ async function moveFighterAlongPath(fighter, path, silent = false) {
     movedCost += movementCostAtPosition(step);
     collectLootAtPosition(fighter, step);
     triggerTrapAtPosition(fighter, step);
+    if (state.mode !== "combat" && isPlayerControlledPartyFighter(fighter)) moveAutonomousAlliesWithLeaderStep(fighter);
     const usedPortal = triggerPortalAtPosition(fighter, fighter.position);
     const openedDoor = autoOpenAdjacentExplorationDoor(fighter);
     render();
@@ -158,7 +163,8 @@ async function moveFighterAlongPath(fighter, path, silent = false) {
   }
 
   movementInProgress = false;
-  if (isPartyHeroId(fighter.id) && checkDungeonCompletion(fighter)) return true;
+  if (state.mode !== "combat" && isPlayerControlledPartyFighter(fighter)) await moveAutonomousAlliesNearLeader(fighter);
+  if (isPlayerControlledPartyFighter(fighter) && checkDungeonCompletion(fighter)) return true;
   render();
   return true;
 }
@@ -166,6 +172,78 @@ async function moveFighterAlongPath(fighter, path, silent = false) {
 async function moveFighter(fighter, destination, silent = false) {
   const path = findMovementPath(fighter, destination);
   return moveFighterAlongPath(fighter, path, silent);
+}
+
+function autonomousPartyAllies() {
+  return partyHeroes().filter((fighter) => isAutonomousAlly(fighter) && heroCanAct(fighter));
+}
+
+function mainPartyLeaderForFollowers(preferredLeader = activeHero()) {
+  if (preferredLeader?.alive && isClassHero(preferredLeader)) return preferredLeader;
+  return (
+    (state.party?.heroIds ?? [])
+      .map((id) => state.fighters[id])
+      .find((fighter) => fighter?.alive && isClassHero(fighter)) ??
+    preferredLeader ??
+    activeHero()
+  );
+}
+
+function followDistanceForAlly(ally) {
+  return Math.max(1, Math.min(5, Number(ally?.followDistanceSquares ?? 3) || 3));
+}
+
+function followLeaderForAlly(ally, preferredLeader = activeHero()) {
+  const assigned = state.fighters?.[ally?.followHeroId];
+  if (assigned?.alive && isClassHero(assigned) && isPartyHeroId(assigned.id)) return assigned;
+  return mainPartyLeaderForFollowers(preferredLeader);
+}
+
+function followTargetPositionForAlly(ally, leader) {
+  const followDistance = followDistanceForAlly(ally);
+  const walkable = new Set(state.mode === "home" || state.mode === "exploration" ? visibleWalkable() : currentWalkable());
+  const occupied = new Set(
+    Object.values(state.fighters)
+      .filter((fighter) => fighter.alive && fighter.id !== ally.id)
+      .map((fighter) => positionKey(fighter.position)),
+  );
+  return Array.from(walkable)
+    .map(positionFromKey)
+    .filter((position) => distance(position, leader.position) <= followDistance)
+    .filter((position) => !occupied.has(positionKey(position)))
+    .sort((a, b) => distance(ally.position, a) - distance(ally.position, b) || distance(a, leader.position) - distance(b, leader.position))[0] ?? null;
+}
+
+function moveAutonomousAlliesWithLeaderStep(preferredLeader = activeHero()) {
+  if (state.mode === "combat") return;
+  for (const ally of autonomousPartyAllies()) {
+    const leader = followLeaderForAlly(ally, preferredLeader);
+    if (!leader?.alive) continue;
+    if (distance(ally.position, leader.position) <= followDistanceForAlly(ally)) continue;
+    const destination = followTargetPositionForAlly(ally, leader);
+    if (!destination) continue;
+    const step = adjacentCells(ally.position)
+      .filter((position) => isValidPathStep(ally, ally.position, position, []))
+      .sort((a, b) => distance(a, destination) - distance(b, destination) || distance(a, leader.position) - distance(b, leader.position))[0];
+    if (!step || !isValidPathStep(ally, ally.position, step, [])) continue;
+    ally.position = { ...step };
+    ally.lastMoveFeet = (ally.lastMoveFeet ?? 0) + feetPerSquare;
+    collectLootAtPosition(ally, step);
+    triggerTrapAtPosition(ally, step);
+  }
+}
+
+async function moveAutonomousAlliesNearLeader(preferredLeader = activeHero()) {
+  if (state.mode === "combat") return;
+  for (const ally of autonomousPartyAllies()) {
+    const leader = followLeaderForAlly(ally, preferredLeader);
+    if (!leader?.alive) continue;
+    if (distance(ally.position, leader.position) <= followDistanceForAlly(ally)) continue;
+    const destination = followTargetPositionForAlly(ally, leader);
+    if (!destination) continue;
+    const path = findMovementPath(ally, destination);
+    if (path?.length) await moveFighterAlongPath(ally, path.slice(0, Math.floor(ally.speedFeet / feetPerSquare)), true);
+  }
 }
 
 function occupiedByUnselectedHeroOrObstacle(position, movingHeroIds) {
@@ -269,7 +347,8 @@ async function moveFightersAlongPathsTogether(plans) {
   addLog(`${activePlans.length} heroes move together.`);
   if (stoppedBeforeTrap.size > 0) addLog("The party stops short of danger instead of marching everyone through it.", "important");
   movementInProgress = false;
-  const exitHero = activePlans.map((plan) => plan.hero).find((hero) => isPartyHeroId(hero.id) && isExitPosition(hero.position));
+  await moveAutonomousAlliesNearLeader(activePlans[0]?.hero);
+  const exitHero = activePlans.map((plan) => plan.hero).find((hero) => isPlayerControlledPartyFighter(hero) && isExitPosition(hero.position));
   if (exitHero && checkDungeonCompletion(exitHero)) return true;
   render();
   return true;
@@ -368,6 +447,7 @@ async function moveHeroByKeyboard(delta) {
   if (!gameHasStarted || movementInProgress || dragPath || state.completed) return;
   const hero = activeHero();
   if (!heroCanAct(hero)) return;
+  if (isAutonomousAlly(hero)) return;
   if (state.mode === "combat" && (activeFighter()?.id !== hero.id || !combatNeedsHeroTurns())) return;
   if (state.mode === "combat" && hero.hp <= 0) return;
 
@@ -455,6 +535,10 @@ function partyHeroes() {
 
 function monsterTargetableHeroes() {
   return partyHeroes().filter((fighter) => (fighter.hp ?? 0) > 0);
+}
+
+function aiTargetableEnemiesFor(fighter) {
+  return Object.values(state.fighters).filter((candidate) => candidate?.alive && !candidate.dead && (candidate.hp ?? 0) > 0 && hostileTo(fighter, candidate));
 }
 
 function partyRoleFor(fighter) {
@@ -551,7 +635,7 @@ function attackPlanAgainst(monster, target, avoidOpportunity = false, baseWalkab
   return candidates.sort((a, b) => a.cost - b.cost || distance(a.position, target.position) - distance(b.position, target.position))[0] ?? null;
 }
 
-function closestTargetTo(monster, targets = partyHeroes()) {
+function closestTargetTo(monster, targets = aiTargetableEnemiesFor(monster)) {
   const candidates = targets.filter((target) => (target.hp ?? 0) > 0);
   return candidates.slice().sort((a, b) => distance(monster.position, a.position) - distance(monster.position, b.position) || a.id.localeCompare(b.id))[0] ?? null;
 }
@@ -563,7 +647,7 @@ function lowestLifeTarget(targets) {
 }
 
 function chooseMonsterAttackPlan(monster) {
-  const targets = monsterTargetableHeroes();
+  const targets = aiTargetableEnemiesFor(monster);
   if (targets.length === 0) return null;
   const intelligence = abilityScore(monster, "int");
   const smarterMovement = intelligence >= 11;
@@ -683,10 +767,10 @@ function bestRoomKitePath(mover, target, avoidOpportunity = false) {
 
 function swarmTargetFor(monster) {
   const monsterRoom = roomForPosition(monster.position);
-  const heroes = monsterTargetableHeroes();
-  if (!heroes.length) return null;
-  const sameRoomHeroes = monsterRoom ? heroes.filter((fighter) => roomForPosition(fighter.position)?.id === monsterRoom.id) : [];
-  const candidates = sameRoomHeroes.length ? sameRoomHeroes : heroes;
+  const targets = aiTargetableEnemiesFor(monster);
+  if (!targets.length) return null;
+  const sameRoomTargets = monsterRoom ? targets.filter((fighter) => roomForPosition(fighter.position)?.id === monsterRoom.id) : [];
+  const candidates = sameRoomTargets.length ? sameRoomTargets : targets;
   const swarmMates = monsterRoom
     ? aliveMonsters().filter((entry) => entry.behavior === "swarm" && roomForPosition(entry.position)?.id === monsterRoom.id)
     : [monster];
@@ -733,8 +817,61 @@ function bestSwarmPath(mover, target) {
   return pathForMonster(mover, pool[0].position, walkable);
 }
 
+function healingItemsForAi(fighter) {
+  return (fighter?.inventory?.items ?? []).filter((item) => item.use?.kind === "healing" && itemHasCharges(item));
+}
+
+function dyingClassHeroes() {
+  return partyHeroes()
+    .filter((target) => isClassHero(target) && target.hp <= 0 && !target.dead)
+    .sort((a, b) => (b.deathSaves?.failures ?? 0) - (a.deathSaves?.failures ?? 0));
+}
+
+function dyingHeroForAiHealing(ally) {
+  return dyingClassHeroes().find((target) => hasMeleeAccess(ally, target)) ?? null;
+}
+
+async function maybeUseAiHealingPotion(ally) {
+  if (!isAutonomousAlly(ally) || !canFighterReceiveInventory(ally) || !ally.hasAction) return false;
+  const item = healingItemsForAi(ally)[0];
+  if (!item) return false;
+  let target = dyingHeroForAiHealing(ally);
+  const distantDyingHero = !target ? dyingClassHeroes()[0] : null;
+  if (distantDyingHero && ally.movementLeft > 0) {
+    const path = bestPathToward(ally, distantDyingHero, false);
+    if (path?.length) await moveFighterAlongPath(ally, path, true);
+    target = dyingHeroForAiHealing(ally);
+  }
+  target = target ?? ((ally.hp ?? 0) > 0 && ally.hp <= ally.maxHp * 0.35 ? ally : null);
+  if (!target) return false;
+
+  ally.hasAction = false;
+  if (!spendItemCharge(item)) return false;
+  const healingRoll = rollDice(item.use.dice.count, item.use.dice.sides);
+  const healing = healingRoll.total + (item.use.bonus ?? 0);
+  const healed = applyHealingToHero(target, healing);
+  playSoundEffect("potionDrink");
+  if (item.use?.consume !== false && !item.use?.charges) {
+    ally.inventory.items = ally.inventory.items.filter((entry) => entry.id !== item.id);
+    for (const slot of equipmentSlots) {
+      if (ally.equipment?.[slot.id] === item.id) ally.equipment[slot.id] = null;
+    }
+  }
+  const targetText = target.id === ally.id ? "" : ` on ${target.name}`;
+  addLog(`${ally.name} uses ${item.name}${targetText} and heals ${healed} HP (${healingRoll.rolls.join(" + ")} + ${item.use.bonus ?? 0}).`, "heal");
+  refreshDerivedStats(ally);
+  refreshDerivedStats(target);
+  return true;
+}
+
 async function runMonsterAi(monster) {
   if (!monster.alive || partyDefeatedOrDying()) return;
+  if (await maybeUseAiHealingPotion(monster)) {
+    window.setTimeout(() => {
+      if (activeFighter()?.id === monster.id && !partyDefeatedOrDying()) endTurn();
+    }, tokenSlideMs);
+    return;
+  }
   if (await maybeUseMonsterStartSpecial(monster)) {
     window.setTimeout(() => {
       if (activeFighter()?.id === monster.id && !partyDefeatedOrDying()) endTurn();
@@ -835,7 +972,7 @@ async function runMonsterAi(monster) {
 function heroCanStartMovement() {
   const hero = activeHero();
   if (!gameHasStarted || movementInProgress || state.completed) return false;
-  if (state.mode === "home") return heroCanAct(hero);
+  if (state.mode === "home") return heroCanAct(hero) && !isAutonomousAlly(hero);
   if (state.mode === "combat") {
     return activeFighter()?.id === hero?.id && combatNeedsHeroTurns() && heroCanAct(hero) && hero.movementLeft > 0;
   }
@@ -845,6 +982,7 @@ function heroCanStartMovement() {
 function heroCanUseDoor() {
   const hero = activeHero();
   if (!gameHasStarted || movementInProgress || state.completed) return false;
+  if (isAutonomousAlly(hero)) return false;
   if (state.mode === "combat") {
     return activeFighter()?.id === hero?.id && combatNeedsHeroTurns() && heroCanAct(hero);
   }

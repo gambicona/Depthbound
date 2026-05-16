@@ -34,7 +34,8 @@ async function handleHeroDeath() {
 function downHero(hero) {
   hero.hp = 0;
   hero.alive = true;
-  hero.deathSaves = hero.deathSaves ?? { successes: 0, failures: 0 };
+  hero.stableAtZero = false;
+  resetDeathSaveCounters(hero);
   hero.hasAction = false;
   hero.hasBonusAction = false;
   hero.movementLeft = 0;
@@ -44,6 +45,7 @@ function killHero(hero) {
   hero.hp = 0;
   hero.alive = false;
   hero.dead = true;
+  hero.stableAtZero = false;
   hero.deathSaves = { successes: 0, failures: 3 };
   dropLootForHero(hero);
   state.party.heroIds = livingPartyHeroIds();
@@ -52,6 +54,23 @@ function killHero(hero) {
   }
   addLog(`${hero.name} dies.`, "important");
   handleHeroDeath();
+}
+
+function resetDeathSaveCounters(fighter) {
+  if (!fighter) return;
+  fighter.deathSaves = { successes: 0, failures: 0 };
+}
+
+function clearStableAtZero(fighter) {
+  if (!fighter) return;
+  fighter.stableAtZero = false;
+}
+
+function markFighterStableAtZero(fighter) {
+  if (!fighter) return;
+  fighter.alive = true;
+  fighter.stableAtZero = true;
+  resetDeathSaveCounters(fighter);
 }
 
 function applyDamageToFighter(defender, damage) {
@@ -85,16 +104,21 @@ function applyDamageToFighter(defender, damage) {
   ) {
     defender.hp = 1;
     defender.alive = true;
+    clearStableAtZero(defender);
+    resetDeathSaveCounters(defender);
     defender.relentlessEnduranceUsed = true;
     addLog(`${defender.name}'s Relentless Endurance keeps them standing at 1 HP.`, "important");
     return;
   }
   if (defender.hp > 0) {
     defender.alive = true;
-    defender.deathSaves = { successes: 0, failures: 0 };
+    clearStableAtZero(defender);
+    resetDeathSaveCounters(defender);
     return;
   }
   if (wasDown) {
+    clearStableAtZero(defender);
+    defender.deathSaves = defender.deathSaves ?? { successes: 0, failures: 0 };
     defender.deathSaves.failures += 1;
     addLog(`${defender.name} takes damage while down: death save failure ${defender.deathSaves.failures}/3.`, "important");
     if (defender.deathSaves.failures >= 3) killHero(defender);
@@ -108,6 +132,7 @@ function applyDamageToFighter(defender, damage) {
 
 function checkConcentrationAfterDamage(fighter, damage) {
   if (!fighter?.concentration || damage <= 0 || fighter.hp <= 0) return;
+  if (isSidekickSpellcaster(fighter) && (fighter.level ?? 1) >= 20) return;
   const dc = Math.max(10, Math.floor(damage / 2));
   const save = savingThrow(fighter, "con", dc);
   addLog(`${fighter.name} makes a concentration save: CON ${save.roll} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
@@ -171,7 +196,7 @@ function showDeathSaveMenu(hero) {
 async function rollDeathSave(hero) {
   if (!isPartyHeroId(hero.id) || hero.hp > 0 || hero.dead) return;
   hero.deathSaves = hero.deathSaves ?? { successes: 0, failures: 0 };
-  if (hero.deathSaves.successes >= 3) {
+  if (heroIsStableAtZero(hero)) {
     addLog(`${hero.name} is stable at 0 HP.`, "important");
     await maybeFinishEncounterAfterHeroRecovery();
     return;
@@ -180,7 +205,8 @@ async function rollDeathSave(hero) {
   if (roll === 20) {
     hero.hp = 1;
     hero.alive = true;
-    hero.deathSaves = { successes: 0, failures: 0 };
+    clearStableAtZero(hero);
+    resetDeathSaveCounters(hero);
     addLog(`${hero.name} rolls a 20 death save and gets back up with 1 HP.`, "important");
     recordD20OutcomeForFighter(hero, true);
     await maybeFinishEncounterAfterHeroRecovery();
@@ -193,8 +219,7 @@ async function rollDeathSave(hero) {
   addLog(`${hero.name} death save: ${roll}. Successes ${hero.deathSaves.successes}/3, failures ${hero.deathSaves.failures}/3.`, "important");
   if (hero.deathSaves.failures >= 3) killHero(hero);
   else if (hero.deathSaves.successes >= 3) {
-    hero.alive = true;
-    hero.deathSaves = { successes: 3, failures: 0 };
+    markFighterStableAtZero(hero);
     addLog(`${hero.name} stabilizes.`, "important");
     await maybeFinishEncounterAfterHeroRecovery();
   }
@@ -205,11 +230,15 @@ function heroCanAct(fighter) {
 }
 
 function heroIsStableAtZero(hero) {
-  return Boolean(hero?.alive && !hero.dead && hero.hp <= 0 && (hero.deathSaves?.successes ?? 0) >= 3);
+  return Boolean(hero?.alive && !hero.dead && hero.hp <= 0 && hero.stableAtZero);
 }
 
 function heroIsUnstableDying(hero) {
-  return Boolean(hero?.alive && !hero.dead && hero.hp <= 0 && (hero.deathSaves?.successes ?? 0) < 3);
+  return Boolean(hero?.alive && !hero.dead && hero.hp <= 0 && !hero.stableAtZero);
+}
+
+function partyClassHeroes() {
+  return partyHeroes().filter(isClassHero);
 }
 
 function unstableDyingPartyHeroes() {
@@ -221,8 +250,8 @@ function stableUnconsciousPartyHeroes() {
 }
 
 function partyDefeatedOrDying() {
-  const heroes = partyHeroes();
-  return heroes.length === 0 || heroes.every((hero) => !heroCanAct(hero));
+  const heroes = partyClassHeroes();
+  return heroes.length === 0;
 }
 
 function addLog(text, type = "") {
@@ -254,8 +283,10 @@ function monsterAttackAgainstHero(attacker, defender) {
 }
 
 function resolveMonsterHeroCritical(attacker, defender, attackRoll) {
-  if (attackRoll !== 20 || !monsterAttackAgainstHero(attacker, defender)) {
-    return { attackRoll, isCritical: attackRoll === 20, doublesDamage: attackRoll === 20, forcedHit: false, note: "" };
+  const criticalThreshold = isSidekickWarrior(attacker) && (attacker.level ?? 1) >= 3 ? 19 : 20;
+  const criticalHit = attackRoll >= criticalThreshold;
+  if (!criticalHit || attackRoll !== 20 || !monsterAttackAgainstHero(attacker, defender)) {
+    return { attackRoll, isCritical: criticalHit, doublesDamage: criticalHit, forcedHit: false, note: criticalHit && criticalThreshold < 20 ? "Improved Critical." : "" };
   }
   const mode = normalizeD20Mode(state?.d20Mode);
   if (mode === "karmic" && Math.random() < 0.5) {
@@ -476,6 +507,37 @@ async function maybeUseHellishRebuke(defender, attacker) {
   }
 }
 
+function warriorDefenderCandidates(attacker, target) {
+  if (!attacker?.alive || !target?.alive) return [];
+  return partyHeroes().filter(
+    (candidate) =>
+      candidate.id !== target.id &&
+      candidate.id !== attacker.id &&
+      isSidekickWarrior(candidate) &&
+      (candidate.sidekickWarriorRole ?? "attacker") === "defender" &&
+      hasReactionAvailable(candidate) &&
+      heroCanAct(candidate) &&
+      attackGridDistance(candidate.position, attacker.position) <= 1 &&
+      hasClearLineOfSight(candidate.position, attacker.position) &&
+      !hostileTo(candidate, target) &&
+      hostileTo(candidate, attacker),
+  );
+}
+
+async function maybeUseWarriorDefender(attacker, target) {
+  const candidate = warriorDefenderCandidates(attacker, target)[0];
+  if (!candidate) return false;
+  const useDefense = await showReactionPrompt({
+    actor: candidate,
+    title: "Defender",
+    message: `${attacker.name} attacks ${target.name}. ${candidate.name} can impose disadvantage.`,
+    acceptLabel: "Defend",
+  });
+  if (!useDefense || !consumeReaction(candidate, "Defender")) return false;
+  addLog(`${candidate.name} uses Defender to hinder ${attacker.name}'s attack.`, "important");
+  return true;
+}
+
 function tickStatusDurations(fighter) {
   if (!fighter?.statusEffects?.length) return;
   const expired = [];
@@ -495,6 +557,7 @@ function tickStatusDurations(fighter) {
 function attacksPerAttackAction(fighter) {
   if (isWildShaped(fighter)) return wildShapeHasMultiattack(wildShapeBeastById(fighter.wildShapeState?.beastFormId)) ? 2 : 1;
   const level = fighter?.level ?? 1;
+  if (isSidekickWarrior(fighter)) return level >= 15 ? 3 : level >= 6 ? 2 : 1;
   if (!["barbarian", "fighter", "monk", "paladin", "ranger"].includes(fighter?.classId)) return 1;
   if (fighter.classId === "fighter") return level >= 20 ? 4 : level >= 11 ? 3 : level >= 5 ? 2 : 1;
   return level >= 5 ? 2 : 1;
@@ -1221,7 +1284,7 @@ function isObjectInAttackRangeWithProfile(attacker, object, profile) {
 }
 
 function destructibleObjectTargets(hero = activeFighter()) {
-  if (state.mode !== "combat" || !hero || !isPartyHeroId(hero.id)) return [];
+  if (state.mode !== "combat" || !hero || !isPlayerControlledPartyFighter(hero)) return [];
   const profile = damageProfile(hero);
   return (state.dungeonObjects ?? [])
     .filter((object) => objectIsDestructible(ensureDestructibleObjectState(object)))
@@ -1231,7 +1294,7 @@ function destructibleObjectTargets(hero = activeFighter()) {
 
 function attackTargets() {
   const hero = activeFighter();
-  if (state.mode !== "combat" || !hero || !isPartyHeroId(hero.id) || combatMonsters().length === 0) return [];
+  if (state.mode !== "combat" || !hero || !isPlayerControlledPartyFighter(hero) || combatMonsters().length === 0) return [];
   return [
     ...visibleMonsters().filter((monster) => isInAttackRange(hero, monster)),
     ...destructibleObjectTargets(hero),
@@ -1262,12 +1325,12 @@ function selectAttackTarget(targetId) {
 
 function selectedHeroCanTargetMonster(monster) {
   const hero = activeFighter();
-  return Boolean(monster?.alive && hero && isPartyHeroId(hero.id) && isInAttackRange(hero, monster));
+  return Boolean(monster?.alive && hero && isPlayerControlledPartyFighter(hero) && isInAttackRange(hero, monster));
 }
 
 function selectedHeroCanTargetObject(object) {
   const hero = activeFighter();
-  return Boolean(hero && isPartyHeroId(hero.id) && isObjectInAttackRangeWithProfile(hero, object, damageProfile(hero)));
+  return Boolean(hero && isPlayerControlledPartyFighter(hero) && isObjectInAttackRangeWithProfile(hero, object, damageProfile(hero)));
 }
 
 function cycleAttackTarget() {
@@ -1280,7 +1343,7 @@ function cycleAttackTarget() {
 }
 
 function canOffHandAttack(fighter) {
-  if (state.mode !== "combat" || !fighter?.hasBonusAction || !heroCanAct(fighter) || !isPartyHeroId(fighter.id)) return false;
+  if (state.mode !== "combat" || !fighter?.hasBonusAction || !heroCanAct(fighter) || !isPlayerControlledPartyFighter(fighter)) return false;
   const main = weaponFromSlot(fighter, "mainHand");
   const offHand = weaponFromSlot(fighter, "offHand");
   if (!main?.damage || !offHand?.damage) return false;
@@ -1309,32 +1372,23 @@ function attackBonusForAbility(fighter, ability) {
 function hostileTo(fighter, candidate) {
   if (!candidate.alive || candidate.id === fighter.id) return false;
   const heroIds = new Set(state.party?.heroIds ?? ["hero"]);
-  const fighterIsHero = heroIds.has(fighter.id);
-  const candidateIsHero = heroIds.has(candidate.id);
+  const fighterIsHero = heroIds.has(fighter.id) || fighter.team === "heroes" || fighter.friendly;
+  const candidateIsHero = heroIds.has(candidate.id) || candidate.team === "heroes" || candidate.friendly;
   return fighterIsHero ? !candidateIsHero : candidateIsHero;
 }
 
 function canOpportunityAttack(attacker, defender, from, to) {
   if (state.mode !== "combat" || !attacker.alive || !defender.alive || !hostileTo(attacker, defender)) return false;
-  if (!hasReactionAvailable(attacker)) return false;
   if (defender.disengaged) return false;
   const profile = opportunityAttackProfile(attacker);
   const range = profileRangeSquares(profile);
-  const hadThreat = range <= 1 ? hasMeleeAccess(attacker, { ...defender, position: from }) : attackGridDistance(attacker.position, from) <= range && hasClearLineOfSight(attacker.position, from);
-  const keepsThreat = range <= 1 ? hasMeleeAccess(attacker, { ...defender, position: to }) : attackGridDistance(attacker.position, to) <= range && hasClearLineOfSight(attacker.position, to);
+  const hadThreat = attackGridDistance(attacker.position, from) <= range;
+  const keepsThreat = attackGridDistance(attacker.position, to) <= range;
   return hadThreat && !keepsThreat;
 }
 
 async function shouldTakeOpportunityAttack(attacker, defender) {
-  if (!hasReactionAvailable(attacker)) return false;
-  if (!isPartyHeroId(attacker.id)) return consumeReaction(attacker, "opportunity attack");
-  const useAttack = await showReactionPrompt({
-    actor: attacker,
-    title: "Opportunity Attack",
-    message: `${defender.name} is leaving ${attacker.name}'s reach. Make an opportunity attack?`,
-    acceptLabel: "Attack",
-  });
-  return useAttack && consumeReaction(attacker, "opportunity attack");
+  return true;
 }
 
 async function finishEncounterAfterLastMonsterFalls() {
@@ -1453,7 +1507,7 @@ function isExitPosition(position) {
 }
 
 function canHeroUseHomeExit(hero = activeHero()) {
-  return state.mode === "home" && hero?.alive && isPartyHeroId(hero.id);
+  return state.mode === "home" && hero?.alive && isPartyHeroId(hero.id) && !isAutonomousAlly(hero);
 }
 
 function partyHasBaseItem(itemId) {
@@ -1800,12 +1854,15 @@ function dropLootForHero(hero) {
 
 function awardMonsterXp(monster) {
   const xp = monster.xp ?? 50;
-  const heroes = partyHeroes();
-  const share = Math.max(1, Math.ceil(xp / Math.max(1, heroes.length)));
-  heroes.forEach((hero) => {
+  const participants = partyHeroes();
+  const recipients = participants.filter((fighter) => isClassHero(fighter) || isTrainedSidekick(fighter));
+  const lostShares = participants.length - recipients.length;
+  const share = Math.max(1, Math.ceil(xp / Math.max(1, participants.length)));
+  recipients.forEach((hero) => {
     hero.xp = (hero.xp ?? 0) + share;
   });
-  addLog(`${heroes.map((hero) => hero.name).join(", ")} gain ${share} XP.`, "important");
+  const recipientText = recipients.length ? `${recipients.map((hero) => hero.name).join(", ")} gain ${share} XP` : `No one gains ${share} XP`;
+  addLog(`${recipientText}.${lostShares ? ` ${lostShares} ally share${lostShares === 1 ? "" : "s"} lost.` : ""}`, "important");
 }
 
 function awardHeroXp(xp, reason = "") {
@@ -1818,6 +1875,7 @@ function collectLootAtPosition(fighter, position) {
   const lootIndex = state.lootPiles.findIndex((pile) => positionKey(pile.position) === positionKey(position));
   if (lootIndex < 0) return false;
   if (!isPartyHeroId(fighter.id)) return maybeMonsterPickUpThrownWeapon(fighter, lootIndex);
+  if (!canFighterReceiveInventory(fighter)) return false;
 
   const [loot] = state.lootPiles.splice(lootIndex, 1);
   addMoney(fighter.inventory.money, moneyToCp(loot.money));
@@ -2242,12 +2300,14 @@ async function rollInitiative() {
   const monsters = threateningMonsters();
   if (monsters.length === 0) return;
   const heroEntries = partyHeroes().map((hero) => {
-    const heroRoll = rollD20ForFighter(hero).roll;
+    const rollResult = rollD20ForFighter(hero, { advantage: isSidekickWarrior(hero) && (hero.level ?? 1) >= 7 });
+    const heroRoll = rollResult.roll;
     return {
       fighterId: hero.id,
       fighter: hero,
       side: "hero",
       roll: heroRoll,
+      rolls: rollResult.rolls,
       total: heroRoll + hero.initiativeBonus,
     };
   });
@@ -2422,7 +2482,8 @@ async function makeAttack(attacker, defender, options = {}) {
   const rangedDisadvantage = rangedAttack && adjacentHostiles;
   const attackAdvantage = (attacker.statusEffects ?? []).some((effect) => effect.attackAdvantage);
   const defenderDodge = defender.dodging;
-  const hasDisadvantage = rangedDisadvantage || defenderDodge;
+  const defendedBySidekick = await maybeUseWarriorDefender(attacker, defender);
+  const hasDisadvantage = rangedDisadvantage || defenderDodge || defendedBySidekick;
   const attackRollResult = rollD20ForFighter(attacker, { advantage: attackAdvantage && !hasDisadvantage, disadvantage: hasDisadvantage && !attackAdvantage });
   const attackRolls = attackRollResult.rolls;
   const criticalResult = resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll);
@@ -2438,7 +2499,7 @@ async function makeAttack(attacker, defender, options = {}) {
   const isMiss = attackRoll === 1 || (!criticalResult.forcedHit && totalAttack < defenderAc) || shieldBlocked;
 
   addLog(
-    `${attacker.name} ${options.actionLabel ?? "attacks"}${attackAdvantage && !hasDisadvantage ? " with advantage" : ""}${rangedDisadvantage && !attackAdvantage ? " with disadvantage" : ""}${defenderDodge && !attackAdvantage ? " because the target is dodging" : ""}: d20 ${
+    `${attacker.name} ${options.actionLabel ?? "attacks"}${attackAdvantage && !hasDisadvantage ? " with advantage" : ""}${rangedDisadvantage && !attackAdvantage ? " with disadvantage" : ""}${defenderDodge && !attackAdvantage ? " because the target is dodging" : ""}${defendedBySidekick && !attackAdvantage ? " because of Defender" : ""}: d20 ${
       attackRolls.length > 1 ? `${attackRolls.join(" / ")} -> ${attackRoll}` : attackRoll
     } ${abilityLabel(currentAttackBonus)}${inspiration.used ? " + inspiration" : ""} = ${totalAttack} vs AC ${
       defenderAc
@@ -2574,11 +2635,22 @@ function savingThrow(target, ability, dc) {
   const roll = rollResult.roll;
   const statusBonus = (target.statusEffects ?? []).reduce((sum, effect) => sum + (effect.saveBonus ?? 0), 0);
   const auraBonus = auraSaveBonus(target);
-  const bonus = abilityMod(target, ability) + statusBonus + auraBonus;
-  const total = roll + bonus;
-  const success = total >= dc;
+  const proficiency = (target.savingThrowProficiencies ?? []).includes(ability) ? proficiencyBonus(target) : 0;
+  const bonus = abilityMod(target, ability) + proficiency + statusBonus + auraBonus;
+  let total = roll + bonus;
+  let success = total >= dc;
+  let indomitable = null;
+  const indomitableAbility = fighterAbilityDefinitions(target).find((entry) => entry.id === "indomitable");
+  if (!success && indomitableAbility && (target.level ?? 1) >= (indomitableAbility.level ?? 1) && (target.abilityUses?.indomitable ?? 0) < abilityMaxUses(target, indomitableAbility)) {
+    const rerollResult = rollD20ForFighter(target);
+    const rerollTotal = rerollResult.roll + bonus;
+    target.abilityUses.indomitable = (target.abilityUses.indomitable ?? 0) + 1;
+    indomitable = { roll: rerollResult.roll, rolls: rerollResult.rolls, rawRolls: rerollResult.rawRolls, rollResult: rerollResult, total: rerollTotal };
+    total = rerollTotal;
+    success = total >= dc;
+  }
   recordD20OutcomeForFighter(target, success);
-  return { roll, rolls: rollResult.rolls, rawRolls: rollResult.rawRolls, rollResult, bonus, statusBonus, auraBonus, total, success };
+  return { ability, roll, rolls: rollResult.rolls, rawRolls: rollResult.rawRolls, rollResult, bonus, proficiency, statusBonus, auraBonus, total, success, indomitable };
 }
 
 function auraSaveBonus(target) {
@@ -2638,7 +2710,9 @@ function showSavingThrowMenu({ target, ability, dc, message }) {
 async function rollSavingThrow(target, ability, dc, message) {
   if (!isPartyHeroId(target?.id)) {
     const save = savingThrow(target, ability, dc);
-    addLog(`${target.name} rolls ${ability.toUpperCase()} save: ${save.roll} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
+    if (save.indomitable) addLog(`${target.name} uses Indomitable and rerolls ${save.indomitable.roll}.`, "important");
+    const rollText = save.indomitable ? `${save.roll} -> ${save.indomitable.roll}` : save.roll;
+    addLog(`${target.name} rolls ${ability.toUpperCase()} save: ${rollText} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
     return save;
   }
   addLog(message, "important");
@@ -2662,8 +2736,10 @@ async function rollSavingThrow(target, ability, dc, message) {
       }
     }
   }
-  addLog(`${target.name} rolls ${ability.toUpperCase()} save: ${save.roll} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
-  addAdminLog(`${target.name} ${ability.toUpperCase()} save breakdown: ${d20RollDetail(save.rollResult)} + ability ${abilityLabel(abilityMod(target, ability))}${save.statusBonus ? ` + status ${save.statusBonus}` : ""}${save.auraBonus ? ` + aura ${save.auraBonus}` : ""} = ${save.total} vs DC ${dc}.`);
+  if (save.indomitable) addLog(`${target.name} uses Indomitable and rerolls ${save.indomitable.roll}.`, "important");
+  const rollText = save.indomitable ? `${save.roll} -> ${save.indomitable.roll}` : save.roll;
+  addLog(`${target.name} rolls ${ability.toUpperCase()} save: ${rollText} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
+  addAdminLog(`${target.name} ${ability.toUpperCase()} save breakdown: ${d20RollDetail(save.rollResult)} + ability ${abilityLabel(abilityMod(target, ability))}${save.proficiency ? ` + proficiency ${save.proficiency}` : ""}${save.statusBonus ? ` + status ${save.statusBonus}` : ""}${save.auraBonus ? ` + aura ${save.auraBonus}` : ""}${save.indomitable ? `; Indomitable ${d20RollDetail(save.indomitable.rollResult)} => ${save.indomitable.total}` : ""} = ${save.total} vs DC ${dc}.`);
   return save;
 }
 
@@ -2673,6 +2749,10 @@ function applyStatusEffect(target, effect) {
   refreshDerivedStats(target);
   if (effect.tempHp) {
     target.hp = Math.min(target.maxHp, target.hp + effect.tempHp);
+    if (target.hp > 0) {
+      clearStableAtZero(target);
+      resetDeathSaveCounters(target);
+    }
   }
 }
 
@@ -2692,6 +2772,16 @@ function applySpecialDamage(source, target, damage, type, label) {
   addLog(`${source.name}'s ${label} deals ${modified.damage} ${type} damage to ${target.name}.${note}`, "damage");
   if (modified.damage !== damage || modified.reason) addAdminLog(`Damage modifier: ${target.name} incoming ${damage} ${type}, final ${modified.damage}${modified.reason ? ` (${modified.reason})` : ""}.`);
   return modified.damage;
+}
+
+function evasionAdjustedDamage(target, save, rawDamage) {
+  if (!isSidekickExpert(target) || (target.level ?? 1) < 7 || save?.ability !== "dex" || !heroCanAct(target)) return save?.success ? Math.floor(rawDamage / 2) : rawDamage;
+  if (save.success) {
+    addLog(`${target.name}'s Evasion avoids the damage.`, "important");
+    return 0;
+  }
+  addLog(`${target.name}'s Evasion halves the damage.`, "important");
+  return Math.floor(rawDamage / 2);
 }
 
 function rollWildShapeEffectDamage(damageText) {
@@ -3244,8 +3334,11 @@ async function applySpellDamage(caster, target, spell) {
       addLog(`${target.name} avoids ${spell.name}.`);
       return;
     }
-    if (save.success && spell.save.halfDamage) raw = Math.floor(raw / 2);
+    if (spell.save.halfDamage) raw = evasionAdjustedDamage(target, save, raw);
   }
+  if (isSidekickSpellcaster(caster) && spellBaseLevel(spell) === 0 && (caster.level ?? 1) >= 6) raw += Math.max(0, abilityMod(caster, spellcastingAbility(caster)));
+  if (isSidekickSpellcaster(caster) && spellBaseLevel(spell) > 0 && (caster.level ?? 1) >= 14 && caster.empoweredSpellSchool === spell.school) raw += Math.max(0, abilityMod(caster, spellcastingAbility(caster)));
+  if (raw <= 0) return;
   applySpecialDamage(caster, target, raw, spell.effect.type ?? "force", spell.name);
   if (spell.effect?.status && (!save || !save.success)) await applySpellStatus(caster, target, spell, { skipSave: true });
 }
@@ -3253,7 +3346,8 @@ async function applySpellDamage(caster, target, spell) {
 function applySpellHealing(caster, target, spell) {
   const dice = scaledSpellDice(spell);
   const roll = rollDice(dice.count, dice.sides);
-  const bonus = spell.effect?.abilityBonus === "spellcasting" ? abilityMod(caster, spell?.saveDcAbility ?? spellcastingAbility(caster)) : spell.effect?.bonus ?? 0;
+  let bonus = spell.effect?.abilityBonus === "spellcasting" ? abilityMod(caster, spell?.saveDcAbility ?? spellcastingAbility(caster)) : spell.effect?.bonus ?? 0;
+  if (isSidekickSpellcaster(caster) && spellBaseLevel(spell) > 0 && (caster.level ?? 1) >= 14 && caster.empoweredSpellSchool === spell.school) bonus += Math.max(0, abilityMod(caster, spellcastingAbility(caster)));
   const healed = applyHealingToHero(target, Math.max(0, roll.total + bonus));
   addLog(`${caster.name}'s ${spell.name} heals ${target.name} for ${healed} HP (${roll.rolls.join(" + ")} ${abilityLabel(bonus)}).`, "heal");
   void maybeFinishEncounterAfterHeroRecovery();
@@ -3386,7 +3480,7 @@ async function applySpellStatus(caster, target, spell, options = {}) {
     effect.damageBonus = (effect.damageBonus ?? 0) + Math.max(0, spellCastLevel(spell) - spellBaseLevel(spell)) * spell.upcast.damageBonusPerLevel;
   }
   if (effect.id === "spare-the-dying" && isPartyHeroId(target.id) && target.hp <= 0) {
-    target.deathSaves = { successes: 3, failures: 0 };
+    markFighterStableAtZero(target);
     addLog(`${target.name} is stabilized by ${spell.name}.`, "important");
     await maybeFinishEncounterAfterHeroRecovery();
   }
@@ -3629,9 +3723,9 @@ async function tryMonsterAreaSpecial(monster, namePattern, label, damageType, sa
     const save = await rollSavingThrow(target, saveAbility, dc, `${monster.name}'s ${label} forces ${target.name} to make a ${saveAbility.toUpperCase()} save.`);
     const roll = rollDice(dice.count, dice.sides);
     const raw = Math.max(1, roll.total + dice.bonus);
-    const damage = save.success ? Math.floor(raw / 2) : raw;
-    if (save.success) addLog(`${target.name} takes half damage from ${label}.`);
-    applySpecialDamage(monster, target, damage, damageType, label);
+    const damage = saveAbility === "dex" ? evasionAdjustedDamage(target, save, raw) : save.success ? Math.floor(raw / 2) : raw;
+    if (save.success && damage > 0) addLog(`${target.name} takes half damage from ${label}.`);
+    if (damage > 0) applySpecialDamage(monster, target, damage, damageType, label);
     if (!target.alive) handleHeroDeath();
   }
   return true;
@@ -3712,7 +3806,7 @@ async function endTurn() {
 
 function maybeRunMonsterTurn() {
   const fighter = activeFighter();
-  if (!fighter || isPartyHeroId(fighter.id) || !fighter.alive || partyDefeatedOrDying()) return;
+  if (!fighter || isPlayerControlledPartyFighter(fighter) || !fighter.alive || partyDefeatedOrDying()) return;
 
   els.attack.disabled = true;
   els.useItem.disabled = true;
@@ -3723,7 +3817,7 @@ function maybeRunMonsterTurn() {
   const delay = Math.max(tokenSlideMs, dueAt - now);
   monsterTurnTimer = window.setTimeout(() => {
     const current = activeFighter();
-    if (current && !isPartyHeroId(current.id)) {
+    if (current && !isPlayerControlledPartyFighter(current)) {
       current.nextAiDecisionAt = performance.now() + monsterAiDecisionIntervalMs;
       pathfindingJobsThisTurn = 0;
       perfStats.aiUpdates += 1;

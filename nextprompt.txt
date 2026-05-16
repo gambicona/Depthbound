@@ -1,7 +1,3 @@
-Turn Ranger Companion and summon spells into persistent actors with pet command action economy.
-add roles: pet and support (pet like controllable npc for example ranger pet, support acts on its own)
-
-
 add the standard item descriptions
 subclasses
 add more monster behaviour (already according to role and int)

@@ -88,6 +88,7 @@ window.DungeonContent.register("themes", "forestOfTheBeasts", {
     "poison-ivy-patch": 0.05,
     "muddy-sinkhole": 0.04,
     "wasp-nest": 0.03,
+    "beast-crate": 0.018,
   },
   trapTagGroups: [
     ["trap", "forest"],
