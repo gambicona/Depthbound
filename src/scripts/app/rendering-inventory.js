@@ -56,11 +56,11 @@ function createCombatantToken(combatant) {
     event.stopPropagation();
     const current = state.fighters[combatant.id];
     if (pendingSpellTargeting) {
-      if (current?.position) void confirmPendingSpellTarget(current.position);
+      clearPendingSpellTargeting();
       return;
     }
     if (pendingEldritchBlast) {
-      if (current?.position) void confirmPendingEldritchBlast(current.position);
+      cancelPendingEldritchBlast();
       return;
     }
     if (current && (current.id === "hero" || isKnownTile(current.position))) {
@@ -186,13 +186,13 @@ function createTileButton(position) {
     if (pendingSpellTargeting) {
       event.preventDefault();
       event.stopPropagation();
-      void confirmPendingSpellTarget(position);
+      clearPendingSpellTargeting();
       return;
     }
     if (pendingEldritchBlast) {
       event.preventDefault();
       event.stopPropagation();
-      void confirmPendingEldritchBlast(position);
+      cancelPendingEldritchBlast();
       return;
     }
     const table = planningTablePosition();
@@ -265,11 +265,11 @@ function buildRoom() {
     event.preventDefault();
     event.stopPropagation();
     if (pendingSpellTargeting) {
-      void confirmPendingSpellTarget(state.exit.position);
+      clearPendingSpellTargeting();
       return;
     }
     if (pendingEldritchBlast) {
-      void confirmPendingEldritchBlast(state.exit.position);
+      cancelPendingEldritchBlast();
       return;
     }
     if (canHeroUseHomeExit(activeHero())) {
@@ -300,6 +300,14 @@ function buildRoom() {
   const inspectChest = (event) => {
     event?.preventDefault();
     event?.stopPropagation();
+    if (pendingSpellTargeting) {
+      clearPendingSpellTargeting();
+      return;
+    }
+    if (pendingEldritchBlast) {
+      cancelPendingEldritchBlast();
+      return;
+    }
     if (state.mode === "home") {
       showHomeChestInfo();
     }
@@ -316,6 +324,14 @@ function buildRoom() {
   planningToken.addEventListener("contextmenu", (event) => {
     event.preventDefault();
     event.stopPropagation();
+    if (pendingSpellTargeting) {
+      clearPendingSpellTargeting();
+      return;
+    }
+    if (pendingEldritchBlast) {
+      cancelPendingEldritchBlast();
+      return;
+    }
     if (state.mode === "home") showPlanningTableInfo();
   });
   planningToken.addEventListener("click", (event) => {
@@ -511,11 +527,11 @@ function renderDungeonObjects() {
       event.preventDefault();
       event.stopPropagation();
       if (pendingSpellTargeting) {
-        void confirmPendingSpellTarget(object.position);
+        clearPendingSpellTargeting();
         return;
       }
       if (pendingEldritchBlast) {
-        void confirmPendingEldritchBlast(object.position);
+        cancelPendingEldritchBlast();
         return;
       }
       showDungeonObjectInfo(object);
@@ -640,7 +656,10 @@ function renderRoom() {
   const spellTargeting = currentPendingSpellTargeting();
   const spellPreview = spellPreviewCells(spellTargeting);
   const persistentAreas = persistentAreaTileKeys();
-  const reachable = heroTurn
+  const shouldShowReachable = !movementInProgress && !dragPath;
+  const reachable = !shouldShowReachable
+    ? new Map()
+    : heroTurn
       ? reachableTiles(hero, state.fighters, {
           gridSize: currentGridSize(),
           walkable,
@@ -941,12 +960,13 @@ function showDungeonObjectInfo(object) {
       : objectTemplate(object.type);
   if (!template) return;
   const hero = activeHero();
+  const objectInteractionAdjacent = (cell) => Math.max(Math.abs(hero.position.x - cell.x), Math.abs(hero.position.y - cell.y)) === 1;
   const objectAdjacent =
     object.type === "homeChest"
       ? distance(hero.position, homeChestPosition()) <= 1
       : object.type === "dungeonExit" || object.type === "homeExit"
         ? distance(hero.position, object.position) <= 1
-        : objectCells(object).some((cell) => distance(hero.position, cell) === 1);
+        : objectCells(object).some(objectInteractionAdjacent);
   const canActInCombat = state.mode !== "combat" || activeFighter()?.id === hero?.id;
   const isHomeChest = object.type === "homeChest";
   const objectLocked = !isHomeChest && object.locked === true;
@@ -1364,7 +1384,10 @@ function takeObjectItem(objectId, itemId) {
     return;
   }
   const hero = activeHero();
-  if ((state.mode === "combat" && activeFighter()?.id !== hero.id) || !objectCells(object).some((cell) => distance(hero.position, cell) === 1)) {
+  if (
+    (state.mode === "combat" && activeFighter()?.id !== hero.id) ||
+    !objectCells(object).some((cell) => Math.max(Math.abs(hero.position.x - cell.x), Math.abs(hero.position.y - cell.y)) === 1)
+  ) {
     addLog(`${hero.name} needs to be next to ${objectTemplate(object.type)?.name ?? "it"} to loot it${state.mode === "combat" ? " on their turn" : ""}.`);
     renderLog();
     return;
@@ -1399,13 +1422,17 @@ function pickObjectLock(objectId) {
   const object = dungeonObjectForId(objectId);
   const hero = activeHero();
   if (!object || !object.locked) return;
-  if ((state.mode === "combat" && activeFighter()?.id !== hero.id) || !objectCells(object).some((cell) => distance(hero.position, cell) === 1)) {
+  if (
+    (state.mode === "combat" && activeFighter()?.id !== hero.id) ||
+    !objectCells(object).some((cell) => Math.max(Math.abs(hero.position.x - cell.x), Math.abs(hero.position.y - cell.y)) === 1)
+  ) {
     addLog(`${hero.name} needs to be next to ${objectTemplate(object.type)?.name ?? "it"} to pick the lock${state.mode === "combat" ? " on their turn" : ""}.`);
     renderLog();
     return;
   }
 
-  const roll = rollD20ForFighter(hero).roll;
+  const rollResult = rollD20ForFighter(hero);
+  const roll = rollResult.roll;
   const bonus = thievesToolsCheckBonus(hero);
   const total = roll + bonus;
   const dc = object.lockDc ?? 12;
@@ -1416,6 +1443,7 @@ function pickObjectLock(objectId) {
   object.lockAttemptsByHero[hero.id] = true;
   object.lastResult = attemptText;
   addLog(attemptText, "important");
+  addAdminCheckLog({ actor: hero, label: "Thieves' Tools check to pick lock", target: objectTemplate(object.type)?.name ?? "object", rollResult, bonus, total, dc, success: total >= dc, note: trainingLabel ? trainingLabel.trim() : "not proficient" });
   if (total >= dc) {
     object.locked = false;
     object.lastResult += " The lock clicks open.";
@@ -1452,14 +1480,19 @@ function takeAllHomeChestItems() {
 function disarmTrap(objectId) {
   const object = dungeonObjectForId(objectId);
   const hero = activeHero();
-  if (!object || state.mode === "combat" || !objectCells(object).some((cell) => distance(hero.position, cell) === 1)) return;
+  if (
+    !object ||
+    state.mode === "combat" ||
+    !objectCells(object).some((cell) => Math.max(Math.abs(hero.position.x - cell.x), Math.abs(hero.position.y - cell.y)) === 1)
+  ) return;
 
   const trap = object.trap ?? object;
   if (!trap || !trap.detected || trap.armed === false || trap.disarmed) return;
   trap.disarmAttemptsByHero ??= {};
   if (trap.disarmAttemptsByHero[hero.id]) return;
 
-  const roll = rollD20ForFighter(hero).roll;
+  const rollResult = rollD20ForFighter(hero);
+  const roll = rollResult.roll;
   const bonus = skillCheckBonus(hero, "int", "disarm");
   const guidance = guidanceSkillBonus();
   const total = roll + bonus + guidance;
@@ -1469,6 +1502,7 @@ function disarmTrap(objectId) {
   const attemptText = `${hero.name} attempts to disarm the trap: INT ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${dc}.`;
   object.lastResult = attemptText;
   addLog(attemptText, "important");
+  addAdminCheckLog({ actor: hero, label: "Disarm check", target: objectTemplate(object.type)?.name ?? "trap", rollResult, bonus, guidance, total, dc, success: roll !== 1 && total >= dc, note: roll === 1 ? "natural 1 triggers trap" : "" });
   if (roll === 1) {
     recordD20OutcomeForFighter(hero, false);
     object.lastResult += " Critical failure — the trap triggers.";
@@ -1587,13 +1621,14 @@ function investigateObject(objectId) {
   const hero = activeHero();
   const template = object ? objectTemplate(object.type) : null;
   if (!object || !objectCanInspect(object) || object.investigated || state.mode === "combat") return;
-  if (!objectCells(object).some((cell) => distance(hero.position, cell) === 1)) return;
+  if (!objectCells(object).some((cell) => Math.max(Math.abs(hero.position.x - cell.x), Math.abs(hero.position.y - cell.y)) === 1)) return;
 
   object.investigated = true;
   const hiddenLoot = objectComponent(object, "hiddenLoot") ?? objectComponent(object, "harvestableResource");
   const ambush = objectComponent(object, "ambushOnInspect");
   const inspectDc = hiddenLoot?.dc ?? template.inspectDc ?? template.spotDc ?? 13;
-  const roll = rollD20ForFighter(hero).roll;
+  const rollResult = rollD20ForFighter(hero);
+  const roll = rollResult.roll;
   const bonus = skillCheckBonus(hero, "int", "investigation");
   const guidance = guidanceSkillBonus();
   const total = roll + bonus + guidance;
@@ -1602,6 +1637,7 @@ function investigateObject(objectId) {
   const checkText = `${hero.name} investigates ${template.name}: INT ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${inspectDc}.`;
   object.lastResult = checkText;
   addLog(checkText, "important");
+  addAdminCheckLog({ actor: hero, label: "Investigation check", target: template.name, rollResult, bonus, guidance, total, dc: inspectDc, success: total >= inspectDc, note: hiddenLoot ? "hidden loot/resource possible" : ambush ? "ambush trigger possible" : "generic inspection" });
 
   const ambushOnNaturalOne = ambush && (ambush.trigger === "natural1" || ambush.naturalOne);
   const ambushByChance = ambush && !ambushOnNaturalOne && Math.random() < (ambush.chance ?? 1);
@@ -2645,11 +2681,13 @@ function useCombatAction(action, targetId = null) {
 
   if (action === "getBehind") {
     if (!fighter.hasBonusAction) return;
-    const roll = rollD20ForFighter(fighter).roll;
+    const rollResult = rollD20ForFighter(fighter);
+    const roll = rollResult.roll;
     const bonus = abilityMod(fighter, "dex");
     const total = roll + bonus;
     recordD20OutcomeForFighter(fighter, total >= 12);
     addLog(`${fighter.name} tries to Get Behind: DEX ${roll} ${abilityLabel(bonus)} = ${total} vs DC 12.`, "important");
+    addAdminCheckLog({ actor: fighter, label: "Dexterity check to Get Behind", rollResult, bonus, total, dc: 12, success: total >= 12 });
     if (total >= 12) {
       fighter.canMoveThroughMonsters = true;
       fighter.hasBonusAction = false;
@@ -2681,12 +2719,14 @@ function useCombatAction(action, targetId = null) {
     const targets = adjacentDyingHeroes(fighter);
     const target = targets.find((hero) => hero.id === targetId) ?? targets[0];
     if (!target) return;
-    const roll = rollD20ForFighter(fighter).roll;
+    const rollResult = rollD20ForFighter(fighter);
+    const roll = rollResult.roll;
     const bonus = abilityMod(fighter, "wis");
     const total = roll + bonus;
     fighter.hasAction = false;
     recordD20OutcomeForFighter(fighter, total >= 10);
     addLog(`${fighter.name} makes a Medicine check for ${target.name}: WIS ${roll} ${abilityLabel(bonus)} = ${total} vs DC 10.`, "important");
+    addAdminCheckLog({ actor: fighter, label: "Medicine check to stabilize", target: target.name, rollResult, bonus, total, dc: 10, success: total >= 10 });
     if (total >= 10) {
       target.alive = true;
       target.deathSaves = { successes: 3, failures: 0 };
@@ -2740,6 +2780,7 @@ function fighterAbilityUnavailableReason(fighter, ability) {
   }
   if (ability.id === "actionSurge" && state.mode !== "combat") return "Only usable in combat.";
   if (ability.id === "uncannyDodge") return "Triggers as a reaction when this hero is hit.";
+  if (ability.id === "goliathStoneEndurance") return "Triggers as a reaction when this hero takes damage.";
   if (ability.id === "steadyAim" && state.mode !== "combat") return "Only usable in combat.";
   if (ability.id === "steadyAim" && ((fighter.lastMoveFeet ?? 0) > 0 || (fighter.movementLeft ?? 0) < Math.floor(fighter.speedFeet / feetPerSquare))) return "Steady Aim requires not moving this turn.";
   if (ability.id === "eldritchBlast" && state.mode !== "combat") return "Only usable in combat.";
@@ -3097,6 +3138,7 @@ async function levelUpHero() {
     hero.unusedSpellChoiceCredits = result.unusedCredits;
     if (gained.length) spellText += ` New spell${gained.length === 1 ? "" : "s"}: ${gained.map((spellId) => getContentDefinition("spells", spellId)?.name ?? spellId).join(", ")}.`;
   }
+  const expertiseText = await chooseLevelUpExpertise(hero);
   refreshDerivedStats(hero);
   hero.hp = hero.maxHp;
   hero.spellPointMax = spellPointMaximum(hero);
@@ -3104,7 +3146,7 @@ async function levelUpHero() {
   const features = classFeatureNames(hero, hero.level);
   const featureText = features.length ? ` New feature${features.length === 1 ? "" : "s"}: ${features.join(", ")}.` : "";
   const racialHpText = racialHpGain ? ` (${racialHpGain} from Dwarven Toughness)` : "";
-  const levelUpText = `${hero.name} reaches level ${hero.level} and gains ${hpGain} max HP${racialHpText}.${featureText}${asiText}${spellText}`;
+  const levelUpText = `${hero.name} reaches level ${hero.level} and gains ${hpGain} max HP${racialHpText}.${featureText}${asiText}${spellText}${expertiseText}`;
   addLog(levelUpText, "important");
   hideHomeMenu();
   render();
@@ -3269,6 +3311,54 @@ async function useFighterAbility(abilityId) {
 
   if (ability.id === "eldritchBlast") {
     startEldritchBlastTargeting(hero);
+    return;
+  }
+
+  if (ability.id === "dragonbornBreath") {
+    hero.abilityUses[ability.id] = Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1);
+    if (state.mode === "combat") hero.hasAction = true;
+    const baseBreath = getContentDefinition("spells", "dragonborn-breath");
+    const breath = {
+      ...baseBreath,
+      save: { ...baseBreath.save, ability: hero.racialTraits?.dragonBreathSaveAbility ?? "dex" },
+      effect: { ...baseBreath.effect, type: hero.racialTraits?.dragonDamageType ?? baseBreath.effect?.type ?? "fire" },
+    };
+    startSpellTargeting(hero, breath);
+    return;
+  }
+
+  if (ability.id === "aasimarHealingHands") {
+    const target = await chooseLayOnHandsTarget(hero);
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      renderAbilitiesMenu();
+      return;
+    }
+    const healed = applyHealingToHero(target, hero.level ?? 1);
+    const targetText = target.id === hero.id ? "" : ` on ${target.name}`;
+    addLog(`${hero.name} uses Healing Hands${targetText} and heals ${healed} HP.`, "heal");
+    await maybeFinishEncounterAfterHeroRecovery();
+  }
+
+  if (ability.racialSpellId) {
+    refundFighterAbilityUse(hero, ability);
+    const racialSpell = getContentDefinition("spells", ability.racialSpellId);
+    if (!racialSpell) {
+      addLog(`${ability.name} is not ready yet.`, "important");
+      renderAbilitiesMenu();
+      return;
+    }
+    const spell = spellWithCastLevel(racialSpell, spellBaseLevel(racialSpell));
+    if (!canCastSpell(hero, spell)) {
+      addLog(`${hero.name} cannot use ${ability.name} right now.`, "important");
+      renderAbilitiesMenu();
+      return;
+    }
+    if (spell.target === "self") {
+      await castSpellAtTarget(hero, spell, hero);
+      return;
+    }
+    startSpellTargeting(hero, spell);
     return;
   }
 
@@ -3793,8 +3883,14 @@ function renderControls() {
   els.zoomOut.disabled = roomZoom <= 0.5;
   els.zoomIn.disabled = roomZoom >= 2;
   els.zoomLabel.textContent = `${Math.round(roomZoom * 100)}%`;
-  if (els.volumeSlider) els.volumeSlider.value = String(Math.round(soundVolume * 100));
-  if (els.volumeLabel) els.volumeLabel.textContent = `${Math.round(soundVolume * 100)}%`;
+  if (els.zoomSlider) els.zoomSlider.value = String(Math.round(roomZoom * 100));
+  els.volumeSliders?.forEach((slider) => {
+    slider.value = String(Math.round(soundVolume * 100));
+  });
+  els.volumeLabels?.forEach((label) => {
+    label.textContent = `${Math.round(soundVolume * 100)}%`;
+  });
+  if (els.buttonThemeSelect) els.buttonThemeSelect.value = buttonTheme;
   els.debugKill.disabled = !adminEnabled() || visibleMonsters().length === 0;
   els.levelUp.disabled = !gameHasStarted || state.mode !== "home" || !canLevelUp(hero);
   if (els.selectParty) {

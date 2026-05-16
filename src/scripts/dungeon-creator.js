@@ -81,7 +81,17 @@ function roomAt(position) {
 }
 
 function objectAt(position) {
-  return state.objects.find((object) => object.position.x === position.x && object.position.y === position.y) ?? null;
+  return state.objects.find((object) => objectCellsForCreator(object).some((cell) => cell.x === position.x && cell.y === position.y)) ?? null;
+}
+
+function objectCellsForCreator(object) {
+  const template = window.DungeonContent.get("furniture", object.type);
+  const width = object.width ?? template?.width ?? 1;
+  const height = object.height ?? template?.height ?? 1;
+  return Array.from({ length: width * height }, (_, index) => ({
+    x: object.position.x + (index % width),
+    y: object.position.y + Math.floor(index / width),
+  }));
 }
 
 function monsterAt(position) {
@@ -197,6 +207,8 @@ function templateFromState() {
       id: object.id,
       type: object.type,
       position: { ...object.position },
+      ...(object.width ? { width: object.width } : {}),
+      ...(object.height ? { height: object.height } : {}),
       ...(object.pairId ? { pairId: object.pairId } : {}),
       ...(typeof object.locked === "boolean" ? { locked: object.locked } : {}),
       ...(object.lockDc ? { lockDc: object.lockDc } : {}),
@@ -431,7 +443,8 @@ function renderSelected() {
         <span></span><button type="button" data-action="move-object" data-dx="0" data-dy="-1">↑</button><span></span>
         <button type="button" data-action="move-object" data-dx="-1" data-dy="0">←</button><span>•</span><button type="button" data-action="move-object" data-dx="1" data-dy="0">→</button>
         <span></span><button type="button" data-action="move-object" data-dx="0" data-dy="1">↓</button><span></span>
-      </div>`;
+      </div>
+      ${Math.max(def?.width ?? 1, def?.height ?? 1) > 1 ? `<button type="button" data-action="rotate-object">Rotate</button>` : ""}`;
     return;
   }
   els.selectedCard.innerHTML = `
@@ -699,9 +712,28 @@ function moveSelectedObject(dx, dy) {
   if (!object?.type || (!dx && !dy)) return;
   const position = { x: object.position.x + dx, y: object.position.y + dy };
   const room = roomAt(position);
-  if (!room || occupied(position, object.id)) return;
+  const nextObject = { ...object, position };
+  if (
+    !room ||
+    objectCellsForCreator(nextObject).some((cell) => !roomAt(cell) || roomAt(cell).id !== room.id || occupied(cell, object.id))
+  ) return;
   object.position = position;
   object.roomId = room.id;
+  renderAll();
+}
+
+function rotateSelectedObject() {
+  const object = selectedEntity();
+  if (!object?.type) return;
+  const template = window.DungeonContent.get("furniture", object.type);
+  const width = object.width ?? template?.width ?? 1;
+  const height = object.height ?? template?.height ?? 1;
+  if (width === height) return;
+  const rotated = { ...object, width: height, height: width };
+  const room = roomAt(object.position);
+  if (!room || objectCellsForCreator(rotated).some((cell) => !roomAt(cell) || roomAt(cell).id !== room.id || occupied(cell, object.id))) return;
+  object.width = height;
+  object.height = width;
   renderAll();
 }
 
@@ -725,9 +757,11 @@ function createCustomItem() {
 
 function placeFurniture(position) {
   const room = roomAt(position);
-  if (!room || !state.selectedFurnitureId || occupied(position)) return;
+  if (!room || !state.selectedFurnitureId) return;
   const id = `${state.selectedFurnitureId}-${state.objects.length + 1}`;
-  state.objects.push({ id, type: state.selectedFurnitureId, position: { ...position }, items: [], roomId: room.id });
+  const object = { id, type: state.selectedFurnitureId, position: { ...position }, items: [], roomId: room.id };
+  if (objectCellsForCreator(object).some((cell) => !roomAt(cell) || roomAt(cell).id !== room.id || occupied(cell))) return;
+  state.objects.push(object);
   state.selectedId = id;
 }
 
@@ -1011,6 +1045,7 @@ function init() {
     if (!button) return;
     if (button.dataset.action === "move-room") moveSelectedRoom(Number(button.dataset.dx), Number(button.dataset.dy));
     if (button.dataset.action === "move-object") moveSelectedObject(Number(button.dataset.dx), Number(button.dataset.dy));
+    if (button.dataset.action === "rotate-object") rotateSelectedObject();
   });
   els.selectedCard.addEventListener("input", (event) => {
     const selected = selectedEntity();

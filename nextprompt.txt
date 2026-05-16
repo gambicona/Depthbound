@@ -16,12 +16,11 @@ Bug report function
 Monster Compendium to collect
 build base
 NPCs with (random) quests
-predefined dungeons and dungeon creator
-repo-backed dungeon content folder for authored dungeons, plus main questline and DLC-style storyline support with sequential unlocks
+
 ressource points to get ressources (stone pit, con check, get stone, farmable, as configurable file, spawnable in dungeons at walls)
 packs to find (Medizin Pack Proviant Pack, etc) that can either be sold to merchants or even factions for points or be opened to gain whatever is inside
 add stealthing through rooms a possibilty
-add locks to chests to lockpick (for rogues and such, add tool proficiencies?)
+
 Factions with quests (Monsterhunter, buying pelts etc, elementalists, Gravebinder etc)
 Arena fighting pit for glory
 

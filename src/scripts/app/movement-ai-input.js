@@ -15,6 +15,15 @@ function isDetectedArmedTrapPosition(position) {
   return detectedArmedTrapKeys().has(positionKey(position));
 }
 
+function hazardousTerrainKeys() {
+  const keys = new Set();
+  for (const object of state.dungeonObjects ?? []) {
+    if (!objectIsHazardousTerrain(object)) continue;
+    objectCells(object).forEach((cell) => keys.add(positionKey(cell)));
+  }
+  return keys;
+}
+
 function trapAwareWalkableFor(fighter, destination = null) {
   const walkable = new Set(movementWalkableFor(fighter));
   const destinationKey = destination ? positionKey(destination) : "";
@@ -72,6 +81,16 @@ function findMovementPath(fighter, destination) {
   return findPath(fighter.position, destination, fighter, state.fighters, {
     ...options,
     walkable: movementWalkableFor(fighter),
+  });
+}
+
+function findMovementPathWithWalkable(fighter, destination, walkable) {
+  return findPath(fighter.position, destination, fighter, state.fighters, {
+    gridSize: currentGridSize(),
+    walkable,
+    canTraverse: (from, to, path) => canTraverseMovementEdge(fighter, from, to, path),
+    stateKey: (position, path) => movementStateKey(fighter, position, path),
+    canEnterOccupied: (position) => canMoveThroughOccupiedTile(fighter, position),
   });
 }
 
@@ -161,7 +180,13 @@ function occupiedByUnselectedHeroOrObstacle(position, movingHeroIds) {
 
 function groupMoveDestinations(destination, heroes, anchorHero = heroes[0]) {
   const movingHeroIds = new Set(heroes.map((hero) => hero.id));
-  const walkable = state.mode === "home" || state.mode === "exploration" ? visibleWalkable() : movementWalkableFor(heroes[0]);
+  const walkable = new Set(state.mode === "home" || state.mode === "exploration" ? visibleWalkable() : movementWalkableFor(heroes[0]));
+  hazardousTerrainKeys().forEach((tileKey) => walkable.delete(tileKey));
+  const unselectedBlockedKeys = new Set(
+    Object.values(state.fighters)
+      .filter((fighter) => fighter.alive && !movingHeroIds.has(fighter.id))
+      .map((fighter) => positionKey(fighter.position)),
+  );
   const assigned = new Set();
   const sortedHeroes = [
     anchorHero,
@@ -171,8 +196,9 @@ function groupMoveDestinations(destination, heroes, anchorHero = heroes[0]) {
   ].filter(Boolean);
   const candidates = Array.from(walkable)
     .map(positionFromKey)
-    .filter((position) => !occupiedByUnselectedHeroOrObstacle(position, movingHeroIds))
-    .sort((a, b) => distance(a, destination) - distance(b, destination));
+    .filter((position) => !unselectedBlockedKeys.has(positionKey(position)))
+    .sort((a, b) => distance(a, destination) - distance(b, destination))
+    .slice(0, Math.max(48, heroes.length * 18));
 
   const plans = [];
   for (const hero of sortedHeroes) {
@@ -184,8 +210,8 @@ function groupMoveDestinations(destination, heroes, anchorHero = heroes[0]) {
       const key = positionKey(position);
       if (assigned.has(key)) return false;
       if (!walkable.has(key)) return false;
-      if (occupiedByUnselectedHeroOrObstacle(position, movingHeroIds)) return false;
-      const path = findMovementPath(hero, position);
+      if (unselectedBlockedKeys.has(key)) return false;
+      const path = findMovementPathWithWalkable(hero, position, walkable);
       if (!path?.length && positionKey(hero.position) !== key) return false;
       plans.push({ hero, destination: position, path: path ?? [] });
       assigned.add(key);
@@ -208,19 +234,22 @@ async function moveFightersAlongPathsTogether(plans) {
 
   const maxLength = Math.max(...activePlans.map((plan) => plan.path.length));
   const blockedTrapKeys = detectedArmedTrapKeys();
+  const blockedHazardKeys = hazardousTerrainKeys();
   const stoppedBeforeTrap = new Set();
   for (let stepIndex = 0; stepIndex < maxLength; stepIndex += 1) {
+    let anyMovedThisTick = false;
     for (const plan of activePlans) {
       if (plan.stoppedBeforeTrap) continue;
       const step = plan.path[stepIndex];
       if (!step || !plan.hero.alive) continue;
       const stepKey = positionKey(step);
-      if (blockedTrapKeys.has(stepKey)) {
+      if (blockedTrapKeys.has(stepKey) || blockedHazardKeys.has(stepKey)) {
         plan.stoppedBeforeTrap = true;
         stoppedBeforeTrap.add(plan.hero.id);
         continue;
       }
       plan.hero.position = { ...step };
+      anyMovedThisTick = true;
       collectLootAtPosition(plan.hero, step);
       if (triggerTrapAtPosition(plan.hero, step)) {
         const trap = objectAt(step);
@@ -228,9 +257,8 @@ async function moveFightersAlongPathsTogether(plans) {
       }
       triggerPortalAtPosition(plan.hero, plan.hero.position);
       autoOpenAdjacentExplorationDoor(plan.hero);
-      render();
-      await sleep(Math.max(20, Math.round(tokenSlideMs * 0.18)));
     }
+    if (anyMovedThisTick) renderRoom();
     await sleep(Math.max(30, Math.round(tokenSlideMs * 0.35)));
   }
 
@@ -239,7 +267,7 @@ async function moveFightersAlongPathsTogether(plans) {
     plan.hero.lastMoveFeet = Math.max(0, reachedIndex + 1) * feetPerSquare;
   }
   addLog(`${activePlans.length} heroes move together.`);
-  if (stoppedBeforeTrap.size > 0) addLog("The party stops short of the trap instead of marching everyone through it.", "important");
+  if (stoppedBeforeTrap.size > 0) addLog("The party stops short of danger instead of marching everyone through it.", "important");
   movementInProgress = false;
   const exitHero = activePlans.map((plan) => plan.hero).find((hero) => isPartyHeroId(hero.id) && isExitPosition(hero.position));
   if (exitHero && checkDungeonCompletion(exitHero)) return true;

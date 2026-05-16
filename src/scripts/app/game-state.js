@@ -895,13 +895,200 @@ function combatantRoleLabel(combatant) {
 }
 
 function fighterAbilityDefinitions(fighter = state?.fighters?.hero) {
-  const source = fighter?.abilities ?? (isRosterHeroId(fighter?.id) ? getHeroTemplate(fighter?.classId).abilities : []) ?? [];
+  const source = [...(fighter?.abilities ?? (isRosterHeroId(fighter?.id) ? getHeroTemplate(fighter?.classId).abilities : []) ?? [])];
+  if (fighter?.racialTraits?.dragonDamageType && !source.some((ability) => ability.id === "dragonbornBreath")) {
+    source.push({ id: "dragonbornBreath", name: "Breath Weapon", description: "Ancestral 15 ft cone. DEX/CON save by ancestry, half damage on success.", resource: "action", refresh: "shortRest", uses: 1 });
+  }
+  for (const ability of racialSpellAbilityDefinitions(fighter)) {
+    if (!source.some((entry) => entry.id === ability.id)) source.push(ability);
+  }
   return source
     .filter((ability) => ability.id !== "eldritchBlast")
     .map((ability) => ({
       ...ability,
       usesByLevel: Array.isArray(ability.usesByLevel) ? ability.usesByLevel.map((entry) => ({ ...entry })) : undefined,
     }));
+}
+
+function racialSpellAbilityDefinitions(fighter = state?.fighters?.hero) {
+  const race = fighter?.raceSelection?.raceId ?? fighter?.race;
+  const subrace = fighter?.raceSelection?.subraceId ?? fighter?.subrace;
+  const abilities = [];
+  const add = (ability) => abilities.push({ uses: 1, refresh: "longRest", level: 1, ...ability });
+
+  if (subrace === "eladrin") {
+    add({
+      id: "eladrinFeyStep",
+      name: "Fey Step",
+      description: "Racial teleport. Bonus action to blink to a visible empty square within 30 ft.",
+      resource: "bonusAction",
+      refresh: "shortRest",
+      racialSpellId: "eladrin-fey-step",
+    });
+  }
+  if (subrace === "shadar-kai") {
+    add({
+      id: "shadarKaiBlessing",
+      name: "Blessing of the Raven Queen",
+      description: "Racial teleport. Bonus action to slip through shadow to a visible empty square within 30 ft.",
+      resource: "bonusAction",
+      refresh: "shortRest",
+      racialSpellId: "shadar-kai-blessing",
+    });
+  }
+  if (subrace === "duergar") {
+    add({
+      id: "duergarEnlarge",
+      name: "Duergar Enlarge",
+      description: "Once per long rest. Grow battle-hardened for 3 rounds: temporary HP and extra weapon damage.",
+      resource: "action",
+      level: 3,
+      racialSpellId: "duergar-enlarge",
+    });
+  }
+  if (subrace === "drow" || subrace === "drow-half-elf") {
+    add({
+      id: "drowFaerieFire",
+      name: "Drow Faerie Fire",
+      description: "Once per long rest. Expose enemies in a small area; DEX save negates.",
+      resource: "action",
+      level: 3,
+      racialSpellId: "drow-faerie-fire",
+    });
+  }
+  if (race === "tiefling" && subrace === "baalzebul") {
+    add({
+      id: "baalzebulRayOfSickness",
+      name: "Ray of Sickness",
+      description: "Once per long rest. Poison ray that can sicken a visible enemy.",
+      resource: "action",
+      level: 3,
+      racialSpellId: "baalzebul-ray-of-sickness",
+    });
+  }
+  if (race === "tiefling" && subrace === "levistus") {
+    add({
+      id: "levistusArmorOfAgathys",
+      name: "Armor of Agathys",
+      description: "Once per long rest. Gain icy protection and temporary HP.",
+      resource: "action",
+      level: 3,
+      racialSpellId: "levistus-armor-of-agathys",
+    });
+  }
+  if (race === "tiefling" && subrace === "mephistopheles") {
+    add({
+      id: "mephistophelesBurningHands",
+      name: "Burning Hands",
+      description: "Once per long rest. Fan hellfire in a 15 ft cone; DEX save half.",
+      resource: "action",
+      level: 3,
+      racialSpellId: "mephistopheles-burning-hands",
+    });
+  }
+  if (race === "tiefling" && subrace === "zariel") {
+    add({
+      id: "zarielBrandingSmite",
+      name: "Branding Smite",
+      description: "Once per long rest. Bonus action; your next hit brands the target with radiant power.",
+      resource: "bonusAction",
+      level: 3,
+      racialSpellId: "zariel-branding-smite",
+    });
+  }
+  if (race === "aasimar") {
+    add({
+      id: "aasimarHealingHands",
+      name: "Healing Hands",
+      description: "Once per long rest. Touch yourself or an adjacent hero to restore HP equal to your level.",
+      resource: "action",
+    });
+  }
+  if (race === "aasimar" && subrace === "protector") {
+    add({
+      id: "aasimarRadiantSoul",
+      name: "Radiant Soul",
+      description: "Once per long rest at level 3. Divine battle-form with radiant extra damage.",
+      resource: "action",
+      level: 3,
+      racialSpellId: "aasimar-radiant-soul",
+    });
+  }
+  if (race === "aasimar" && subrace === "scourge") {
+    add({
+      id: "aasimarRadiantConsumption",
+      name: "Radiant Consumption",
+      description: "Once per long rest at level 3. Dangerous radiant battle-form: strong damage, lower defense.",
+      resource: "action",
+      level: 3,
+      racialSpellId: "aasimar-radiant-consumption",
+    });
+  }
+  if (race === "aasimar" && subrace === "fallen") {
+    add({
+      id: "aasimarNecroticShroud",
+      name: "Necrotic Shroud",
+      description: "Once per long rest at level 3. Necrotic battle-form that frightens nearby enemies.",
+      resource: "action",
+      level: 3,
+      racialSpellId: "aasimar-necrotic-shroud",
+    });
+  }
+  if (race === "goliath") {
+    add({
+      id: "goliathStoneEndurance",
+      name: "Stone's Endurance",
+      description: "Reaction. When damaged, reduce damage by 1d12 + CON. Refreshes on short rest.",
+      resource: "reaction",
+      refresh: "shortRest",
+    });
+  }
+  if (race === "yuan-ti") {
+    add({
+      id: "yuanTiSuggestion",
+      name: "Suggestion",
+      description: "Once per long rest at level 3. Charm-like command that briefly disables one enemy.",
+      resource: "action",
+      level: 3,
+      racialSpellId: "yuan-ti-suggestion",
+    });
+  }
+  if (race === "genasi" && subrace === "air") {
+    add({
+      id: "airGenasiLevitate",
+      name: "Levitate",
+      description: "Once per long rest at level 3. Float above danger for a short defensive lift.",
+      resource: "action",
+      level: 3,
+      racialSpellId: "air-genasi-levitate",
+    });
+  }
+  if (race === "genasi" && subrace === "fire") {
+    add({
+      id: "fireGenasiBurningHands",
+      name: "Burning Hands",
+      description: "Once per long rest at level 3. 15 ft cone, DEX save half.",
+      resource: "action",
+      level: 3,
+      racialSpellId: "fire-genasi-burning-hands",
+    });
+  }
+
+  return abilities;
+}
+
+function racialCantripSpellIdsForFighter(fighter = state?.fighters?.hero) {
+  const race = fighter?.raceSelection?.raceId ?? fighter?.race;
+  const subrace = fighter?.raceSelection?.subraceId ?? fighter?.subrace;
+  const spells = [];
+  if (subrace === "high-elf" || subrace === "high-half-elf") spells.push("high-elf-fire-bolt");
+  if (subrace === "forest-gnome" || (race === "tiefling" && subrace === "glasya")) spells.push("minor-illusion");
+  if (race === "tiefling" && subrace === "levistus") spells.push("levistus-ray-of-frost");
+  if (race === "yuan-ti") spells.push("yuan-ti-poison-spray");
+  if (race === "genasi" && subrace === "earth") spells.push("blade-ward");
+  if (race === "genasi" && subrace === "fire") spells.push("produce-flame");
+  if (race === "genasi" && subrace === "water") spells.push("acid-splash");
+  return spells;
 }
 
 function abilityMaxUses(fighter, ability) {
@@ -947,7 +1134,8 @@ function classKnownSpellListForFighter(fighter = state?.fighters?.hero) {
 }
 
 function spellDefinitionsForFighter(fighter = state?.fighters?.hero) {
-  return (fighter?.spells ?? [])
+  const spellIds = [...(fighter?.spells ?? []), ...racialCantripSpellIdsForFighter(fighter)];
+  return Array.from(new Set(spellIds.map(canonicalSpellId)))
     .map((spellId) => getContentDefinition("spells", canonicalSpellId(spellId)))
     .filter((spell) => spell && spellUnlockedForFighter(fighter, spell));
 }
@@ -1035,8 +1223,8 @@ function skillCheckBonus(fighter, ability, skillId) {
 function thievesToolsTraining(fighter) {
   const expertTools = new Set(fighter?.expertiseTools ?? []);
   const proficientTools = new Set(fighter?.toolProficiencies ?? []);
-  if (expertTools.has("thieves-tools") || fighter?.classId === "rogue") return 2;
-  if (proficientTools.has("thieves-tools") || ["bard", "ranger"].includes(fighter?.classId)) return 1;
+  if (expertTools.has("thieves-tools")) return 2;
+  if (proficientTools.has("thieves-tools")) return 1;
   return 0;
 }
 
@@ -1096,6 +1284,26 @@ function classArmorProficiencies(classTemplate = {}) {
   return proficiencyEntries(classTemplate.armorProficiencies ?? []);
 }
 
+function classProficiencyPlan(classId = defaultContent.heroClass) {
+  return classProficiencyPlans[classId] ?? {};
+}
+
+function classToolProficiencies(classId = defaultContent.heroClass) {
+  return uniqueValues(classProficiencyPlan(classId).toolProficiencies ?? []);
+}
+
+function expertisePlanForClassLevel(classId = defaultContent.heroClass, level = 1) {
+  return classProficiencyPlan(classId).expertiseByLevel?.[level] ?? null;
+}
+
+function skillName(skillId) {
+  return skillDefinitions[skillId]?.name ?? String(skillId).replace(/-/g, " ");
+}
+
+function toolName(toolId) {
+  return toolDefinitions[toolId]?.name ?? String(toolId).replace(/-/g, " ");
+}
+
 function raceTraitsForSelection(selection = defaultRaceSelection) {
   const normalized = normalizeRaceSelection(selection);
   const race = speciesDefinitions[normalized.raceId];
@@ -1109,6 +1317,7 @@ function raceTraitsForSelection(selection = defaultRaceSelection) {
   }
   const abilityBonuses = mergeAbilityBonuses(base.abilityBonuses, subrace.abilityBonuses, chosenBonuses);
   const damageResistances = uniqueValues([...(base.damageResistances ?? []), ...(subrace.damageResistances ?? []), ancestry?.damageType]);
+  const damageImmunities = uniqueValues([...(base.damageImmunities ?? []), ...(subrace.damageImmunities ?? [])]);
   return {
     raceId: normalized.raceId,
     subraceId: normalized.subraceId,
@@ -1121,15 +1330,22 @@ function raceTraitsForSelection(selection = defaultRaceSelection) {
     size: subrace.size ?? base.size ?? "medium",
     hpPerLevel: (base.hpPerLevel ?? 0) + (subrace.hpPerLevel ?? 0),
     damageResistances,
+    damageImmunities,
     weaponProficiencies: proficiencyEntries([...(base.weaponProficiencies ?? []), ...(subrace.weaponProficiencies ?? [])]),
     armorProficiencies: proficiencyEntries([...(base.armorProficiencies ?? []), ...(subrace.armorProficiencies ?? [])]),
     skillProficiencies: uniqueValues([...(base.skillProficiencies ?? []), ...(subrace.skillProficiencies ?? [])]),
+    skillChoiceCount: (base.skillChoiceCount ?? 0) + (subrace.skillChoiceCount ?? 0),
+    skillChoices: uniqueValues([...(base.skillChoices ?? allSkillIds), ...(subrace.skillChoices ?? [])]),
+    toolProficiencies: uniqueValues([...(base.toolProficiencies ?? []), ...(subrace.toolProficiencies ?? [])]),
+    toolChoiceCount: (base.toolChoiceCount ?? 0) + (subrace.toolChoiceCount ?? 0),
+    toolChoices: uniqueValues([...(base.toolChoices ?? []), ...(subrace.toolChoices ?? [])]),
     traits: uniqueValues([...(base.traits ?? []), ...(subrace.traits ?? [])]),
     spellTraits: uniqueValues([...(base.spellTraits ?? []), ...(subrace.spellTraits ?? [])]),
     halflingLucky: Boolean(base.halflingLucky || subrace.halflingLucky),
     relentlessEndurance: Boolean(base.relentlessEndurance || subrace.relentlessEndurance),
     savageAttacks: Boolean(base.savageAttacks || subrace.savageAttacks),
     dragonDamageType: ancestry?.damageType ?? "",
+    dragonBreathSaveAbility: ancestry?.saveAbility ?? "dex",
   };
 }
 
@@ -1179,6 +1395,7 @@ function applyHeroCreationOptions(template, options = {}) {
       relentlessEndurance: raceTraits.relentlessEndurance,
       savageAttacks: raceTraits.savageAttacks,
       dragonDamageType: raceTraits.dragonDamageType,
+      dragonBreathSaveAbility: raceTraits.dragonBreathSaveAbility,
       traits: raceTraits.traits,
       spellTraits: raceTraits.spellTraits,
     },
@@ -1186,15 +1403,14 @@ function applyHeroCreationOptions(template, options = {}) {
     baseSpeedFeet: raceTraits.speedFeet,
     speedFeet: raceTraits.speedFeet,
     damageResistances: uniqueValues([...(settings.damageResistances ?? []), ...raceTraits.damageResistances]),
+    damageImmunities: uniqueValues([...(settings.damageImmunities ?? []), ...raceTraits.damageImmunities]),
     weaponProficiencies: proficiencyEntries([...(settings.weaponProficiencies ?? []), ...raceTraits.weaponProficiencies]),
     armorProficiencies: proficiencyEntries([...(settings.armorProficiencies ?? []), ...raceTraits.armorProficiencies]),
     skillProficiencies: uniqueValues([...(settings.skillProficiencies ?? []), ...raceTraits.skillProficiencies]),
-    expertiseSkills: settings.expertiseSkills ?? (["rogue", "bard"].includes(classId) ? uniqueValues([...(settings.skillProficiencies ?? []), ...raceTraits.skillProficiencies]).slice(0, 2) : []),
-    toolProficiencies: uniqueValues([
-      ...(settings.toolProficiencies ?? []),
-      ...(["rogue", "bard", "ranger"].includes(classId) ? ["thieves-tools"] : []),
-    ]),
-    expertiseTools: uniqueValues([...(settings.expertiseTools ?? []), ...(classId === "rogue" ? ["thieves-tools"] : [])]),
+    expertiseSkills: uniqueValues(settings.expertiseSkills ?? []),
+    toolProficiencies: uniqueValues([...(settings.toolProficiencies ?? []), ...raceTraits.toolProficiencies, ...classToolProficiencies(classId)]),
+    expertiseTools: uniqueValues(settings.expertiseTools ?? []),
+    proficiencySchemaVersion: 1,
     abilityScores,
     abilityMods,
     baseAttackAbilityMod: template.abilityMods?.str ?? 0,
@@ -1232,6 +1448,7 @@ function applyThemePalette() {
 }
 
 function soundPathForMusic(key) {
+  if (key === "mainmenu") return `${soundAssetRoot}/music/mainmenu.mp3`;
   if (key === "home") return `${soundAssetRoot}/music/home.mp3`;
   const theme = getContentDefinition("themes", currentThemeId());
   if (key === "exploration" && theme?.music?.exploration) return theme.music.exploration;
@@ -1252,7 +1469,8 @@ function playSoundEffect(id) {
 }
 
 function desiredMusicKey() {
-  if (!state || !gameHasStarted) return "";
+  if (!gameHasStarted || !els.mainMenu?.classList.contains("hidden")) return "mainmenu";
+  if (!state) return "";
   if (state.mode === "home") return "home";
   if (state.mode === "combat") {
     return combatMonsters().some((monster) => monster.id?.startsWith("boss-")) ? "boss-combat" : "combat";
@@ -1262,7 +1480,13 @@ function desiredMusicKey() {
 
 function updateBackgroundMusic() {
   const key = desiredMusicKey();
-  if (key === currentMusicKey) return;
+  if (key === currentMusicKey) {
+    if (currentMusic) {
+      currentMusic.volume = 0.1 * soundVolume;
+      if (currentMusic.paused) currentMusic.play().catch(() => {});
+    }
+    return;
+  }
 
   if (currentMusic) {
     currentMusic.pause();
@@ -1559,6 +1783,10 @@ function objectHasLoot(object) {
 
 function movementCostAtPosition(position) {
   return objectHasComponent(objectAt(position), "difficultTerrain") ? 2 : 1;
+}
+
+function objectIsHazardousTerrain(object) {
+  return Boolean(objectHasComponent(object, "hazardOnEnter") || objectHasComponent(object, "hazardOnMovement"));
 }
 
 function objectCells(object) {
@@ -2942,10 +3170,12 @@ function normalizeLoadedState(loadedState) {
       relentlessEndurance: Boolean(fighter.racialTraits?.relentlessEndurance),
       savageAttacks: Boolean(fighter.racialTraits?.savageAttacks),
       dragonDamageType: fighter.racialTraits?.dragonDamageType ?? raceTraits.dragonDamageType,
+      dragonBreathSaveAbility: fighter.racialTraits?.dragonBreathSaveAbility ?? raceTraits.dragonBreathSaveAbility,
       traits: fighter.racialTraits?.traits ?? raceTraits.traits,
       spellTraits: fighter.racialTraits?.spellTraits ?? raceTraits.spellTraits,
     };
-    fighter.damageResistances = uniqueValues(fighter.damageResistances ?? []);
+    fighter.damageResistances = uniqueValues([...(fighter.damageResistances ?? []), ...(raceTraits.damageResistances ?? [])]);
+    fighter.damageImmunities = uniqueValues([...(fighter.damageImmunities ?? []), ...(raceTraits.damageImmunities ?? [])]);
     fighter.classId = fighter.classId ?? defaultContent.heroClass;
     const classTemplate = getHeroTemplate(fighter.classId);
     fighter.weaponProficiencies = proficiencyEntries([
@@ -2958,7 +3188,15 @@ function normalizeLoadedState(loadedState) {
       ...raceTraits.armorProficiencies,
       ...(fighter.armorProficiencies ?? []),
     ]);
+    if (!fighter.proficiencySchemaVersion) {
+      if (fighter.classId === "rogue") fighter.expertiseTools = (fighter.expertiseTools ?? []).filter((toolId) => toolId !== "thieves-tools");
+      if (["bard", "ranger"].includes(fighter.classId)) fighter.toolProficiencies = (fighter.toolProficiencies ?? []).filter((toolId) => toolId !== "thieves-tools");
+    }
     fighter.skillProficiencies = uniqueValues([...(raceTraits.skillProficiencies ?? []), ...(fighter.skillProficiencies ?? [])]);
+    fighter.toolProficiencies = uniqueValues([...(raceTraits.toolProficiencies ?? []), ...classToolProficiencies(fighter.classId), ...(fighter.toolProficiencies ?? [])]);
+    fighter.expertiseSkills = uniqueValues(fighter.expertiseSkills ?? []).filter((skillId) => fighter.skillProficiencies.includes(skillId));
+    fighter.expertiseTools = uniqueValues(fighter.expertiseTools ?? []).filter((toolId) => fighter.toolProficiencies.includes(toolId));
+    fighter.proficiencySchemaVersion = 1;
     fighter.className = fighter.className ?? classTemplate.className ?? "Fighter";
     fighter.casterType = fighter.casterType ?? classTemplate.casterType;
     fighter.spellcastingAbility = fighter.spellcastingAbility ?? classTemplate.spellcastingAbility;

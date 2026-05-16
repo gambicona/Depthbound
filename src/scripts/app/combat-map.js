@@ -214,9 +214,29 @@ function partyDefeatedOrDying() {
 
 function addLog(text, type = "") {
   state.log.push({ text, type });
-  if (state.log.length > 80) {
+  if (state.log.length > 120) {
     state.log.shift();
   }
+}
+
+function addAdminLog(text) {
+  if (!adminEnabled?.()) return;
+  addLog(`Admin: ${text}`, "admin-log");
+}
+
+function d20RollDetail(rollResult) {
+  if (!rollResult) return "d20 ?";
+  const rolls = rollResult.rolls ?? [rollResult.roll];
+  const rawRolls = rollResult.rawRolls ?? rolls;
+  const rawChanged = rawRolls.length === rolls.length && rawRolls.some((roll, index) => roll !== rolls[index]);
+  const adjusted = rawChanged ? ` raw ${rawRolls.join(" / ")} -> adjusted ${rolls.join(" / ")}` : rolls.join(" / ");
+  return rolls.length > 1 ? `d20 ${adjusted} -> ${rollResult.roll}` : `d20 ${adjusted}`;
+}
+
+function addAdminCheckLog({ actor, label, rollResult, bonus = 0, guidance = 0, total, dc, target = "", success = false, note = "" }) {
+  const guidanceText = guidance ? ` + Guidance ${guidance}` : "";
+  const targetText = target ? ` on ${target}` : "";
+  addAdminLog(`${actor?.name ?? "Unknown"} ${label}${targetText}: ${d20RollDetail(rollResult)} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${dc} => ${success ? "success" : "failure"}${note ? `. ${note}` : ""}.`);
 }
 
 function turnLogSideForFighter(fighter) {
@@ -321,7 +341,7 @@ async function maybeUseBardicAttackDie(attacker, totalAttack, defenderAc) {
   const roll = rollDie(inspiration.sides);
   consumeBardicInspiration(attacker);
   addLog(`${attacker.name} uses Bardic Inspiration: +${roll}.`, "important");
-  return { totalAttack: totalAttack + roll, used: true };
+  return { totalAttack: totalAttack + roll, used: true, roll };
 }
 
 async function maybeUseShieldReaction(defender, attacker, totalAttack, defenderAc) {
@@ -356,6 +376,35 @@ async function maybeUseUncannyDodge(defender, attacker, damage) {
   if (!useDodge || !consumeReaction(defender, "Uncanny Dodge")) return damage;
   const reduced = Math.max(0, Math.floor(damage / 2));
   addLog(`${defender.name}'s Uncanny Dodge reduces the damage to ${reduced}.`, "important");
+  return reduced;
+}
+
+function canUseStoneEndurance(defender, damage) {
+  const ability = fighterAbilityDefinitions(defender).find((entry) => entry.id === "goliathStoneEndurance");
+  return Boolean(
+    isPartyHeroId(defender?.id) &&
+      ability &&
+      damage > 0 &&
+      hasReactionAvailable(defender) &&
+      (defender.abilityUses?.[ability.id] ?? 0) < abilityMaxUses(defender, ability),
+  );
+}
+
+async function maybeUseStoneEndurance(defender, damage) {
+  if (!canUseStoneEndurance(defender, damage)) return damage;
+  const useEndurance = await showReactionPrompt({
+    actor: defender,
+    title: "Stone's Endurance",
+    message: `${defender.name} would take ${damage} damage. Roll 1d12 + CON to reduce it?`,
+    acceptLabel: "Reduce Damage",
+    declineLabel: "Take Hit",
+  });
+  if (!useEndurance || !consumeReaction(defender, "Stone's Endurance")) return damage;
+  const roll = rollDice(1, 12);
+  const reduction = Math.max(0, roll.total + abilityMod(defender, "con"));
+  defender.abilityUses = { ...(defender.abilityUses ?? {}), goliathStoneEndurance: (defender.abilityUses?.goliathStoneEndurance ?? 0) + 1 };
+  const reduced = Math.max(0, damage - reduction);
+  addLog(`${defender.name}'s Stone's Endurance reduces damage by ${reduction} (${roll.rolls[0]} ${abilityLabel(abilityMod(defender, "con"))}).`, "important");
   return reduced;
 }
 
@@ -644,6 +693,13 @@ function corridorPassageIdsForEdge(from, to) {
     .map((passage) => passage.id);
 }
 
+function corridorPassageIdsAtPosition(position) {
+  const tileKey = positionKey(position);
+  return (state.dungeon?.corridorPassages ?? [])
+    .filter((passage) => passage.cells?.some((cell) => positionKey(cell) === tileKey))
+    .map((passage) => passage.id);
+}
+
 function previousPositionForPath(fighter, path) {
   if (!path || path.length <= 1) return fighter.position;
   return path[path.length - 2];
@@ -751,6 +807,7 @@ function rememberedTileKeys() {
 
   const opened = currentOpenedKeys();
   opened.forEach((tileKey) => keys.add(tileKey));
+  visibleWalkable().forEach((tileKey) => keys.add(tileKey));
   for (const door of state.dungeon?.doors ?? []) {
     if (adjacentCells(door).some((cell) => opened.has(positionKey(cell)))) {
       keys.add(positionKey(door));
@@ -771,6 +828,10 @@ function isKnownTile(position) {
   if (doorAt(position)) {
     const door = doorAt(position);
     if (currentDiscoveredRoomIds().has(door.roomId)) return true;
+    const visibleCorridors = visibleWalkable();
+    return adjacentCells(position).some((cell) => currentOpenedKeys().has(positionKey(cell)) || visibleCorridors.has(positionKey(cell)));
+  }
+  if (corridorTiles().has(tileKey)) {
     return adjacentCells(position).some((cell) => currentOpenedKeys().has(positionKey(cell)));
   }
   return (state.dungeon?.rooms ?? []).some((room) => currentDiscoveredRoomIds().has(room.id) && roomHasCell(room, position));
@@ -805,7 +866,16 @@ function visibleWalkable() {
       room.doors.forEach((door) => known.add(positionKey(door)));
     }
   }
-  openedKeys.forEach((tileKey) => known.add(tileKey));
+  const corridorKeys = corridorTiles();
+  openedKeys.forEach((tileKey) => {
+    known.add(tileKey);
+    if (corridorKeys.has(tileKey)) {
+      adjacentCells(positionFromKey(tileKey)).forEach((cell) => {
+        const adjacentKey = positionKey(cell);
+        if (corridorKeys.has(adjacentKey)) known.add(adjacentKey);
+      });
+    }
+  });
   for (const door of state.dungeon?.doors ?? []) {
     if (adjacentCells(door).some((cell) => openedKeys.has(positionKey(cell)))) {
       known.add(positionKey(door));
@@ -854,10 +924,14 @@ function canTraverseMovementEdge(fighter, from, to, path = []) {
   if (fromRoom && toRoom) return fromRoom.id === toRoom.id;
 
   const corridorIds = corridorPassageIdsForEdge(from, to);
-  if (corridorIds.length === 0) return false;
+  if (corridorIds.length === 0) {
+    return corridorTiles().has(positionKey(from)) && corridorTiles().has(positionKey(to));
+  }
 
   const activeCorridors = activeCorridorIdsAt(fighter, from, path);
   if (activeCorridors.length === 0) return true;
+  const junctionCorridors = corridorPassageIdsAtPosition(from);
+  if (junctionCorridors.length > 1 && corridorIds.some((id) => junctionCorridors.includes(id))) return true;
   return corridorIds.some((id) => activeCorridors.includes(id));
 }
 
@@ -1252,8 +1326,10 @@ async function opportunityAttack(attacker, defender) {
     return;
   }
   const resolvedPackets = packets.map((packet) => ({ ...packet, ...calculateDamageModifiers(defender, packet.raw, packet.type) }));
+  addAdminLog(`${attacker.name} damage packets vs ${defender.name}: ${resolvedPackets.map((packet) => `${packet.label} => raw ${packet.raw}, final ${packet.damage}${packet.reason ? ` (${packet.reason})` : ""}`).join("; ")}.`);
   let totalDamage = resolvedPackets.reduce((sum, packet) => sum + packet.damage, 0);
   totalDamage = await maybeUseUncannyDodge(defender, attacker, totalDamage);
+  totalDamage = await maybeUseStoneEndurance(defender, totalDamage);
   applyDamageToFighter(defender, totalDamage);
   defender.lastDamagedById = attacker.id;
   const adjustmentNote = resolvedPackets
@@ -1756,13 +1832,15 @@ function checkTrapDetectionOnReveal() {
     trap.spotCheckedBy = trap.spotCheckedBy ?? [];
     for (const hero of heroes.filter((entry) => !trap.spotCheckedBy.includes(entry.id))) {
       trap.spotCheckedBy.push(hero.id);
-      const roll = rollD20ForFighter(hero).roll;
+      const rollResult = rollD20ForFighter(hero);
+      const roll = rollResult.roll;
       const bonus = skillCheckBonus(hero, "wis", "perception");
       const guidance = guidanceSkillBonus();
       const total = roll + bonus + guidance;
       const dc = trap.spotDc ?? 12;
       trap.detected = total >= dc;
       recordD20OutcomeForFighter(hero, trap.detected);
+      addAdminCheckLog({ actor: hero, label: "Perception check to spot hidden trap", rollResult, bonus, guidance, total, dc, success: trap.detected, note: `trap id ${trap.id ?? "unknown"}` });
       if (trap.detected) {
         addLog(`${hero.name} spots a hidden trap.`, "important");
         break;
@@ -1776,13 +1854,15 @@ function checkTrapDetectionOnReveal() {
     chest.trap.spotCheckedBy = chest.trap.spotCheckedBy ?? [];
     for (const hero of heroes.filter((entry) => !chest.trap.spotCheckedBy.includes(entry.id))) {
       chest.trap.spotCheckedBy.push(hero.id);
-      const roll = rollD20ForFighter(hero).roll;
+      const rollResult = rollD20ForFighter(hero);
+      const roll = rollResult.roll;
       const bonus = skillCheckBonus(hero, "wis", "perception");
       const guidance = guidanceSkillBonus();
       const total = roll + bonus + guidance;
       const dc = chest.trap.spotDc ?? 12;
       chest.trap.detected = total >= dc;
       recordD20OutcomeForFighter(hero, chest.trap.detected);
+      addAdminCheckLog({ actor: hero, label: "Perception check to spot hidden trap", target: objectTemplate(chest.type)?.name ?? "a feature", rollResult, bonus, guidance, total, dc, success: chest.trap.detected, note: `object id ${chest.id ?? "unknown"}` });
       if (chest.trap.detected) {
         addLog(`${hero.name} spots a hidden trap on ${objectTemplate(chest.type)?.name ?? "a feature"}.`, "important");
         break;
@@ -1842,7 +1922,17 @@ function openDoor(door) {
     const targetRoom = (state.dungeon?.rooms ?? []).find((room) => room.id === entry.to);
     const doorRoom = (state.dungeon?.rooms ?? []).find((room) => room.id === entry.roomId);
     const targetDoor = reciprocalDoor(entry);
-    if (!targetRoom || !doorRoom || !targetDoor) continue;
+    if (!targetRoom || !targetDoor) {
+      if (!doorRoom) continue;
+      openedDoorKeys.add(positionKey(entry));
+      if (entry.corridor) openedCorridorKeys.add(positionKey(entry.corridor));
+      if (!discovered.has(doorRoom.id)) {
+        discovered.add(doorRoom.id);
+        revealedRooms.push(doorRoom);
+      }
+      openedAnyPassage = true;
+      continue;
+    }
 
     const openingFromDiscoveredRoom = discovered.has(entry.roomId);
     const roomToReveal = openingFromDiscoveredRoom ? null : doorRoom;
@@ -2177,6 +2267,7 @@ async function makeAttack(attacker, defender, options = {}) {
       defenderAc
     }.`,
   );
+  addAdminLog(`${attacker.name} attack breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)} + attack ${abilityLabel(currentAttackBonus)}${inspiration.used ? ` + inspiration ${inspiration.roll}` : ""} = ${totalAttack}; target AC ${defenderAc}; ${isMiss ? "miss" : isCritical ? "critical hit" : "hit"}.`);
 
   if (isMiss) {
     addLog(attackRoll === 1 ? "Natural 1. The attack misses badly." : shieldBlocked ? `${defender.name} blocks the blow with Shield.` : `${defender.name} avoids the blow.`);
@@ -2237,8 +2328,10 @@ async function makeAttack(attacker, defender, options = {}) {
     return;
   }
   const resolvedPackets = packets.map((packet) => ({ ...packet, ...calculateDamageModifiers(defender, packet.raw, packet.type) }));
+  addAdminLog(`${attacker.name} damage packets vs ${defender.name}: ${resolvedPackets.map((packet) => `${packet.label} => raw ${packet.raw}, final ${packet.damage}${packet.reason ? ` (${packet.reason})` : ""}`).join("; ")}.`);
   let totalDamage = resolvedPackets.reduce((sum, packet) => sum + packet.damage, 0);
   totalDamage = await maybeUseUncannyDodge(defender, attacker, totalDamage);
+  totalDamage = await maybeUseStoneEndurance(defender, totalDamage);
   applyDamageToFighter(defender, totalDamage);
   defender.lastDamagedById = attacker.id;
   if (!isPartyHeroId(attacker.id)) {
@@ -2299,14 +2392,15 @@ function shouldUseMonsterSpecial(kind = "active") {
 }
 
 function savingThrow(target, ability, dc) {
-  const roll = rollD20ForFighter(target).roll;
+  const rollResult = rollD20ForFighter(target);
+  const roll = rollResult.roll;
   const statusBonus = (target.statusEffects ?? []).reduce((sum, effect) => sum + (effect.saveBonus ?? 0), 0);
   const auraBonus = auraSaveBonus(target);
   const bonus = abilityMod(target, ability) + statusBonus + auraBonus;
   const total = roll + bonus;
   const success = total >= dc;
   recordD20OutcomeForFighter(target, success);
-  return { roll, bonus, total, success };
+  return { roll, rolls: rollResult.rolls, rawRolls: rollResult.rawRolls, rollResult, bonus, statusBonus, auraBonus, total, success };
 }
 
 function auraSaveBonus(target) {
@@ -2391,6 +2485,7 @@ async function rollSavingThrow(target, ability, dc, message) {
     }
   }
   addLog(`${target.name} rolls ${ability.toUpperCase()} save: ${save.roll} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
+  addAdminLog(`${target.name} ${ability.toUpperCase()} save breakdown: ${d20RollDetail(save.rollResult)} + ability ${abilityLabel(abilityMod(target, ability))}${save.statusBonus ? ` + status ${save.statusBonus}` : ""}${save.auraBonus ? ` + aura ${save.auraBonus}` : ""} = ${save.total} vs DC ${dc}.`);
   return save;
 }
 
@@ -2417,6 +2512,7 @@ function applySpecialDamage(source, target, damage, type, label) {
   applyDamageToFighter(target, modified.damage);
   const note = modified.reason ? ` ${target.name} is ${modified.reason} to ${type} damage.` : "";
   addLog(`${source.name}'s ${label} deals ${modified.damage} ${type} damage to ${target.name}.${note}`, "damage");
+  if (modified.damage !== damage || modified.reason) addAdminLog(`Damage modifier: ${target.name} incoming ${damage} ${type}, final ${modified.damage}${modified.reason ? ` (${modified.reason})` : ""}.`);
   return modified.damage;
 }
 
@@ -2424,12 +2520,13 @@ function spellcastingAbility(fighter) {
   return fighter?.spellcastingAbility ?? "wis";
 }
 
-function spellSaveDc(fighter) {
-  return 8 + proficiencyBonus(fighter) + abilityMod(fighter, spellcastingAbility(fighter));
+function spellSaveDc(fighter, spell = null) {
+  const ability = spell?.saveDcAbility ?? spellcastingAbility(fighter);
+  return 8 + proficiencyBonus(fighter) + abilityMod(fighter, ability);
 }
 
-function spellAttackBonus(fighter) {
-  return proficiencyBonus(fighter) + abilityMod(fighter, spellcastingAbility(fighter));
+function spellAttackBonus(fighter, spell = null) {
+  return proficiencyBonus(fighter) + abilityMod(fighter, spell?.attackAbility ?? spell?.saveDcAbility ?? spellcastingAbility(fighter));
 }
 
 function spellBaseLevel(spell) {
@@ -2496,6 +2593,12 @@ function canPaySpellCost(caster, spell) {
 
 function canCastSpell(caster, spell) {
   if (!heroCanAct(caster) || !spell || !canPaySpellCost(caster, spell)) return false;
+  if (spell.id === "dragonborn-breath" && (caster.abilityUses?.dragonbornBreath ?? 0) >= 1) return false;
+  if (spell.racialAbilityId) {
+    const ability = fighterAbilityDefinitions(caster).find((entry) => entry.id === spell.racialAbilityId);
+    if (!ability || (caster.level ?? 1) < (ability.level ?? 1)) return false;
+    if ((caster.abilityUses?.[ability.id] ?? 0) >= abilityMaxUses(caster, ability)) return false;
+  }
   if (state.mode === "combat") {
     if (spell.resource === "reaction") return Boolean(caster.hasReaction);
     if (activeFighter()?.id !== caster.id) return false;
@@ -2507,6 +2610,12 @@ function canCastSpell(caster, spell) {
 
 function spendSpellResources(caster, spell) {
   if (spell.concentration) startConcentration(caster, spell);
+  if (spell.id === "dragonborn-breath") {
+    caster.abilityUses = { ...(caster.abilityUses ?? {}), dragonbornBreath: 1 };
+  }
+  if (spell.racialAbilityId) {
+    caster.abilityUses = { ...(caster.abilityUses ?? {}), [spell.racialAbilityId]: (caster.abilityUses?.[spell.racialAbilityId] ?? 0) + 1 };
+  }
   const cost = spellPointCost(spell);
   if (cost > 0) {
     caster.spellPoints = Math.max(0, (caster.spellPoints ?? 0) - cost);
@@ -2548,7 +2657,14 @@ function currentPendingSpellTargeting() {
   if (!pendingSpellTargeting) return null;
   const caster = state.fighters[pendingSpellTargeting.casterId];
   const spell = getContentDefinition("spells", pendingSpellTargeting.spellId);
-  const castSpell = spell ? spellWithCastLevel(spell, pendingSpellTargeting.castLevel) : null;
+  let castSpell = spell ? spellWithCastLevel(spell, pendingSpellTargeting.castLevel) : null;
+  if (castSpell?.id === "dragonborn-breath") {
+    castSpell = {
+      ...castSpell,
+      save: { ...castSpell.save, ability: caster?.racialTraits?.dragonBreathSaveAbility ?? "dex" },
+      effect: { ...castSpell.effect, type: caster?.racialTraits?.dragonDamageType ?? castSpell.effect?.type ?? "fire" },
+    };
+  }
   if (!caster || !castSpell || !canCastSpell(caster, castSpell)) {
     pendingSpellTargeting = null;
     return null;
@@ -2878,6 +2994,11 @@ function breathTemplateTargets(caster, direction, spell) {
 
 function scaledSpellDice(spell) {
   const dice = { ...(spell.effect?.dice ?? { count: 1, sides: 6 }) };
+  if (spell.id === "dragonborn-breath") {
+    const casterLevel = spell.casterLevel ?? 1;
+    dice.count = casterLevel >= 16 ? 5 : casterLevel >= 11 ? 4 : casterLevel >= 6 ? 3 : 2;
+    return dice;
+  }
   if (spellBaseLevel(spell) === 0) {
     const casterLevel = spell.casterLevel ?? 1;
     const multiplier = casterLevel >= 17 ? 4 : casterLevel >= 11 ? 3 : casterLevel >= 5 ? 2 : 1;
@@ -2899,8 +3020,14 @@ async function applySpellDamage(caster, target, spell) {
   const roll = rollDice(dice.count, dice.sides);
   let raw = Math.max(1, roll.total + (dice.bonus ?? 0));
   let save = null;
+  if (spell.id === "dragonborn-breath") {
+    const bonusText = dice.bonus ? ` ${abilityLabel(dice.bonus)}` : "";
+    addLog(`${caster.name}'s Breath Weapon damage roll: ${roll.rolls.join(" + ")}${bonusText} = ${raw} ${spell.effect?.type ?? "damage"}.`, "damage");
+  } else {
+    addAdminLog(`${caster.name}'s ${spell.name} damage roll: ${roll.rolls.join(" + ")}${dice.bonus ? ` ${abilityLabel(dice.bonus)}` : ""} = ${raw} ${spell.effect?.type ?? "damage"}.`);
+  }
   if (spell.save) {
-    save = await rollSavingThrow(target, spell.save.ability, spellSaveDc(caster), `${caster.name}'s ${spell.name} forces ${target.name} to make a ${spell.save.ability.toUpperCase()} save.`);
+    save = await rollSavingThrow(target, spell.save.ability, spellSaveDc(caster, spell), `${caster.name}'s ${spell.name} forces ${target.name} to make a ${spell.save.ability.toUpperCase()} save.`);
     if (save.success && spellBaseLevel(spell) === 0 && !spell.save.halfDamage) {
       addLog(`${target.name} avoids ${spell.name}.`);
       return;
@@ -2914,7 +3041,7 @@ async function applySpellDamage(caster, target, spell) {
 function applySpellHealing(caster, target, spell) {
   const dice = scaledSpellDice(spell);
   const roll = rollDice(dice.count, dice.sides);
-  const bonus = spell.effect?.abilityBonus === "spellcasting" ? abilityMod(caster, spellcastingAbility(caster)) : spell.effect?.bonus ?? 0;
+  const bonus = spell.effect?.abilityBonus === "spellcasting" ? abilityMod(caster, spell?.saveDcAbility ?? spellcastingAbility(caster)) : spell.effect?.bonus ?? 0;
   const healed = applyHealingToHero(target, Math.max(0, roll.total + bonus));
   addLog(`${caster.name}'s ${spell.name} heals ${target.name} for ${healed} HP (${roll.rolls.join(" + ")} ${abilityLabel(bonus)}).`, "heal");
   void maybeFinishEncounterAfterHeroRecovery();
@@ -2923,10 +3050,11 @@ function applySpellHealing(caster, target, spell) {
 async function applySpellAttack(caster, target, spell) {
   const rollResult = rollD20ForFighter(caster);
   const roll = rollResult.roll;
-  const bonus = spellAttackBonus(caster);
+  const bonus = spellAttackBonus(caster, spell);
   const total = roll + bonus;
   const targetAc = armorClass(target);
   addLog(`${caster.name} casts ${spell.name}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.`, "important");
+  addAdminLog(`${caster.name} spell attack breakdown vs ${target.name}: ${d20RollDetail(rollResult)} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}.`);
   recordD20OutcomeForFighter(caster, roll !== 1 && total >= targetAc);
   if (roll === 1 || total < targetAc) {
     addLog(`${spell.name} misses ${target.name}.`);
@@ -2934,8 +3062,10 @@ async function applySpellAttack(caster, target, spell) {
   }
   const dice = scaledSpellDice(spell);
   const damageRoll = rollDice(dice.count * (roll === 20 ? 2 : 1), dice.sides);
-  const extra = spell.effect?.abilityBonus === "spellcasting" ? abilityMod(caster, spellcastingAbility(caster)) : 0;
-  applySpecialDamage(caster, target, Math.max(1, damageRoll.total + (dice.bonus ?? 0) + extra), spell.effect?.type ?? "force", spell.name);
+  const extra = spell.effect?.abilityBonus === "spellcasting" ? abilityMod(caster, spell?.attackAbility ?? spell?.saveDcAbility ?? spellcastingAbility(caster)) : 0;
+  const rawDamage = Math.max(1, damageRoll.total + (dice.bonus ?? 0) + extra);
+  addAdminLog(`${caster.name}'s ${spell.name} hit damage roll: ${damageRoll.rolls.join(" + ")}${dice.bonus ? ` ${abilityLabel(dice.bonus)}` : ""}${extra ? ` + spell ability ${extra}` : ""} = ${rawDamage} ${spell.effect?.type ?? "force"}.`);
+  applySpecialDamage(caster, target, rawDamage, spell.effect?.type ?? "force", spell.name);
   if (spell.effect?.status) await applySpellStatus(caster, target, spell);
 }
 
@@ -2956,12 +3086,14 @@ async function resolveEldritchBlastBeam(caster, target, beamIndex, beamCount) {
   const total = roll + bonus;
   const targetAc = armorClass(target);
   addLog(`${caster.name}'s Eldritch Blast beam ${beamIndex}/${beamCount}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.`, "important");
+  addAdminLog(`${caster.name} Eldritch Blast beam ${beamIndex}/${beamCount} breakdown: ${d20RollDetail(rollResult)} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}.`);
   recordD20OutcomeForFighter(caster, roll !== 1 && total >= targetAc);
   if (roll === 1 || total < targetAc) {
     addLog(`Eldritch Blast misses ${target.name}.`);
     return true;
   }
   const damageRoll = rollDice(roll === 20 ? 2 : 1, 10);
+  addAdminLog(`${caster.name}'s Eldritch Blast damage roll: ${damageRoll.rolls.join(" + ")} = ${Math.max(1, damageRoll.total)} force.`);
   applySpecialDamage(caster, target, Math.max(1, damageRoll.total), "force", "Eldritch Blast");
   if (!target.alive) {
     playSoundEffect("enemyDefeated");
@@ -3018,7 +3150,7 @@ async function confirmPendingEldritchBlast(position) {
 
 async function applySpellStatus(caster, target, spell, options = {}) {
   if (spell.save && !options.skipSave) {
-    const save = await rollSavingThrow(target, spell.save.ability, spellSaveDc(caster), `${caster.name}'s ${spell.name} forces ${target.name} to make a ${spell.save.ability.toUpperCase()} save.`);
+    const save = await rollSavingThrow(target, spell.save.ability, spellSaveDc(caster, spell), `${caster.name}'s ${spell.name} forces ${target.name} to make a ${spell.save.ability.toUpperCase()} save.`);
     if (save.success && spell.save.negatesStatus) {
       addLog(`${target.name} resists ${spell.name}.`);
       return;

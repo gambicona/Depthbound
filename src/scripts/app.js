@@ -1,3 +1,42 @@
+
+const minRoomZoom = 0.5;
+const maxRoomZoom = 2;
+
+function gridPointFromClientPoint(clientX, clientY) {
+  if (!els.room) return viewportCenterGridPoint();
+  const rect = els.room.getBoundingClientRect();
+  if (!rect.width || !rect.height) return viewportCenterGridPoint();
+  return {
+    x: clamp(((clientX - rect.left) / rect.width) * currentGridSize(), 0, currentGridSize()),
+    y: clamp(((clientY - rect.top) / rect.height) * currentGridSize(), 0, currentGridSize()),
+  };
+}
+
+function setRoomZoom(value, focusPoint = viewportCenterGridPoint()) {
+  const nextZoom = clamp(Number(value) || 1, minRoomZoom, maxRoomZoom);
+  const roundedZoom = Number(nextZoom.toFixed(2));
+  if (Math.abs(roomZoom - roundedZoom) < 0.001) {
+    renderControls();
+    return;
+  }
+  roomZoom = roundedZoom;
+  renderKeepingGridFocus(focusPoint);
+}
+
+function adjustRoomZoom(delta, focusPoint = viewportCenterGridPoint()) {
+  setRoomZoom(roomZoom + delta, focusPoint);
+}
+
+function handleDungeonCtrlWheelZoom(event) {
+  if (!event.ctrlKey || !gameHasStarted) return;
+  const target = event.target;
+  if (target?.closest?.("input, textarea, select, .fighter-info")) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const focusPoint = els.roomScroll?.contains(target) ? gridPointFromClientPoint(event.clientX, event.clientY) : viewportCenterGridPoint();
+  adjustRoomZoom(event.deltaY > 0 ? -0.1 : 0.1, focusPoint);
+}
+
 function ensurePerfOverlay() {
   if (perfOverlayElement) return perfOverlayElement;
   perfOverlayElement = document.createElement("div");
@@ -101,6 +140,9 @@ els.showDungeonIntro?.addEventListener("click", () => {
 });
 els.tutorial.addEventListener("click", showTutorial);
 els.mainTutorial?.addEventListener("click", startInteractiveTutorial);
+els.loadMenu?.addEventListener("click", () => showMainMenuSubmenu("load"));
+els.settingsMenu?.addEventListener("click", () => showMainMenuSubmenu("settings"));
+els.mainMenuBack?.addEventListener("click", showMainMenuRoot);
 els.tutorialTourBack?.addEventListener("click", () => {
   if (!interactiveTutorialActive) return;
   interactiveTutorialStep = Math.max(0, interactiveTutorialStep - 1);
@@ -127,37 +169,26 @@ els.toggleLayout.addEventListener("click", () => {
   showDungeonLayout = !showDungeonLayout;
   render();
 });
-els.zoomOut.addEventListener("click", () => {
-  const focusPoint = viewportCenterGridPoint();
-  roomZoom = Math.max(0.5, Number((roomZoom - 0.1).toFixed(1)));
-  renderKeepingGridFocus(focusPoint);
+els.zoomOut.addEventListener("click", () => adjustRoomZoom(-0.1));
+els.zoomIn.addEventListener("click", () => adjustRoomZoom(0.1));
+els.zoomSlider?.addEventListener("input", (event) => {
+  setRoomZoom(Number(event.target.value) / 100);
 });
-els.zoomIn.addEventListener("click", () => {
-  const focusPoint = viewportCenterGridPoint();
-  roomZoom = Math.min(2, Number((roomZoom + 0.1).toFixed(1)));
-  renderKeepingGridFocus(focusPoint);
+els.volumeSliders?.forEach((slider) => {
+  slider.addEventListener("input", (event) => {
+    soundVolume = clamp(Number(event.target.value) / 100, 0, 1);
+    window.localStorage.setItem("dungeonCrawler.soundVolume.v1", String(soundVolume));
+    if (currentMusic) currentMusic.volume = 0.1 * soundVolume;
+    renderControls();
+  });
 });
-els.volumeSlider?.addEventListener("input", (event) => {
-  soundVolume = clamp(Number(event.target.value) / 100, 0, 1);
-  window.localStorage.setItem("dungeonCrawler.soundVolume.v1", String(soundVolume));
-  if (currentMusic) currentMusic.volume = 0.1 * soundVolume;
+els.buttonThemeSelect?.addEventListener("change", (event) => {
+  applyButtonTheme(event.target.value);
   renderControls();
 });
 els.debugKill.addEventListener("click", debugKillVisibleMonsters);
 els.saveGame.addEventListener("click", () => void saveAdventure(state.saveSlotId ?? activeSaveSlot));
-els.chooseSaveFolder?.addEventListener("click", async () => {
-  try {
-    const status = window.DungeonSave?.getStatus?.() ?? {};
-    if (status.mode === "unsupported") {
-      updateSaveStatus("Folder-backed saves do not work in Firefox yet. Try Chrome or another Chromium browser on localhost/HTTPS. Legacy browser saves are still available.");
-      return;
-    }
-    const connected = await window.DungeonSave.chooseSaveFolder();
-    updateSaveStatus(connected ? "Save folder connected. JSON saves will be written there." : "Could not connect the save folder.");
-  } catch (error) {
-    updateSaveStatus(error?.message ?? "Could not choose a save folder.");
-  }
-});
+els.chooseSaveFolder?.addEventListener("click", () => void chooseSaveFolderFromMenu());
 els.startAdventure.addEventListener("click", startNewAdventure);
 els.saveSlots.addEventListener("click", async (event) => {
   const slotElement = event.target.closest("[data-slot]");
@@ -445,8 +476,24 @@ els.roomScroll.addEventListener("pointercancel", finishMapPan);
 els.roomScroll.addEventListener("scroll", () => {
   if (interactiveTutorialActive) updateInteractiveTutorial();
 });
+window.addEventListener("wheel", handleDungeonCtrlWheelZoom, { passive: false, capture: true });
 window.addEventListener("resize", () => {
   if (interactiveTutorialActive) updateInteractiveTutorial();
+});
+window.addEventListener(
+  "pointerdown",
+  () => {
+    updateBackgroundMusic();
+  },
+  { capture: true },
+);
+els.roomScroll.addEventListener("contextmenu", (event) => {
+  if (pendingSpellTargeting || pendingEldritchBlast) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (pendingSpellTargeting) clearPendingSpellTargeting();
+    if (pendingEldritchBlast) cancelPendingEldritchBlast();
+  }
 });
 window.addEventListener("dungeon-save-slots-updated", () => {
   if (!els.mainMenu.classList.contains("hidden")) updateSaveStatus();
@@ -561,6 +608,7 @@ Promise.allSettled([window.DungeonSave.ready, loadPredefinedHeroTokenArt()]).fin
   renderControls();
   updateSaveStatus();
 });
+applyButtonTheme(buttonTheme);
 state = createInitialState();
 render();
 showMainMenu();

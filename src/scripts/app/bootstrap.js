@@ -34,6 +34,7 @@ let activeDialogCancel = null;
 let currentMusicKey = "";
 let currentMusic = null;
 let soundVolume = Number(window.localStorage.getItem("dungeonCrawler.soundVolume.v1") ?? 0.5);
+let buttonTheme = window.localStorage.getItem("dungeonCrawler.buttonTheme.v1") || "verdigris";
 let selectedAttackTargetId = null;
 let selectedHeroIds = new Set();
 let suppressNextHeroClick = false;
@@ -74,6 +75,11 @@ const heroTokenArtStorageKey = "dungeonCrawler.heroTokenArt.v1";
 const heroTokenArtSize = 256;
 const heroTokenPreviewSize = 74;
 const preheroTokenManifestPath = "assets/tokens/preheros/manifest.json";
+const mainMenuBackgrounds = [
+  "assets/backgrounds/Corrupted Forest.png",
+  "assets/backgrounds/Ruined armory of the undead.png",
+];
+const buttonThemes = new Set(["verdigris", "ember", "steel", "royal"]);
 const longMoveFastAfterSteps = 5;
 const longMoveFastMultiplier = 0.45;
 const defaultD20Mode = "karmic";
@@ -85,27 +91,88 @@ const d20ModeLabels = {
 const defaultRaceSelection = { raceId: "human", subraceId: "standard-human", dragonAncestryId: "red", abilityChoices: [] };
 const dragonAncestries = {
   chromatic: {
-    black: { name: "Black", damageType: "acid" },
-    blue: { name: "Blue", damageType: "lightning" },
-    green: { name: "Green", damageType: "poison" },
-    red: { name: "Red", damageType: "fire" },
-    white: { name: "White", damageType: "cold" },
+    black: { name: "Black", damageType: "acid", saveAbility: "dex" },
+    blue: { name: "Blue", damageType: "lightning", saveAbility: "dex" },
+    green: { name: "Green", damageType: "poison", saveAbility: "con" },
+    red: { name: "Red", damageType: "fire", saveAbility: "dex" },
+    white: { name: "White", damageType: "cold", saveAbility: "con" },
   },
   gem: {
-    amethyst: { name: "Amethyst", damageType: "force" },
-    crystal: { name: "Crystal", damageType: "radiant" },
-    emerald: { name: "Emerald", damageType: "psychic" },
-    sapphire: { name: "Sapphire", damageType: "thunder" },
-    topaz: { name: "Topaz", damageType: "necrotic" },
+    amethyst: { name: "Amethyst", damageType: "force", saveAbility: "dex" },
+    crystal: { name: "Crystal", damageType: "radiant", saveAbility: "dex" },
+    emerald: { name: "Emerald", damageType: "psychic", saveAbility: "dex" },
+    sapphire: { name: "Sapphire", damageType: "thunder", saveAbility: "dex" },
+    topaz: { name: "Topaz", damageType: "necrotic", saveAbility: "dex" },
   },
   metallic: {
-    brass: { name: "Brass", damageType: "fire" },
-    bronze: { name: "Bronze", damageType: "lightning" },
-    copper: { name: "Copper", damageType: "acid" },
-    gold: { name: "Gold", damageType: "fire" },
-    silver: { name: "Silver", damageType: "cold" },
+    brass: { name: "Brass", damageType: "fire", saveAbility: "dex" },
+    bronze: { name: "Bronze", damageType: "lightning", saveAbility: "dex" },
+    copper: { name: "Copper", damageType: "acid", saveAbility: "dex" },
+    gold: { name: "Gold", damageType: "fire", saveAbility: "dex" },
+    silver: { name: "Silver", damageType: "cold", saveAbility: "con" },
   },
 };
+
+const skillDefinitions = {
+  acrobatics: { name: "Acrobatics", ability: "dex" },
+  "animal-handling": { name: "Animal Handling", ability: "wis" },
+  arcana: { name: "Arcana", ability: "int" },
+  athletics: { name: "Athletics", ability: "str" },
+  deception: { name: "Deception", ability: "cha" },
+  history: { name: "History", ability: "int" },
+  insight: { name: "Insight", ability: "wis" },
+  intimidation: { name: "Intimidation", ability: "cha" },
+  investigation: { name: "Investigation", ability: "int" },
+  medicine: { name: "Medicine", ability: "wis" },
+  nature: { name: "Nature", ability: "int" },
+  perception: { name: "Perception", ability: "wis" },
+  performance: { name: "Performance", ability: "cha" },
+  persuasion: { name: "Persuasion", ability: "cha" },
+  religion: { name: "Religion", ability: "int" },
+  "sleight-of-hand": { name: "Sleight of Hand", ability: "dex" },
+  stealth: { name: "Stealth", ability: "dex" },
+  survival: { name: "Survival", ability: "wis" },
+};
+const allSkillIds = Object.keys(skillDefinitions);
+const toolDefinitions = {
+  "thieves-tools": { name: "Thieves' Tools", category: "tool" },
+  "disguise-kit": { name: "Disguise Kit", category: "tool" },
+  "forgery-kit": { name: "Forgery Kit", category: "tool" },
+  "herbalism-kit": { name: "Herbalism Kit", category: "tool" },
+  "poisoners-kit": { name: "Poisoner's Kit", category: "tool" },
+  "navigators-tools": { name: "Navigator's Tools", category: "tool" },
+  "smiths-tools": { name: "Smith's Tools", category: "artisan" },
+  "brewers-supplies": { name: "Brewer's Supplies", category: "artisan" },
+  "masons-tools": { name: "Mason's Tools", category: "artisan" },
+  "carpenters-tools": { name: "Carpenter's Tools", category: "artisan" },
+  "cooks-utensils": { name: "Cook's Utensils", category: "artisan" },
+  "painters-supplies": { name: "Painter's Supplies", category: "artisan" },
+  "potters-tools": { name: "Potter's Tools", category: "artisan" },
+  "tinkers-tools": { name: "Tinker's Tools", category: "artisan" },
+  drum: { name: "Drum", category: "instrument" },
+  flute: { name: "Flute", category: "instrument" },
+  horn: { name: "Horn", category: "instrument" },
+  lute: { name: "Lute", category: "instrument" },
+  lyre: { name: "Lyre", category: "instrument" },
+  viol: { name: "Viol", category: "instrument" },
+};
+const musicalInstrumentToolIds = Object.entries(toolDefinitions).filter(([, tool]) => tool.category === "instrument").map(([id]) => id);
+const artisanToolIds = Object.entries(toolDefinitions).filter(([, tool]) => tool.category === "artisan").map(([id]) => id);
+const classProficiencyPlans = {
+  barbarian: { skillChoiceCount: 2, skillChoices: ["animal-handling", "athletics", "intimidation", "nature", "perception", "survival"] },
+  bard: { skillChoiceCount: 3, skillChoices: allSkillIds, toolChoiceCount: 3, toolChoices: musicalInstrumentToolIds, expertiseByLevel: { 3: { count: 2, skillsOnly: true }, 10: { count: 2, skillsOnly: true } } },
+  cleric: { skillChoiceCount: 2, skillChoices: ["history", "insight", "medicine", "persuasion", "religion"] },
+  druid: { skillChoiceCount: 2, skillChoices: ["arcana", "animal-handling", "insight", "medicine", "nature", "perception", "religion", "survival"], toolProficiencies: ["herbalism-kit"] },
+  fighter: { skillChoiceCount: 2, skillChoices: ["acrobatics", "animal-handling", "athletics", "history", "insight", "intimidation", "perception", "survival"] },
+  monk: { skillChoiceCount: 2, skillChoices: ["acrobatics", "athletics", "history", "insight", "religion", "stealth"], toolChoiceCount: 1, toolChoices: [...artisanToolIds, ...musicalInstrumentToolIds] },
+  paladin: { skillChoiceCount: 2, skillChoices: ["athletics", "insight", "intimidation", "medicine", "persuasion", "religion"] },
+  ranger: { skillChoiceCount: 3, skillChoices: ["animal-handling", "athletics", "insight", "investigation", "nature", "perception", "stealth", "survival"] },
+  rogue: { skillChoiceCount: 4, skillChoices: ["acrobatics", "athletics", "deception", "insight", "intimidation", "investigation", "perception", "performance", "persuasion", "sleight-of-hand", "stealth"], toolProficiencies: ["thieves-tools"], expertiseByLevel: { 1: { count: 2, allowedTools: ["thieves-tools"] }, 6: { count: 2, allowedTools: ["thieves-tools"] } } },
+  sorcerer: { skillChoiceCount: 2, skillChoices: ["arcana", "deception", "insight", "intimidation", "persuasion", "religion"] },
+  warlock: { skillChoiceCount: 2, skillChoices: ["arcana", "deception", "history", "intimidation", "investigation", "nature", "religion"] },
+  wizard: { skillChoiceCount: 2, skillChoices: ["arcana", "history", "insight", "investigation", "medicine", "religion"] },
+};
+
 const speciesDefinitions = {
   human: {
     name: "Human",
@@ -121,14 +188,16 @@ const speciesDefinitions = {
       speedFeet: 25,
       damageResistances: ["poison"],
       weaponProficiencies: ["battleaxe", "handaxe", "light-hammer", "warhammer"],
-      traits: ["Dwarven Resilience: poison damage resistance.", "Dwarven Combat Training."],
+      toolChoiceCount: 1,
+      toolChoices: ["smiths-tools", "brewers-supplies", "masons-tools"],
+      traits: ["Dwarven Resilience: poison damage resistance.", "Dwarven Combat Training.", "Tool Proficiency: choose smith's tools, brewer's supplies, or mason's tools."],
     },
     subraces: {
       duergar: {
         name: "Duergar",
         abilityBonuses: { str: 1 },
         traits: ["Duergar Resilience stored for future condition/magic saves."],
-        spellTraits: ["Enlarge/Reduce", "Invisibility"],
+        spellTraits: ["Duergar Enlarge active at level 3", "Invisibility stored for later stealth rules"],
       },
       "hill-dwarf": {
         name: "Hill Dwarf",
@@ -157,25 +226,25 @@ const speciesDefinitions = {
         name: "Drow",
         abilityBonuses: { cha: 1 },
         weaponProficiencies: ["rapier", "shortsword", "crossbow-hand"],
-        spellTraits: ["Dancing Lights", "Faerie Fire", "Darkness"],
+        spellTraits: ["Dancing Lights stored", "Faerie Fire active at level 3", "Darkness stored"],
       },
       eladrin: {
         name: "Eladrin",
         abilityBonuses: { int: 1 },
         weaponProficiencies: ["longsword", "shortsword", "shortbow", "longbow"],
-        traits: ["Fey Step stored for a future teleport action."],
+        traits: ["Fey Step: short-rest bonus-action teleport."],
       },
       "high-elf": {
         name: "High Elf",
         abilityBonuses: { int: 1 },
         weaponProficiencies: ["longsword", "shortsword", "shortbow", "longbow"],
-        spellTraits: ["Wizard Cantrip"],
+        spellTraits: ["High Elf Fire Bolt cantrip"],
       },
       "shadar-kai": {
         name: "Shadar-kai",
         abilityBonuses: { con: 1 },
         damageResistances: ["necrotic"],
-        traits: ["Blessing of the Raven Queen stored for a future teleport action."],
+        traits: ["Blessing of the Raven Queen: short-rest bonus-action teleport."],
       },
       "wood-elf": {
         name: "Wood Elf",
@@ -191,7 +260,7 @@ const speciesDefinitions = {
     base: {
       abilityBonuses: { str: 2, cha: 1 },
       speedFeet: 30,
-      traits: ["Draconic Resistance from ancestry.", "Breath Weapon stored for a future area action."],
+      traits: ["Draconic Resistance from ancestry.", "Breath Weapon: 15 ft ancestral cone."],
     },
     subraces: {
       chromatic: { name: "Chromatic", dragonCategory: "chromatic", traits: ["Chromatic Warding stored for future use."] },
@@ -204,8 +273,8 @@ const speciesDefinitions = {
     base: { abilityBonuses: { int: 2 }, speedFeet: 25, size: "small", traits: ["Gnome Cunning stored for future magic-save context."] },
     subraces: {
       "deep-gnome": { name: "Deep Gnome", abilityBonuses: { dex: 1 }, traits: ["Stone Camouflage stored for future stealth rules."] },
-      "forest-gnome": { name: "Forest Gnome", abilityBonuses: { dex: 1 }, spellTraits: ["Minor Illusion"], traits: ["Speak with Small Beasts omitted for dungeon combat."] },
-      "rock-gnome": { name: "Rock Gnome", abilityBonuses: { con: 1 }, traits: ["Artificer's Lore and Tinker stored for future noncombat/tool systems."] },
+      "forest-gnome": { name: "Forest Gnome", abilityBonuses: { dex: 1 }, spellTraits: ["Minor Illusion cantrip"], traits: ["Speak with Small Beasts omitted for dungeon combat."] },
+      "rock-gnome": { name: "Rock Gnome", abilityBonuses: { con: 1 }, toolProficiencies: ["tinkers-tools"], traits: ["Artificer's Lore stored for future lore checks.", "Tinker: proficiency with tinker's tools."] },
     },
   },
   "half-elf": {
@@ -214,11 +283,12 @@ const speciesDefinitions = {
       abilityBonuses: { cha: 2 },
       speedFeet: 30,
       abilityChoiceCount: 2,
-      traits: ["Fey Ancestry stored for future charm/sleep handling.", "Skill Versatility omitted until skill choices exist."],
+      skillChoiceCount: 2,
+      traits: ["Fey Ancestry stored for future charm/sleep handling.", "Skill Versatility: choose two skill proficiencies."],
     },
     subraces: {
-      "drow-half-elf": { name: "Drow Descent", spellTraits: ["Drow Magic"] },
-      "high-half-elf": { name: "High Elf Descent", spellTraits: ["Wizard Cantrip"] },
+      "drow-half-elf": { name: "Drow Descent", spellTraits: ["Drow Faerie Fire active at level 3"] },
+      "high-half-elf": { name: "High Elf Descent", spellTraits: ["High Elf Fire Bolt cantrip"] },
       "wood-half-elf": { name: "Wood Elf Descent", traits: ["Wood elf descent stored; Fleet of Foot choice is not auto-applied."] },
     },
   },
@@ -251,18 +321,72 @@ const speciesDefinitions = {
       "standard-half-orc": { name: "Standard Half-Orc" },
     },
   },
+  aasimar: {
+    name: "Aasimar",
+    base: {
+      abilityBonuses: { cha: 2 },
+      speedFeet: 30,
+      damageResistances: ["necrotic", "radiant"],
+      traits: ["Celestial Resistance: necrotic and radiant damage resistance.", "Healing Hands: heal a nearby hero once per long rest.", "Light Bearer stored; light has no current dungeon effect."],
+    },
+    subraces: {
+      protector: { name: "Protector", abilityBonuses: { wis: 1 }, traits: ["Radiant Soul active at level 3 as a radiant combat transformation."] },
+      scourge: { name: "Scourge", abilityBonuses: { con: 1 }, traits: ["Radiant Consumption active at level 3 as a dangerous radiant combat transformation."] },
+      fallen: { name: "Fallen", abilityBonuses: { str: 1 }, traits: ["Necrotic Shroud active at level 3 as a frightening necrotic combat transformation."] },
+    },
+  },
+  goliath: {
+    name: "Goliath",
+    base: {
+      abilityBonuses: { str: 2, con: 1 },
+      speedFeet: 30,
+      damageResistances: ["cold"],
+      skillProficiencies: ["athletics"],
+      traits: ["Natural Athlete: Athletics proficiency.", "Stone's Endurance: reaction damage reduction once per short rest.", "Powerful Build stored for future carrying rules.", "Mountain Born: cold damage resistance."],
+    },
+    subraces: {
+      "elemental-evil": { name: "Elemental Evil" },
+    },
+  },
+  "yuan-ti": {
+    name: "Yuan-ti",
+    base: {
+      abilityBonuses: { cha: 2, int: 1 },
+      speedFeet: 30,
+      damageImmunities: ["poison"],
+      traits: ["Magic Resistance stored for future spell-save context.", "Poison Immunity: immune to poison damage.", "Poisoned condition immunity stored for future condition rules."],
+      spellTraits: ["Poison Spray cantrip", "Suggestion active at level 3", "Animal Friendship stored for future beast/social rules"],
+    },
+    subraces: {
+      pureblood: { name: "Pureblood" },
+    },
+  },
+  genasi: {
+    name: "Genasi",
+    base: {
+      abilityBonuses: { con: 2 },
+      speedFeet: 30,
+      traits: ["Elemental heritage. Utility breathing/swimming/terrain traits are stored where relevant."],
+    },
+    subraces: {
+      air: { name: "Air", abilityBonuses: { dex: 1 }, speedFeet: 30, traits: ["Unending Breath stored."], spellTraits: ["Levitate active at level 3"] },
+      earth: { name: "Earth", abilityBonuses: { str: 1 }, traits: ["Earth Walk stored for future terrain rules."], spellTraits: ["Blade Ward cantrip", "Pass without Trace stored for future stealth rules"] },
+      fire: { name: "Fire", abilityBonuses: { int: 1 }, damageResistances: ["fire"], traits: ["Fire Resistance: fire damage resistance."], spellTraits: ["Produce Flame cantrip", "Burning Hands active at level 3"] },
+      water: { name: "Water", abilityBonuses: { wis: 1 }, damageResistances: ["acid"], traits: ["Acid Resistance: acid damage resistance.", "Amphibious and swim speed stored for future water rules."], spellTraits: ["Acid Splash cantrip"] },
+    },
+  },
   tiefling: {
     name: "Tiefling",
     base: { speedFeet: 30, damageResistances: ["fire"], traits: ["Hellish Resistance: fire damage resistance."] },
     subraces: {
-      baalzebul: { name: "Baalzebul", abilityBonuses: { cha: 2, int: 1 }, spellTraits: ["Thaumaturgy", "Ray of Sickness", "Crown of Madness"] },
+      baalzebul: { name: "Baalzebul", abilityBonuses: { cha: 2, int: 1 }, spellTraits: ["Thaumaturgy stored", "Ray of Sickness active at level 3", "Crown of Madness stored"] },
       dispater: { name: "Dispater", abilityBonuses: { cha: 2, dex: 1 }, spellTraits: ["Thaumaturgy", "Disguise Self", "Detect Thoughts"] },
       fierna: { name: "Fierna", abilityBonuses: { cha: 2, wis: 1 }, spellTraits: ["Friends", "Charm Person", "Suggestion"] },
-      glasya: { name: "Glasya", abilityBonuses: { cha: 2, dex: 1 }, spellTraits: ["Minor Illusion", "Disguise Self", "Invisibility"] },
-      levistus: { name: "Levistus", abilityBonuses: { cha: 2, con: 1 }, spellTraits: ["Ray of Frost", "Armor of Agathys", "Darkness"] },
+      glasya: { name: "Glasya", abilityBonuses: { cha: 2, dex: 1 }, spellTraits: ["Minor Illusion cantrip", "Disguise Self stored", "Invisibility stored"] },
+      levistus: { name: "Levistus", abilityBonuses: { cha: 2, con: 1 }, spellTraits: ["Ray of Frost cantrip", "Armor of Agathys active at level 3", "Darkness stored"] },
       mammon: { name: "Mammon", abilityBonuses: { cha: 2, int: 1 }, spellTraits: ["Mage Hand", "Tenser's Floating Disk", "Arcane Lock"] },
-      mephistopheles: { name: "Mephistopheles", abilityBonuses: { cha: 2, int: 1 }, spellTraits: ["Mage Hand", "Burning Hands", "Flame Blade"] },
-      zariel: { name: "Zariel", abilityBonuses: { cha: 2, str: 1 }, spellTraits: ["Thaumaturgy", "Searing Smite", "Branding Smite"] },
+      mephistopheles: { name: "Mephistopheles", abilityBonuses: { cha: 2, int: 1 }, spellTraits: ["Mage Hand stored", "Burning Hands active at level 3", "Flame Blade stored"] },
+      zariel: { name: "Zariel", abilityBonuses: { cha: 2, str: 1 }, spellTraits: ["Thaumaturgy stored", "Searing Smite stored", "Branding Smite active at level 3"] },
     },
   },
 };
@@ -328,7 +452,12 @@ const classPredefinedAbilityScores = {
 
 const els = {
   mainMenu: document.querySelector("#main-menu"),
+  menuActions: document.querySelector(".menu-actions"),
+  mainMenuBack: document.querySelector("#main-menu-back"),
   startAdventure: document.querySelector("#start-adventure"),
+  loadMenu: document.querySelector("#load-menu"),
+  settingsMenu: document.querySelector("#settings-menu"),
+  mainSettings: document.querySelector("#main-settings"),
   chooseSaveFolder: document.querySelector("#choose-save-folder"),
   mainTutorial: document.querySelector("#main-tutorial"),
   saveSlots: document.querySelector("#save-slots"),
@@ -386,8 +515,10 @@ const els = {
   zoomIn: document.querySelector("#zoom-in"),
   zoomOut: document.querySelector("#zoom-out"),
   zoomLabel: document.querySelector("#zoom-label"),
-  volumeSlider: document.querySelector("#volume-slider"),
-  volumeLabel: document.querySelector("#volume-label"),
+  zoomSlider: document.querySelector("#zoom-slider"),
+  volumeSliders: Array.from(document.querySelectorAll(".volume-slider")),
+  volumeLabels: Array.from(document.querySelectorAll(".volume-label")),
+  buttonThemeSelect: document.querySelector("#button-theme-select"),
   debugKill: document.querySelector("#debug-kill"),
   clearLog: document.querySelector("#clear-log"),
   gameDialog: document.querySelector("#game-dialog"),

@@ -1,10 +1,10 @@
 Race / Species Implementation Log
-Updated: 2026-05-08
+Updated: 2026-05-15
 
 Overview
-This update adds race/species selection to hero creation. The flow now asks for a hero name and token picture first, then asks for race/species and subrace, then proceeds to ability score generation and starting gear.
+Race/species selection is part of hero creation and roster creation. The chosen race, subrace, Dragonborn ancestry, and Half-Elf ability choices are stored on each hero and normalized for older saves.
 
-The selected race data is stored directly on the hero and therefore becomes part of normal save files. Existing older saves are normalized to a default Human / Standard Human selection when they do not yet have race data.
+The spell/action system now supports a first wave of active racial powers. Features that fit the current dungeon-combat model are usable from the Abilities or Spells menus; features that need light, social play, languages, tool scenes, or condition-tagged saving throw context remain stored as traits for later systems.
 
 
 Creation Flow
@@ -15,255 +15,243 @@ Creation Flow
 5. For Half-Elf, choose the two +1 ability score bonuses.
 6. Choose ability score method.
 7. Assign ability scores.
-8. Choose starting gear.
-9. Choose d20 luck mode.
-10. Start the dungeon.
+8. Choose class spells/cantrips where applicable.
+9. Choose starting gear.
+10. Choose d20 luck mode.
+11. Start the dungeon.
 
 Roster hero creation at the Planning Table uses the same race/species flow.
 
 
-Ability Score Handling
-Race/species ability score increases are applied to the final hero stats, not just shown cosmetically.
+Implemented Engine Hooks
 
-The stat assignment UI now shows racial bonuses next to each ability. For example, Human shows +1 on STR, DEX, CON, INT, WIS, and CHA. If a player assigns 15 STR to a Human, the select option displays it as 15 +1 = 16.
+Ability scores and movement
+- Race/species ability score increases are applied to stored hero abilityScores.
+- The stat assignment UI shows racial bonuses while assigning scores.
+- Race speed is stored as baseSpeedFeet/speedFeet and is used by movement.
+- Size is stored for Small races, though size-specific movement rules are still future work.
 
-The stored hero abilityScores already include the racial bonus. This keeps the rest of the existing combat math simple, because attack rolls, saving throws, AC, initiative, HP, and checks already read from abilityScore and abilityMod.
+Damage resistances
+- Race-based resistances are stored in fighter.damageResistances.
+- Existing damage modifier logic reads those resistances for attacks, traps, monster specials, and spell damage.
+- Status effects can now contribute temporary resistances too, used by some spell-like features.
+
+Racial active powers
+- Racial powers are injected into fighter abilities automatically from the hero's race/subrace.
+- Per-rest racial spells consume their racial use, not spell points.
+- Targeting, action costs, saving throws, and damage rolls reuse the normal spell system.
+- Right-click cancellation works for racial spell targeting because these powers use the same targeting pipeline.
+
+Racial cantrips
+- Implemented as always-available spell entries, independent of class spell points.
+- They still consume the normal action/bonus action required by the spell.
+
+Rest handling
+- Short-rest racial powers refresh on short rest and long rest.
+- Long-rest racial powers refresh when the hero returns home / takes a long rest.
 
 
 Implemented Races / Species
 
 Human
-- Standard Human
-- Implemented:
-  - +1 STR
-  - +1 DEX
-  - +1 CON
-  - +1 INT
-  - +1 WIS
-  - +1 CHA
+- Standard Human:
+  - +1 STR, DEX, CON, INT, WIS, CHA
   - 30 ft walking speed
 
 
 Dwarf
-Base dwarf implemented:
+Base dwarf:
 - +2 CON
 - 25 ft walking speed
 - Poison damage resistance
-- Weapon proficiencies stored:
-  - Battleaxe
-  - Handaxe
-  - Light Hammer
-  - Warhammer
+- Stored weapon proficiencies: Battleaxe, Handaxe, Light Hammer, Warhammer
 
-Duergar implemented:
-- Base dwarf traits
+Duergar:
 - +1 STR
-- Duergar magic traits are stored for later spell/action systems.
+- Duergar Enlarge active at level 3:
+  - Once per long rest
+  - Action
+  - Grants temporary HP and bonus weapon damage for 3 rounds
+- Invisibility remains stored until stealth/visibility rules are deeper.
 
-Hill Dwarf implemented:
-- Base dwarf traits
+Hill Dwarf:
 - +1 WIS
-- Dwarven Toughness:
-  - +1 max HP at level 1
-  - +1 additional max HP every time the hero gains a level
+- Dwarven Toughness: +1 max HP per level
 
-Mountain Dwarf implemented:
-- Base dwarf traits
+Mountain Dwarf:
 - +2 STR
-- Light armor proficiency stored
-- Medium armor proficiency stored
+- Light and medium armor proficiencies stored
 
 Not implemented yet:
 - Darkvision
-- Advantage against poison saving throws
+- Poison-save advantage
 - Tool proficiencies
 - Stonecunning
-- Duergar sunlight sensitivity, invisibility, enlarge/reduce, and similar magic traits as active powers
+- Duergar sunlight sensitivity and invisibility
 
 
 Elf
-Base elf implemented:
+Base elf:
 - +2 DEX
 - 30 ft walking speed
 - Perception proficiency stored
-- Fey Ancestry stored for future condition-aware saving throws
+- Fey Ancestry stored for future charm/sleep save context
 
-Drow implemented:
-- Base elf traits
+Drow:
 - +1 CHA
-- Weapon proficiencies stored:
-  - Rapier
-  - Shortsword
-  - Hand Crossbow
-- Drow magic traits are stored for later spell/action systems.
+- Stored weapon proficiencies: Rapier, Shortsword, Hand Crossbow
+- Drow Faerie Fire active at level 3:
+  - Once per long rest
+  - Action
+  - DEX save or targets are Revealed briefly
+- Dancing Lights and Darkness remain stored; the light/obscurement model is not complete enough for full fidelity.
 
-Eladrin implemented:
-- Base elf traits
+Eladrin:
 - +1 INT
-- Weapon proficiencies stored:
-  - Longsword
-  - Shortsword
-  - Shortbow
-  - Longbow
-- Fey Step is stored for a future teleport action.
+- Stored weapon proficiencies: Longsword, Shortsword, Shortbow, Longbow
+- Fey Step active:
+  - Once per short rest
+  - Bonus action
+  - Teleports to a visible empty square within 30 ft
 
-High Elf implemented:
-- Base elf traits
+High Elf:
 - +1 INT
-- Weapon proficiencies stored:
-  - Longsword
-  - Shortsword
-  - Shortbow
-  - Longbow
-- Wizard cantrip choice is stored for later spell systems.
+- Stored weapon proficiencies: Longsword, Shortsword, Shortbow, Longbow
+- High Elf Fire Bolt cantrip active:
+  - At will
+  - Uses INT for the spell attack
 
-Shadar-kai implemented:
-- Base elf traits
+Shadar-kai:
 - +1 CON
 - Necrotic damage resistance
-- Blessing of the Raven Queen is stored for a future teleport action.
+- Blessing of the Raven Queen active:
+  - Once per short rest
+  - Bonus action
+  - Teleports to a visible empty square within 30 ft
 
-Wood Elf implemented:
-- Base elf traits
+Wood Elf:
 - +1 WIS
 - 35 ft walking speed
-- Weapon proficiencies stored:
-  - Longsword
-  - Shortsword
-  - Shortbow
-  - Longbow
-- Mask of the Wild is stored for future stealth rules.
+- Stored weapon proficiencies: Longsword, Shortsword, Shortbow, Longbow
+- Mask of the Wild remains stored for future stealth rules.
 
 Not implemented yet:
 - Darkvision
 - Trance
-- Charm and sleep advantage from Fey Ancestry
+- Fey Ancestry saving throw effects
 - Drow sunlight sensitivity
-- Any racial spells/cantrips
+- Full light/darkness interaction
 - Wood Elf stealth benefits
-- Teleport powers
 
 
 Dragonborn
-Base dragonborn implemented:
+Base Dragonborn:
 - +2 STR
 - +1 CHA
 - 30 ft walking speed
 - Draconic ancestry selection
 - Damage resistance based on ancestry damage type
+- Breath Weapon active:
+  - Once per short rest
+  - Action
+  - 15 ft cone
+  - Save DC = 8 + CON modifier + proficiency bonus
+  - Save type follows ancestry
+  - Damage type follows ancestry
+  - Damage scales: 2d6 at levels 1-5, 3d6 at 6, 4d6 at 11, 5d6 at 16
+  - Combat log shows the actual damage dice roll before saves are applied
 
-Chromatic Dragonborn implemented:
-- Black: acid resistance
-- Blue: lightning resistance
-- Green: poison resistance
-- Red: fire resistance
-- White: cold resistance
-- Chromatic Warding is stored for later active-use systems.
+Chromatic Dragonborn:
+- Black acid, Blue lightning, Green poison, Red fire, White cold resistance and breath type
+- Chromatic Warding remains stored.
 
-Gem Dragonborn implemented:
-- Amethyst: force resistance
-- Crystal: radiant resistance
-- Emerald: psychic resistance
-- Sapphire: thunder resistance
-- Topaz: necrotic resistance
-- Psionic Mind and Gem Flight are stored for future systems.
+Gem Dragonborn:
+- Amethyst force, Crystal radiant, Emerald psychic, Sapphire thunder, Topaz necrotic resistance and breath type
+- Psionic Mind and Gem Flight remain stored.
 
-Metallic Dragonborn implemented:
-- Brass: fire resistance
-- Bronze: lightning resistance
-- Copper: acid resistance
-- Gold: fire resistance
-- Silver: cold resistance
-- Metallic Breath Weapon is stored for future active-use systems.
+Metallic Dragonborn:
+- Brass fire, Bronze lightning, Copper acid, Gold fire, Silver cold resistance and breath type
+- Metallic special breath effects remain stored.
 
 Not implemented yet:
-- Breath weapon attacks
-- Chromatic Warding active resistance/immunity effect
+- Chromatic Warding active immunity/resistance surge
 - Gem flight
 - Psionic Mind
-- Metallic special breath effects
+- Metallic special breath riders
 
 
 Gnome
-Base gnome implemented:
+Base gnome:
 - +2 INT
 - 25 ft walking speed
 - Small size stored
 - Gnome Cunning stored for future magic-save context
 
-Deep Gnome implemented:
-- Base gnome traits
+Deep Gnome:
 - +1 DEX
-- Stone Camouflage stored for future stealth rules.
+- Stone Camouflage stored for future stealth rules
 
-Forest Gnome implemented:
-- Base gnome traits
+Forest Gnome:
 - +1 DEX
-- Minor Illusion stored for later spell systems.
+- Minor Illusion cantrip active:
+  - At will
+  - Action
+  - Grants a brief defensive distraction in the current combat model
+- Speak with Small Beasts omitted until social/noncombat systems exist.
 
-Rock Gnome implemented:
-- Base gnome traits
+Rock Gnome:
 - +1 CON
-- Artificer's Lore and Tinker stored for future noncombat/tool systems.
+- Artificer's Lore and Tinker stored for future tool/noncombat systems
 
 Not implemented yet:
 - Darkvision
 - Gnome Cunning advantage against magic saves
-- Illusion cantrip
 - Tool/noncombat features
 - Small creature movement through larger creatures
 
 
 Half-Elf
-Base Half-Elf implemented:
+Base Half-Elf:
 - +2 CHA
 - Player chooses two different ability scores for +1 each
 - 30 ft walking speed
-- Fey Ancestry stored for future condition-aware saving throws
+- Fey Ancestry stored for future charm/sleep save context
 
-Drow Half-Elf implemented:
-- Base Half-Elf traits
-- Drow Magic stored for later spell systems.
+Drow Half-Elf:
+- Drow Faerie Fire active at level 3, using the same implementation as Drow
 
-High Half-Elf implemented:
-- Base Half-Elf traits
-- Wizard cantrip stored for later spell systems.
+High Half-Elf:
+- High Elf Fire Bolt cantrip active, using INT for the spell attack
 
-Wood Half-Elf implemented:
-- Base Half-Elf traits
-- Wood elf descent stored.
+Wood Half-Elf:
+- Wood elf descent stored
 
 Not implemented yet:
 - Darkvision
 - Fey Ancestry saving throw effects
 - Skill Versatility choices
-- Drow/High Elf spells and cantrips
-- Wood Elf Fleet of Foot or Mask of the Wild choice
+- Wood Elf Fleet of Foot / Mask of the Wild choice
 
 
 Halfling
-Base Halfling implemented:
+Base Halfling:
 - +2 DEX
 - 25 ft walking speed
 - Small size stored
 - Lucky:
-  - When a friendly/player-controlled Halfling rolls a natural 1 on a d20, the game rerolls once.
-  - This is applied inside the shared d20 roll helper, so it affects attacks, saves, checks, death saves, and similar d20 rolls.
-- Brave is stored for future frightened-condition saving throws.
-- Nimbleness is stored for future size-aware movement.
+  - Friendly/player-controlled Halflings reroll a natural 1 on d20 rolls once
+  - Applies through the shared d20 helper, so attacks, saves, checks, and death saves benefit
+- Brave and Nimbleness remain stored.
 
-Ghostwise Halfling implemented:
-- Base Halfling traits
+Ghostwise Halfling:
 - +1 WIS
-- Silent Speech omitted until social/telepathy systems exist.
+- Silent Speech omitted until social/telepathy systems exist
 
-Lightfoot Halfling implemented:
-- Base Halfling traits
+Lightfoot Halfling:
 - +1 CHA
-- Naturally Stealthy stored for future stealth rules.
+- Naturally Stealthy stored for future stealth rules
 
-Stout Halfling implemented:
-- Base Halfling traits
+Stout Halfling:
 - +1 CON
 - Poison damage resistance
 
@@ -272,131 +260,139 @@ Not implemented yet:
 - Nimbleness movement through larger creatures
 - Naturally Stealthy
 - Silent Speech
-- Poison saving throw advantage
+- Poison-save advantage
 
 
 Half-Orc
-Standard Half-Orc implemented:
+Standard Half-Orc:
 - +2 STR
 - +1 CON
 - 30 ft walking speed
 - Intimidation proficiency stored
 - Relentless Endurance:
-  - If reduced to 0 HP from above 0 HP, the hero drops to 1 HP instead.
-  - This can happen once, then resets after returning home / long rest.
+  - Once per long rest, dropping from above 0 HP to 0 HP leaves the hero at 1 HP
 - Savage Attacks:
-  - On a critical hit with a melee attack, the hero rolls one additional weapon damage die and adds it to damage.
+  - On melee critical hits, one extra weapon damage die is added
 
 Not implemented yet:
 - Darkvision
-- Menacing as an active social skill beyond storing Intimidation proficiency
+- Menacing as active social gameplay beyond stored Intimidation proficiency
 
 
 Tiefling
-Base Tiefling implemented:
+Base Tiefling:
 - 30 ft walking speed
 - Fire damage resistance
 
-Baalzebul implemented:
-- +2 CHA
-- +1 INT
-- Thaumaturgy, Ray of Sickness, and Crown of Madness stored for later spell systems.
+Baalzebul:
+- +2 CHA, +1 INT
+- Ray of Sickness active at level 3:
+  - Once per long rest
+  - Action
+  - CHA spell attack for poison damage and a brief attack penalty
+- Thaumaturgy and Crown of Madness remain stored.
 
-Dispater implemented:
-- +2 CHA
-- +1 DEX
-- Thaumaturgy, Disguise Self, and Detect Thoughts stored for later spell systems.
+Dispater:
+- +2 CHA, +1 DEX
+- Disguise Self and Detect Thoughts remain stored because they need social/utility gameplay.
 
-Fierna implemented:
-- +2 CHA
-- +1 WIS
-- Friends, Charm Person, and Suggestion stored for later spell systems.
+Fierna:
+- +2 CHA, +1 WIS
+- Friends, Charm Person, and Suggestion remain stored because they need social/condition-rich gameplay.
 
-Glasya implemented:
-- +2 CHA
-- +1 DEX
-- Minor Illusion, Disguise Self, and Invisibility stored for later spell systems.
+Glasya:
+- +2 CHA, +1 DEX
+- Minor Illusion cantrip active
+- Disguise Self and Invisibility remain stored.
 
-Levistus implemented:
-- +2 CHA
-- +1 CON
-- Ray of Frost, Armor of Agathys, and Darkness stored for later spell systems.
+Levistus:
+- +2 CHA, +1 CON
+- Ray of Frost cantrip active:
+  - At will
+  - Uses CHA for the spell attack
+- Armor of Agathys active at level 3:
+  - Once per long rest
+  - Action
+  - Grants icy protection, temporary HP, and brief cold resistance
+- Darkness remains stored until light/obscurement rules are stronger.
 
-Mammon implemented:
-- +2 CHA
-- +1 INT
-- Mage Hand, Tenser's Floating Disk, and Arcane Lock stored for later spell systems.
+Mammon:
+- +2 CHA, +1 INT
+- Mage Hand / Tenser's Floating Disk / Arcane Lock remain stored as utility magic.
 
-Mephistopheles implemented:
-- +2 CHA
-- +1 INT
-- Mage Hand, Burning Hands, and Flame Blade stored for later spell systems.
+Mephistopheles:
+- +2 CHA, +1 INT
+- Burning Hands active at level 3:
+  - Once per long rest
+  - Action
+  - 15 ft cone, DEX save for half fire damage
+- Mage Hand and Flame Blade remain stored.
 
-Zariel implemented:
-- +2 CHA
-- +1 STR
-- Thaumaturgy, Searing Smite, and Branding Smite stored for later spell systems.
+Zariel:
+- +2 CHA, +1 STR
+- Branding Smite active at level 3:
+  - Once per long rest
+  - Bonus action / weapon rider
+  - Next weapon hit this turn adds radiant branding damage
+- Thaumaturgy and Searing Smite remain stored.
 
 Not implemented yet:
 - Darkvision
-- All innate spellcasting
-- Any social or utility-only magic
-
-
-Implemented Engine Hooks
-
-Damage resistances:
-- Race-based resistances are stored in fighter.damageResistances.
-- Existing damage modifier logic already reads damageResistances, so poison/fire/etc. resistance works with normal attacks, traps, monster specials, and other damage packets that declare a damage type.
-
-Speed:
-- Race speed is stored as baseSpeedFeet and speedFeet.
-- Existing movement logic uses speedFeet, so 25 ft / 30 ft / 35 ft movement works automatically.
-
-Max HP:
-- Hill Dwarf Dwarven Toughness is stored as racialHpPerLevel.
-- It applies at creation and during level-up.
-
-Halfling Lucky:
-- Implemented inside rollD20ForFighter.
-- It rerolls natural 1s before the visible roll is finalized.
-- It stacks with the existing d20 luck modes, including Karmic and Tymora's Favorite.
-
-Relentless Endurance:
-- Implemented inside applyDamageToFighter.
-- It triggers only when a party hero drops from above 0 HP to 0 HP.
-- It does not trigger while already down.
-- It resets when the hero is rested/prepared at home.
-
-Savage Attacks:
-- Implemented inside makeAttack.
-- It adds one extra weapon damage die on melee critical hits.
-- It does not apply to ranged attacks.
-
-Character inspection:
-- The inspect panel now shows species/subrace, resistances, stored proficiencies, and stored future traits when present.
+- Utility-only and social-only innate spells
+- Full invisibility/stealth/light interactions
 
 
 Known Limitations / Future Work
 
-No light system:
-- Darkvision has no current gameplay effect and is therefore not implemented.
+No full light system yet
+- Darkvision, Dancing Lights, Darkness, sunlight sensitivity, and related features are either inactive or simplified.
 
-No spell system:
-- Innate spells, cantrips, breath weapons, teleport powers, and similar active supernatural features are stored but not usable.
-- The data is structured so later spell/action work can read racialTraits.spellTraits and dragon damage metadata.
+Limited condition-tagged saving throw context
+- Fey Ancestry, Gnome Cunning, Brave, poison-save advantage, and similar traits need saving throws to know whether they are against charm, sleep, magic, poison, frightened, etc.
 
-No condition-tagged saving throw context:
-- Traits like Fey Ancestry and Gnome Cunning need saves to know whether a roll is against charm, sleep, magic, etc.
-- Current savingThrow only knows target, ability, and DC, so these traits are stored but inactive.
+Limited social/tool gameplay
+- Languages, tool proficiencies, social magic, disguise magic, telepathy, age, alignment, and similar features are stored or omitted until the game has scenes where they matter.
 
-No tool/social skill gameplay:
-- Tool proficiencies, languages, age, alignment, social features, and similar traits are omitted or stored only as notes.
+Proficiency enforcement remains soft
+- Weapon and armor proficiencies are stored and displayed.
+- The current equipment/attack system mostly permits use rather than blocking gear outright.
 
-Proficiency enforcement:
-- Weapon and armor proficiencies are stored and displayed, but the current equipment/attack system does not yet restrict use based on proficiency.
-- This is intentional for now because the existing fighter can already use most gear and the game does not have class/race proficiency enforcement yet.
+Legacy rule mix
+- The project uses mostly 2014-style 5e race/species rules with some later playable options.
+- Where tabletop features do not map cleanly to the current dungeon engine, they are adapted conservatively or stored for later.
 
-Legacy rule mix:
-- The request asked for 2014-style 5e rules and also included some later playable options.
-- The implementation uses 2014-era PHB/Mordenkainen-style ability bonuses where practical, and stores later/spell-heavy features for future systems.
+2026-05-16 Addendum - New Lineages
+
+Creation UI
+- Race/species summaries now show stored traits, innate magic notes, currently usable racial abilities, racial cantrips, damage immunities, proficiencies, speed, and ability bonuses.
+
+Aasimar (Volo version)
+- Added as a race with Protector, Scourge, and Fallen subraces.
+- Base: +2 CHA, 30 ft speed, necrotic/radiant resistance.
+- Healing Hands active: once per long rest, action, heals self or adjacent hero for HP equal to level.
+- Protector: +1 WIS, Radiant Soul active at level 3 as a radiant combat form.
+- Scourge: +1 CON, Radiant Consumption active at level 3 as a stronger but riskier radiant combat form.
+- Fallen: +1 STR, Necrotic Shroud active at level 3 as a close fear effect.
+- Light Bearer remains stored until light matters mechanically.
+
+Goliath (Elemental Evil version)
+- Added as a race with Elemental Evil subrace.
+- +2 STR, +1 CON, 30 ft speed, Athletics proficiency, cold resistance.
+- Stone's Endurance active as a reaction prompt when damaged: 1d12 + CON damage reduction, once per short rest.
+- Powerful Build and high-altitude acclimation are stored/noncombat.
+
+Yuan-ti Pureblood (Volo version)
+- Added as Yuan-ti race with Pureblood subrace.
+- +2 CHA, +1 INT, 30 ft speed.
+- Poison damage immunity implemented.
+- Poison Spray cantrip active using CHA.
+- Suggestion active at level 3 as a once-per-long-rest disabling command.
+- Animal Friendship and full Magic Resistance are stored until beast/social and spell-save context systems are richer.
+
+Genasi (Elemental Evil version)
+- Added Genasi as one race with Air, Earth, Fire, and Water subraces.
+- Base: +2 CON, 30 ft speed.
+- Air: +1 DEX, Levitate active at level 3 as a defensive mobility buff. Unending Breath stored.
+- Earth: +1 STR, Blade Ward cantrip active. Earth Walk and Pass without Trace stored.
+- Fire: +1 INT, fire resistance, Produce Flame cantrip active, Burning Hands active at level 3.
+- Water: +1 WIS, acid resistance, Acid Splash cantrip active. Amphibious and swim speed stored.

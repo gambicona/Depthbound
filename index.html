@@ -8,17 +8,37 @@
   </head>
   <body>
     <section id="main-menu" class="main-menu" aria-label="Main menu">
-      <div class="menu-panel">
-        <p class="eyebrow">Dungeon crawler</p>
-        <h1>Depthbound</h1>
-        <div class="menu-actions">
-          <button id="start-adventure" type="button">Start New Adventure</button>
-          <button id="choose-save-folder" class="ghost-button" type="button">Choose Save Folder</button>
-          <a class="ghost-button" href="dungeon-creator.html">Dungeon Creator</a>
-          <button id="main-tutorial" class="ghost-button" type="button">Tutorial</button>
+      <div class="main-menu-inner">
+        <img class="main-menu-title" src="assets/backgrounds/title.png" alt="Depthbound" />
+        <div class="menu-panel">
+          <div class="menu-actions">
+            <button id="start-adventure" type="button">Start New Adventure</button>
+            <button id="load-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="save-slots">Load</button>
+            <button id="main-tutorial" class="ghost-button" type="button">Tutorial</button>
+            <button id="settings-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="main-settings">Settings</button>
+          </div>
+          <button id="main-menu-back" class="ghost-button menu-back hidden" type="button">Back</button>
+          <div id="save-slots" class="save-slots hidden" aria-label="Save slots"></div>
+          <div id="main-settings" class="main-settings hidden" aria-label="Settings">
+            <label class="volume-controls menu-volume" aria-label="Sound volume">
+              <span class="volume-text">Volume</span>
+              <span class="volume-label">50%</span>
+              <input class="volume-slider" type="range" min="0" max="100" step="1" value="50" />
+            </label>
+            <label class="menu-setting-field">
+              <span>Button Theme</span>
+              <select id="button-theme-select">
+                <option value="verdigris">Verdigris</option>
+                <option value="ember">Classic Ember</option>
+                <option value="steel">Dungeon Steel</option>
+                <option value="royal">Royal Violet</option>
+              </select>
+            </label>
+            <button id="choose-save-folder" class="ghost-button" type="button">Choose Save Folder</button>
+            <a class="ghost-button" href="dungeon-creator.html">Dungeon Creator</a>
+          </div>
+          <p id="save-status" class="save-status"></p>
         </div>
-        <div id="save-slots" class="save-slots" aria-label="Save slots"></div>
-        <p id="save-status" class="save-status"></p>
       </div>
     </section>
 
@@ -34,12 +54,13 @@
             <div class="zoom-controls" aria-label="Dungeon zoom controls">
               <button id="zoom-out" class="icon-button ghost-button" type="button" title="Zoom out" aria-label="Zoom out">-</button>
               <span id="zoom-label">100%</span>
+              <input id="zoom-slider" type="range" min="50" max="200" step="5" value="100" aria-label="Dungeon zoom" />
               <button id="zoom-in" class="icon-button ghost-button" type="button" title="Zoom in" aria-label="Zoom in">+</button>
             </div>
-            <label class="volume-controls" aria-label="Sound volume">
+            <label class="volume-controls dungeon-volume" aria-label="Sound volume">
               <span class="volume-text">Volume</span>
-              <span id="volume-label">50%</span>
-              <input id="volume-slider" type="range" min="0" max="100" step="1" value="50" />
+              <span class="volume-label">50%</span>
+              <input class="volume-slider" type="range" min="0" max="100" step="1" value="50" />
             </label>
             <button id="toggle-admin-mode" class="ghost-button admin-mode-button" type="button">Adminmode</button>
             <button id="toggle-layout" class="ghost-button debug-button" type="button">Show Dungeon Layout</button>

@@ -21,8 +21,10 @@ window.DungeonContent.register("classes", "rogue", {
   token: "G",
   classFeatures: [
     { level: 1, name: "Sneak Attack", description: "Deal extra damage when you strike with precision at the right opening." },
+    { level: 1, name: "Expertise", description: "Choose two trained proficiencies to double your proficiency bonus." },
     { level: 2, name: "Cunning Action", description: "Use quick bonus actions to Dash, Disengage, or Hide." },
     { level: 5, name: "Uncanny Dodge", description: "Use your reaction to halve damage from an attack you can see." },
+    { level: 6, name: "Expertise", description: "Choose two more trained proficiencies to master." },
     { level: 7, name: "Evasion", description: "Slip through dangerous effects, taking less or no damage on Dexterity saves." },
     { level: 11, name: "Reliable Talent", description: "Treat poor proficient skill rolls as competent results." },
   ],

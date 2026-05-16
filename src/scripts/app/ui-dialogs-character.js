@@ -78,6 +78,12 @@ function escapeHtml(value) {
 }
 
 function renderSaveSlots() {
+  if (els.loadMenu) {
+    els.loadMenu.setAttribute("aria-expanded", String(!els.saveSlots.classList.contains("hidden")));
+  }
+  if (els.settingsMenu) {
+    els.settingsMenu.setAttribute("aria-expanded", String(!els.mainSettings?.classList.contains("hidden")));
+  }
   if (els.chooseSaveFolder) {
     const status = window.DungeonSave?.getStatus?.() ?? {};
     els.chooseSaveFolder.textContent = status.mode === "file" ? "Change Save Folder" : status.mode === "unsupported" ? "Try Chrome for Save Folder" : "Choose Save Folder";
@@ -106,6 +112,68 @@ function renderSaveSlots() {
     .join("");
 }
 
+function applyButtonTheme(theme = buttonTheme) {
+  buttonTheme = buttonThemes.has(theme) ? theme : "verdigris";
+  document.body.dataset.buttonTheme = buttonTheme;
+  window.localStorage.setItem("dungeonCrawler.buttonTheme.v1", buttonTheme);
+  if (els.buttonThemeSelect) els.buttonThemeSelect.value = buttonTheme;
+}
+
+function showMainMenuRoot() {
+  els.menuActions?.classList.remove("hidden");
+  els.mainMenuBack?.classList.add("hidden");
+  els.saveSlots?.classList.add("hidden");
+  els.mainSettings?.classList.add("hidden");
+  renderSaveSlots();
+}
+
+function showMainMenuSubmenu(section) {
+  els.menuActions?.classList.add("hidden");
+  els.mainMenuBack?.classList.remove("hidden");
+  els.saveSlots?.classList.toggle("hidden", section !== "load");
+  els.mainSettings?.classList.toggle("hidden", section !== "settings");
+  renderSaveSlots();
+}
+
+function randomizeMainMenuBackground() {
+  if (!els.mainMenu || !mainMenuBackgrounds?.length) return;
+  const background = mainMenuBackgrounds[Math.floor(Math.random() * mainMenuBackgrounds.length)];
+  const backgroundUrl = new URL(background, window.location.href).href;
+  els.mainMenu.style.setProperty("--main-menu-bg", `url("${backgroundUrl}")`);
+}
+
+async function chooseSaveFolderFromMenu() {
+  try {
+    const status = window.DungeonSave?.getStatus?.() ?? {};
+    if (status.mode === "unsupported") {
+      updateSaveStatus("Folder-backed saves do not work in Firefox yet. Try Chrome or another Chromium browser on localhost/HTTPS. Legacy browser saves are still available.");
+      return false;
+    }
+    const connected = await window.DungeonSave.chooseSaveFolder();
+    updateSaveStatus(connected ? "Save folder connected. JSON saves will be written there." : "Could not connect the save folder.");
+    return connected;
+  } catch (error) {
+    updateSaveStatus(error?.message ?? "Could not choose a save folder.");
+    return false;
+  }
+}
+
+async function promptForSaveFolderIfNeeded() {
+  const status = window.DungeonSave?.getStatus?.() ?? {};
+  if (status.mode === "file" || status.mode === "unsupported") return true;
+  const choice = await showTwoChoiceDialog({
+    title: status.mode === "disconnected" ? "Reconnect Save Folder" : "Choose Save Folder",
+    message:
+      status.mode === "disconnected"
+        ? `Depthbound needs permission for${status.directoryName ? ` "${status.directoryName}"` : " your save folder"} again before it can write JSON saves.`
+        : "Choose a save folder now to keep your adventures as JSON files. You can continue with browser storage if you prefer.",
+    primaryText: status.mode === "disconnected" ? "Reconnect Folder" : "Choose Folder",
+    secondaryText: "Use Browser Storage",
+  });
+  if (choice !== "primary") return true;
+  return chooseSaveFolderFromMenu();
+}
+
 function restoreDialogInputField() {
   els.gameDialogField.className = "dialog-field hidden";
   els.gameDialogField.innerHTML = `
@@ -125,14 +193,25 @@ function showMainMenu(message = "") {
   disableAdminModeOptions();
   clearHeldMovementKeys();
   window.clearTimeout(monsterTurnTimer);
+  hideFighterInfo();
+  hideInventoryMenu();
+  hideUseItemMenu();
+  hideAbilitiesMenu();
+  hideHomeMenu();
+  hideStoreMenu();
+  randomizeMainMenuBackground();
+  document.body.classList.add("menu-active");
   els.mainMenu.classList.remove("hidden");
+  showMainMenuRoot();
   updateSaveStatus(message);
   renderControls();
 }
 
 function hideMainMenu() {
   gameHasStarted = true;
+  document.body.classList.remove("menu-active");
   els.mainMenu.classList.add("hidden");
+  showMainMenuRoot();
   renderControls();
 }
 
@@ -512,9 +591,12 @@ function showChoiceDialog({ title, message, choices, actor = null }) {
     els.gameDialogActions.innerHTML = choices
       .map(
         (choice) =>
-          `<button type="button" class="${choice.value === dialogBackValue ? "ghost-button" : ""}" data-choice="${escapeAttribute(choice.value)}">${escapeHtml(
-            choice.label,
-          )}</button>`,
+          `<button type="button" class="${choice.value === dialogBackValue ? "ghost-button" : ""} ${choice.description ? "choice-with-description" : ""}" data-choice="${escapeAttribute(choice.value)}" ${
+            choice.description ? `title="${escapeAttribute(choice.description)}"` : ""
+          }>
+            <b>${escapeHtml(choice.label)}</b>
+            ${choice.description ? `<span class="choice-description">${escapeHtml(choice.description)}</span>` : ""}
+          </button>`,
       )
       .join("");
 
@@ -545,6 +627,15 @@ function storyImageMarkup(images = []) {
     .join("");
 }
 
+function storyTextMarkup(text = "") {
+  return String(text)
+    .trim()
+    .split(/\n\s*\n/)
+    .filter(Boolean)
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
 function customGoalStatusForTemplate(template) {
   const goal = template?.goal;
   if (!goal || goal.type === "reachExit") return { text: "Reach the exit." };
@@ -567,9 +658,11 @@ function showDungeonStoryDialog({ title, text = "", images = [], actionLabel = "
   return new Promise((resolve) => {
     els.gameDialogTitle.textContent = title;
     els.gameDialogMessage.innerHTML = `
-      ${storyImageMarkup(images)}
-      ${text ? `<p>${escapeHtml(text)}</p>` : ""}
-      ${goalText ? `<p class="story-goal"><b>Goal:</b> ${escapeHtml(goalText)}</p>` : ""}
+      <div class="story-dialog-content">
+        ${storyImageMarkup(images)}
+        ${text ? storyTextMarkup(text) : ""}
+        ${goalText ? `<p class="story-goal"><b>Goal:</b> ${escapeHtml(goalText)}</p>` : ""}
+      </div>
     `;
     els.gameDialogField.classList.add("hidden");
     els.gameDialogActions.innerHTML = `<button type="button" data-story-continue>${escapeHtml(actionLabel)}</button>`;
@@ -1181,20 +1274,34 @@ function dragonAncestrySelectOptions(category, selectedAncestryId) {
 
 function raceFeatureSummaryMarkup(selection) {
   const traits = raceTraitsForSelection(selection);
-  const details = activeRaceFeatureLines(traits);
+  const details = activeRaceFeatureLines(traits, selection);
   return `<p class="empty-note">${details.map(escapeHtml).join("<br>")}</p>`;
 }
 
-function activeRaceFeatureLines(traits) {
+function activeRaceFeatureLines(traits, selection = null) {
   const lines = [
     `Ability bonuses: ${abilityBonusSummary(traits.abilityBonuses)}`,
     `Speed: ${traits.speedFeet} ft`,
   ];
   if (traits.damageResistances?.length) lines.push(`Resistances: ${traits.damageResistances.join(", ")}`);
+  if (traits.damageImmunities?.length) lines.push(`Immunities: ${traits.damageImmunities.join(", ")}`);
   if (traits.hpPerLevel) lines.push(`Dwarven Toughness: +${traits.hpPerLevel} max HP per level`);
   if (traits.halflingLucky) lines.push("Lucky: reroll d20 natural 1s once");
   if (traits.relentlessEndurance) lines.push("Relentless Endurance: drop to 1 HP once per long rest");
   if (traits.savageAttacks) lines.push("Savage Attacks: extra weapon damage die on melee critical hits");
+  const previewFighter = selection
+    ? { raceSelection: normalizeRaceSelection(selection), race: traits.raceId, subrace: traits.subraceId, level: 20, racialTraits: { dragonDamageType: traits.dragonDamageType } }
+    : null;
+  const racialAbilities = previewFighter ? racialSpellAbilityDefinitions(previewFighter) : [];
+  const racialCantrips = previewFighter ? racialCantripSpellIdsForFighter(previewFighter).map((spellId) => getContentDefinition("spells", canonicalSpellId(spellId))?.name ?? spellId) : [];
+  if (traits.traits?.length) lines.push(...traits.traits);
+  if (traits.spellTraits?.length) lines.push(`Innate magic/features: ${traits.spellTraits.join(", ")}`);
+  if (racialAbilities.length) lines.push(`Usable racial abilities: ${racialAbilities.map((ability) => `${ability.name}${ability.level > 1 ? ` (level ${ability.level}+)` : ""}`).join(", ")}`);
+  if (racialCantrips.length) lines.push(`Racial cantrips: ${uniqueValues(racialCantrips).join(", ")}`);
+  if (traits.skillProficiencies?.length) lines.push(`Skill proficiencies: ${traits.skillProficiencies.map(skillName).join(", ")}`);
+  if (traits.skillChoiceCount) lines.push(`Skill choices: choose ${traits.skillChoiceCount}`);
+  if (traits.toolProficiencies?.length) lines.push(`Tool proficiencies: ${traits.toolProficiencies.map(toolName).join(", ")}`);
+  if (traits.toolChoiceCount) lines.push(`Tool choices: choose ${traits.toolChoiceCount} from ${(traits.toolChoices ?? []).map(toolName).join(", ")}`);
   if (traits.weaponProficiencies?.length) lines.push(`Weapon proficiencies: ${traits.weaponProficiencies.join(", ")}`);
   if (traits.armorProficiencies?.length) lines.push(`Armor proficiencies: ${traits.armorProficiencies.join(", ")}`);
   return lines;
@@ -1205,8 +1312,14 @@ function activeRaceFeatureLinesForFighter(fighter) {
   return activeRaceFeatureLines({
     ...traits,
     damageResistances: uniqueValues(fighter?.damageResistances ?? traits.damageResistances),
+    damageImmunities: uniqueValues(fighter?.damageImmunities ?? traits.damageImmunities),
     weaponProficiencies: uniqueValues(fighter?.weaponProficiencies ?? traits.weaponProficiencies),
     armorProficiencies: uniqueValues(fighter?.armorProficiencies ?? traits.armorProficiencies),
+    skillProficiencies: uniqueValues(fighter?.skillProficiencies ?? traits.skillProficiencies),
+    toolProficiencies: uniqueValues(fighter?.toolProficiencies ?? traits.toolProficiencies),
+    skillChoiceCount: traits.skillChoiceCount,
+    toolChoiceCount: traits.toolChoiceCount,
+    toolChoices: traits.toolChoices,
     hpPerLevel: fighter?.racialHpPerLevel ?? traits.hpPerLevel,
     halflingLucky: Boolean(fighter?.racialTraits?.halflingLucky),
     relentlessEndurance: Boolean(fighter?.racialTraits?.relentlessEndurance),
@@ -1404,7 +1517,7 @@ const interactiveTutorialSteps = [
   },
   {
     title: "Menus And Controls",
-    body: "The top bar has save, main menu, zoom, volume, and the text tutorial. Main Menu exits this tour.",
+    body: "The top bar has save, main menu, zoom, admin tools, and the text tutorial. Main Menu exits this tour.",
     selector: ".top-actions",
   },
 ];
@@ -1723,6 +1836,18 @@ function eligibleSpellChoicesFor(classSource, chosenSpellIds = []) {
     .filter((spell) => spell && !chosen.has(spell.id) && spellBaseLevel(spell) > 0 && spellBaseLevel(spell) <= maxLevel);
 }
 
+function spellChoiceDescription(spell) {
+  const parts = [];
+  if (spell.description) parts.push(spell.description);
+  const range = spell.range?.kind === "self" ? "Self" : spell.range?.feet ? `${spell.range.feet} ft` : "";
+  const target = spell.target ? spell.target.replace(/([A-Z])/g, " $1").toLowerCase() : "";
+  const damage = spell.effect?.dice ? `${spell.effect.dice.count ?? 1}d${spell.effect.dice.sides ?? 6} ${spell.effect?.type ?? ""}`.trim() : "";
+  const save = spell.save?.ability ? `${spell.save.ability.toUpperCase()} save${spell.save.halfDamage ? " half" : ""}` : "";
+  const tags = [range && `Range: ${range}`, target && `Target: ${target}`, damage && `Damage: ${damage}`, save].filter(Boolean);
+  if (tags.length) parts.push(tags.join(" • "));
+  return parts.join(" ");
+}
+
 async function chooseClassSpells(classSource, count, chosenSpellIds = []) {
   const chosen = [...chosenSpellIds];
   let unusedCredits = 0;
@@ -1738,6 +1863,7 @@ async function chooseClassSpells(classSource, count, chosenSpellIds = []) {
       choices: eligible.map((spell) => ({
         value: spell.id,
         label: `${spell.name} (L${spellBaseLevel(spell)})`,
+        description: spellChoiceDescription(spell),
       })),
     });
     if (!choice) {
@@ -1768,7 +1894,7 @@ async function chooseClassCantrips(classSource, count, chosenSpellIds = []) {
     const choice = await showChoiceDialog({
       title: "Choose Cantrip",
       message: `Choose a ${classSource.className ?? "class"} cantrip (${index + 1}/${count}).`,
-      choices: eligible.map((spell) => ({ value: spell.id, label: spell.name })),
+      choices: eligible.map((spell) => ({ value: spell.id, label: spell.name, description: spellChoiceDescription(spell) })),
     });
     if (!choice) {
       unusedCredits += count - index;
@@ -1799,6 +1925,169 @@ async function chooseFightingStyle(classId) {
     message: "Choose a fighting style.",
     choices,
   });
+}
+
+
+function proficiencyChoiceLabel(type, id) {
+  return type === "tool" ? toolName(id) : skillName(id);
+}
+
+async function chooseUniqueProficiencies({ title, message, count, choices, selected = [], valuePrefix = "" }) {
+  const picked = [...selected];
+  const newlyPicked = [];
+  for (let index = 0; index < count; index += 1) {
+    const available = choices.filter((id) => !picked.includes(id));
+    if (!available.length) break;
+    const choice = await showChoiceDialog({
+      title,
+      message: `${message} (${index + 1}/${count})`,
+      choices: available.map((id) => ({ value: `${valuePrefix}${id}`, label: valuePrefix === "tool:" ? toolName(id) : skillName(id) })),
+    });
+    if (!choice) return null;
+    const cleanChoice = valuePrefix ? choice.slice(valuePrefix.length) : choice;
+    picked.push(cleanChoice);
+    newlyPicked.push(cleanChoice);
+  }
+  return newlyPicked;
+}
+
+async function chooseExpertiseProficiencies({ title, message, count, skillProficiencies = [], toolProficiencies = [], existingSkillExpertise = [], existingToolExpertise = [], skillsOnly = false, allowedTools = null }) {
+  const expertiseSkills = [...existingSkillExpertise];
+  const expertiseTools = [...existingToolExpertise];
+  const gained = { skills: [], tools: [] };
+  for (let index = 0; index < count; index += 1) {
+    const skillChoices = skillProficiencies
+      .filter((skillId) => !expertiseSkills.includes(skillId))
+      .map((skillId) => ({ value: `skill:${skillId}`, label: skillName(skillId), description: "Double proficiency bonus for this skill." }));
+    const eligibleTools = skillsOnly ? [] : toolProficiencies.filter((toolId) => !allowedTools || allowedTools.includes(toolId));
+    const toolChoices = eligibleTools
+      .filter((toolId) => !expertiseTools.includes(toolId))
+      .map((toolId) => ({ value: `tool:${toolId}`, label: toolName(toolId), description: "Double proficiency bonus for this tool." }));
+    const choices = [...skillChoices, ...toolChoices];
+    if (!choices.length) break;
+    const choice = await showChoiceDialog({ title, message: `${message} (${index + 1}/${count})`, choices });
+    if (!choice) return null;
+    const [type, id] = choice.split(":");
+    if (type === "tool") {
+      expertiseTools.push(id);
+      gained.tools.push(id);
+    } else {
+      expertiseSkills.push(id);
+      gained.skills.push(id);
+    }
+  }
+  return gained;
+}
+
+async function chooseCharacterProficiencies(classId = defaultContent.heroClass, raceSelection = defaultRaceSelection) {
+  const raceTraits = raceTraitsForSelection(raceSelection);
+  const classPlan = classProficiencyPlan(classId);
+  const skillProficiencies = [...(raceTraits.skillProficiencies ?? [])];
+  const toolProficiencies = uniqueValues([...(raceTraits.toolProficiencies ?? []), ...classToolProficiencies(classId)]);
+  const expertiseSkills = [];
+  const expertiseTools = [];
+
+  if (raceTraits.skillChoiceCount) {
+    const picked = await chooseUniqueProficiencies({
+      title: "Race Skill Proficiency",
+      message: `${raceTraits.raceName} grants extra skill training. Choose a skill proficiency.`,
+      count: raceTraits.skillChoiceCount,
+      choices: raceTraits.skillChoices?.length ? raceTraits.skillChoices : allSkillIds,
+      selected: skillProficiencies,
+    });
+    if (!picked) return null;
+    skillProficiencies.push(...picked);
+  }
+
+  if (raceTraits.toolChoiceCount) {
+    const picked = await chooseUniqueProficiencies({
+      title: "Race Tool Proficiency",
+      message: `${raceTraits.raceName} grants tool training. Choose a tool proficiency.`,
+      count: raceTraits.toolChoiceCount,
+      choices: raceTraits.toolChoices ?? [],
+      selected: toolProficiencies,
+      valuePrefix: "tool:",
+    });
+    if (!picked) return null;
+    toolProficiencies.push(...picked);
+  }
+
+  if (classPlan.skillChoiceCount) {
+    const classTemplate = getHeroTemplate(classId);
+    const picked = await chooseUniqueProficiencies({
+      title: "Class Skill Proficiency",
+      message: `${classTemplate.className ?? classTemplate.name ?? "Class"} training. Choose a skill proficiency.`,
+      count: classPlan.skillChoiceCount,
+      choices: classPlan.skillChoices ?? allSkillIds,
+      selected: skillProficiencies,
+    });
+    if (!picked) return null;
+    skillProficiencies.push(...picked);
+  }
+
+  if (classPlan.toolChoiceCount) {
+    const picked = await chooseUniqueProficiencies({
+      title: "Class Tool Proficiency",
+      message: "Choose a tool proficiency.",
+      count: classPlan.toolChoiceCount,
+      choices: classPlan.toolChoices ?? [],
+      selected: toolProficiencies,
+      valuePrefix: "tool:",
+    });
+    if (!picked) return null;
+    toolProficiencies.push(...picked);
+  }
+
+  const levelOneExpertise = expertisePlanForClassLevel(classId, 1);
+  if (levelOneExpertise?.count) {
+    const gained = await chooseExpertiseProficiencies({
+      title: "Expertise",
+      message: "Choose a proficiency to master.",
+      count: levelOneExpertise.count,
+      skillProficiencies,
+      toolProficiencies,
+      skillsOnly: Boolean(levelOneExpertise.skillsOnly),
+      allowedTools: levelOneExpertise.allowedTools ?? null,
+    });
+    if (!gained) return null;
+    expertiseSkills.push(...gained.skills);
+    expertiseTools.push(...gained.tools);
+  }
+
+  return {
+    skillProficiencies: uniqueValues(skillProficiencies),
+    toolProficiencies: uniqueValues(toolProficiencies),
+    expertiseSkills: uniqueValues(expertiseSkills),
+    expertiseTools: uniqueValues(expertiseTools),
+  };
+}
+
+async function chooseLevelUpExpertise(hero) {
+  const plan = expertisePlanForClassLevel(hero.classId, hero.level ?? 1);
+  const fallbackPlan = Object.values(classProficiencyPlan(hero.classId).expertiseByLevel ?? {})[0] ?? {};
+  const activePlan = plan ?? fallbackPlan;
+  const count = (plan?.count ?? 0) + (hero.unusedExpertiseChoiceCredits ?? 0);
+  if (!count) return "";
+  const gained = await chooseExpertiseProficiencies({
+    title: "Expertise",
+    message: `${hero.className ?? "Class"} expertise improves. Choose a proficiency to master.`,
+    count,
+    skillProficiencies: hero.skillProficiencies ?? [],
+    toolProficiencies: hero.toolProficiencies ?? [],
+    existingSkillExpertise: hero.expertiseSkills ?? [],
+    existingToolExpertise: hero.expertiseTools ?? [],
+    skillsOnly: Boolean(activePlan.skillsOnly),
+    allowedTools: activePlan.allowedTools ?? null,
+  });
+  if (!gained) {
+    hero.unusedExpertiseChoiceCredits = count;
+    return " Expertise choice deferred.";
+  }
+  hero.expertiseSkills = uniqueValues([...(hero.expertiseSkills ?? []), ...gained.skills]);
+  hero.expertiseTools = uniqueValues([...(hero.expertiseTools ?? []), ...gained.tools]);
+  hero.unusedExpertiseChoiceCredits = Math.max(0, count - gained.skills.length - gained.tools.length);
+  const labels = [...gained.skills.map(skillName), ...gained.tools.map(toolName)];
+  return labels.length ? ` Expertise gained: ${labels.join(", ")}.` : "";
 }
 
 async function createCharacterOptions(raceSelection = defaultRaceSelection, classId = defaultContent.heroClass) {
@@ -1839,6 +2128,8 @@ async function createCharacterOptions(raceSelection = defaultRaceSelection, clas
       continue;
     }
     if (gearOptions) {
+      const proficiencyOptions = await chooseCharacterProficiencies(classId, raceSelection);
+      if (!proficiencyOptions) return null;
       const classTemplate = getHeroTemplate(classId);
       const classSpellList = [...(classTemplate.classSpellList ?? classTemplate.spellList ?? classTemplate.spells ?? [])];
       const classCantripList = [...(classTemplate.classCantripList ?? classTemplate.cantripList ?? [])];
@@ -1857,6 +2148,7 @@ async function createCharacterOptions(raceSelection = defaultRaceSelection, clas
         spells: [...cantripChoice.spells, ...spellChoice.spells],
         unusedSpellChoiceCredits: spellChoice.unusedCredits,
         unusedCantripChoiceCredits: cantripChoice.unusedCredits,
+        ...proficiencyOptions,
         ...gearOptions,
       };
     }
@@ -1866,6 +2158,7 @@ async function createCharacterOptions(raceSelection = defaultRaceSelection, clas
 
 async function startNewAdventure() {
   window.clearTimeout(monsterTurnTimer);
+  if (!(await promptForSaveFolderIfNeeded())) return;
   const slotId = await chooseSaveSlotForAdventure();
   if (!slotId) return;
   let chosenName = "";

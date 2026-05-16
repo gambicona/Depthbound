@@ -104,6 +104,278 @@ const reaction = "reaction";
 const concentration3 = { concentration: true, duration: { kind: "rounds", rounds: 3 } };
 const oneRound = { duration: { kind: "rounds", rounds: 1 } };
 
+spell("dragonborn-breath", {
+  name: "Breath Weapon",
+  level: 0,
+  resource: action,
+  range: { kind: "self", feet: 15 },
+  target: "direction",
+  area: { shape: "cone", lengthFeet: 15 },
+  save: { ability: "dex", halfDamage: true },
+  saveDcAbility: "con",
+  effect: { kind: "damage", dice: { count: 2, sides: 6 }, type: "fire" },
+  aiCategory: "area-damage",
+  description: "Ancestral 15 ft cone. DEX save for half damage. Damage type follows draconic ancestry.",
+});
+
+spell("eladrin-fey-step", {
+  name: "Fey Step",
+  level: 2,
+  cost: 0,
+  costsByLevel: { 2: 0 },
+  resource: quick,
+  range: { kind: "self", feet: 30 },
+  target: "point",
+  effect: { kind: "teleport" },
+  racialAbilityId: "eladrinFeyStep",
+  aiCategory: "escape-mobility",
+  description: "Racial bonus action. Teleport to a visible empty square within 30 ft. Refreshes on short rest.",
+});
+
+spell("shadar-kai-blessing", {
+  name: "Blessing of the Raven Queen",
+  level: 2,
+  cost: 0,
+  costsByLevel: { 2: 0 },
+  resource: quick,
+  range: { kind: "self", feet: 30 },
+  target: "point",
+  effect: { kind: "teleport" },
+  racialAbilityId: "shadarKaiBlessing",
+  aiCategory: "escape-mobility",
+  description: "Racial bonus action. Teleport through shadow to a visible empty square within 30 ft. Refreshes on short rest.",
+});
+
+spell("duergar-enlarge", {
+  name: "Duergar Enlarge",
+  level: 2,
+  cost: 0,
+  costsByLevel: { 2: 0 },
+  resource: action,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  effect: { kind: "status", status: { id: "duergar-enlarge", label: "Enlarged", tempHp: 4, damageBonus: 4, durationRounds: 3 } },
+  racialAbilityId: "duergarEnlarge",
+  aiCategory: "buff-opener",
+  description: "Racial action. Gain 4 HP and +4 weapon damage for 3 rounds. Refreshes on long rest.",
+});
+
+spell("drow-faerie-fire", {
+  name: "Drow Faerie Fire",
+  level: 1,
+  cost: 0,
+  costsByLevel: { 1: 0 },
+  resource: action,
+  range: { kind: "ranged", feet: 60 },
+  target: "point",
+  area: { shape: "circle", radiusFeet: 10 },
+  save: { ability: "dex", negatesStatus: true },
+  saveDcAbility: "cha",
+  ...concentration3,
+  effect: { kind: "status", status: { id: "faerie-fire", label: "Revealed", attackBonus: -1, expiresAtEndOfTurn: true } },
+  racialAbilityId: "drowFaerieFire",
+  aiCategory: "control-cluster",
+  description: "Racial action. DEX save or Revealed and easier to hit. Refreshes on long rest.",
+});
+
+spell("baalzebul-ray-of-sickness", {
+  name: "Ray of Sickness",
+  level: 1,
+  cost: 0,
+  costsByLevel: { 1: 0 },
+  resource: action,
+  range: { kind: "ranged", feet: 60 },
+  target: "enemy",
+  saveDcAbility: "cha",
+  attackAbility: "cha",
+  effect: { kind: "attackDamage", dice: { count: 2, sides: 8 }, type: "poison", status: { id: "sickened", label: "Sickened", attackBonus: -2, expiresAtEndOfTurn: true } },
+  racialAbilityId: "baalzebulRayOfSickness",
+  aiCategory: "finish-target",
+  description: "Racial action. Poison spell attack for 2d8 and a brief attack penalty. Refreshes on long rest.",
+});
+
+spell("levistus-armor-of-agathys", {
+  name: "Armor of Agathys",
+  level: 1,
+  cost: 0,
+  costsByLevel: { 1: 0 },
+  resource: action,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  effect: { kind: "status", status: { id: "armor-of-agathys", label: "Armor of Agathys", tempHp: 5, resistances: ["cold"], durationRounds: 3 } },
+  racialAbilityId: "levistusArmorOfAgathys",
+  aiCategory: "defensive-reaction",
+  description: "Racial action. Gain icy protection, cold resistance, and 5 HP for 3 rounds. Refreshes on long rest.",
+});
+
+spell("mephistopheles-burning-hands", {
+  name: "Burning Hands",
+  level: 1,
+  cost: 0,
+  costsByLevel: { 1: 0 },
+  resource: action,
+  range: { kind: "self", feet: 15 },
+  target: "direction",
+  area: { shape: "cone", lengthFeet: 15 },
+  save: { ability: "dex", halfDamage: true },
+  saveDcAbility: "cha",
+  effect: { kind: "damage", dice: { count: 3, sides: 6 }, type: "fire" },
+  racialAbilityId: "mephistophelesBurningHands",
+  aiCategory: "aoe-damage",
+  description: "Racial action. 15 ft cone for 3d6 fire, DEX save half. Refreshes on long rest.",
+});
+
+spell("zariel-branding-smite", {
+  name: "Branding Smite",
+  level: 2,
+  cost: 0,
+  costsByLevel: { 2: 0 },
+  resource: weaponRider,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  saveDcAbility: "cha",
+  effect: { kind: "status", status: { id: "branding-smite", label: "Branding Smite", damageBonus: 8, expiresAtEndOfTurn: true } },
+  racialAbilityId: "zarielBrandingSmite",
+  aiCategory: "buff-opener",
+  description: "Racial bonus action. Your next weapon hit this turn adds radiant branding. Refreshes on long rest.",
+});
+
+spell("minor-illusion", {
+  name: "Minor Illusion",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  effect: { kind: "status", status: { id: "minor-illusion", label: "Minor Illusion", acBonus: 2, expiresAtStartOfTurn: true } },
+  description: "Racial cantrip. Create a quick distraction; gain +2 AC until your next turn.",
+});
+
+spell("high-elf-fire-bolt", {
+  name: "High Elf Fire Bolt",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 120 },
+  target: "enemy",
+  attackAbility: "int",
+  effect: { kind: "attackDamage", dice: { count: 1, sides: 10 }, type: "fire" },
+  description: "Racial wizard cantrip. INT spell attack for fire damage. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("levistus-ray-of-frost", {
+  name: "Levistus Ray of Frost",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 60 },
+  target: "enemy",
+  attackAbility: "cha",
+  effect: { kind: "attackDamage", dice: { count: 1, sides: 8 }, type: "cold", status: { id: "ray-of-frost", label: "Slowed", speedBonusFeet: -10, expiresAtEndOfTurn: true } },
+  description: "Racial cantrip. CHA spell attack for cold damage and a brief slow. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("aasimar-radiant-soul", {
+  name: "Radiant Soul",
+  level: 3,
+  cost: 0,
+  costsByLevel: { 3: 0 },
+  resource: action,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  effect: { kind: "status", status: { id: "aasimar-radiant-soul", label: "Radiant Soul", damageBonus: 4, speedBonusFeet: 10, durationRounds: 10 } },
+  racialAbilityId: "aasimarRadiantSoul",
+  description: "Racial action. Divine form: +4 damage and +10 ft speed for 10 rounds. Refreshes on long rest.",
+});
+
+spell("aasimar-radiant-consumption", {
+  name: "Radiant Consumption",
+  level: 3,
+  cost: 0,
+  costsByLevel: { 3: 0 },
+  resource: action,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  effect: { kind: "status", status: { id: "aasimar-radiant-consumption", label: "Radiant Consumption", damageBonus: 6, acBonus: -1, durationRounds: 10 } },
+  racialAbilityId: "aasimarRadiantConsumption",
+  description: "Racial action. Searing form: +6 damage but -1 AC for 10 rounds. Refreshes on long rest.",
+});
+
+spell("aasimar-necrotic-shroud", {
+  name: "Necrotic Shroud",
+  level: 3,
+  cost: 0,
+  costsByLevel: { 3: 0 },
+  resource: action,
+  range: { kind: "self", feet: 10 },
+  target: "point",
+  area: { shape: "circle", radiusFeet: 10 },
+  save: { ability: "cha", negatesStatus: true },
+  saveDcAbility: "cha",
+  effect: { kind: "status", status: { id: "frightened", label: "Frightened", attackBonus: -2, expiresAtEndOfTurn: true } },
+  racialAbilityId: "aasimarNecroticShroud",
+  description: "Racial action. Nearby enemies make a CHA save or become Frightened briefly. Refreshes on long rest.",
+});
+
+spell("yuan-ti-poison-spray", {
+  name: "Yuan-ti Poison Spray",
+  level: 0,
+  cost: 0,
+  resource: action,
+  range: { kind: "ranged", feet: 10 },
+  target: "enemy",
+  save: { ability: "con" },
+  saveDcAbility: "cha",
+  effect: { kind: "damage", dice: { count: 1, sides: 12 }, type: "poison" },
+  description: "Racial cantrip. CHA-based CON save or poison damage. Damage scales at levels 5, 11, and 17.",
+});
+
+spell("yuan-ti-suggestion", {
+  name: "Suggestion",
+  level: 2,
+  cost: 0,
+  costsByLevel: { 2: 0 },
+  resource: action,
+  range: { kind: "ranged", feet: 30 },
+  target: "enemy",
+  save: { ability: "wis", negatesStatus: true },
+  saveDcAbility: "cha",
+  effect: { kind: "status", status: { id: "suggested", label: "Suggested", actionLocked: true, expiresAtEndOfTurn: true } },
+  racialAbilityId: "yuanTiSuggestion",
+  description: "Racial action. WIS save or the enemy loses its next action. Refreshes on long rest.",
+});
+
+spell("air-genasi-levitate", {
+  name: "Levitate",
+  level: 2,
+  cost: 0,
+  costsByLevel: { 2: 0 },
+  resource: action,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  saveDcAbility: "con",
+  effect: { kind: "status", status: { id: "levitating", label: "Levitating", acBonus: 2, speedBonusFeet: 10, durationRounds: 3 } },
+  racialAbilityId: "airGenasiLevitate",
+  description: "Racial action. Float above danger: +2 AC and +10 ft speed for 3 rounds. Refreshes on long rest.",
+});
+
+spell("fire-genasi-burning-hands", {
+  name: "Burning Hands",
+  level: 1,
+  cost: 0,
+  costsByLevel: { 1: 0 },
+  resource: action,
+  range: { kind: "self", feet: 15 },
+  target: "direction",
+  area: { shape: "cone", lengthFeet: 15 },
+  save: { ability: "dex", halfDamage: true },
+  saveDcAbility: "con",
+  effect: { kind: "damage", dice: { count: 3, sides: 6 }, type: "fire" },
+  racialAbilityId: "fireGenasiBurningHands",
+  aiCategory: "aoe-damage",
+  description: "Racial action. 15 ft cone for 3d6 fire, DEX save half. Refreshes on long rest.",
+});
+
 spell("cure-wounds", {
   name: "Cure Wounds",
   level: 1,
