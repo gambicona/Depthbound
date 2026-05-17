@@ -28,11 +28,19 @@ window.DungeonContent.register("classes", "ranger", {
   classFeatures: [
     { level: 1, name: "Favored Foe", description: "Mark a chosen enemy and punish it with extra damage." },
     { level: 2, name: "Fighting Style", description: "Adopt a martial specialty that improves how you fight." },
-    { level: 3, name: "Ranger Companion", description: "Gain a loyal companion trained to aid you in battle." },
+    { level: 3, name: "Ranger Archetype", description: "Choose a ranger subclass. Beast Masters gain a loyal companion trained to aid them in battle." },
     { level: 5, name: "Extra Attack", description: "Attack more than once when you take the Attack action." },
   ],
   abilities: [
-    { id: "rangerCompanion", name: "Ranger Companion", level: 3, refresh: "shortRest", uses: 1, resource: "bonusAction", description: "Command a companion strike in simplified form." },
+    {
+      id: "favoredFoe",
+      name: "Favored Foe",
+      level: 1,
+      refresh: "longRest",
+      resource: "passive",
+      resourcePool: "favoredFoe",
+      description: "When you hit, you can mark the target with concentration. Once on each of your turns, your first damaging hit against that target deals extra nature damage.",
+    },
   ],
   equipment: { mainHand: "longbow", torso: "leather", quiver: "arrows-20" },
   inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["longbow", "leather", "arrows-20"] },

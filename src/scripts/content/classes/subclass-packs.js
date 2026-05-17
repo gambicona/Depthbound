@@ -296,16 +296,15 @@ const rangerSubclasses = [
     ability("apexPredator", "Apex Predator", 18, "bonusAction", "Commit to a wounded or marked prey. Your next hit deals heavy extra damage.", common.riderDamage({ count: 4, sides: 8 }, "damage", "marked"), { refresh: "shortRest" }),
   ]),
   subclass("beast-master", "Beast Master", "A ranger who fights beside a loyal companion that grows with them.", [
-    "Your companion is an allied creature that acts on its own beside the party.",
+    "At level 3, choose a permanent beast companion. You control it as a Warrior sidekick, and it uses your proficiency bonus for AC, attacks, damage, proficient saves, and proficient skills.",
     "Use Coordinated Command to point the companion at the target you care about.",
   ], [
-    feature(3, "Call Beast Companion", "Call a loyal companion that fights beside you and grows stronger as you level."),
+    feature(3, "Ranger's Companion", "Choose a loyal beast companion. It fights beside you, uses your proficiency bonus, and grows through the Warrior sidekick level system."),
     feature(6, "Coordinated Attack", "Command the companion and empower your next hit against the same prey."),
     feature(10, "Bestial Defense", "Your bond gives you temporary HP and defensive confidence."),
     feature(14, "Storm of Claws", "Command a brutal companion strike that hinders the enemy."),
     feature(18, "Primal Bond", "Your companion bond reaches its peak, improving commands and durability."),
   ], [
-    ability("callBeastCompanion", "Call Beast Companion", 3, "action", "Call a loyal beast companion for this fight. It acts on its own, stays near you, and scales with your level.", common.summon("melee", "Beast Companion", 99), { refresh: "shortRest" }),
     ability("coordinatedCommand", "Coordinated Command", 6, "bonusAction", "Mark your prey for both you and your companion. Your next hit deals extra damage.", common.riderDamage({ count: 1, sides: 8 }, "piercing", "marked"), { refresh: "turn" }),
     ability("bestialDefense", "Bestial Defense", 10, "bonusAction", "Your companion guards your flank. Gain temporary HP and AC for a few rounds.", common.self({ id: "bestial-defense", label: "Bestial Defense", tempHp: { base: 4, levelMultiplier: 1 }, acBonus: 1, durationRounds: 3 }), { refresh: "shortRest" }),
     ability("stormOfClaws", "Storm of Claws", 14, "action", "Command a savage companion strike that deals slashing damage and knocks the target off balance.", common.damageTarget({ count: 4, sides: 6 }, "slashing", "prone"), { refresh: "shortRest" }),
@@ -447,6 +446,7 @@ const warlockSubclasses = [
   ], { expandedSpellList: ["burning_hands", "fireball", "scorching_ray"] }),
   subclass("hexblade", "The Hexblade", "A cursed weapon warlock who marks prey and calls a specter ally.", [
     "Hexblade plays like a curse duelist. Curse the target you want dead, then attack or blast it down.",
+    "Hexblade weapon attacks use Charisma for hit and damage in this game, so CHA stays your main combat stat.",
     "Accursed Specter calls a short-lived spirit that fights beside you after you claim a soul.",
   ], [
     feature(3, "Hexblade's Curse", "Mark a foe so your hits against it are stronger."),

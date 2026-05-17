@@ -177,7 +177,11 @@ function checkConcentrationAfterDamage(fighter, damage) {
   if (isSidekickSpellcaster(fighter) && (fighter.level ?? 1) >= 20) return;
   const dc = Math.max(10, Math.floor(damage / 2));
   const save = savingThrow(fighter, "con", dc);
-  addLog(`${fighter.name} makes a concentration save: CON ${save.roll} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
+  if (warlockKnowsInvocation(fighter, "eldritchMind")) {
+    save.total += 5;
+    save.success = save.total >= dc;
+  }
+  addLog(`${fighter.name} makes a concentration save: CON ${save.roll} ${abilityLabel(save.bonus)}${warlockKnowsInvocation(fighter, "eldritchMind") ? " + Eldritch Mind 5" : ""} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
   if (!save.success) endConcentration(fighter, "failed concentration save");
 }
 
@@ -292,8 +296,12 @@ function stableUnconsciousPartyHeroes() {
 }
 
 function partyDefeatedOrDying() {
-  const heroes = partyClassHeroes();
-  return heroes.length === 0;
+  const party = partyHeroes();
+  const controlled = party.filter((fighter) => isPlayerControlledPartyFighter(fighter));
+  const autonomousCanAct = party.some((fighter) => isAutonomousAlly(fighter) && heroCanAct(fighter));
+  if (controlled.length === 0) return !autonomousCanAct;
+  if (controlled.some(heroCanAct)) return false;
+  return !autonomousCanAct;
 }
 
 function addLog(text, type = "") {
@@ -1123,6 +1131,7 @@ function attacksPerAttackAction(fighter) {
   const level = fighter?.level ?? 1;
   if (isSidekickWarrior(fighter)) return level >= 15 ? 3 : level >= 6 ? 2 : 1;
   if (fighter?.classId === "bard" && ["college-of-valor", "college-of-swords"].includes(fighter.subclassId) && level >= 6) return 2;
+  if (warlockKnowsInvocation(fighter, "thirstingBlade") && level >= 5) return 2;
   if (!["barbarian", "fighter", "monk", "paladin", "ranger"].includes(fighter?.classId)) return 1;
   if (fighter.classId === "fighter") return level >= 20 ? 4 : level >= 11 ? 3 : level >= 5 ? 2 : 1;
   return level >= 5 ? 2 : 1;
@@ -3193,7 +3202,10 @@ async function makeAttack(attacker, defender, options = {}) {
   playSoundEffect(rangedAttack ? "rangedAttack" : "meleeAttack");
   const adjacentHostiles = hostileFightersAdjacentTo(attacker).length > 0;
   const rangedDisadvantage = rangedAttack && adjacentHostiles;
-  const attackAdvantage = (attacker.statusEffects ?? []).some((effect) => effect.attackAdvantage);
+  const attackAdvantage =
+    (attacker.statusEffects ?? []).some((effect) => effect.attackAdvantage) ||
+    (warlockKnowsInvocation(attacker, "devilsSight") && targetIsInMagicalDarkness(defender)) ||
+    (warlockKnowsInvocation(attacker, "witchSight") && targetIsCursedOrObscured(defender));
   const defenderDodge = defender.dodging;
   const defendedBySidekick = await maybeUseWarriorDefender(attacker, defender);
   const hasDisadvantage = rangedDisadvantage || defenderDodge || defendedBySidekick;
@@ -3290,6 +3302,24 @@ async function makeAttack(attacker, defender, options = {}) {
     });
     attacker.blessedStrikeUsedThisTurn = true;
   }
+  const favoredFoePacket = await maybeApplyFavoredFoe(attacker, defender);
+  if (favoredFoePacket) packets.push(favoredFoePacket);
+  if (!rangedAttack && warlockKnowsInvocation(attacker, "lifedrinker")) {
+    const lifeDamage = Math.max(1, abilityMod(attacker, "cha"));
+    packets.push({
+      raw: lifeDamage,
+      type: "necrotic",
+      label: `Lifedrinker ${lifeDamage} necrotic`,
+    });
+  }
+  if (!rangedAttack && warlockHasPact(attacker, "pactBlade")) {
+    const bladeDamage = Math.max(1, Math.floor(proficiencyBonus(attacker) / 2));
+    packets.push({
+      raw: bladeDamage,
+      type: "force",
+      label: `Pact Blade ${bladeDamage} force`,
+    });
+  }
   if (!rangedAttack && attacker.subclassId === "zealot" && (attacker.level ?? 1) >= 3 && !attacker.zealotDivineFuryUsedThisTurn && (attacker.statusEffects ?? []).some((effect) => effect.id === "rage")) {
     const divineRoll = rollDice(1, 6);
     const divineBonus = Math.max(1, Math.floor((attacker.level ?? 1) / 2));
@@ -3341,6 +3371,10 @@ async function makeAttack(attacker, defender, options = {}) {
   totalDamage = await maybeUseSpiritShield(defender, attacker, totalDamage);
   applyDamageToFighter(defender, totalDamage);
   defender.lastDamagedById = attacker.id;
+  if (!rangedAttack && warlockKnowsInvocation(attacker, "lifedrinker") && totalDamage > 0) {
+    const healed = applyHealingToHero(attacker, Math.max(1, Math.floor(abilityMod(attacker, "cha") / 2)));
+    if (healed > 0) addLog(`${attacker.name}'s Lifedrinker restores ${healed} HP.`, "heal");
+  }
   if (!isPartyHeroId(attacker.id)) {
     await applyMonsterOnHitSpecials(attacker, defender, totalDamage, doublesDamage);
   }
@@ -3418,7 +3452,7 @@ function savingThrow(target, ability, dc) {
   const roll = rollResult.roll;
   const statusBonus = (target.statusEffects ?? []).reduce((sum, effect) => sum + (effect.saveBonus ?? 0), 0);
   const auraBonus = auraSaveBonus(target);
-  const proficiency = (target.savingThrowProficiencies ?? []).includes(ability) ? proficiencyBonus(target) : 0;
+  const proficiency = (target.savingThrowProficiencies ?? []).includes(ability) ? rangerCompanionProficiencyBonus(target) : 0;
   const bonus = abilityMod(target, ability) + proficiency + statusBonus + auraBonus;
   let total = roll + bonus;
   let success = total >= dc;
@@ -3634,7 +3668,7 @@ function spellcastingAbility(fighter) {
 function spellSaveDc(fighter, spell = null) {
   const ability = spell?.saveDcAbility ?? spellcastingAbility(fighter);
   const statusBonus = (fighter?.statusEffects ?? []).reduce((sum, effect) => sum + (effect.saveDcBonus ?? 0), 0);
-  return 8 + proficiencyBonus(fighter) + abilityMod(fighter, ability) + statusBonus;
+  return 8 + proficiencyBonus(fighter) + abilityMod(fighter, ability) + statusBonus + (spell?.metamagic?.saveDcBonus ?? 0);
 }
 
 function spellAttackBonus(fighter, spell = null) {
@@ -3674,6 +3708,117 @@ function spellResourceLabel(spell) {
   return "Action";
 }
 
+function metamagicAbilityForSpell(caster, id) {
+  return fighterAbilityDefinitions(caster).find((ability) => ability.id === id && ability.metamagicOption);
+}
+
+function metamagicCostForSpell(spell, ability) {
+  if (!ability) return 0;
+  if (ability.id === "metamagicTwinned") return Math.max(1, spellCastLevel(spell));
+  return Math.max(1, ability.uses ?? 1);
+}
+
+function metamagicPoolSpent(fighter) {
+  return fighterAbilityDefinitions(fighter)
+    .filter((ability) => ability.resourcePool === "metamagic")
+    .reduce((sum, ability) => sum + (fighter?.abilityUses?.[ability.id] ?? 0), 0);
+}
+
+function canSpendMetamagic(caster, spell, ability) {
+  if (!ability || (caster.level ?? 1) < (ability.level ?? 1)) return false;
+  return metamagicPoolSpent(caster) + metamagicCostForSpell(spell, ability) <= abilityMaxUses(caster, ability);
+}
+
+function spellHasTimedEffect(spell) {
+  return Boolean(spell?.duration?.rounds || spell?.effect?.status?.durationRounds || persistentAreaSpellIds().has(spell?.id));
+}
+
+function spellCanUseMetamagic(caster, spell, ability) {
+  if (caster?.classId !== "sorcerer" || !spell || !ability || spell.metamagic) return false;
+  if (ability.id === "metamagicDistant") return (spell.range?.feet ?? 0) > 0 && spell.target !== "self";
+  if (ability.id === "metamagicEmpowered") return ["damage", "attackDamage"].includes(spell.effect?.kind);
+  if (ability.id === "metamagicExtended") return spellHasTimedEffect(spell);
+  if (ability.id === "metamagicHeightened") return Boolean(spell.save);
+  if (ability.id === "metamagicQuickened") return (spell.resource ?? "action") === "action";
+  if (ability.id === "metamagicTwinned") return spellTargetingMode(spell) === "target" && !spell.area && !["self", "point", "direction"].includes(spell.target) && spellTargetCount(spell) === 1;
+  return false;
+}
+
+function applyMetamagicToSpell(caster, spell, ability) {
+  const cost = metamagicCostForSpell(spell, ability);
+  const meta = { id: ability.id, name: ability.name, cost };
+  const next = {
+    ...spell,
+    metamagic: meta,
+    range: spell.range ? { ...spell.range } : undefined,
+    duration: spell.duration ? { ...spell.duration } : undefined,
+    effect: spell.effect ? { ...spell.effect, status: spell.effect.status ? { ...spell.effect.status } : undefined } : undefined,
+  };
+  if (ability.id === "metamagicDistant" && next.range) next.range.feet = Math.max(next.range.feet ?? 0, (next.range.feet ?? 0) * 2);
+  if (ability.id === "metamagicEmpowered") next.metamagic.damageBonus = Math.max(1, abilityMod(caster, spellcastingAbility(caster)));
+  if (ability.id === "metamagicExtended") {
+    if (next.duration?.rounds) next.duration.rounds *= 2;
+    if (next.effect?.status?.durationRounds) next.effect.status.durationRounds *= 2;
+    next.metamagic.extended = true;
+  }
+  if (ability.id === "metamagicHeightened") next.metamagic.saveDcBonus = 3;
+  if (ability.id === "metamagicQuickened") next.resource = "bonusAction";
+  if (ability.id === "metamagicTwinned") next.metamagic.extraTarget = 1;
+  return next;
+}
+
+function spendMetamagic(caster, spell) {
+  const meta = spell?.metamagic;
+  if (!meta?.id) return;
+  const ability = metamagicAbilityForSpell(caster, meta.id);
+  if (!ability) return;
+  caster.abilityUses = { ...(caster.abilityUses ?? {}) };
+  caster.abilityUses[ability.id] = (caster.abilityUses[ability.id] ?? 0) + (meta.cost ?? metamagicCostForSpell(spell, ability));
+  addLog(`${caster.name} uses ${ability.name} (${meta.cost ?? 1} sorcery point${(meta.cost ?? 1) === 1 ? "" : "s"}).`, "important");
+}
+
+async function chooseMetamagicForSpell(caster, spell) {
+  if (caster?.classId !== "sorcerer" || !(caster.knownMetamagic ?? []).length) return canCastSpell(caster, spell) ? spell : null;
+  const choices = [];
+  if (canCastSpell(caster, spell)) {
+    choices.push({ value: "none", label: "No Metamagic", description: "Cast the spell normally." });
+  }
+  const abilities = fighterAbilityDefinitions(caster).filter((ability) => ability.metamagicOption);
+  for (const ability of abilities) {
+    if (!spellCanUseMetamagic(caster, spell, ability) || !canSpendMetamagic(caster, spell, ability)) continue;
+    const adjusted = applyMetamagicToSpell(caster, spell, ability);
+    if (!canCastSpell(caster, adjusted)) continue;
+    choices.push({
+      value: ability.id,
+      label: `${ability.name} (${metamagicCostForSpell(spell, ability)} sorcery)`,
+      description: ability.description,
+    });
+  }
+  if (!choices.length) return null;
+  if (choices.length === 1 && choices[0].value === "none") return spell;
+  const choice = await showSelectChoiceDialog({
+    title: "Metamagic",
+    message: `Choose how ${caster.name} casts ${spell.name}.`,
+    choices,
+    actor: caster,
+    label: "Option",
+    defaultValue: choices[0].value,
+    confirmText: "Cast",
+  });
+  if (!choice) return null;
+  if (choice === "none") return spell;
+  const ability = abilities.find((entry) => entry.id === choice);
+  return ability ? applyMetamagicToSpell(caster, spell, ability) : spell;
+}
+
+function canStartSpellCast(caster, spell) {
+  if (canCastSpell(caster, spell)) return true;
+  if (caster?.classId !== "sorcerer" || !(caster.knownMetamagic ?? []).length) return false;
+  return fighterAbilityDefinitions(caster)
+    .filter((ability) => ability.metamagicOption)
+    .some((ability) => spellCanUseMetamagic(caster, spell, ability) && canSpendMetamagic(caster, spell, ability) && canCastSpell(caster, applyMetamagicToSpell(caster, spell, ability)));
+}
+
 function concentrationId(caster) {
   return caster?.id ? `concentration-${caster.id}` : "";
 }
@@ -3698,6 +3843,76 @@ function startConcentration(caster, spell) {
   addLog(`${caster.name} concentrates on ${spell.name}.`, "important");
 }
 
+function favoredFoeDamageDie(fighter) {
+  const level = fighter?.level ?? 1;
+  return level >= 14 ? 8 : level >= 6 ? 6 : 4;
+}
+
+function favoredFoeTurnKey(fighter) {
+  return `${state.round ?? 0}:${state.activeIndex ?? 0}:${fighter?.id ?? ""}`;
+}
+
+function activeFavoredFoeTarget(attacker) {
+  return Object.values(state.fighters ?? {}).find((fighter) =>
+    fighter.alive &&
+      !fighter.dead &&
+      (fighter.statusEffects ?? []).some((effect) => effect.id === `favored-foe-${attacker.id}` && effect.sourceId === attacker.id),
+  ) ?? null;
+}
+
+function cleanupExpiredFavoredFoe(attacker) {
+  if (attacker?.concentration?.spellId !== "favored-foe") return;
+  if (!activeFavoredFoeTarget(attacker)) endConcentration(attacker, "favored foe defeated");
+}
+
+function favoredFoeAbility(attacker) {
+  return fighterAbilityDefinitions(attacker).find((ability) => ability.id === "favoredFoe" && (attacker.level ?? 1) >= (ability.level ?? 1)) ?? null;
+}
+
+function favoredFoeUsesRemaining(attacker, ability = favoredFoeAbility(attacker)) {
+  if (!ability) return 0;
+  return Math.max(0, abilityMaxUses(attacker, ability) - (attacker.abilityUses?.[ability.id] ?? 0));
+}
+
+async function maybeApplyFavoredFoe(attacker, defender) {
+  const ability = favoredFoeAbility(attacker);
+  if (!ability || activeFighter()?.id !== attacker.id) return null;
+  cleanupExpiredFavoredFoe(attacker);
+  const turnKey = favoredFoeTurnKey(attacker);
+  if (attacker.favoredFoeDamageTurnKey === turnKey) return null;
+  let target = activeFavoredFoeTarget(attacker);
+  if (target?.id !== defender.id) {
+    if (target || favoredFoeUsesRemaining(attacker, ability) <= 0) return null;
+    const choice = await showChoiceDialog({
+      title: "Favored Foe",
+      message: `${attacker.name} hit ${defender.name}. Mark this creature as your favored foe and add damage to this hit?`,
+      actor: attacker,
+      choices: [
+        { value: "mark", label: "Mark Target", description: `${favoredFoeUsesRemaining(attacker, ability)} use${favoredFoeUsesRemaining(attacker, ability) === 1 ? "" : "s"} remaining.` },
+        { value: "skip", label: "Not Now", description: "Keep the use for a later hit." },
+      ],
+    });
+    if (choice !== "mark") return null;
+    endConcentration(attacker, "Favored Foe");
+    const id = concentrationId(attacker);
+    attacker.concentration = { id, spellId: "favored-foe", spellName: "Favored Foe" };
+    attacker.abilityUses = { ...(attacker.abilityUses ?? {}) };
+    attacker.abilityUses[ability.id] = (attacker.abilityUses[ability.id] ?? 0) + 1;
+    applyStatusEffect(defender, { id: `favored-foe-${attacker.id}`, label: "Favored Foe", sourceId: attacker.id, concentrationId: id, durationRounds: 10 });
+    target = defender;
+    addLog(`${attacker.name} marks ${defender.name} as a favored foe.`, "important");
+  }
+  if (target?.id !== defender.id) return null;
+  attacker.favoredFoeDamageTurnKey = turnKey;
+  const die = favoredFoeDamageDie(attacker);
+  const roll = rollDice(1, die);
+  return {
+    raw: roll.total,
+    type: "damage",
+    label: `Favored Foe ${roll.rolls.join(" + ")} nature`,
+  };
+}
+
 function canPaySpellCost(caster, spell) {
   if (spellBaseLevel(spell) === 0) return true;
   ensureSpellPointState(caster);
@@ -3706,6 +3921,7 @@ function canPaySpellCost(caster, spell) {
 
 function canCastSpell(caster, spell) {
   if (!heroCanAct(caster) || !spell || !canPaySpellCost(caster, spell)) return false;
+  if (spell.metamagic?.id && !canSpendMetamagic(caster, spell, metamagicAbilityForSpell(caster, spell.metamagic.id))) return false;
   if (isWildShaped(caster) && (caster.level ?? 1) < 18) return false;
   if (spell.id === "dragonborn-breath" && (caster.abilityUses?.dragonbornBreath ?? 0) >= 1) return false;
   if (spell.racialAbilityId) {
@@ -3735,10 +3951,25 @@ function spendSpellResources(caster, spell) {
     caster.spellPoints = Math.max(0, (caster.spellPoints ?? 0) - cost);
     addLog(`${caster.name} spends ${cost} SP on ${spell.name} (spell level ${spellCastLevel(spell)}).`, "important");
   }
+  spendMetamagic(caster, spell);
   if (state.mode === "combat") {
     if (spell.resource === "reaction") caster.hasReaction = false;
     else if (["bonusAction", "weaponRider"].includes(spell.resource)) caster.hasBonusAction = false;
     else caster.hasAction = false;
+  }
+  if (caster?.classId === "warlock" && spellPointCost(spell) > 0) {
+    if (warlockKnowsInvocation(caster, "eldritchAegis")) {
+      applyStatusEffect(caster, { id: "eldritch-aegis", label: "Eldritch Aegis", acBonus: 2, durationRounds: 1 });
+      addLog(`${caster.name}'s Eldritch Aegis hardens around them.`, "important");
+    }
+    if (warlockKnowsInvocation(caster, "patronsAegis")) {
+      applyStatusEffect(caster, { id: "patrons-aegis", label: "Patron's Aegis", resistances: ["acid", "cold", "fire", "force", "lightning", "necrotic", "poison", "psychic", "radiant", "thunder"], durationRounds: 1 });
+      addLog(`${caster.name}'s patron grants a broad aegis.`, "important");
+    }
+    if (warlockKnowsInvocation(caster, "patronsStep")) {
+      caster.movementLeft = (caster.movementLeft ?? 0) + 3;
+      addLog(`${caster.name}'s patron opens a 15 ft step.`, "important");
+    }
   }
 }
 
@@ -3764,7 +3995,7 @@ function spellTargetingMode(spell) {
 function spellTargetCount(spell) {
   const baseTargets = { bless: 3, bane: 3, aid: 3, "mass-healing-word": 6 };
   const base = baseTargets[spell?.id] ?? 1;
-  return base + Math.max(0, spellCastLevel(spell) - spellBaseLevel(spell)) * (spell?.upcast?.targetsPerLevel ?? 0);
+  return base + (spell?.metamagic?.extraTarget ?? 0) + Math.max(0, spellCastLevel(spell) - spellBaseLevel(spell)) * (spell?.upcast?.targetsPerLevel ?? 0);
 }
 
 function currentPendingSpellTargeting() {
@@ -3772,6 +4003,8 @@ function currentPendingSpellTargeting() {
   const caster = state.fighters[pendingSpellTargeting.casterId];
   const spell = getContentDefinition("spells", pendingSpellTargeting.spellId);
   let castSpell = spell ? spellWithCastLevel(spell, pendingSpellTargeting.castLevel) : null;
+  const metamagicAbility = pendingSpellTargeting.metamagicId ? metamagicAbilityForSpell(caster, pendingSpellTargeting.metamagicId) : null;
+  if (castSpell && metamagicAbility) castSpell = applyMetamagicToSpell(caster, castSpell, metamagicAbility);
   if (castSpell?.id === "dragonborn-breath") {
     castSpell = {
       ...castSpell,
@@ -4038,6 +4271,7 @@ function startSpellTargeting(caster, spell) {
     casterId: caster.id,
     spellId: spell.id,
     castLevel: spellCastLevel(spell),
+    metamagicId: spell.metamagic?.id ?? null,
     mode,
     hoverPosition: mode === "target" ? spellTargetsFor(caster, spell)[0]?.position ?? null : caster.position,
   };
@@ -4046,7 +4280,8 @@ function startSpellTargeting(caster, spell) {
     direction: "Choose a direction from the caster.",
     target: targetCount > 1 ? `Choose ${targetCount} targets.` : "Choose a creature to center or target the spell.",
   };
-  addLog(`${caster.name} readies ${spell.name} at spell level ${spellCastLevel(spell)} for ${spellPointCost(spell)} SP. ${instructions[mode]}`, "important");
+  const metamagicText = spell.metamagic?.name ? ` with ${spell.metamagic.name}` : "";
+  addLog(`${caster.name} readies ${spell.name}${metamagicText} at spell level ${spellCastLevel(spell)} for ${spellPointCost(spell)} SP. ${instructions[mode]}`, "important");
   hideAbilitiesMenu();
   render();
 }
@@ -4058,7 +4293,7 @@ async function confirmPendingSpellTarget(position) {
   pendingSpellTargeting = null;
   if (mode === "point") {
     if (!isValidSpellPointTarget(caster, spell, position)) {
-      pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), mode, hoverPosition: position };
+      pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), metamagicId: spell.metamagic?.id ?? null, mode, hoverPosition: position };
       addLog(`${spell.name} needs a visible square in range inside this room.`, "important");
       render();
       return true;
@@ -4069,7 +4304,7 @@ async function confirmPendingSpellTarget(position) {
   if (mode === "direction") {
     const direction = directionFromCasterToPosition(caster, position);
     if (!direction) {
-      pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), mode, hoverPosition: position };
+      pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), metamagicId: spell.metamagic?.id ?? null, mode, hoverPosition: position };
       render();
       return true;
     }
@@ -4078,7 +4313,7 @@ async function confirmPendingSpellTarget(position) {
   }
   const target = fighterAtPosition(position);
   if (!isValidSpellTarget(caster, spell, target)) {
-    pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), mode, hoverPosition: position };
+    pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), metamagicId: spell.metamagic?.id ?? null, mode, hoverPosition: position };
     addLog(`That is not a valid target for ${spell.name}.`, "important");
     render();
     return true;
@@ -4088,7 +4323,7 @@ async function confirmPendingSpellTarget(position) {
     pendingMultiTargetSpell = pendingMultiTargetSpell ?? { targetIds: [] };
     if (!pendingMultiTargetSpell.targetIds.includes(target.id)) pendingMultiTargetSpell.targetIds.push(target.id);
     if (pendingMultiTargetSpell.targetIds.length < targetCount) {
-      pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), mode, hoverPosition: position };
+      pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), metamagicId: spell.metamagic?.id ?? null, mode, hoverPosition: position };
       addLog(`${spell.name}: choose target ${pendingMultiTargetSpell.targetIds.length + 1} of ${targetCount}.`, "important");
       render();
       return true;
@@ -4150,6 +4385,7 @@ async function applySpellDamage(caster, target, spell) {
   }
   if (isSidekickSpellcaster(caster) && spellBaseLevel(spell) === 0 && (caster.level ?? 1) >= 6) raw += Math.max(0, abilityMod(caster, spellcastingAbility(caster)));
   if (isSidekickSpellcaster(caster) && spellBaseLevel(spell) > 0 && (caster.level ?? 1) >= 14 && caster.empoweredSpellSchool === spell.school) raw += Math.max(0, abilityMod(caster, spellcastingAbility(caster)));
+  if (spell.metamagic?.damageBonus) raw += spell.metamagic.damageBonus;
   if (caster.classId === "cleric" && (caster.level ?? 1) >= 8 && spellBaseLevel(spell) === 0 && !caster.blessedStrikeUsedThisTurn) {
     const blessed = rollDice(1, 8);
     raw += blessed.total;
@@ -4195,7 +4431,7 @@ async function applySpellAttack(caster, target, spell) {
   const dice = scaledSpellDice(spell);
   const damageRoll = rollDice(dice.count * (criticalResult.doublesDamage ? 2 : 1), dice.sides);
   const extra = spell.effect?.abilityBonus === "spellcasting" ? abilityMod(caster, spell?.attackAbility ?? spell?.saveDcAbility ?? spellcastingAbility(caster)) : 0;
-  const rawDamage = Math.max(1, damageRoll.total + (dice.bonus ?? 0) + extra);
+  const rawDamage = Math.max(1, damageRoll.total + (dice.bonus ?? 0) + extra + (spell.metamagic?.damageBonus ?? 0));
   addAdminLog(`${caster.name}'s ${spell.name} hit damage roll: ${damageRoll.rolls.join(" + ")}${dice.bonus ? ` ${abilityLabel(dice.bonus)}` : ""}${extra ? ` + spell ability ${extra}` : ""} = ${rawDamage} ${spell.effect?.type ?? "force"}.`);
   let totalDamage = rawDamage;
   if (caster.classId === "cleric" && (caster.level ?? 1) >= 8 && spellBaseLevel(spell) === 0 && !caster.blessedStrikeUsedThisTurn) {
@@ -4213,19 +4449,66 @@ function eldritchBlastBeamCount(caster) {
   return level >= 17 ? 4 : level >= 11 ? 3 : level >= 5 ? 2 : 1;
 }
 
+function warlockKnowsInvocation(caster, id) {
+  return caster?.classId === "warlock" && (caster.knownInvocations ?? []).includes(id);
+}
+
+function warlockHasPact(caster, pactId) {
+  return caster?.classId === "warlock" && caster?.pactBoon === pactId;
+}
+
+function targetIsInMagicalDarkness(target) {
+  return (target?.statusEffects ?? []).some((effect) => effect.id === "darkness" || effect.label === "Darkness");
+}
+
+function targetIsCursedOrObscured(target) {
+  return (target?.statusEffects ?? []).some((effect) => ["hex", "frightened", "darkness", "marked"].includes(effect.id) || ["Hexed", "Frightened", "Darkness", "Marked"].includes(effect.label));
+}
+
+function eldritchBlastRangeFeet(caster) {
+  return warlockKnowsInvocation(caster, "eldritchSpear") ? 300 : 120;
+}
+
+function pullTargetToward(source, target) {
+  const dx = Math.sign(source.position.x - target.position.x);
+  const dy = Math.sign(source.position.y - target.position.y);
+  const destination = { x: target.position.x + dx, y: target.position.y + dy };
+  if (!window.DungeonGrid.isInsideGrid(destination, currentGridSize())) return false;
+  if (!movementWalkableFor(target).has(positionKey(destination))) return false;
+  if (!canTraverseMovementEdge(target, target.position, destination, [])) return false;
+  if (window.DungeonGrid.isOccupied(destination, state.fighters, target)) return false;
+  target.position = destination;
+  return true;
+}
+
+function maybeApplyEldritchBlastInvocations(caster, target) {
+  if (!target?.alive) return;
+  if (warlockKnowsInvocation(caster, "repellingBlast") && pushTargetAway(caster, target)) {
+    addLog(`${caster.name}'s Repelling Blast pushes ${target.name} away.`, "important");
+  } else if (warlockKnowsInvocation(caster, "graspOfHadar") && pullTargetToward(caster, target)) {
+    addLog(`${caster.name}'s Grasp of Hadar pulls ${target.name} closer.`, "important");
+  }
+  if (warlockKnowsInvocation(caster, "voidLance") && target.alive) {
+    applyStatusEffect(target, { id: `void-lance-${caster.id}`, label: "Void Lance", speedBonusFeet: -10, expiresAtEndOfTurn: true });
+    addLog(`${caster.name}'s Void Lance slows ${target.name}.`, "important");
+  }
+}
+
 async function resolveEldritchBlastBeam(caster, target, beamIndex, beamCount) {
-  if (!target?.alive || !hostileTo(caster, target) || !isInAttackRangeWithProfile(caster, target, { range: { kind: "ranged", feet: 120 } })) {
+  if (!target?.alive || !hostileTo(caster, target) || !isInAttackRangeWithProfile(caster, target, { range: { kind: "ranged", feet: eldritchBlastRangeFeet(caster) } })) {
     addLog("Choose a visible enemy in range for Eldritch Blast.", "important");
     render();
     return false;
   }
-  const rollResult = rollD20ForFighter(caster);
+  const devilSightAdvantage = warlockKnowsInvocation(caster, "devilsSight") && targetIsInMagicalDarkness(target);
+  const witchSightAdvantage = warlockKnowsInvocation(caster, "witchSight") && targetIsCursedOrObscured(target);
+  const rollResult = rollD20ForFighter(caster, { advantage: devilSightAdvantage || witchSightAdvantage });
   const criticalResult = resolveMonsterHeroCritical(caster, target, rollResult.roll);
   const roll = criticalResult.attackRoll;
   const bonus = spellAttackBonus(caster);
   const total = roll + bonus;
   const targetAc = armorClass(target);
-  addLog(`${caster.name}'s Eldritch Blast beam ${beamIndex}/${beamCount}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`, "important");
+  addLog(`${caster.name}'s Eldritch Blast beam ${beamIndex}/${beamCount}${devilSightAdvantage ? " with Devil's Sight" : witchSightAdvantage ? " with Witch Sight" : ""}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`, "important");
   addAdminLog(`${caster.name} Eldritch Blast beam ${beamIndex}/${beamCount} breakdown: ${d20RollDetail(rollResult)}${criticalResult.attackRoll !== rollResult.roll ? ` -> Karmic outcome d20 ${roll}` : ""} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
   recordD20OutcomeForFighter(caster, roll !== 1 && (criticalResult.forcedHit || total >= targetAc));
   if (roll === 1 || (!criticalResult.forcedHit && total < targetAc)) {
@@ -4233,9 +4516,22 @@ async function resolveEldritchBlastBeam(caster, target, beamIndex, beamCount) {
     return true;
   }
   const damageRoll = rollDice(criticalResult.doublesDamage ? 2 : 1, 10);
-  addAdminLog(`${caster.name}'s Eldritch Blast damage roll: ${damageRoll.rolls.join(" + ")} = ${Math.max(1, damageRoll.total)} force.`);
-  applySpecialDamage(caster, target, Math.max(1, damageRoll.total), "force", "Eldritch Blast");
+  const agonizingBonus = warlockKnowsInvocation(caster, "agonizingBlast") ? Math.max(0, abilityMod(caster, "cha")) : 0;
+  const hexingBonus = warlockKnowsInvocation(caster, "hexingBlast") && (target.statusEffects ?? []).some((effect) => effect.id === "hex") ? rollDie(6) : 0;
+  const damage = Math.max(1, damageRoll.total + agonizingBonus + hexingBonus);
+  addAdminLog(`${caster.name}'s Eldritch Blast damage roll: ${damageRoll.rolls.join(" + ")}${agonizingBonus ? ` + Agonizing Blast ${agonizingBonus}` : ""}${hexingBonus ? ` + Hexing Blast ${hexingBonus}` : ""} = ${damage} force.`);
+  applySpecialDamage(caster, target, damage, "force", "Eldritch Blast");
+  if (criticalResult.isCritical && warlockKnowsInvocation(caster, "eldritchDoom") && target.alive) {
+    applyStatusEffect(target, { id: `eldritch-doom-${caster.id}`, label: "Eldritch Doom", speedLocked: true, actionLocked: true, durationRounds: 1 });
+    addLog(`${caster.name}'s Eldritch Doom stuns ${target.name}.`, "important");
+  }
+  maybeApplyEldritchBlastInvocations(caster, target);
   if (!target.alive) {
+    if (warlockKnowsInvocation(caster, "soulLeech")) {
+      const tempHp = Math.max(3, abilityMod(caster, "cha") + proficiencyBonus(caster));
+      applyStatusEffect(caster, { id: "soul-leech", label: "Soul Leech", tempHp, durationRounds: 10 });
+      addLog(`${caster.name}'s Soul Leech grants ${tempHp} temporary HP.`, "important");
+    }
     triggerMonsterDeathStory(target);
     playSoundEffect("enemyDefeated");
     awardMonsterXp(target);
@@ -4250,7 +4546,7 @@ function startEldritchBlastTargeting(caster) {
   if (!canCastSpell(caster, spell)) return;
   const beamCount = eldritchBlastBeamCount(caster);
   pendingEldritchBlast = { casterId: caster.id, beamsRemaining: beamCount, beamCount };
-  addLog(`${caster.name} casts Eldritch Blast. Click target ${beamCount > 1 ? `1 of ${beamCount}` : ""}.`, "important");
+  addLog(`${caster.name} casts Eldritch Blast (${eldritchBlastRangeFeet(caster)} ft). Click target ${beamCount > 1 ? `1 of ${beamCount}` : ""}.`, "important");
   hideAbilitiesMenu();
   render();
 }
@@ -4302,6 +4598,7 @@ async function applySpellStatus(caster, target, spell, options = {}) {
     id: spell.effect?.status?.id ?? spell.id,
     label: spell.effect?.status?.label ?? spell.name,
   };
+  if (spell.duration?.rounds && !effect.durationRounds && !effect.expiresAtEndOfTurn && !effect.expiresAtStartOfTurn) effect.durationRounds = spell.duration.rounds;
   if (spell.concentration) effect.concentrationId = concentrationId(caster);
   if (spell.resource === "weaponRider") effect.weaponRider = true;
   if (effect.weaponRider && effect.damageDice) {
@@ -4458,8 +4755,9 @@ async function castSpellInDirection(caster, spell, direction) {
 async function chooseAndCastSpell(spellId, castLevel = null) {
   const caster = state.mode === "combat" ? activeFighter() : activeHero();
   const baseSpell = spellDefinitionsForFighter(caster).find((entry) => entry.id === spellId);
-  const spell = baseSpell ? spellWithCastLevel(baseSpell, castLevel ?? spellBaseLevel(baseSpell)) : null;
-  if (!canCastSpell(caster, spell)) return;
+  let spell = baseSpell ? spellWithCastLevel(baseSpell, castLevel ?? spellBaseLevel(baseSpell)) : null;
+  spell = await chooseMetamagicForSpell(caster, spell);
+  if (!spell || !canCastSpell(caster, spell)) return;
   if (spell?.id === "eldritch-blast") {
     startEldritchBlastTargeting(caster);
     return;

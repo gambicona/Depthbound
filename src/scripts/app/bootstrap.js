@@ -503,6 +503,7 @@ const els = {
   goNewDungeon: document.querySelector("#go-new-dungeon"),
   levelPanel: document.querySelector(".level-panel"),
   levelUp: document.querySelector("#level-up"),
+  replaceRangerCompanion: document.querySelector("#replace-ranger-companion"),
   storeMenu: document.querySelector("#store-menu"),
   storeBody: document.querySelector("#store-body"),
   closeStore: document.querySelector("#close-store"),

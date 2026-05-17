@@ -4843,6 +4843,8 @@ function fighterAbilityUnavailableReason(fighter, ability) {
     if (state.mode === "combat" && ability.resource === "bonusAction" && !fighter.hasBonusAction) return "Bonus action already used.";
     return "";
   }
+  if (ability.invocationOption && ability.resource === "passive") return "";
+  if (ability.resource === "passive") return "";
   if (abilityResourceSpent(fighter, ability) >= abilityMaxUses(fighter, ability)) return "No uses remaining.";
   if (ability.id === "rage" && fighterWearsHeavyArmor(fighter)) return "Cannot rage while wearing heavy armor.";
   if (ability.id === "layOnHands" && !partyHeroes().some((target) => !target.dead && (target.id === fighter.id || hasMeleeAccess(fighter, target)) && (target.hp ?? 0) < (target.maxHp ?? 0))) {
@@ -4855,6 +4857,7 @@ function fighterAbilityUnavailableReason(fighter, ability) {
   if (ability.id === "uncannyDodge") return "Triggers as a reaction when this hero is hit.";
   if (ability.id === "indomitable") return "Triggers automatically when this companion fails a saving throw.";
   if (ability.id === "goliathStoneEndurance") return "Triggers as a reaction when this hero takes damage.";
+  if (ability.metamagicOption) return "Choose this while casting an eligible spell.";
   if (ability.subclassEffect?.kind === "interruptSpell") return "Triggers as a reaction prompt when an enemy uses a spell-like power.";
   if (ability.id === "cuttingWords") return "Triggers as a reaction prompt when an enemy attack threatens a hero.";
   if (
@@ -4944,17 +4947,23 @@ function abilityRowMarkup(hero, ability, { favoriteIndex = null, favoriteTotal =
   const disabled = unavailableReason ? "disabled" : "";
   const buttonLabel = ability.id === "wildShape" && isWildShaped(hero) ? "Revert" : "Use";
   const favoriteKey = abilityFavoriteKey(ability);
+  const passive = ability.resource === "passive";
+  const atWill = ability.invocationOption && maxUses >= 99;
+  const useText = passive ? "Passive." : atWill ? "At will." : `Uses: ${used}/${maxUses}.`;
+  const actionMarkup = passive
+    ? `<small class="ability-cost">Passive</small>`
+    : `<button type="button" data-action="use-fighter-ability" data-ability="${escapeAttribute(ability.id)}" ${disabled}>${buttonLabel}</button>`;
   return `
     <div class="use-item-row">
       <div>
         <b>${escapeHtml(ability.name)} <small class="ability-cost">${escapeHtml(abilityCostLabel(ability))}</small></b>
-        <span>${escapeHtml(ability.description)} Uses: ${used}/${maxUses}.</span>
+        <span>${escapeHtml(ability.description)} ${escapeHtml(useText)}</span>
         ${unavailableReason ? `<small class="ability-warning">${escapeHtml(unavailableReason)}</small>` : ""}
       </div>
       <div class="use-item-actions">
         ${favoriteMoveButtonsMarkup(favoriteKey, favoriteIndex, favoriteTotal)}
         ${favoriteButtonMarkup(hero, favoriteKey)}
-        <button type="button" data-action="use-fighter-ability" data-ability="${escapeAttribute(ability.id)}" ${disabled}>${buttonLabel}</button>
+        ${actionMarkup}
       </div>
     </div>
   `;
@@ -4966,7 +4975,7 @@ function spellRowMarkup(hero, spell, { favoriteIndex = null, favoriteTotal = 0 }
   const castButtons = castLevels
     .map((castLevel) => {
       const castSpell = spellWithCastLevel(spell, castLevel);
-      const disabled = canCastSpell(hero, castSpell) ? "" : "disabled";
+      const disabled = canStartSpellCast(hero, castSpell) ? "" : "disabled";
       const upcast = castLevel > spellBaseLevel(spell) ? ` L${castLevel}` : "";
       return `<button type="button" data-action="cast-spell" data-spell="${escapeAttribute(spell.id)}" data-cast-level="${castLevel}" ${disabled}>${spellBaseLevel(spell) === 0 ? "Use" : `Cast${upcast}`}</button>`;
     })
@@ -5132,9 +5141,12 @@ function hideAbilitiesMenu() {
 function showHomeMenu() {
   const hero = activeHero();
   const canTrain = canTrainAsSidekick(hero);
+  const canReplaceCompanion = canReplaceDeadBeastMasterCompanion(hero);
   els.levelPanel?.classList.toggle("hidden", isAutonomousAlly(hero));
   els.levelUp.textContent = canTrain ? "Train" : "Level Up";
   els.levelUp.disabled = !canTrain && !canLevelUp(hero);
+  els.replaceRangerCompanion?.classList.toggle("hidden", !canReplaceCompanion);
+  if (els.replaceRangerCompanion) els.replaceRangerCompanion.disabled = !canReplaceCompanion;
   const barrowCompleted = state.campaignProgress?.["barrow-crown"] ?? 0;
   const thornwoodCompleted = state.campaignProgress?.["thornwood-pact"] ?? 0;
   els.goBarrowCrown?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${barrowCompleted}/7`));
@@ -5668,7 +5680,14 @@ function subclassOptionCount(subclass, kind, level) {
 }
 
 async function chooseSubclassOptions({ hero, subclass, kind, property, options, title, message }) {
-  const targetCount = subclassOptionCount(subclass, kind, hero.level ?? 1);
+  const targetCount =
+    kind === "metamagic"
+      ? metamagicKnownCountForLevel(hero.level ?? 1)
+      : kind === "invocations"
+        ? invocationKnownCountForLevel(hero.level ?? 1)
+        : kind === "pactBoon"
+          ? 1
+          : subclassOptionCount(subclass, kind, hero.level ?? 1);
   const selected = [...(hero[property] ?? [])].filter((id) => options.some((option) => option.id === id && (hero.level ?? 1) >= (option.level ?? 1)));
   const newlyPicked = [];
   while (selected.length < targetCount) {
@@ -5772,6 +5791,325 @@ async function chooseBarbarianSubclassOptions(hero, subclass) {
   }
   ensureFighterAbilityState(hero);
   return parts.length ? ` ${parts.join(". ")}.` : "";
+}
+
+function metamagicKnownCountForLevel(level) {
+  if (level >= 17) return 4;
+  if (level >= 10) return 3;
+  if (level >= 3) return 2;
+  return 0;
+}
+
+async function chooseSorcererMetamagicOptions(hero) {
+  if (hero.classId !== "sorcerer" || ![3, 10, 17].includes(hero.level ?? 1)) return "";
+  const options = getHeroTemplate("sorcerer").metamagicOptions ?? [];
+  const picked = await chooseSubclassOptions({
+    hero,
+    subclass: null,
+    kind: "metamagic",
+    property: "knownMetamagic",
+    options,
+    title: "Metamagic",
+    message: "Choose a Metamagic option.",
+  });
+  if (picked === null) return null;
+  ensureFighterAbilityState(hero);
+  return picked.length ? ` Metamagic learned: ${picked.join(", ")}.` : "";
+}
+
+function invocationKnownCountForLevel(level) {
+  if (level >= 18) return 8;
+  if (level >= 15) return 7;
+  if (level >= 12) return 6;
+  if (level >= 9) return 5;
+  if (level >= 7) return 4;
+  if (level >= 5) return 3;
+  if (level >= 2) return 2;
+  return 0;
+}
+
+async function chooseWarlockInvocations(hero) {
+  if (hero.classId !== "warlock" || ![2, 5, 7, 9, 12, 15, 18].includes(hero.level ?? 1)) return "";
+  const options = getHeroTemplate("warlock").invocationOptions ?? [];
+  const picked = await chooseSubclassOptions({
+    hero,
+    subclass: null,
+    kind: "invocations",
+    property: "knownInvocations",
+    options,
+    title: "Eldritch Invocations",
+    message: "Choose an invocation.",
+  });
+  if (picked === null) return null;
+  ensureFighterAbilityState(hero);
+  return picked.length ? ` Invocations learned: ${picked.join(", ")}.` : "";
+}
+
+function applyWarlockPactBoonChoice(hero, pactId) {
+  hero.pactBoon = pactId;
+  if (pactId === "pactTome") {
+    hero.spells = uniqueValues([...(hero.spells ?? []), "guidance", "sacred-flame", "shillelagh"]);
+    hero.classCantripList = uniqueValues([...(hero.classCantripList ?? []), "guidance", "sacred-flame", "shillelagh"]);
+  }
+  if (pactId === "pactBlade") {
+    hero.weaponProficiencies = proficiencyEntries([...(hero.weaponProficiencies ?? []), "martial"]);
+  }
+}
+
+async function chooseWarlockPactBoon(hero) {
+  if (hero.classId !== "warlock" || (hero.level ?? 1) !== 3 || hero.pactBoon) return "";
+  const options = getHeroTemplate("warlock").pactBoonOptions ?? [];
+  const choice = await showSelectChoiceDialog({
+    title: "Pact Boon",
+    message: "Choose the pact gift your patron grants.",
+    actor: hero,
+    label: "Pact",
+    choices: options.map((option) => ({
+      value: option.id,
+      label: option.name,
+      description: option.description,
+    })),
+  });
+  if (!choice) return null;
+  applyWarlockPactBoonChoice(hero, choice);
+  ensureFighterAbilityState(hero);
+  const name = options.find((option) => option.id === choice)?.name ?? "Pact Boon";
+  return ` Pact Boon: ${name}.`;
+}
+
+const beastMasterCompanionOptions = [
+  {
+    id: "wolf",
+    monsterId: "forestWolf",
+    name: "Forest Wolf",
+    description: "Fast melee hunter. Best at pursuit, Perception, and knocking wounded enemies down.",
+    attackAbility: "dex",
+    abilityScores: { str: 12, dex: 16, con: 12, int: 3, wis: 12, cha: 6 },
+    savingThrowProficiencies: ["dex"],
+    skillProficiencies: ["perception", "stealth"],
+  },
+  {
+    id: "mastiff",
+    monsterId: "strayFightingDog",
+    name: "War Mastiff",
+    description: "Reliable guard beast. Good HP, good senses, and strong single-target pressure.",
+    attackAbility: "str",
+    abilityScores: { str: 14, dex: 12, con: 13, int: 3, wis: 12, cha: 7 },
+    savingThrowProficiencies: ["str"],
+    skillProficiencies: ["athletics", "perception"],
+  },
+  {
+    id: "panther",
+    monsterId: "darkmantlePanther",
+    name: "Shadow Panther",
+    description: "Agile ambusher. High Dexterity, stealth, and hard-hitting claws.",
+    attackAbility: "dex",
+    abilityScores: { str: 12, dex: 16, con: 12, int: 3, wis: 14, cha: 7 },
+    damage: { count: 1, sides: 6, bonus: 0, type: "slashing", attackType: "weapon", weaponName: "Claws" },
+    savingThrowProficiencies: ["dex"],
+    skillProficiencies: ["perception", "stealth"],
+  },
+  {
+    id: "hawk",
+    monsterId: "talonHawk",
+    name: "Talon Hawk",
+    description: "Ranged skirmisher. Keeps distance and harasses enemies from the air.",
+    attackAbility: "dex",
+    abilityScores: { str: 6, dex: 16, con: 10, int: 3, wis: 14, cha: 7 },
+    savingThrowProficiencies: ["dex"],
+    skillProficiencies: ["perception"],
+  },
+  {
+    id: "boar",
+    monsterId: "brambleBoar",
+    name: "Bramble Boar",
+    description: "Tough charger. Strong Constitution, solid HP, and straightforward melee AI.",
+    attackAbility: "str",
+    abilityScores: { str: 14, dex: 11, con: 14, int: 2, wis: 10, cha: 5 },
+    savingThrowProficiencies: ["con"],
+    skillProficiencies: ["athletics", "perception"],
+  },
+  {
+    id: "spider",
+    monsterId: "gloomwebSpider",
+    name: "Gloomweb Spider",
+    description: "Poisonous ambusher. Lower damage dice, but poison resistance and stealth.",
+    attackAbility: "dex",
+    abilityScores: { str: 10, dex: 14, con: 12, int: 2, wis: 10, cha: 4 },
+    savingThrowProficiencies: ["dex"],
+    skillProficiencies: ["stealth", "perception"],
+  },
+  {
+    id: "hare",
+    monsterId: "thornbackHare",
+    name: "Thornback Hare",
+    description: "Tiny evasive striker. High AC profile and speed, but lighter HP.",
+    attackAbility: "dex",
+    abilityScores: { str: 6, dex: 16, con: 10, int: 2, wis: 12, cha: 6 },
+    savingThrowProficiencies: ["dex"],
+    skillProficiencies: ["acrobatics", "stealth"],
+  },
+  {
+    id: "otter",
+    monsterId: "marshOtter",
+    name: "River Otter",
+    description: "Creative skirmisher. Balanced, nimble, and useful in wet dungeon spaces.",
+    attackAbility: "dex",
+    abilityScores: { str: 8, dex: 16, con: 12, int: 3, wis: 12, cha: 8 },
+    savingThrowProficiencies: ["dex"],
+    skillProficiencies: ["acrobatics", "perception"],
+  },
+];
+
+function companionSpawnPosition(owner) {
+  const occupied = new Set(Object.values(state.fighters ?? {}).filter((fighter) => fighter.alive && fighter.position).map((fighter) => positionKey(fighter.position)));
+  const base = owner?.position ?? { x: 4, y: 6 };
+  const candidates = [
+    { x: base.x + 1, y: base.y },
+    { x: base.x - 1, y: base.y },
+    { x: base.x, y: base.y + 1 },
+    { x: base.x, y: base.y - 1 },
+    { x: base.x + 1, y: base.y + 1 },
+  ];
+  return candidates.find((position) => !occupied.has(positionKey(position))) ?? { x: base.x + 1, y: base.y };
+}
+
+async function chooseBeastCompanionStatIncreases(companion) {
+  companion.abilityScores = Object.fromEntries(abilities.map((ability) => [ability, baseAbilityScore(companion, ability)]));
+  const chosen = [];
+  for (let index = 0; index < 2; index += 1) {
+    const ability = await showChoiceDialog({
+      title: "Companion Stat Point",
+      message: `Assign stat point ${index + 1} of 2 for ${companion.name}.`,
+      actor: companion,
+      choices: abilities.map((value) => ({
+        value,
+        label: value.toUpperCase(),
+        description: `Current score ${companion.abilityScores[value]}.`,
+      })),
+    });
+    if (!ability) return null;
+    companion.abilityScores[ability] = Math.min(20, companion.abilityScores[ability] + 1);
+    chosen.push(ability.toUpperCase());
+  }
+  return chosen;
+}
+
+function createBeastMasterCompanion(hero, option, identity, options = {}) {
+  const template = getMonsterTemplate(option.monsterId);
+  if (!template) return null;
+  const abilityScores = { ...option.abilityScores };
+  const companion = createFriendlyBeastFromMonster(option.monsterId, {
+    id: `beastmaster-${hero.id}-${option.id}-${Date.now()}`,
+    name: (identity?.name || option.name).slice(0, 32),
+    tokenArt: identity?.tokenArt || template.tokenArt,
+    position: companionSpawnPosition(hero),
+    kind: "companion",
+    control: "player",
+    renameable: true,
+    classId: "sidekick-warrior",
+    className: "Beast Companion",
+    sidekickClassName: "Beast Companion",
+    sidekickWarriorRole: "attacker",
+    level: hero.level ?? 3,
+    hitDiceRemaining: hero.level ?? 3,
+    xp: options.xp ?? 0,
+    followHeroId: hero.id,
+    followDistanceSquares: 2,
+    rangerCompanion: true,
+    rangerCompanionOwnerId: hero.id,
+    rangerCompanionNormalMaxHp: Math.max(template.maxHp ?? 1, 1),
+    companionAttackAbility: option.attackAbility,
+    abilityScores,
+    baseAttackAbilityMod: scoreToMod(abilityScores[option.attackAbility] ?? 10),
+    damage: option.damage ?? template.damage,
+    savingThrowProficiencies: option.savingThrowProficiencies,
+    skillProficiencies: option.skillProficiencies,
+  });
+  if (!companion) return null;
+  companion.baseDamage = { ...(option.damage ?? template.damage) };
+  companion.rangerCompanionOptionId = option.id;
+  refreshDerivedStats(companion);
+  companion.hp = companion.maxHp;
+  return companion;
+}
+
+async function chooseBeastMasterCompanion(hero, options = {}) {
+  if (hero.classId !== "ranger" || hero.subclassId !== "beast-master" || (hero.level ?? 1) < 3) return "";
+  if (!options.forceReplacement && hero.beastCompanionId && state.fighters?.[hero.beastCompanionId]) return "";
+  const existing = rangerBeastCompanionForOwner(hero.id);
+  if (existing && !options.forceReplacement) {
+    hero.beastCompanionId = existing.id;
+    return "";
+  }
+  const choice = await showSelectChoiceDialog({
+    title: "Ranger's Companion",
+    message: "Choose the beast that is trained to fight beside you.",
+    actor: hero,
+    label: "Companion",
+    choices: beastMasterCompanionOptions
+      .filter((option) => getMonsterTemplate(option.monsterId))
+      .map((option) => ({
+        value: option.id,
+        label: option.name,
+        description: option.description,
+        info: `Attack ability: ${option.attackAbility.toUpperCase()}. Saves: ${option.savingThrowProficiencies.map((save) => save.toUpperCase()).join(", ")}. Skills: ${option.skillProficiencies.map(skillName).join(", ")}.`,
+      })),
+  });
+  if (!choice) return null;
+  const option = beastMasterCompanionOptions.find((entry) => entry.id === choice);
+  const identity = await showHeroIdentityDialog({
+    title: "Companion Identity",
+    message: "Name your companion and optionally add a custom token picture.",
+    nameValue: option.name,
+    tokenArt: "",
+    confirmText: "Choose Companion",
+  });
+  if (!identity) return null;
+  const companion = createBeastMasterCompanion(hero, option, identity, { xp: options.inheritedXp ?? 0 });
+  if (!companion) return "";
+  const statChoices = await chooseBeastCompanionStatIncreases(companion);
+  if (!statChoices) return null;
+  refreshDerivedStats(companion);
+  companion.hp = companion.maxHp;
+  addRecruitedAllyToParty(companion);
+  hero.beastCompanionId = companion.id;
+  addLog(`${companion.name} becomes ${hero.name}'s ranger companion.`, "important");
+  return ` Ranger's Companion: ${companion.name} (${option.name}); stat points ${statChoices.join(", ")}.`;
+}
+
+function canReplaceDeadBeastMasterCompanion(hero = activeHero()) {
+  return Boolean(
+    state.mode === "home" &&
+      hero?.classId === "ranger" &&
+      hero.subclassId === "beast-master" &&
+      deadRangerBeastCompanionForOwner(hero.id) &&
+      !rangerBeastCompanionForOwner(hero.id),
+  );
+}
+
+async function replaceDeadBeastMasterCompanion() {
+  const hero = activeHero();
+  if (!canReplaceDeadBeastMasterCompanion(hero)) return;
+  const oldCompanion = deadRangerBeastCompanionForOwner(hero.id);
+  const inheritedXp = oldCompanion?.xp ?? 0;
+  const text = await chooseBeastMasterCompanion(hero, { forceReplacement: true, inheritedXp });
+  if (text === null) return;
+  if (oldCompanion?.id) {
+    state.party.heroIds = (state.party.heroIds ?? []).filter((id) => id !== oldCompanion.id);
+    state.party.rosterIds = (state.party.rosterIds ?? state.party.heroIds ?? []).filter((id) => id !== oldCompanion.id);
+    oldCompanion.retiredCompanion = true;
+  }
+  addLog(`${hero.name} calls a new ranger companion.${inheritedXp ? ` It inherits ${inheritedXp} XP from the fallen companion.` : ""}`, "important");
+  hideHomeMenu();
+  render();
+  if (text) {
+    await showChoiceDialog({
+      title: "New Ranger Companion",
+      message: `${text}${inheritedXp ? ` Inherited XP: ${inheritedXp}.` : ""}`,
+      choices: [{ value: "ok", label: "Continue" }],
+    });
+  }
 }
 
 async function chooseClassSubclassOptions(hero, subclass) {
@@ -5936,15 +6274,22 @@ async function chooseClassSubclass(hero) {
     hero.unusedSpellChoiceCredits = spells.unusedCredits;
     gained.push("subclass spellcasting");
   }
+  const beastCompanionText = await chooseBeastMasterCompanion(hero);
+  if (beastCompanionText === null) return levelUpCancelled;
 
   ensureFighterAbilityState(hero);
   refreshDerivedStats(hero);
-  return ` ${title}: ${fullSubclassName(subclass)}${gained.length ? ` (${gained.join("; ")})` : ""}.${optionText}`;
+  return ` ${title}: ${fullSubclassName(subclass)}${gained.length ? ` (${gained.join("; ")})` : ""}.${optionText}${beastCompanionText}`;
 }
 
 async function applyClassSubclassLevelChoices(hero) {
   if (!hero.subclassId) return "";
   let text = "";
+  if (hero.classId === "ranger" && hero.subclassId === "beast-master") {
+    const companionText = await chooseBeastMasterCompanion(hero);
+    if (companionText === null) return levelUpCancelled;
+    text += companionText;
+  }
   if (hero.classId === "fighter" && hero.subclassId === "champion" && (hero.level ?? 1) === 10) {
     const style = await chooseFightingStyle("fighter");
     if (!style) return levelUpCancelled;
@@ -6073,6 +6418,21 @@ async function levelUpHero() {
     cancelLevelUp();
     return;
   }
+  const metamagicText = await chooseSorcererMetamagicOptions(hero);
+  if (metamagicText === null) {
+    cancelLevelUp();
+    return;
+  }
+  const pactBoonText = await chooseWarlockPactBoon(hero);
+  if (pactBoonText === null) {
+    cancelLevelUp();
+    return;
+  }
+  const invocationText = await chooseWarlockInvocations(hero);
+  if (invocationText === null) {
+    cancelLevelUp();
+    return;
+  }
   let spellText = "";
   const cantripChoices =
     (isSidekickSpellcaster(hero) ? sidekickCantripChoiceCountForLevel(hero, hero.level ?? 1) : cantripChoiceCountForClassLevel(hero.classId, hero.level ?? 1)) +
@@ -6156,13 +6516,16 @@ async function levelUpHero() {
     }
   }
   refreshDerivedStats(hero);
+  syncRangerBeastCompanionsForOwner(hero).forEach((companion) => {
+    companion.hp = companion.maxHp;
+  });
   hero.hp = hero.maxHp;
   hero.spellPointMax = spellPointMaximum(hero);
   hero.spellPoints = hero.spellPointMax;
   const features = classFeatureNames(hero, hero.level);
   const featureText = features.length ? ` New feature${features.length === 1 ? "" : "s"}: ${features.join(", ")}.` : "";
   const racialHpText = isTrainedSidekick(hero) ? ` (${hpRoll} + CON)` : racialHpGain ? ` (${racialHpGain} from Dwarven Toughness)` : "";
-  const levelUpText = `${hero.name} reaches level ${hero.level} and gains ${hpGain} max HP${racialHpText}.${featureText}${subclassText}${subclassLevelText}${asiText}${spellText}${expertiseText}`;
+  const levelUpText = `${hero.name} reaches level ${hero.level} and gains ${hpGain} max HP${racialHpText}.${featureText}${subclassText}${subclassLevelText}${metamagicText}${pactBoonText}${invocationText}${asiText}${spellText}${expertiseText}`;
   addLog(levelUpText, "important");
   hideHomeMenu();
   render();
@@ -7208,6 +7571,57 @@ async function useFighterAbility(abilityId) {
     return;
   }
 
+  if (ability.id === "armorOfShadows") {
+    if (equippedItem(hero, "torso")?.armor?.base) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${hero.name} must remove armor before Armor of Shadows can help.`, "important");
+      renderAbilitiesMenu();
+      return;
+    }
+    applyStatusEffect(hero, { id: "armor-of-shadows", label: "Armor of Shadows", acBonus: 3, durationRounds: 100 });
+    addLog(`${hero.name} wraps themselves in Armor of Shadows.`, "important");
+  }
+
+  if (ability.id === "fiendishVigor") {
+    applyStatusEffect(hero, { id: "fiendish-vigor", label: "Fiendish Vigor", tempHp: 8, durationRounds: 10 });
+    addLog(`${hero.name} draws on Fiendish Vigor for 8 temporary HP.`, "important");
+  }
+
+  if (ability.id === "ascendantStep") {
+    hero.movementLeft = (hero.movementLeft ?? 0) + 6;
+    applyStatusEffect(hero, { id: "ascendant-step", label: "Ascendant Step", acBonus: 1, durationRounds: 3 });
+    addLog(`${hero.name} rises on Ascendant Step, gaining movement and defense.`, "important");
+  }
+
+  if (ability.id === "oneWithShadows") {
+    applyStatusEffect(hero, { id: "one-with-shadows", label: "One with Shadows", acBonus: 2, attackAdvantage: true, durationRounds: 1 });
+    addLog(`${hero.name} becomes One with Shadows.`, "important");
+  }
+
+  if (ability.id === "mireTheMind") {
+    const target = currentAttackTargetForAbility();
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${hero.name} has no visible target for Mire the Mind.`, "important");
+      renderAbilitiesMenu();
+      return;
+    }
+    applyStatusEffect(target, { id: `mire-the-mind-${hero.id}`, label: "Mired Mind", speedBonusFeet: -10, attackBonus: -2, durationRounds: 2 });
+    addLog(`${hero.name} mires ${target.name}'s mind.`, "important");
+  }
+
+  if (ability.id === "dreadfulWord") {
+    const targets = visibleMonsters().filter((target) => distance(hero.position, target.position) <= 6 && hasClearLineOfSight(hero.position, target.position));
+    if (!targets.length) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${hero.name} has no nearby visible enemies for Dreadful Word.`, "important");
+      renderAbilitiesMenu();
+      return;
+    }
+    for (const target of targets) applyStatusEffect(target, { id: `dreadful-word-${hero.id}`, label: "Frightened", attackBonus: -2, durationRounds: 2 });
+    addLog(`${hero.name}'s Dreadful Word frightens ${targets.map((target) => target.name).join(", ")}.`, "important");
+  }
+
   if (ability.id === "dragonbornBreath") {
     hero.abilityUses[ability.id] = Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1);
     if (state.mode === "combat") hero.hasAction = true;
@@ -7860,9 +8274,12 @@ function renderControls() {
   if (els.buttonThemeSelect) els.buttonThemeSelect.value = buttonTheme;
   els.debugKill.disabled = !adminEnabled() || visibleMonsters().length === 0;
   const canTrain = gameHasStarted && state.mode === "home" && canTrainAsSidekick(hero);
+  const canReplaceCompanion = gameHasStarted && state.mode === "home" && canReplaceDeadBeastMasterCompanion(hero);
   els.levelPanel?.classList.toggle("hidden", isAutonomousAlly(hero));
   els.levelUp.textContent = canTrain ? "Train" : "Level Up";
   els.levelUp.disabled = !gameHasStarted || state.mode !== "home" || (!canTrain && !canLevelUp(hero));
+  els.replaceRangerCompanion?.classList.toggle("hidden", !canReplaceCompanion);
+  if (els.replaceRangerCompanion) els.replaceRangerCompanion.disabled = !canReplaceCompanion;
   if (els.selectParty) {
     const selectableCount = partyHeroes().filter((entry) => heroCanAct(entry) && !isAutonomousAlly(entry)).length;
     els.selectParty.disabled = !gameHasStarted || state.mode === "combat" || selectableCount <= 1;

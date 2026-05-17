@@ -400,6 +400,7 @@ els.goBarrowCrown?.addEventListener("click", () => void startCampaignDungeon("ba
 els.goThornwoodPact?.addEventListener("click", () => void startCampaignDungeon("thornwood-pact"));
 els.goNewDungeon.addEventListener("click", startNewDungeonWithHero);
 els.levelUp.addEventListener("click", levelUpHero);
+els.replaceRangerCompanion?.addEventListener("click", () => void replaceDeadBeastMasterCompanion());
 els.storeMenu.addEventListener("click", (event) => {
   if (event.target === els.storeMenu) {
     hideStoreMenu();

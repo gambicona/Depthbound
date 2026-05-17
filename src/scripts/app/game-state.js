@@ -599,8 +599,12 @@ function isPlayerControlledCompanion(fighter) {
   return partyMemberKind(fighter) === "companion" && fighter?.companionControl !== "ai";
 }
 
+function isRangerBeastCompanion(fighter) {
+  return Boolean(fighter?.rangerCompanionOwnerId && fighter?.rangerCompanion === true);
+}
+
 function isSidekickWarrior(fighter) {
-  return isPlayerControlledCompanion(fighter) && fighter?.classId === "sidekick-warrior";
+  return (isPlayerControlledCompanion(fighter) || isRangerBeastCompanion(fighter)) && fighter?.classId === "sidekick-warrior";
 }
 
 function isSidekickExpert(fighter) {
@@ -635,6 +639,49 @@ function activeClassHeroIds(ids = state?.party?.heroIds ?? []) {
   return ids.filter((id) => isClassHeroId(id));
 }
 
+function rangerCompanionOwner(fighter) {
+  const ownerId = fighter?.rangerCompanionOwnerId;
+  const owner = ownerId ? state?.fighters?.[ownerId] : null;
+  return owner?.classId === "ranger" ? owner : null;
+}
+
+function rangerCompanionProficiencyBonus(fighter) {
+  return isRangerBeastCompanion(fighter) ? proficiencyBonus(rangerCompanionOwner(fighter) ?? fighter) : proficiencyBonus(fighter);
+}
+
+function rangerBeastCompanionsForOwner(ownerId) {
+  return Object.values(state?.fighters ?? {}).filter((fighter) => fighter?.rangerCompanionOwnerId === ownerId && fighter?.rangerCompanion === true && !fighter.retiredCompanion);
+}
+
+function rangerBeastCompanionForOwner(ownerId) {
+  return rangerBeastCompanionsForOwner(ownerId).find((fighter) => !fighter.dead) ?? null;
+}
+
+function deadRangerBeastCompanionForOwner(ownerId) {
+  return rangerBeastCompanionsForOwner(ownerId).find((fighter) => fighter.dead || !fighter.alive || (fighter.hp ?? 0) <= 0) ?? null;
+}
+
+function syncRangerBeastCompanionStats(companion) {
+  if (!isRangerBeastCompanion(companion)) return companion;
+  const owner = rangerCompanionOwner(companion);
+  if (!owner) return companion;
+  const rangerHpFloor = Math.max(companion.rangerCompanionNormalMaxHp ?? 1, (owner.level ?? 1) * 4);
+  companion.classId = "sidekick-warrior";
+  companion.className = companion.className ?? "Beast Companion";
+  companion.sidekickClassName = companion.sidekickClassName ?? "Beast Companion";
+  companion.sidekickWarriorRole = companion.sidekickWarriorRole ?? "attacker";
+  companion.baseMaxHp = Math.max(companion.baseMaxHp ?? companion.maxHp ?? 1, rangerHpFloor);
+  companion.hitDiceRemaining = Math.min(companion.hitDiceRemaining ?? companion.level ?? 1, companion.level ?? 1);
+  return companion;
+}
+
+function syncRangerBeastCompanionsForOwner(owner) {
+  if (!owner?.id) return [];
+  const companions = rangerBeastCompanionsForOwner(owner.id);
+  companions.forEach((companion) => refreshDerivedStats(companion));
+  return companions;
+}
+
 function createFriendlyBeastFromMonster(monsterId, options = {}) {
   const template = getMonsterTemplate(monsterId);
   if (!template) return null;
@@ -644,14 +691,28 @@ function createFriendlyBeastFromMonster(monsterId, options = {}) {
     id: options.id ?? `${monsterId}-ally-${Date.now()}`,
     name: options.name ?? template.name,
     position: options.position ?? { x: 4, y: 5 },
+    token: options.token ?? template.token,
+    tokenArt: options.tokenArt ?? template.tokenArt,
     partyMemberKind: options.kind ?? "ally",
     companionControl: options.control ?? "ai",
     team: "heroes",
     friendly: true,
     renameable: options.renameable ?? true,
     baseMonsterId: monsterId,
+    abilityScores: options.abilityScores ?? template.abilityScores,
+    abilityMods: options.abilityMods ?? template.abilityMods,
+    attackBonus: options.attackBonus ?? template.attackBonus,
+    baseAttackAbilityMod: options.baseAttackAbilityMod ?? template.baseAttackAbilityMod,
+    damage: options.damage ?? template.damage,
+    baseAc: options.baseAc ?? template.baseAc ?? template.ac,
     classId: options.classId,
     className: options.className ?? (companion ? "Beast Companion" : "Beast Ally"),
+    sidekickClassName: options.sidekickClassName,
+    sidekickWarriorRole: options.sidekickWarriorRole,
+    rangerCompanion: options.rangerCompanion,
+    rangerCompanionOwnerId: options.rangerCompanionOwnerId,
+    rangerCompanionNormalMaxHp: options.rangerCompanionNormalMaxHp ?? template.maxHp,
+    companionAttackAbility: options.companionAttackAbility,
     level: options.level ?? template.level ?? 1,
     xp: options.xp ?? 0,
     followHeroId: options.followHeroId ?? null,
@@ -1311,8 +1372,12 @@ function fighterAbilityDefinitions(fighter = state?.fighters?.hero) {
   return source
     .filter((ability) => ability.id !== "eldritchBlast")
     .filter((ability) => {
+      if (ability.id === "rangerCompanion") return false;
       if (ability.resourcePool === "arcaneShot") return (fighter?.knownArcaneShots ?? []).includes(ability.id);
       if (ability.resourcePool === "superiority") return (fighter?.knownManeuvers ?? []).includes(ability.id);
+      if (ability.metamagicOption) return (fighter?.knownMetamagic ?? []).includes(ability.id);
+      if (ability.invocationOption) return (fighter?.knownInvocations ?? []).includes(ability.id);
+      if (ability.pactBoon) return fighter?.pactBoon === ability.pactBoon;
       if (ability.rune) return (fighter?.knownRunes ?? []).includes(ability.id);
       return true;
     })
@@ -1516,6 +1581,7 @@ function abilityMaxUses(fighter, ability) {
   if (ability.resourcePool === "layOnHands") return Math.max(0, level * 5) + poolBonus;
   if (ability.resourcePool === "arcaneRecovery") return 1 + poolBonus;
   if (ability.resourcePool === "metamagic") return Math.max(0, level) + poolBonus;
+  if (ability.resourcePool === "favoredFoe") return proficiencyBonus(fighter) + poolBonus;
   let uses = ability.uses ?? 1;
   for (const entry of ability.usesByLevel ?? []) {
     if (level >= entry.level) uses = entry.uses;
@@ -1642,8 +1708,9 @@ function proficiencyBonus(fighter) {
 function skillCheckBonus(fighter, ability, skillId) {
   const proficiencies = new Set(fighter?.skillProficiencies ?? []);
   const expertise = new Set(fighter?.expertiseSkills ?? []);
-  const prof = proficiencies.has(skillId) ? proficiencyBonus(fighter) : 0;
-  const expert = expertise.has(skillId) ? proficiencyBonus(fighter) : 0;
+  const baseProf = rangerCompanionProficiencyBonus(fighter);
+  const prof = proficiencies.has(skillId) ? baseProf : 0;
+  const expert = expertise.has(skillId) ? baseProf : 0;
   const jackOfAllTrades = fighter?.classId === "bard" && (fighter.level ?? 1) >= 2 && !proficiencies.has(skillId)
     ? Math.floor(proficiencyBonus(fighter) / 2)
     : 0;
@@ -3187,8 +3254,16 @@ function canLevelUp(hero = state.fighters.hero) {
   return Boolean(hero && (isClassHero(hero) || isTrainedSidekick(hero)) && (hero.level ?? 1) < 20 && (hero.xp ?? 0) >= xpForNextLevel(hero.level ?? 1));
 }
 
+function warlockUsesCharismaForWeapon(fighter, weapon) {
+  if (fighter?.classId !== "warlock" || !weapon?.damage) return false;
+  if (fighter.subclassId === "hexblade" && (fighter.level ?? 1) >= 3) return true;
+  if (fighter.pactBoon === "pactBlade" && (fighter.level ?? 1) >= 3 && !weaponIsRanged(weapon)) return true;
+  return false;
+}
+
 function attackAbilityForWeapon(weapon, fighter = null) {
   if (!weapon) return "str";
+  if (warlockUsesCharismaForWeapon(fighter, weapon)) return "cha";
   if (weapon.weaponRange === "ranged" || weapon.range?.kind === "ranged") return "dex";
   if (fighter && weapon.properties?.includes("finesse") && abilityMod(fighter, "dex") > abilityMod(fighter, "str")) return "dex";
   return "str";
@@ -3228,12 +3303,16 @@ function attackBonus(fighter) {
 function attackBonusForWeapon(fighter, weapon = activeWeapon(fighter)) {
   const statusBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.attackBonus ?? 0), 0);
   const sidekickAttackBonus = isSidekickWarrior(fighter) && (fighter.sidekickWarriorRole ?? "attacker") === "attacker" ? 2 : 0;
-  const sidekickProficiencyBonus = isTrainedSidekick(fighter) ? Math.max(0, proficiencyBonus(fighter) - 2) : 0;
+  const sidekickProficiencyBonus = isTrainedSidekick(fighter) && !isRangerBeastCompanion(fighter) ? Math.max(0, proficiencyBonus(fighter) - 2) : 0;
   if (isWildShaped(fighter)) return (fighter.attackBonus ?? 0) + statusBonus;
   const unarmed = !weapon?.damage;
-  const ability = abilityMod(fighter, unarmed ? attackAbilityForUnarmed(fighter) : attackAbilityForWeapon(weapon, fighter));
+  const attackAbility = isRangerBeastCompanion(fighter) ? fighter.companionAttackAbility ?? "str" : unarmed ? attackAbilityForUnarmed(fighter) : attackAbilityForWeapon(weapon, fighter);
+  const ability = abilityMod(fighter, attackAbility);
   const magicBonus = (weapon?.magic?.attackBonus ?? 0) + magicEffects(fighter).attackBonus + statusBonus + sidekickAttackBonus + sidekickProficiencyBonus;
   const styleBonus = fighterHasStyle(fighter, "archery") && weaponIsRanged(weapon) ? 2 : 0;
+  if (isRangerBeastCompanion(fighter)) {
+    return ability + rangerCompanionProficiencyBonus(fighter) + magicBonus + styleBonus;
+  }
   if (isPartyHeroId(fighter?.id) && isClassHero(fighter) && unarmed) {
     return ability + proficiencyBonus(fighter) + magicBonus + styleBonus;
   }
@@ -3378,6 +3457,20 @@ function damageProfile(fighter, options = {}) {
   }
   if (!weapon?.damage) {
     if ((!isPartyHeroId(fighter?.id) || !isClassHero(fighter)) && (fighter.baseDamage?.count || fighter.baseDamage?.flat)) {
+      if (isRangerBeastCompanion(fighter)) {
+        const attackAbility = fighter.companionAttackAbility ?? "str";
+        const damage = {
+          flat: fighter.baseDamage.flat,
+          count: fighter.baseDamage.count ?? 0,
+          sides: fighter.baseDamage.sides ?? 0,
+          bonus: (includeDamageModifier ? abilityMod(fighter, attackAbility) + rangerCompanionProficiencyBonus(fighter) : 0) + magicEffects(fighter).damageBonus + statusDamageBonus,
+          type: fighter.baseDamage.type,
+          range: fighter.baseDamage.range ?? { kind: "melee", feet: 5 },
+          weaponName: fighter.baseDamage.weaponName,
+          extraDamage: magicEffects(fighter).extraDamage,
+        };
+        return { ...damage, label: formatDamage(damage) };
+      }
       const damage = {
         flat: fighter.baseDamage.flat,
         count: fighter.baseDamage.count ?? 0,
@@ -3428,6 +3521,18 @@ function opportunityAttackProfile(fighter) {
 
   const baseRange = fighter.baseDamage?.range ?? { kind: "melee", feet: 5 };
   if (!activeWeapon(fighter) && baseRange.kind !== "ranged" && (fighter.baseDamage?.count || fighter.baseDamage?.flat)) {
+    if (isRangerBeastCompanion(fighter)) {
+      const attackAbility = fighter.companionAttackAbility ?? "str";
+      const damage = {
+        flat: fighter.baseDamage.flat,
+        count: fighter.baseDamage.count ?? 0,
+        sides: fighter.baseDamage.sides ?? 0,
+        bonus: abilityMod(fighter, attackAbility) + rangerCompanionProficiencyBonus(fighter),
+        type: fighter.baseDamage.type,
+        range: baseRange,
+      };
+      return { ...damage, label: formatDamage(damage), attackAbility, weaponName: fighter.baseDamage.weaponName ?? "Natural weapon" };
+    }
     const damage = {
       flat: fighter.baseDamage.flat,
       count: fighter.baseDamage.count ?? 0,
@@ -3531,6 +3636,11 @@ function armorClass(fighter) {
     const statusAc = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.acBonus ?? 0), 0);
     return (fighter.baseAc ?? fighter.ac ?? 10) + statusAc + sidekickDefenseBonus;
   }
+  if (isRangerBeastCompanion(fighter)) {
+    const magicAc = magicEffects(fighter).acBonus;
+    const statusAc = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.acBonus ?? 0), 0);
+    return (fighter.baseAc ?? fighter.ac ?? 10) + rangerCompanionProficiencyBonus(fighter) + magicAc + statusAc + sidekickDefenseBonus;
+  }
   const torso = equippedItem(fighter, "torso");
   const armor = armorStrengthRequirementMet(fighter, torso) && heroHasArmorProficiency(fighter, torso) ? torso?.armor : null;
   const shield = equippedItem(fighter, "offHand");
@@ -3601,6 +3711,7 @@ function classMovementSpeedBonus(fighter) {
 
 function refreshDerivedStats(fighter) {
   fighter.baseMaxHp = fighter.baseMaxHp ?? fighter.maxHp ?? 1;
+  syncRangerBeastCompanionStats(fighter);
   const effects = magicEffects(fighter);
   const statusSpeedBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.speedBonusFeet ?? 0), 0);
   const statusMaxHpBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.maxHpBonus ?? 0), 0);
@@ -4042,6 +4153,10 @@ function normalizeLoadedState(loadedState) {
     fighter.classSpellList = fighter.classSpellList ?? subclass?.spellList ?? classTemplate.classSpellList ?? classTemplate.spellList ?? classTemplate.spells ?? [];
     fighter.classCantripList = fighter.classCantripList ?? subclass?.cantripList ?? classTemplate.classCantripList ?? classTemplate.cantripList ?? [];
     fighter.spells = fighter.spells ?? [];
+    if (fighter.classId === "warlock" && fighter.pactBoon === "pactTome") {
+      fighter.spells = uniqueValues([...(fighter.spells ?? []), "guidance", "sacred-flame", "shillelagh"]);
+      fighter.classCantripList = uniqueValues([...(fighter.classCantripList ?? []), "guidance", "sacred-flame", "shillelagh"]);
+    }
     fighter.baseAttackAbilityMod = fighter.baseAttackAbilityMod ?? scoreToMod(baseAbilityScore(fighter, attackAbilityForWeapon(activeWeapon(fighter), fighter)));
     fighter.level = fighter.level ?? 1;
     fighter.xp = fighter.xp ?? 0;

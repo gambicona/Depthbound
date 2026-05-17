@@ -4,6 +4,7 @@ Dungeon Creator: make text appear (like intro and outro with pictures) at specif
 added fighter and barbarian subclasses. check every one for correct behaviour.
 subclasses
 
+
 Sidekicks expert and spellcaster availability
 recruitable sidekicks
 

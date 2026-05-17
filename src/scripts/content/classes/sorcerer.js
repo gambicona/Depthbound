@@ -1,6 +1,15 @@
 (() => {
 const fullCasterSpellPoints = { 1: 4, 2: 6, 3: 14, 4: 17, 5: 27, 6: 32, 7: 38, 8: 44, 9: 57, 10: 64, 11: 73, 12: 73, 13: 83, 14: 83, 15: 94, 16: 94, 17: 107, 18: 114, 19: 123, 20: 133 };
 
+const metamagicOptions = [
+  { id: "metamagicDistant", name: "Distant Spell", level: 3, cost: 1, description: "Double a spell's range before choosing its target." },
+  { id: "metamagicEmpowered", name: "Empowered Spell", level: 3, cost: 1, description: "Add your Charisma modifier to one spell's damage." },
+  { id: "metamagicExtended", name: "Extended Spell", level: 3, cost: 1, description: "Double the duration of a spell that creates a timed effect." },
+  { id: "metamagicHeightened", name: "Heightened Spell", level: 3, cost: 3, description: "Make a saving-throw spell harder to resist." },
+  { id: "metamagicQuickened", name: "Quickened Spell", level: 3, cost: 2, description: "Cast an action spell with your bonus action." },
+  { id: "metamagicTwinned", name: "Twinned Spell", level: 3, cost: "spellLevel", description: "Affect a second target with an eligible single-target spell." },
+];
+
 window.DungeonContent.register("classes", "sorcerer", {
   name: "Wild Spark",
   className: "Sorcerer",
@@ -29,11 +38,22 @@ window.DungeonContent.register("classes", "sorcerer", {
   classFeatures: [
     { level: 1, name: "Spellcasting", description: "You can shape class magic into prepared or known spells." },
     { level: 2, name: "Font of Magic", description: "Convert magical power into flexible sorcery points." },
-    { level: 3, name: "Metamagic", description: "Twist spells with special sorcerous modifications." },
+    { level: 3, name: "Metamagic", description: "Choose two ways to twist spells with sorcery points." },
+    { level: 10, name: "Metamagic Option", description: "Choose one additional Metamagic option." },
+    { level: 17, name: "Metamagic Option", description: "Choose one additional Metamagic option." },
   ],
-  abilities: [
-    { id: "empoweredSpell", name: "Empowered Spell", level: 3, refresh: "longRest", uses: 3, resourcePool: "metamagic", resource: "bonusAction", description: "Spend metamagic to empower the next spell or attack with raw arcane force." },
-  ],
+  metamagicOptions,
+  abilities: metamagicOptions.map((option) => ({
+    id: option.id,
+    name: option.name,
+    level: option.level,
+    refresh: "longRest",
+    uses: option.cost === "spellLevel" ? 1 : option.cost,
+    resourcePool: "metamagic",
+    metamagicOption: true,
+    resource: "spellModifier",
+    description: option.description,
+  })),
   equipment: { mainHand: "quarterstaff", torso: null },
   inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["quarterstaff"] },
   startingGear: {
