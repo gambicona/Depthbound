@@ -20,6 +20,7 @@ let suppressNextTileClick = false;
 let pendingSpellTargeting = null;
 let pendingEldritchBlast = null;
 let pendingMultiTargetSpell = null;
+let suppressInspectUntil = 0;
 let adminMode = false;
 let adminTeleportEnabled = false;
 let adminGodMode = false;

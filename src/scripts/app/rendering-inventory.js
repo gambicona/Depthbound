@@ -71,6 +71,18 @@ function hideCombatantTokenArt(token) {
   token?.classList.remove("has-token-art");
 }
 
+function targetSelectionActive() {
+  return Boolean(pendingSpellTargeting || pendingEldritchBlast);
+}
+
+function suppressInspectionAfterTargetSelection() {
+  suppressInspectUntil = performance.now() + 350;
+}
+
+function inspectionSuppressedByTargeting() {
+  return targetSelectionActive() || performance.now() < suppressInspectUntil;
+}
+
 function setCombatantTokenArt(token, art) {
   const tokenImage = token?.querySelector(".token-art");
   if (!tokenImage) return;
@@ -137,11 +149,8 @@ function createCombatantToken(combatant) {
     event.preventDefault();
     event.stopPropagation();
     const current = state.fighters[combatant.id];
-    if (pendingSpellTargeting) {
+    if (targetSelectionActive()) {
       clearPendingSpellTargeting();
-      return;
-    }
-    if (pendingEldritchBlast) {
       cancelPendingEldritchBlast();
       return;
     }
@@ -159,14 +168,20 @@ function createCombatantToken(combatant) {
     token.addEventListener("click", (event) => {
       if (pendingSpellTargeting) {
         const current = state.fighters[combatant.id];
-        if (current?.position) void confirmPendingSpellTarget(current.position);
+        if (current?.position) {
+          suppressInspectionAfterTargetSelection();
+          void confirmPendingSpellTarget(current.position);
+        }
         event.preventDefault();
         event.stopPropagation();
         return;
       }
       if (pendingEldritchBlast) {
         const current = state.fighters[combatant.id];
-        if (current?.position) void confirmPendingEldritchBlast(current.position);
+        if (current?.position) {
+          suppressInspectionAfterTargetSelection();
+          void confirmPendingEldritchBlast(current.position);
+        }
         event.preventDefault();
         event.stopPropagation();
         return;
@@ -191,15 +206,26 @@ function createCombatantToken(combatant) {
   } else {
     token.addEventListener("click", (event) => {
       const current = state.fighters[combatant.id];
-      if (!current?.alive || !isKnownTile(current.position)) return;
       if (pendingSpellTargeting) {
-        void confirmPendingSpellTarget(current.position);
+        if (current?.position) {
+          suppressInspectionAfterTargetSelection();
+          void confirmPendingSpellTarget(current.position);
+        }
         event.preventDefault();
         event.stopPropagation();
         return;
       }
       if (pendingEldritchBlast) {
-        void confirmPendingEldritchBlast(current.position);
+        if (current?.position) {
+          suppressInspectionAfterTargetSelection();
+          void confirmPendingEldritchBlast(current.position);
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (!current?.alive || !isKnownTile(current.position)) return;
+      if (inspectionSuppressedByTargeting()) {
         event.preventDefault();
         event.stopPropagation();
         return;
@@ -352,6 +378,7 @@ function buildRoom() {
     event.preventDefault();
     event.stopPropagation();
     if (isHomeBuilderOpen()) return;
+    if (targetSelectionActive()) return;
     if (canHeroUseHomeExit(activeHero())) showHomeMenu();
   });
   exitToken.addEventListener("click", (event) => {
@@ -359,10 +386,12 @@ function buildRoom() {
     event.stopPropagation();
     if (isHomeBuilderOpen()) return;
     if (pendingSpellTargeting) {
+      suppressInspectionAfterTargetSelection();
       void confirmPendingSpellTarget(state.exit.position);
       return;
     }
     if (pendingEldritchBlast) {
+      suppressInspectionAfterTargetSelection();
       void confirmPendingEldritchBlast(state.exit.position);
       return;
     }
@@ -371,6 +400,7 @@ function buildRoom() {
       showHomeMenu();
       return;
     }
+    if (inspectionSuppressedByTargeting()) return;
     showDungeonObjectInfo({
       id: "dungeon-exit",
       type: state.mode === "home" ? "homeExit" : "dungeonExit",
@@ -680,10 +710,12 @@ function renderDungeonObjects() {
       }
       if (applyHomeBuildAt(object.position)) return;
       if (pendingSpellTargeting) {
+        suppressInspectionAfterTargetSelection();
         void confirmPendingSpellTarget(object.position);
         return;
       }
       if (pendingEldritchBlast) {
+        suppressInspectionAfterTargetSelection();
         void confirmPendingEldritchBlast(object.position);
         return;
       }
@@ -691,20 +723,19 @@ function renderDungeonObjects() {
         selectAttackTarget(object.id);
         return;
       }
+      if (inspectionSuppressedByTargeting()) return;
       showDungeonObjectInfo(object);
     });
     element.addEventListener("contextmenu", (event) => {
       event.preventDefault();
       event.stopPropagation();
       if (isHomeBuilderOpen()) return;
-      if (pendingSpellTargeting) {
+      if (targetSelectionActive()) {
         clearPendingSpellTargeting();
-        return;
-      }
-      if (pendingEldritchBlast) {
         cancelPendingEldritchBlast();
         return;
       }
+      if (inspectionSuppressedByTargeting()) return;
       showDungeonObjectInfo(object);
     });
     objectLayer.append(element);

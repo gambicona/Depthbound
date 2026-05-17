@@ -415,10 +415,12 @@ function handleTileClick(position) {
     return;
   }
   if (pendingSpellTargeting) {
+    suppressInspectionAfterTargetSelection();
     void confirmPendingSpellTarget(position);
     return;
   }
   if (pendingEldritchBlast) {
+    suppressInspectionAfterTargetSelection();
     void confirmPendingEldritchBlast(position);
     return;
   }
@@ -1142,6 +1144,7 @@ function handleHeroPointerDown(event) {
       event.preventDefault();
       event.stopPropagation();
       suppressNextHeroClick = true;
+      suppressInspectionAfterTargetSelection();
       void confirmPendingSpellTarget(hero.position);
     }
     return;
@@ -1152,6 +1155,7 @@ function handleHeroPointerDown(event) {
       event.preventDefault();
       event.stopPropagation();
       suppressNextHeroClick = true;
+      suppressInspectionAfterTargetSelection();
       void confirmPendingEldritchBlast(hero.position);
     }
     return;
@@ -1224,6 +1228,7 @@ function handleMapPanPointerDown(event) {
     if (position) {
       event.preventDefault();
       event.stopPropagation();
+      suppressInspectionAfterTargetSelection();
       void confirmPendingSpellTarget(position);
     }
     return;
@@ -1233,6 +1238,7 @@ function handleMapPanPointerDown(event) {
     if (position) {
       event.preventDefault();
       event.stopPropagation();
+      suppressInspectionAfterTargetSelection();
       void confirmPendingEldritchBlast(position);
     }
     return;
