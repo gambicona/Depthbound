@@ -119,6 +119,45 @@ function applyDamageToFighter(defender, damage) {
     resetDeathSaveCounters(defender);
     return;
   }
+  if (defender.classId === "barbarian" && (defender.statusEffects ?? []).some((effect) => effect.id === "rage")) {
+    if (defender.subclassId === "zealot" && (defender.level ?? 1) >= 14) {
+      defender.hp = 1;
+      defender.alive = true;
+      clearStableAtZero(defender);
+      resetDeathSaveCounters(defender);
+      addLog(`${defender.name}'s Rage Beyond Death keeps them fighting at 1 HP.`, "important");
+      return;
+    }
+    if ((defender.level ?? 1) >= 11) {
+      const dc = defender.relentlessRageDc ?? 10;
+      const save = savingThrow(defender, "con", dc);
+      defender.relentlessRageDc = dc + 5;
+      addLog(`${defender.name}'s Relentless Rage: CON ${save.roll} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}.`, save.success ? "important" : "");
+      if (save.success) {
+        defender.hp = 1;
+        defender.alive = true;
+        clearStableAtZero(defender);
+        resetDeathSaveCounters(defender);
+        addLog(`${defender.name}'s rage keeps them standing at 1 HP.`, "important");
+        return;
+      }
+    }
+  }
+  const strengthBeforeDeath = fighterAbilityDefinitions(defender).find((ability) => ability.id === "strengthBeforeDeath");
+  if (
+    defender.subclassId === "samurai" &&
+    (defender.level ?? 1) >= 18 &&
+    strengthBeforeDeath &&
+    (defender.abilityUses?.strengthBeforeDeath ?? 0) < abilityMaxUses(defender, strengthBeforeDeath)
+  ) {
+    defender.abilityUses.strengthBeforeDeath = (defender.abilityUses.strengthBeforeDeath ?? 0) + 1;
+    defender.hp = 1;
+    defender.alive = true;
+    clearStableAtZero(defender);
+    resetDeathSaveCounters(defender);
+    addLog(`${defender.name}'s Strength Before Death keeps them standing at 1 HP.`, "important");
+    return;
+  }
   if (wasDown) {
     clearStableAtZero(defender);
     defender.deathSaves = defender.deathSaves ?? { successes: 0, failures: 0 };
@@ -285,8 +324,14 @@ function monsterAttackAgainstHero(attacker, defender) {
   return !playerControlledFighter(attacker) && playerControlledFighter(defender);
 }
 
+function weaponCriticalThreshold(attacker) {
+  if (attacker?.subclassId === "champion") return (attacker.level ?? 1) >= 14 ? 18 : (attacker.level ?? 1) >= 3 ? 19 : 20;
+  if (isSidekickWarrior(attacker) && (attacker.level ?? 1) >= 3) return 19;
+  return 20;
+}
+
 function resolveMonsterHeroCritical(attacker, defender, attackRoll) {
-  const criticalThreshold = isSidekickWarrior(attacker) && (attacker.level ?? 1) >= 3 ? 19 : 20;
+  const criticalThreshold = weaponCriticalThreshold(attacker);
   const criticalHit = attackRoll >= criticalThreshold;
   if (!criticalHit || attackRoll !== 20 || !monsterAttackAgainstHero(attacker, defender)) {
     return { attackRoll, isCritical: criticalHit, doublesDamage: criticalHit, forcedHit: false, note: criticalHit && criticalThreshold < 20 ? "Improved Critical." : "" };
@@ -358,12 +403,21 @@ function resetTurnResources(fighter) {
   fighter.hasAction = !actionLocked;
   fighter.attacksRemaining = fighter.hasAction ? attacksPerAttackAction(fighter) : 0;
   fighter.sneakAttackUsedThisTurn = false;
+  fighter.blessedStrikeUsedThisTurn = false;
+  fighter.zealotDivineFuryUsedThisTurn = false;
+  fighter.beastFormHitThisTurn = false;
+  fighter.beastClawExtraUsedThisTurn = false;
   fighter.hasBonusAction = !actionLocked;
   fighter.hasReaction = !actionLocked;
   fighter.dodging = false;
   fighter.disengaged = false;
   fighter.canMoveThroughMonsters = false;
   void applyPersistentSpellAreasAtTurnStart(fighter);
+  if (fighter.subclassId === "champion" && (fighter.level ?? 1) >= 18 && fighter.hp > 0 && fighter.hp <= Math.floor((fighter.maxHp ?? 1) / 2)) {
+    const healed = Math.min((fighter.maxHp ?? 1) - fighter.hp, Math.max(1, 5 + abilityMod(fighter, "con")));
+    fighter.hp += healed;
+    addLog(`${fighter.name}'s Survivor restores ${healed} HP.`, "heal");
+  }
 }
 
 function hasReactionAvailable(fighter) {
@@ -422,6 +476,27 @@ async function maybeUseBardicAttackDie(attacker, totalAttack, defenderAc) {
   consumeBardicInspiration(attacker);
   addLog(`${attacker.name} uses Bardic Inspiration: +${roll}.`, "important");
   return { totalAttack: totalAttack + roll, used: true, roll };
+}
+
+async function maybeUseBendLuckAttack(attacker, totalAttack, defenderAc) {
+  if (!isPartyHeroId(attacker?.id) || totalAttack >= defenderAc || totalAttack + 3 < defenderAc) return { totalAttack, used: false };
+  const candidate = partyHeroes().find((hero) => {
+    const ability = reactionAbility(hero, "bendLuck");
+    return hero.id !== attacker.id && heroCanAct(hero) && hasReactionAvailable(hero) && canSpendCombatAbility(hero, ability) && distance(hero.position, attacker.position) <= 12;
+  });
+  if (!candidate) return { totalAttack, used: false };
+  const useLuck = await showReactionPrompt({
+    actor: candidate,
+    title: "Bend Luck",
+    message: `${attacker.name} missed by ${defenderAc - totalAttack}. Spend sorcery to bend luck by +3?`,
+    acceptLabel: "Bend Luck",
+    declineLabel: "Save It",
+  });
+  const ability = reactionAbility(candidate, "bendLuck");
+  if (!useLuck || !consumeReaction(candidate, "Bend Luck") || !canSpendCombatAbility(candidate, ability)) return { totalAttack, used: false };
+  spendCombatAbilityUse(candidate, ability);
+  addLog(`${candidate.name}'s Bend Luck adds +3 to ${attacker.name}'s attack.`, "important");
+  return { totalAttack: totalAttack + 3, used: true };
 }
 
 async function maybeUseShieldReaction(defender, attacker, totalAttack, defenderAc) {
@@ -488,6 +563,470 @@ async function maybeUseStoneEndurance(defender, damage) {
   return reduced;
 }
 
+function abilityResourceSpentForCombat(fighter, ability) {
+  if (!ability?.resourcePool) return fighter?.abilityUses?.[ability?.id] ?? 0;
+  return fighterAbilityDefinitions(fighter)
+    .filter((entry) => entry.resourcePool === ability.resourcePool)
+    .reduce((sum, entry) => sum + (fighter?.abilityUses?.[entry.id] ?? 0), 0);
+}
+
+function canSpendCombatAbility(fighter, ability) {
+  return Boolean(ability && (fighter.level ?? 1) >= (ability.level ?? 1) && abilityResourceSpentForCombat(fighter, ability) < abilityMaxUses(fighter, ability));
+}
+
+function spendCombatAbilityUse(fighter, ability) {
+  fighter.abilityUses = { ...(fighter.abilityUses ?? {}) };
+  fighter.abilityUses[ability.id] = (fighter.abilityUses[ability.id] ?? 0) + 1;
+}
+
+function reactionAbility(fighter, id) {
+  return fighterAbilityDefinitions(fighter).find((entry) => entry.id === id);
+}
+
+function reactionCandidates(id, target, rangeSquares = 12, includeTarget = true) {
+  return partyHeroes().filter((hero) => {
+    if (!heroCanAct(hero) || !hasReactionAvailable(hero)) return false;
+    if (!includeTarget && hero.id === target.id) return false;
+    const ability = reactionAbility(hero, id);
+    return canSpendCombatAbility(hero, ability) && distance(hero.position, target.position) <= rangeSquares;
+  });
+}
+
+function reactionWeaponAttackDamage(attacker, defender, label, extraDamage = 0, extraType = null) {
+  if (!attacker?.alive || !defender?.alive || !hasMeleeAccess(attacker, defender)) return false;
+  const profile = opportunityAttackProfile(attacker);
+  const attackRollResult = rollD20ForFighter(attacker);
+  const criticalResult = resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll);
+  const attackRoll = criticalResult.attackRoll;
+  const bonus = profile.weapon ? attackBonusForWeapon(attacker, profile.weapon) : attackBonusForAbility(attacker, profile.attackAbility ?? "str");
+  const total = attackRoll + bonus;
+  const targetAc = armorClass(defender);
+  addLog(`${attacker.name}'s ${label}: d20 ${attackRoll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`, "important");
+  addAdminLog(`${attacker.name} ${label} breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)}${criticalResult.attackRoll !== attackRollResult.roll ? ` -> d20 ${attackRoll}` : ""} + attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}.`);
+  if (attackRoll === 1 || (!criticalResult.forcedHit && total < targetAc)) {
+    addLog(`${attacker.name}'s ${label} misses.`);
+    return false;
+  }
+  const weaponRoll = rollDice((profile.count ?? 1) * (criticalResult.doublesDamage ? 2 : 1), profile.sides ?? 6);
+  const weaponDamage = Math.max(1, weaponRoll.total + (profile.bonus ?? 0));
+  applySpecialDamage(attacker, defender, weaponDamage, profile.type ?? "damage", label);
+  if (extraDamage > 0 && defender.alive) applySpecialDamage(attacker, defender, extraDamage, extraType ?? profile.type ?? "damage", label);
+  return true;
+}
+
+async function maybeUseRunicShieldReaction(attacker, defender, totalAttack, currentAttackBonus, defenderAc) {
+  const candidate = reactionCandidates("runicShield", defender, 12, false)[0];
+  if (!candidate || totalAttack < defenderAc) return { totalAttack, blocked: false };
+  const useShield = await showReactionPrompt({
+    actor: candidate,
+    title: "Runic Shield",
+    message: `${attacker.name}'s attack would hit ${defender.name}. Force a reroll?`,
+    acceptLabel: "Use Rune",
+  });
+  const ability = reactionAbility(candidate, "runicShield");
+  if (!useShield || !consumeReaction(candidate, "Runic Shield") || !canSpendCombatAbility(candidate, ability)) return { totalAttack, blocked: false };
+  spendCombatAbilityUse(candidate, ability);
+  const reroll = rollD20ForFighter(attacker);
+  const newTotal = reroll.roll + currentAttackBonus;
+  const blocked = reroll.roll === 1 || newTotal < defenderAc;
+  addLog(`${candidate.name}'s Runic Shield forces ${attacker.name} to reroll: d20 ${reroll.roll} ${abilityLabel(currentAttackBonus)} = ${newTotal}.${blocked ? " The attack misses." : ""}`, "important");
+  return { totalAttack: newTotal, blocked };
+}
+
+async function maybeUseCloudRuneReaction(attacker, defender, totalAttack, defenderAc) {
+  const candidate = reactionCandidates("cloudRune", defender, 6, true)[0];
+  if (!candidate || totalAttack < defenderAc) return false;
+  const useRune = await showReactionPrompt({
+    actor: candidate,
+    title: "Cloud Rune",
+    message: `${attacker.name}'s attack would hit ${defender.name}. Invoke Cloud Rune to turn it aside?`,
+    acceptLabel: "Invoke Rune",
+  });
+  const ability = reactionAbility(candidate, "cloudRune");
+  if (!useRune || !consumeReaction(candidate, "Cloud Rune") || !canSpendCombatAbility(candidate, ability)) return false;
+  spendCombatAbilityUse(candidate, ability);
+  addLog(`${candidate.name}'s Cloud Rune misdirects the attack away from ${defender.name}.`, "important");
+  return true;
+}
+
+async function maybeUseShadowMartyrReaction(attacker, defender, totalAttack, defenderAc) {
+  const candidate = reactionCandidates("shadowMartyr", defender, 6, false)[0];
+  if (!candidate || totalAttack < defenderAc) return false;
+  const useMartyr = await showReactionPrompt({
+    actor: candidate,
+    title: "Shadow Martyr",
+    message: `${attacker.name}'s attack would hit ${defender.name}. Sacrifice the echo to block it?`,
+    acceptLabel: "Interpose Echo",
+  });
+  const ability = reactionAbility(candidate, "shadowMartyr");
+  if (!useMartyr || !consumeReaction(candidate, "Shadow Martyr") || !canSpendCombatAbility(candidate, ability)) return false;
+  spendCombatAbilityUse(candidate, ability);
+  addLog(`${candidate.name}'s echo takes the attack meant for ${defender.name}.`, "important");
+  return true;
+}
+
+async function maybeUseWardingManeuverReaction(attacker, defender, totalAttack, defenderAc) {
+  const candidate = reactionCandidates("wardingManeuver", defender, 1, true)[0];
+  if (!candidate || totalAttack < defenderAc) return { acBonus: 0, blocked: false, resistance: false };
+  const useManeuver = await showReactionPrompt({
+    actor: candidate,
+    title: "Warding Maneuver",
+    message: `${attacker.name}'s attack would hit ${defender.name}. Roll 1d8 to raise AC?`,
+    acceptLabel: "Ward",
+  });
+  const ability = reactionAbility(candidate, "wardingManeuver");
+  if (!useManeuver || !consumeReaction(candidate, "Warding Maneuver") || !canSpendCombatAbility(candidate, ability)) return { acBonus: 0, blocked: false, resistance: false };
+  spendCombatAbilityUse(candidate, ability);
+  const roll = rollDice(1, 8);
+  const blocked = totalAttack < defenderAc + roll.total;
+  addLog(`${candidate.name}'s Warding Maneuver adds ${roll.total} AC to ${defender.name}.${blocked ? " The attack misses." : " The hit lands, but resistance applies."}`, "important");
+  return { acBonus: roll.total, blocked, resistance: !blocked };
+}
+
+async function maybeUseCuttingWordsReaction(attacker, defender, totalAttack, defenderAc) {
+  const candidate = reactionCandidates("cuttingWords", defender, 12, true)[0];
+  if (!candidate || totalAttack < defenderAc) return { totalAttack, blocked: false };
+  const useWords = await showReactionPrompt({
+    actor: candidate,
+    title: "Cutting Words",
+    message: `${attacker.name}'s attack would hit ${defender.name}. Spend Bardic Inspiration to cut down the attack roll?`,
+    acceptLabel: "Cut Words",
+  });
+  const ability = reactionAbility(candidate, "cuttingWords");
+  if (!useWords || !consumeReaction(candidate, "Cutting Words") || !canSpendCombatAbility(candidate, ability)) return { totalAttack, blocked: false };
+  spendCombatAbilityUse(candidate, ability);
+  const dieSides = (candidate.level ?? 1) >= 15 ? 12 : (candidate.level ?? 1) >= 10 ? 10 : (candidate.level ?? 1) >= 5 ? 8 : 6;
+  const roll = rollDie(dieSides);
+  const newTotal = totalAttack - roll;
+  const blocked = newTotal < defenderAc;
+  addLog(`${candidate.name}'s Cutting Words subtracts ${roll} from the attack.${blocked ? " The attack misses." : ""}`, "important");
+  return { totalAttack: newTotal, blocked };
+}
+
+async function maybeUseBeastTailReaction(attacker, defender, totalAttack, defenderAc) {
+  if (!isPartyHeroId(defender?.id) || defender.subclassId !== "beast" || barbarianBeastForm(defender) !== "tail") return { acBonus: 0, blocked: false };
+  if (totalAttack < defenderAc || !hasReactionAvailable(defender) || distance(attacker.position, defender.position) > 2 || !hasClearLineOfSight(defender.position, attacker.position)) return { acBonus: 0, blocked: false };
+  const useTail = await showReactionPrompt({
+    actor: defender,
+    title: "Bestial Tail",
+    message: `${attacker.name}'s attack would hit ${defender.name}. Use your reaction to roll 1d8 and add it to AC?`,
+    acceptLabel: "Swipe Tail",
+  });
+  if (!useTail || !consumeReaction(defender, "Bestial Tail")) return { acBonus: 0, blocked: false };
+  const roll = rollDie(8);
+  const blocked = totalAttack < defenderAc + roll;
+  addLog(`${defender.name}'s tail adds ${roll} AC.${blocked ? " The attack misses." : ""}`, "important");
+  return { acBonus: roll, blocked };
+}
+
+async function maybeUseSelfStatusHitReaction(defender, abilityId, title, message, acceptLabel, totalAttack, defenderAc) {
+  if (!isPartyHeroId(defender?.id) || totalAttack < defenderAc || !hasReactionAvailable(defender)) return { acBonus: 0, blocked: false };
+  const ability = reactionAbility(defender, abilityId);
+  if (!canSpendCombatAbility(defender, ability)) return { acBonus: 0, blocked: false };
+  const useReaction = await showReactionPrompt({
+    actor: defender,
+    title,
+    message,
+    acceptLabel,
+  });
+  if (!useReaction || !consumeReaction(defender, title) || !canSpendCombatAbility(defender, ability)) return { acBonus: 0, blocked: false };
+  spendCombatAbilityUse(defender, ability);
+  const status = subclassEffectStatus(defender, ability.subclassEffect?.status ?? {});
+  applyStatusEffect(defender, status);
+  const acBonus = status.acBonus ?? 0;
+  const blocked = acBonus > 0 && totalAttack < defenderAc + acBonus;
+  addLog(`${defender.name}'s ${ability.name} takes effect.${blocked ? " The attack misses." : ""}`, "important");
+  return { acBonus, blocked };
+}
+
+async function maybeUseHitReactionDefenses(attacker, defender, totalAttack, currentAttackBonus, defenderAc) {
+  if (!isPartyHeroId(defender?.id) && defender?.team !== "heroes" && !defender?.friendly) return { totalAttack, acBonus: 0, blocked: false, resistance: false };
+  const cuttingWords = await maybeUseCuttingWordsReaction(attacker, defender, totalAttack, defenderAc);
+  totalAttack = cuttingWords.totalAttack;
+  if (cuttingWords.blocked) return { totalAttack, acBonus: 0, blocked: true, resistance: false };
+  const entropicWard = await maybeUseSelfStatusHitReaction(defender, "entropicWard", "Entropic Ward", `${attacker.name}'s attack would hit ${defender.name}. Twist probability to raise defense and prime your next attack?`, "Twist Fate", totalAttack, defenderAc);
+  let selfStatusAcBonus = entropicWard.acBonus;
+  if (entropicWard.blocked) return { totalAttack, acBonus: selfStatusAcBonus, blocked: true, resistance: false };
+  defenderAc += entropicWard.acBonus;
+  const armorOfHexes = await maybeUseSelfStatusHitReaction(defender, "armorOfHexes", "Armor of Hexes", `${attacker.name}'s attack would hit ${defender.name}. Bend cursed shadow around the strike?`, "Hex Armor", totalAttack, defenderAc);
+  selfStatusAcBonus += armorOfHexes.acBonus;
+  if (armorOfHexes.blocked) return { totalAttack, acBonus: selfStatusAcBonus, blocked: true, resistance: false };
+  defenderAc += armorOfHexes.acBonus;
+  const tipsySway = await maybeUseSelfStatusHitReaction(defender, "tipsySway", "Tipsy Sway", `${attacker.name}'s attack would hit ${defender.name}. Spend ki to sway aside and ready a counter rhythm?`, "Sway", totalAttack, defenderAc);
+  selfStatusAcBonus += tipsySway.acBonus;
+  if (tipsySway.blocked) return { totalAttack, acBonus: selfStatusAcBonus, blocked: true, resistance: false };
+  defenderAc += tipsySway.acBonus;
+  const tail = await maybeUseBeastTailReaction(attacker, defender, totalAttack, defenderAc);
+  if (tail.blocked) return { totalAttack, acBonus: selfStatusAcBonus + tail.acBonus, blocked: true, resistance: false };
+  defenderAc += tail.acBonus;
+  const runic = await maybeUseRunicShieldReaction(attacker, defender, totalAttack, currentAttackBonus, defenderAc);
+  totalAttack = runic.totalAttack;
+  if (runic.blocked) return { totalAttack, acBonus: selfStatusAcBonus + tail.acBonus, blocked: true, resistance: false };
+  if (await maybeUseCloudRuneReaction(attacker, defender, totalAttack, defenderAc)) return { totalAttack, acBonus: selfStatusAcBonus + tail.acBonus, blocked: true, resistance: false };
+  if (await maybeUseShadowMartyrReaction(attacker, defender, totalAttack, defenderAc)) return { totalAttack, acBonus: selfStatusAcBonus + tail.acBonus, blocked: true, resistance: false };
+  const warding = await maybeUseWardingManeuverReaction(attacker, defender, totalAttack, defenderAc);
+  return { totalAttack, ...warding, acBonus: selfStatusAcBonus + (warding.acBonus ?? 0) + tail.acBonus };
+}
+
+async function maybeUseProtectiveField(target, damage) {
+  if (!isPartyHeroId(target?.id) && target?.team !== "heroes" && !target?.friendly) return damage;
+  if (damage <= 0) return damage;
+  const candidate = reactionCandidates("protectiveField", target, 6, true)[0];
+  if (!candidate) return damage;
+  const useField = await showReactionPrompt({
+    actor: candidate,
+    title: "Protective Field",
+    message: `${target.name} would take ${damage} damage. Spend psionic energy to reduce it?`,
+    acceptLabel: "Protect",
+  });
+  const ability = reactionAbility(candidate, "protectiveField");
+  if (!useField || !consumeReaction(candidate, "Protective Field") || !canSpendCombatAbility(candidate, ability)) return damage;
+  spendCombatAbilityUse(candidate, ability);
+  const roll = rollDice(1, (candidate.level ?? 1) >= 17 ? 12 : (candidate.level ?? 1) >= 11 ? 10 : (candidate.level ?? 1) >= 5 ? 8 : 6);
+  const reduction = Math.max(1, roll.total + abilityMod(candidate, "int"));
+  addLog(`${candidate.name}'s Protective Field reduces damage by ${reduction}.`, "important");
+  return Math.max(0, damage - reduction);
+}
+
+async function maybeUseSpiritShield(target, attacker, damage) {
+  if ((!isPartyHeroId(target?.id) && target?.team !== "heroes" && !target?.friendly) || damage <= 0) return damage;
+  const candidate = reactionCandidates("spiritShield", target, 6, true)[0];
+  if (!candidate) return damage;
+  const useShield = await showReactionPrompt({
+    actor: candidate,
+    title: "Spirit Shield",
+    message: `${target.name} would take ${damage} damage. Let ancestral spirits reduce it?`,
+    acceptLabel: "Shield",
+  });
+  const ability = reactionAbility(candidate, "spiritShield");
+  if (!useShield || !consumeReaction(candidate, "Spirit Shield") || !canSpendCombatAbility(candidate, ability)) return damage;
+  spendCombatAbilityUse(candidate, ability);
+  const dice = (candidate.level ?? 1) >= 14 ? 4 : (candidate.level ?? 1) >= 10 ? 3 : 2;
+  const roll = rollDice(dice, 6);
+  const reduced = Math.max(0, damage - roll.total);
+  addLog(`${candidate.name}'s Spirit Shield reduces damage by ${roll.total}.`, "important");
+  if ((candidate.level ?? 1) >= 14 && attacker?.alive && roll.total > 0) applySpecialDamage(candidate, attacker, roll.total, "force", "Vengeful Ancestors");
+  return reduced;
+}
+
+async function maybeUseBattleMasterParry(defender, attacker, damage, meleeAttack) {
+  if (!meleeAttack || damage <= 0 || !isPartyHeroId(defender?.id) || !hasReactionAvailable(defender)) return damage;
+  const ability = reactionAbility(defender, "maneuverParry");
+  if (!canSpendCombatAbility(defender, ability)) return damage;
+  const useParry = await showReactionPrompt({
+    actor: defender,
+    title: "Parry",
+    message: `${attacker.name} would deal ${damage} melee damage. Spend superiority to reduce it?`,
+    acceptLabel: "Parry",
+  });
+  if (!useParry || !consumeReaction(defender, "Parry")) return damage;
+  spendCombatAbilityUse(defender, ability);
+  const roll = rollDice(1, (defender.level ?? 1) >= 18 ? 12 : (defender.level ?? 1) >= 10 ? 10 : 8);
+  const reduction = Math.max(0, roll.total + abilityMod(defender, "dex"));
+  addLog(`${defender.name}'s Parry reduces damage by ${reduction}.`, "important");
+  return Math.max(0, damage - reduction);
+}
+
+async function maybeUseRiposte(defender, attacker, meleeAttack) {
+  if (!meleeAttack || !isPartyHeroId(defender?.id) || !attacker?.alive || !hasReactionAvailable(defender) || !hasMeleeAccess(defender, attacker)) return;
+  const ability = reactionAbility(defender, "maneuverRiposte");
+  if (!canSpendCombatAbility(defender, ability)) return;
+  const useRiposte = await showReactionPrompt({
+    actor: defender,
+    title: "Riposte",
+    message: `${attacker.name} missed ${defender.name}. Spend superiority to counterattack?`,
+    acceptLabel: "Riposte",
+  });
+  if (!useRiposte || !consumeReaction(defender, "Riposte")) return;
+  spendCombatAbilityUse(defender, ability);
+  const die = rollDice(1, (defender.level ?? 1) >= 18 ? 12 : (defender.level ?? 1) >= 10 ? 10 : 8);
+  reactionWeaponAttackDamage(defender, attacker, "Riposte", die.total, defender.damage?.type ?? "damage");
+  if (!attacker.alive && !isPartyHeroId(attacker.id)) {
+    triggerMonsterDeathStory(attacker);
+    playSoundEffect("enemyDefeated");
+    awardMonsterXp(attacker);
+    dropLootForMonster(attacker);
+    await finishEncounterAfterLastMonsterFalls();
+  }
+}
+
+async function maybeUseBraceBeforeAttack(attacker) {
+  if (isPartyHeroId(attacker?.id) || attacker?.team === "heroes" || attacker?.friendly) return;
+  if (!attacker?.alive) return;
+  const candidate = partyHeroes().find((hero) => {
+    const ability = reactionAbility(hero, "maneuverBrace");
+    return heroCanAct(hero) && hasReactionAvailable(hero) && canSpendCombatAbility(hero, ability) && hasMeleeAccess(hero, attacker);
+  });
+  if (!candidate) return;
+  const useBrace = await showReactionPrompt({
+    actor: candidate,
+    title: "Brace",
+    message: `${attacker.name} is in ${candidate.name}'s reach. Spend superiority to brace and strike first?`,
+    acceptLabel: "Brace",
+  });
+  const ability = reactionAbility(candidate, "maneuverBrace");
+  if (!useBrace || !consumeReaction(candidate, "Brace") || !canSpendCombatAbility(candidate, ability)) return;
+  spendCombatAbilityUse(candidate, ability);
+  const profile = opportunityAttackProfile(candidate);
+  const attackRoll = rollD20ForFighter(candidate);
+  const bonus = profile.weapon ? attackBonusForWeapon(candidate, profile.weapon) : attackBonusForAbility(candidate, profile.attackAbility ?? "str");
+  const total = attackRoll.roll + bonus;
+  const targetAc = armorClass(attacker);
+  addLog(`${candidate.name} braces against ${attacker.name}: d20 ${attackRoll.roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.`, "important");
+  if (attackRoll.roll === 1 || total < targetAc) return;
+  const weaponRoll = rollDice(profile.count ?? 1, profile.sides ?? 6);
+  const die = rollDice(1, (candidate.level ?? 1) >= 18 ? 12 : (candidate.level ?? 1) >= 10 ? 10 : 8);
+  applySpecialDamage(candidate, attacker, Math.max(1, weaponRoll.total + (profile.bonus ?? 0) + die.total), profile.type ?? "damage", "Brace");
+  if (!attacker.alive && !isPartyHeroId(attacker.id)) {
+    triggerMonsterDeathStory(attacker);
+    playSoundEffect("enemyDefeated");
+    awardMonsterXp(attacker);
+    dropLootForMonster(attacker);
+    await finishEncounterAfterLastMonsterFalls();
+  }
+}
+
+async function maybeUseStoneRuneAfterAttack(attacker, defender) {
+  if (isPartyHeroId(attacker?.id) || attacker?.team === "heroes" || attacker?.friendly) return;
+  const candidate = reactionCandidates("stoneRune", attacker, 6, true).find((hero) => hero.id !== attacker.id);
+  if (!candidate || !attacker?.alive) return;
+  const useRune = await showReactionPrompt({
+    actor: candidate,
+    title: "Stone Rune",
+    message: `${attacker.name} is within 30 ft after attacking. Invoke Stone Rune to slow them?`,
+    acceptLabel: "Invoke Rune",
+  });
+  const ability = reactionAbility(candidate, "stoneRune");
+  if (!useRune || !consumeReaction(candidate, "Stone Rune") || !canSpendCombatAbility(candidate, ability)) return;
+  spendCombatAbilityUse(candidate, ability);
+  const save = await rollSavingThrow(attacker, "wis", 8 + proficiencyBonus(candidate) + abilityMod(candidate, "con"), `${candidate.name}'s Stone Rune clouds ${attacker.name}'s mind.`);
+  if (!save.success) applyStatusEffect(attacker, { id: "stone-rune-stupor", label: "Stone Stupor", speedLocked: true, attackBonus: -3, durationRounds: 1 });
+}
+
+async function maybeUseBeastClawExtraAttack(attacker, defender, options = {}) {
+  if (options.beastFormAttack !== "claws" || options.freeAttack || options.resource || attacker.beastClawExtraUsedThisTurn || !defender?.alive) return;
+  attacker.beastClawExtraUsedThisTurn = true;
+  const claw = barbarianBeastNaturalWeapon(attacker, "claws");
+  if (!claw) return;
+  addLog(`${attacker.name}'s claws make an additional attack as part of the same action.`, "important");
+  await makeAttack(attacker, defender, {
+    weapon: claw,
+    beastFormAttack: "claws",
+    freeAttack: true,
+    actionLabel: "makes an additional claw attack",
+  });
+}
+
+async function maybeUseBarbarianAfterDamage(defender, attacker, damage, meleeAttack) {
+  if (!isPartyHeroId(defender?.id) || damage <= 0 || !attacker?.alive) return;
+  const raging = (defender.statusEffects ?? []).some((effect) => effect.id === "rage");
+  if (raging && defender.subclassId === "battlerager" && (defender.level ?? 1) >= 14 && meleeAttack) {
+    applySpecialDamage(defender, attacker, 3, "piercing", "Spiked Retribution");
+  }
+  if (raging && defender.subclassId === "wild-magic" && (defender.level ?? 1) >= 10 && hasReactionAvailable(defender)) {
+    const ability = reactionAbility(defender, "unstableBacklash");
+    if (canSpendCombatAbility(defender, ability)) {
+      const useBacklash = await showReactionPrompt({
+        actor: defender,
+        title: "Unstable Backlash",
+        message: `${defender.name}'s wild magic can surge after taking damage. Trigger a new surge?`,
+        acceptLabel: "Surge",
+      });
+      if (useBacklash && consumeReaction(defender, "Unstable Backlash")) {
+        spendCombatAbilityUse(defender, ability);
+        applyBarbarianWildSurge(defender);
+      }
+    }
+  }
+  if (defender.subclassId === "berserker" && (defender.level ?? 1) >= 14 && meleeAttack && hasReactionAvailable(defender) && hasMeleeAccess(defender, attacker)) {
+    const ability = reactionAbility(defender, "retaliation");
+    if (!canSpendCombatAbility(defender, ability)) return;
+    const useRetaliation = await showReactionPrompt({
+      actor: defender,
+      title: "Retaliation",
+      message: `${attacker.name} damaged ${defender.name}. Strike back?`,
+      acceptLabel: "Retaliate",
+    });
+    if (!useRetaliation || !consumeReaction(defender, "Retaliation")) return;
+    spendCombatAbilityUse(defender, ability);
+    reactionWeaponAttackDamage(defender, attacker, "Retaliation");
+    if (!attacker.alive && !isPartyHeroId(attacker.id)) {
+      triggerMonsterDeathStory(attacker);
+      playSoundEffect("enemyDefeated");
+      awardMonsterXp(attacker);
+      dropLootForMonster(attacker);
+      await finishEncounterAfterLastMonsterFalls();
+    }
+  }
+}
+
+async function maybeUseSubclassAfterDamageReactions(defender, attacker, damage, meleeAttack) {
+  if (!isPartyHeroId(defender?.id) || damage <= 0 || !defender.alive || !attacker?.alive || !hasReactionAvailable(defender)) return;
+
+  const wrath = reactionAbility(defender, "wrathOfTheStorm");
+  if (canSpendCombatAbility(defender, wrath) && distance(defender.position, attacker.position) <= 12 && hasClearLineOfSight(defender.position, attacker.position)) {
+    const useWrath = await showReactionPrompt({
+      actor: defender,
+      title: "Wrath of the Storm",
+      message: `${attacker.name} damaged ${defender.name}. Answer with storm power?`,
+      acceptLabel: "Strike Back",
+    });
+    if (useWrath && consumeReaction(defender, "Wrath of the Storm") && canSpendCombatAbility(defender, wrath)) {
+      spendCombatAbilityUse(defender, wrath);
+      const effect = wrath.subclassEffect ?? {};
+      const stormDamage = Math.max(1, subclassEffectDiceTotal(effect, defender));
+      applySpecialDamage(defender, attacker, stormDamage, effect.damageType ?? "lightning", wrath.name);
+      if (attacker.alive && effect.riderStatus) applyWeaponRiderNamedStatus(defender, attacker, effect.riderStatus);
+      if (!attacker.alive && !isPartyHeroId(attacker.id)) {
+        triggerMonsterDeathStory(attacker);
+        playSoundEffect("enemyDefeated");
+        awardMonsterXp(attacker);
+        dropLootForMonster(attacker);
+        await finishEncounterAfterLastMonsterFalls();
+      }
+      return;
+    }
+  }
+
+  const soul = reactionAbility(defender, "soulOfVengeance");
+  if (meleeAttack && canSpendCombatAbility(defender, soul) && hasMeleeAccess(defender, attacker)) {
+    const useSoul = await showReactionPrompt({
+      actor: defender,
+      title: "Soul of Vengeance",
+      message: `${attacker.name} damaged ${defender.name}. Answer with a radiant weapon strike?`,
+      acceptLabel: "Strike",
+    });
+    if (useSoul && consumeReaction(defender, "Soul of Vengeance") && canSpendCombatAbility(defender, soul)) {
+      spendCombatAbilityUse(defender, soul);
+      const radiant = Math.max(1, subclassEffectDiceTotal(soul.subclassEffect ?? {}, defender));
+      reactionWeaponAttackDamage(defender, attacker, "Soul of Vengeance", radiant, "radiant");
+      if (!attacker.alive && !isPartyHeroId(attacker.id)) {
+        triggerMonsterDeathStory(attacker);
+        playSoundEffect("enemyDefeated");
+        awardMonsterXp(attacker);
+        dropLootForMonster(attacker);
+        await finishEncounterAfterLastMonsterFalls();
+      }
+      return;
+    }
+  }
+
+  const multiattackDefense = reactionAbility(defender, "multiattackDefense");
+  if (canSpendCombatAbility(defender, multiattackDefense)) {
+    const useDefense = await showReactionPrompt({
+      actor: defender,
+      title: "Multiattack Defense",
+      message: `${attacker.name} damaged ${defender.name}. Raise AC against follow-up attacks?`,
+      acceptLabel: "Defend",
+    });
+    if (useDefense && consumeReaction(defender, "Multiattack Defense") && canSpendCombatAbility(defender, multiattackDefense)) {
+      spendCombatAbilityUse(defender, multiattackDefense);
+      applyStatusEffect(defender, subclassEffectStatus(defender, multiattackDefense.subclassEffect?.status ?? {}));
+      addLog(`${defender.name}'s Multiattack Defense raises their guard.`, "important");
+    }
+  }
+}
+
 async function maybeUseHellishRebuke(defender, attacker) {
   if (!isPartyHeroId(defender?.id) || !defender.alive || !attacker?.alive || !canUseReactionSpell(defender, "hellish-rebuke")) return;
   if (!isInAttackRangeWithProfile(defender, attacker, { range: { kind: "ranged", feet: 60 } }) || !hasClearLineOfSight(defender.position, attacker.position)) return;
@@ -503,6 +1042,7 @@ async function maybeUseHellishRebuke(defender, attacker) {
   const wasAlive = attacker.alive;
   await applySpellDamage(defender, attacker, spell);
   if (wasAlive && !attacker.alive && !isPartyHeroId(attacker.id)) {
+    triggerMonsterDeathStory(attacker);
     playSoundEffect("enemyDefeated");
     awardMonsterXp(attacker);
     dropLootForMonster(attacker);
@@ -544,6 +1084,7 @@ async function maybeUseWarriorDefender(attacker, target) {
 function tickStatusDurations(fighter) {
   if (!fighter?.statusEffects?.length) return;
   const expired = [];
+  const expiredEffects = [];
   fighter.statusEffects = fighter.statusEffects
     .map((effect) => {
       if (!effect.durationRounds) return effect;
@@ -551,16 +1092,37 @@ function tickStatusDurations(fighter) {
     })
     .filter((effect) => {
       const keep = !effect.durationRounds || effect.durationRounds > 0;
-      if (!keep) expired.push(effect.label ?? effect.id);
+      if (!keep) {
+        expired.push(effect.label ?? effect.id);
+        expiredEffects.push(effect);
+      }
       return keep;
     });
+  if (expiredEffects.some((effect) => effect.id === "dominated")) {
+    fighter.team = undefined;
+    fighter.friendly = false;
+    addLog(`${fighter.name} shakes off domination and turns hostile again.`, "important");
+  }
   if (expired.length) addLog(`${fighter.name}'s ${expired.join(", ")} ${expired.length === 1 ? "expires" : "expire"}.`);
+}
+
+function removeSummonedAllies(reason = "fade") {
+  const summonIds = Object.values(state.fighters ?? {}).filter((fighter) => fighter.summonedByHeroId).map((fighter) => fighter.id);
+  for (const id of summonIds) {
+    const ally = state.fighters[id];
+    if (ally) addLog(`${ally.name} ${reason}.`, "important");
+    delete state.fighters[id];
+  }
+  state.party.heroIds = (state.party.heroIds ?? []).filter((id) => !summonIds.includes(id));
+  state.party.rosterIds = (state.party.rosterIds ?? []).filter((id) => !summonIds.includes(id));
+  state.initiative = (state.initiative ?? []).filter((entry) => !summonIds.includes(entry.fighterId));
 }
 
 function attacksPerAttackAction(fighter) {
   if (isWildShaped(fighter)) return wildShapeHasMultiattack(wildShapeBeastById(fighter.wildShapeState?.beastFormId)) ? 2 : 1;
   const level = fighter?.level ?? 1;
   if (isSidekickWarrior(fighter)) return level >= 15 ? 3 : level >= 6 ? 2 : 1;
+  if (fighter?.classId === "bard" && ["college-of-valor", "college-of-swords"].includes(fighter.subclassId) && level >= 6) return 2;
   if (!["barbarian", "fighter", "monk", "paladin", "ranger"].includes(fighter?.classId)) return 1;
   if (fighter.classId === "fighter") return level >= 20 ? 4 : level >= 11 ? 3 : level >= 5 ? 2 : 1;
   return level >= 5 ? 2 : 1;
@@ -636,7 +1198,8 @@ function endRages(reason = "") {
   for (const hero of partyHeroes()) {
     const hadRage = (hero.statusEffects ?? []).some((effect) => effect.id === "rage");
     if (!hadRage) continue;
-    hero.statusEffects = (hero.statusEffects ?? []).filter((effect) => effect.id !== "rage");
+    hero.statusEffects = (hero.statusEffects ?? []).filter((effect) => effect.id !== "rage" && !String(effect.id ?? "").startsWith("beast-form-"));
+    hero.beastFormHitThisTurn = false;
     refreshDerivedStats(hero);
     addLog(`${hero.name}'s Rage ends${reason ? ` ${reason}` : ""}.`, "important");
   }
@@ -1132,7 +1695,11 @@ function combatMonsters() {
   const heroIds = new Set([...(state.party?.heroIds ?? ["hero"]), ...(state.party?.rosterIds ?? [])]);
   return state.initiative
     .map((entry) => state.fighters[entry.fighterId])
-    .filter((fighter) => fighter && !heroIds.has(fighter.id) && fighter.alive);
+    .filter((fighter) => {
+      if (!fighter || heroIds.has(fighter.id) || !fighter.alive) return false;
+      const dominated = (fighter.statusEffects ?? []).some((effect) => effect.id === "dominated");
+      return dominated || (fighter.team !== "heroes" && !fighter.friendly);
+    });
 }
 
 function combatNeedsHeroTurns() {
@@ -1290,18 +1857,18 @@ function isObjectInAttackRangeWithProfile(attacker, object, profile) {
 
 function destructibleObjectTargets(hero = activeFighter()) {
   if (state.mode !== "combat" || !hero || !isPlayerControlledPartyFighter(hero)) return [];
-  const profile = damageProfile(hero);
+  const profiles = attackWeaponChoicesForFighter(hero).map((choice) => damageProfile(hero, { weapon: choice.options?.weapon }));
   return (state.dungeonObjects ?? [])
     .filter((object) => objectIsDestructible(ensureDestructibleObjectState(object)))
     .filter((object) => objectCells(object).some((cell) => isKnownTile(cell)))
-    .filter((object) => isObjectInAttackRangeWithProfile(hero, object, profile));
+    .filter((object) => profiles.some((profile) => isObjectInAttackRangeWithProfile(hero, object, profile)));
 }
 
 function attackTargets() {
   const hero = activeFighter();
   if (state.mode !== "combat" || !hero || !isPlayerControlledPartyFighter(hero) || combatMonsters().length === 0) return [];
   return [
-    ...visibleMonsters().filter((monster) => isInAttackRange(hero, monster)),
+    ...visibleMonsters().filter((monster) => attackWeaponChoicesForFighter(hero).some((choice) => isInAttackRangeWithProfile(hero, monster, damageProfile(hero, { weapon: choice.options?.weapon })))),
     ...destructibleObjectTargets(hero),
   ];
 }
@@ -1330,12 +1897,12 @@ function selectAttackTarget(targetId) {
 
 function selectedHeroCanTargetMonster(monster) {
   const hero = activeFighter();
-  return Boolean(monster?.alive && hero && isPlayerControlledPartyFighter(hero) && isInAttackRange(hero, monster));
+  return Boolean(monster?.alive && hero && isPlayerControlledPartyFighter(hero) && attackWeaponChoicesForFighter(hero).some((choice) => isInAttackRangeWithProfile(hero, monster, damageProfile(hero, { weapon: choice.options?.weapon }))));
 }
 
 function selectedHeroCanTargetObject(object) {
   const hero = activeFighter();
-  return Boolean(hero && isPlayerControlledPartyFighter(hero) && isObjectInAttackRangeWithProfile(hero, object, damageProfile(hero)));
+  return Boolean(hero && isPlayerControlledPartyFighter(hero) && attackWeaponChoicesForFighter(hero).some((choice) => isObjectInAttackRangeWithProfile(hero, object, damageProfile(hero, { weapon: choice.options?.weapon }))));
 }
 
 function cycleAttackTarget() {
@@ -1430,14 +1997,19 @@ async function opportunityAttack(attacker, defender) {
   const criticalResult = resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll);
   const attackRoll = criticalResult.attackRoll;
   const currentAttackBonus = profile.weapon ? attackBonusForWeapon(attacker, profile.weapon) : attackBonusForAbility(attacker, profile.attackAbility ?? "str");
-  const defenderAc = armorClass(defender);
+  let defenderAc = armorClass(defender);
   let totalAttack = attackRoll + currentAttackBonus;
   const isCritical = criticalResult.isCritical;
   const doublesDamage = criticalResult.doublesDamage;
   const inspiration = await maybeUseBardicAttackDie(attacker, totalAttack, defenderAc);
   totalAttack = inspiration.totalAttack;
-  const shieldBlocked = attackRoll !== 1 && totalAttack >= defenderAc ? await maybeUseShieldReaction(defender, attacker, totalAttack, defenderAc) : false;
-  const isMiss = attackRoll === 1 || (!criticalResult.forcedHit && totalAttack < defenderAc) || shieldBlocked;
+  const bendLuck = await maybeUseBendLuckAttack(attacker, totalAttack, defenderAc);
+  totalAttack = bendLuck.totalAttack;
+  const hitReaction = attackRoll !== 1 && totalAttack >= defenderAc ? await maybeUseHitReactionDefenses(attacker, defender, totalAttack, currentAttackBonus, defenderAc) : { totalAttack, acBonus: 0, blocked: false, resistance: false };
+  totalAttack = hitReaction.totalAttack;
+  defenderAc += hitReaction.acBonus ?? 0;
+  const shieldBlocked = !hitReaction.blocked && attackRoll !== 1 && totalAttack >= defenderAc ? await maybeUseShieldReaction(defender, attacker, totalAttack, defenderAc) : false;
+  const isMiss = attackRoll === 1 || hitReaction.blocked || (!criticalResult.forcedHit && totalAttack < defenderAc) || shieldBlocked;
 
   addLog(
     `${attacker.name} makes an opportunity attack with ${profile.weaponName}${defender.dodging ? " with disadvantage" : ""}: d20 ${defender.dodging ? `${attackRolls.join(" / ")} -> ${attackRoll}` : attackRoll} ${abilityLabel(currentAttackBonus)} = ${totalAttack} vs AC ${defenderAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`,
@@ -1448,6 +2020,8 @@ async function opportunityAttack(attacker, defender) {
   if (isMiss) {
     addLog(attackRoll === 1 ? "Natural 1. The opportunity attack misses badly." : `${defender.name} slips away.`);
     recordD20OutcomeForFighter(attacker, false);
+    await maybeUseRiposte(defender, attacker, true);
+    await maybeUseStoneRuneAfterAttack(attacker, defender);
     return;
   }
   recordD20OutcomeForFighter(attacker, true);
@@ -1477,10 +2051,14 @@ async function opportunityAttack(attacker, defender) {
   const resolvedPackets = packets.map((packet) => ({ ...packet, ...calculateDamageModifiers(defender, packet.raw, packet.type) }));
   addAdminLog(`${attacker.name} damage packets vs ${defender.name}: ${resolvedPackets.map((packet) => `${packet.label} => raw ${packet.raw}, final ${packet.damage}${packet.reason ? ` (${packet.reason})` : ""}`).join("; ")}.`);
   let totalDamage = resolvedPackets.reduce((sum, packet) => sum + packet.damage, 0);
+  if (hitReaction.resistance) totalDamage = Math.floor(totalDamage / 2);
   totalDamage = await maybeUseUncannyDodge(defender, attacker, totalDamage);
   totalDamage = await maybeUseStoneEndurance(defender, totalDamage);
+  totalDamage = await maybeUseBattleMasterParry(defender, attacker, totalDamage, true);
+  totalDamage = await maybeUseProtectiveField(defender, totalDamage);
   applyDamageToFighter(defender, totalDamage);
   defender.lastDamagedById = attacker.id;
+  await maybeUseSubclassAfterDamageReactions(defender, attacker, totalDamage, true);
   const adjustmentNote = resolvedPackets
     .filter((packet) => packet.reason)
     .map((packet) => `${defender.name} is ${packet.reason} to ${packet.type} damage.`)
@@ -1526,6 +2104,60 @@ function partyBaseItemCount(itemId) {
   const partyItems = partyHeroes().flatMap((hero) => hero.inventory?.items ?? []);
   const allItems = [...partyItems, ...(state.chest ?? [])];
   return allItems.filter((item) => item.baseItemId === itemId || item.id === itemId).length;
+}
+
+let customStoryTriggerQueue = Promise.resolve();
+
+function customStoryTriggerTitle(trigger, context = {}) {
+  if (trigger.title) return trigger.title;
+  if (trigger.event === "enterRoom") return context.room?.name ?? state.customDungeon?.name ?? "Dungeon Story";
+  if (trigger.event === "killMonster") return context.monster?.name ?? "Victory";
+  if (trigger.event === "inspectObject" || trigger.event === "openObject") {
+    return objectTemplate(context.object?.type)?.name ?? state.customDungeon?.name ?? "Dungeon Story";
+  }
+  return state.customDungeon?.name ?? "Dungeon Story";
+}
+
+function customStoryTriggerMatches(trigger, event, context = {}) {
+  if (!trigger || trigger.event !== event) return false;
+  if (event === "enterRoom") return trigger.targetId === context.roomId;
+  if (event === "inspectObject" || event === "openObject") return trigger.targetId === context.objectId;
+  if (event === "killMonster") return trigger.targetId === context.monsterId;
+  return false;
+}
+
+function triggerCustomDungeonStory(event, context = {}) {
+  const customDungeon = state.customDungeon;
+  const triggers = customDungeon?.storyTriggers ?? [];
+  if (!triggers.length) return Promise.resolve(false);
+  customDungeon.storyTriggerHistory ??= {};
+  const matches = triggers.filter((trigger) => {
+    if (!customStoryTriggerMatches(trigger, event, context)) return false;
+    if (trigger.once !== false && customDungeon.storyTriggerHistory[trigger.id]) return false;
+    return Boolean(trigger.text || trigger.images?.length);
+  });
+  if (!matches.length) return Promise.resolve(false);
+  for (const trigger of matches) {
+    if (trigger.once !== false) customDungeon.storyTriggerHistory[trigger.id] = true;
+  }
+  customStoryTriggerQueue = customStoryTriggerQueue.then(async () => {
+    for (const trigger of matches) {
+      await showDungeonStoryDialog({
+        title: customStoryTriggerTitle(trigger, context),
+        text: trigger.text,
+        images: trigger.images ?? [],
+        actionLabel: "Continue",
+        goalText: customGoalStatus().text,
+      });
+    }
+    return true;
+  });
+  return customStoryTriggerQueue;
+}
+
+function triggerMonsterDeathStory(monster) {
+  if (!monster || isPartyHeroId(monster.id)) return;
+  void triggerCustomDungeonStory("killMonster", { monsterId: monster.id, monster });
 }
 
 function customGoalStatus() {
@@ -1987,7 +2619,7 @@ function checkTrapDetectionOnReveal() {
     for (const hero of heroes.filter((entry) => !trap.spotCheckedBy.includes(entry.id))) {
       trap.spotCheckedBy.push(hero.id);
       const rollResult = rollD20ForFighter(hero);
-      const roll = rollResult.roll;
+      const roll = reliableTalentRoll(hero, "perception", rollResult.roll);
       const bonus = skillCheckBonus(hero, "wis", "perception");
       const guidance = guidanceSkillBonus();
       const total = roll + bonus + guidance;
@@ -2009,7 +2641,7 @@ function checkTrapDetectionOnReveal() {
     for (const hero of heroes.filter((entry) => !chest.trap.spotCheckedBy.includes(entry.id))) {
       chest.trap.spotCheckedBy.push(hero.id);
       const rollResult = rollD20ForFighter(hero);
-      const roll = rollResult.roll;
+      const roll = reliableTalentRoll(hero, "perception", rollResult.roll);
       const bonus = skillCheckBonus(hero, "wis", "perception");
       const guidance = guidanceSkillBonus();
       const total = roll + bonus + guidance;
@@ -2189,6 +2821,7 @@ function threatPresent() {
 
 function endCurrentEncounter() {
   endRages("as the fight ends");
+  removeSummonedAllies("fades as the fight ends");
   state.deathSaveAfterVictoryLogged = false;
   state.combatStarted = false;
   state.mode = "exploration";
@@ -2325,7 +2958,7 @@ async function rollInitiative() {
   const monsters = threateningMonsters();
   if (monsters.length === 0) return;
   const heroEntries = partyHeroes().map((hero) => {
-    const rollResult = rollD20ForFighter(hero, { advantage: isSidekickWarrior(hero) && (hero.level ?? 1) >= 7 });
+    const rollResult = rollD20ForFighter(hero, { advantage: (isSidekickWarrior(hero) && (hero.level ?? 1) >= 7) || (hero.classId === "barbarian" && (hero.level ?? 1) >= 7) });
     const heroRoll = rollResult.roll;
     return {
       fighterId: hero.id,
@@ -2336,6 +2969,23 @@ async function rollInitiative() {
       total: heroRoll + hero.initiativeBonus,
     };
   });
+  for (const entry of heroEntries) {
+    const hero = entry.fighter;
+    const ambush = reactionAbility(hero, "maneuverAmbush");
+    if (!canSpendCombatAbility(hero, ambush)) continue;
+    const useAmbush = await showReactionPrompt({
+      actor: hero,
+      title: "Ambush",
+      message: `${hero.name} rolled ${entry.total} initiative. Spend superiority to add a die?`,
+      acceptLabel: "Add Die",
+      declineLabel: "Save It",
+    });
+    if (!useAmbush) continue;
+    spendCombatAbilityUse(hero, ambush);
+    const die = rollDice(1, (hero.level ?? 1) >= 18 ? 12 : (hero.level ?? 1) >= 10 ? 10 : 8);
+    entry.total += die.total;
+    addLog(`${hero.name} uses Ambush for +${die.total} initiative.`, "important");
+  }
 
   const monsterEntries = monsters.map((monster) => {
     const monsterRoll = rollDie(20);
@@ -2363,6 +3013,35 @@ async function rollInitiative() {
   monsterEntries.forEach((entry) => fledMonsterIds.delete(entry.fighterId));
   state.round = 1;
   state.activeIndex = 0;
+  for (const hero of partyHeroes()) {
+    const restoreOne = (abilityId, featureName) => {
+      const ability = fighterAbilityDefinitions(hero).find((entry) => entry.id === abilityId);
+      if (ability && (hero.abilityUses?.[abilityId] ?? 0) >= abilityMaxUses(hero, ability)) {
+        hero.abilityUses[abilityId] = Math.max(0, (hero.abilityUses?.[abilityId] ?? 0) - 1);
+        addLog(`${hero.name}'s ${featureName} restores one use.`, "important");
+      }
+    };
+    if (hero.subclassId === "arcane-archer" && (hero.level ?? 1) >= 15) restoreOne("arcaneShotBursting", "Ever-Ready Shot");
+    if (hero.subclassId === "battle-master" && (hero.level ?? 1) >= 14) restoreOne("maneuverPrecision", "Relentless");
+    if (hero.subclassId === "samurai" && (hero.level ?? 1) >= 10) restoreOne("fightingSpirit", "Tireless Spirit");
+    if (hero.subclassId === "echo-knight" && (hero.level ?? 1) >= 18) restoreOne("unleashIncarnation", "Legion of One");
+    if (hero.classId === "monk" && (hero.level ?? 1) >= 20) {
+      const kiAbilities = fighterAbilityDefinitions(hero).filter((ability) => ability.resourcePool === "ki");
+      const spentKi = kiAbilities.reduce((sum, ability) => sum + (hero.abilityUses?.[ability.id] ?? 0), 0);
+      if (spentKi >= Math.max(0, hero.level ?? 1)) {
+        hero.abilityUses = { ...(hero.abilityUses ?? {}) };
+        let restored = 0;
+        for (const ability of kiAbilities) {
+          while ((hero.abilityUses[ability.id] ?? 0) > 0 && restored < 4) {
+            hero.abilityUses[ability.id] -= 1;
+            restored += 1;
+          }
+          if (restored >= 4) break;
+        }
+        addLog(`${hero.name}'s Perfect Self restores 4 ki as combat begins.`, "important");
+      }
+    }
+  }
   syncActiveHeroToTurn();
   resetTurnResources(activeFighter());
 
@@ -2466,7 +3145,8 @@ async function attackDestructibleObject(attacker, object, options = {}) {
 async function makeAttack(attacker, defender, options = {}) {
   if (isPartyHeroId(attacker?.id) && attacker.hp <= 0) return;
   const usesBonusAction = options.resource === "bonusAction";
-  if (!attacker.alive || !defender.alive || (usesBonusAction ? !attacker.hasBonusAction : !attacker.hasAction)) return;
+  const usesFreeAttack = Boolean(options.freeAttack);
+  if (!attacker.alive || !defender.alive || (!usesFreeAttack && (usesBonusAction ? !attacker.hasBonusAction : !attacker.hasAction))) return;
   const weapon = options.weapon ?? (options.weaponSlot ? weaponFromSlot(attacker, options.weaponSlot) : activeWeapon(attacker));
   const thrownAsMelee = weapon?.properties?.includes("thrown") && hasMeleeAccess(attacker, defender);
   const attackDamage = damageProfile(attacker, { weapon, includeDamageModifier: options.includeDamageModifier });
@@ -2490,7 +3170,15 @@ async function makeAttack(attacker, defender, options = {}) {
     return;
   }
 
-  if (usesBonusAction) attacker.hasBonusAction = false;
+  await maybeUseBraceBeforeAttack(attacker);
+  if (!attacker.alive) {
+    render();
+    return;
+  }
+
+  if (usesFreeAttack) {
+    // Part of the same Attack action, such as Beast Barbarian claws.
+  } else if (usesBonusAction) attacker.hasBonusAction = false;
   else {
     attacker.attacksRemaining = Math.max(0, (attacker.attacksRemaining ?? attacksPerAttackAction(attacker)) - 1);
     attacker.hasAction = attacker.attacksRemaining > 0;
@@ -2513,15 +3201,20 @@ async function makeAttack(attacker, defender, options = {}) {
   const attackRolls = attackRollResult.rolls;
   const criticalResult = resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll);
   const attackRoll = criticalResult.attackRoll;
-  const defenderAc = armorClass(defender);
+  let defenderAc = armorClass(defender);
   const currentAttackBonus = attackBonusForWeapon(attacker, weapon);
   let totalAttack = attackRoll + currentAttackBonus;
   const isCritical = criticalResult.isCritical;
   const doublesDamage = criticalResult.doublesDamage;
   const inspiration = await maybeUseBardicAttackDie(attacker, totalAttack, defenderAc);
   totalAttack = inspiration.totalAttack;
-  const shieldBlocked = attackRoll !== 1 && totalAttack >= defenderAc ? await maybeUseShieldReaction(defender, attacker, totalAttack, defenderAc) : false;
-  const isMiss = attackRoll === 1 || (!criticalResult.forcedHit && totalAttack < defenderAc) || shieldBlocked;
+  const bendLuck = await maybeUseBendLuckAttack(attacker, totalAttack, defenderAc);
+  totalAttack = bendLuck.totalAttack;
+  const hitReaction = attackRoll !== 1 && totalAttack >= defenderAc ? await maybeUseHitReactionDefenses(attacker, defender, totalAttack, currentAttackBonus, defenderAc) : { totalAttack, acBonus: 0, blocked: false, resistance: false };
+  totalAttack = hitReaction.totalAttack;
+  defenderAc += hitReaction.acBonus ?? 0;
+  const shieldBlocked = !hitReaction.blocked && attackRoll !== 1 && totalAttack >= defenderAc ? await maybeUseShieldReaction(defender, attacker, totalAttack, defenderAc) : false;
+  const isMiss = attackRoll === 1 || hitReaction.blocked || (!criticalResult.forcedHit && totalAttack < defenderAc) || shieldBlocked;
 
   addLog(
     `${attacker.name} ${options.actionLabel ?? "attacks"}${attackAdvantage && !hasDisadvantage ? " with advantage" : ""}${rangedDisadvantage && !attackAdvantage ? " with disadvantage" : ""}${defenderDodge && !attackAdvantage ? " because the target is dodging" : ""}${defendedBySidekick && !attackAdvantage ? " because of Defender" : ""}: d20 ${
@@ -2535,6 +3228,9 @@ async function makeAttack(attacker, defender, options = {}) {
   if (isMiss) {
     addLog(attackRoll === 1 ? "Natural 1. The attack misses badly." : shieldBlocked ? `${defender.name} blocks the blow with Shield.` : `${defender.name} avoids the blow.`);
     recordD20OutcomeForFighter(attacker, false);
+    await maybeUseRiposte(defender, attacker, !rangedAttack);
+    await maybeUseStoneRuneAfterAttack(attacker, defender);
+    await maybeUseBeastClawExtraAttack(attacker, defender, options);
     render();
     return;
   }
@@ -2558,6 +3254,15 @@ async function makeAttack(attacker, defender, options = {}) {
       label: `Savage Attacks ${savageRoll.rolls.join(" + ")}${attackDamage.type ? ` ${attackDamage.type}` : ""}`,
     });
   }
+  if (doublesDamage && !rangedAttack && attacker.classId === "barbarian" && (attacker.level ?? 1) >= 9 && attackDamage.sides) {
+    const brutalDice = (attacker.level ?? 1) >= 17 ? 3 : (attacker.level ?? 1) >= 13 ? 2 : 1;
+    const brutalRoll = rollDice(brutalDice, attackDamage.sides);
+    packets.push({
+      raw: brutalRoll.total,
+      type: attackDamage.type,
+      label: `Brutal Critical ${brutalRoll.rolls.join(" + ")}${attackDamage.type ? ` ${attackDamage.type}` : ""}`,
+    });
+  }
   for (const extra of attackDamage.extraDamage ?? []) {
     const extraRoll = rollDice((extra.count ?? 1) * (doublesDamage ? 2 : 1), extra.sides ?? 4);
     packets.push({
@@ -2576,6 +3281,25 @@ async function makeAttack(attacker, defender, options = {}) {
     });
     attacker.sneakAttackUsedThisTurn = true;
   }
+  if (attacker.classId === "cleric" && (attacker.level ?? 1) >= 8 && !attacker.blessedStrikeUsedThisTurn) {
+    const blessedRoll = rollDice(1, 8);
+    packets.push({
+      raw: blessedRoll.total,
+      type: "radiant",
+      label: `Blessed Strike ${blessedRoll.rolls.join(" + ")} radiant`,
+    });
+    attacker.blessedStrikeUsedThisTurn = true;
+  }
+  if (!rangedAttack && attacker.subclassId === "zealot" && (attacker.level ?? 1) >= 3 && !attacker.zealotDivineFuryUsedThisTurn && (attacker.statusEffects ?? []).some((effect) => effect.id === "rage")) {
+    const divineRoll = rollDice(1, 6);
+    const divineBonus = Math.max(1, Math.floor((attacker.level ?? 1) / 2));
+    packets.push({
+      raw: divineRoll.total + divineBonus,
+      type: "radiant",
+      label: `Divine Fury ${divineRoll.rolls.join(" + ")} ${abilityLabel(divineBonus)} radiant`,
+    });
+    attacker.zealotDivineFuryUsedThisTurn = true;
+  }
   const rider = consumeWeaponRider(attacker);
   if (rider?.damageBonus) {
     packets.push({
@@ -2584,6 +3308,22 @@ async function makeAttack(attacker, defender, options = {}) {
       label: `${rider.label ?? "Weapon rider"} ${rider.damageBonus} ${rider.damageType ?? "radiant"}`,
     });
     addLog(`${attacker.name}'s ${rider.label ?? "weapon rider"} is released on the hit.`, "important");
+    if (rider.riderStatus === "prone") applyStatusEffect(defender, { id: "prone", label: "Prone", attackBonus: -2, speedBonusFeet: -10, expiresAtEndOfTurn: true });
+    if (rider.riderStatus === "restrained") applyStatusEffect(defender, { id: "restrained", label: "Restrained", speedLocked: true, attackBonus: -2, durationRounds: 1 });
+    if (rider.riderStatus === "hamstrung") applyStatusEffect(defender, { id: "hamstrung", label: "Hamstrung", speedBonusFeet: -10, expiresAtEndOfTurn: true });
+    if (rider.riderStatus === "shaken") applyStatusEffect(defender, { id: "shaken", label: "Shaken", attackBonus: -2, expiresAtEndOfTurn: true });
+    if (rider.riderStatus === "marked") applyStatusEffect(defender, { id: `marked-by-${attacker.id}`, label: "Marked", attackBonus: -1, expiresAtEndOfTurn: true });
+    if (rider.riderStatus === "disarmed") applyStatusEffect(defender, { id: "disarmed", label: "Disarmed", attackBonus: -2, expiresAtEndOfTurn: true });
+    if (rider.riderStatus === "distracted") applyStatusEffect(defender, { id: "distracted", label: "Distracted", acBonus: -2, expiresAtEndOfTurn: true });
+    if (rider.riderStatus === "frightened") applyStatusEffect(defender, { id: "frightened", label: "Frightened", attackBonus: -2, expiresAtEndOfTurn: true });
+    if (rider.riderStatus === "enfeebled") applyStatusEffect(defender, { id: "enfeebled", label: "Enfeebled", damageBonus: -2, expiresAtEndOfTurn: true });
+    if (rider.riderStatus === "banished") applyStatusEffect(defender, { id: "banished", label: "Banished", speedLocked: true, actionLocked: true, expiresAtEndOfTurn: true });
+    if (rider.riderStatus === "charmed") applyStatusEffect(defender, { id: "beguiled", label: "Beguiled", attackBonus: -2, expiresAtEndOfTurn: true });
+    if (rider.riderStatus === "stunned") applyStatusEffect(defender, { id: "stunned", label: "Stunned", speedLocked: true, actionLocked: true, durationRounds: 1 });
+    if (rider.riderStatus === "sweeping") {
+      const splash = visibleMonsters().find((monster) => monster.id !== defender.id && distance(monster.position, defender.position) <= 1);
+      if (splash) applySpecialDamage(attacker, splash, Math.max(1, Math.floor(rider.damageBonus / 2)), attackDamage.type, "Sweeping Attack");
+    }
   }
   if (isPartyHeroId(defender.id) && adminEnabled() && adminGodMode) {
     addLog(`God mode prevents ${attacker.name}'s damage to ${defender.name}.`, "important");
@@ -2593,12 +3333,26 @@ async function makeAttack(attacker, defender, options = {}) {
   const resolvedPackets = packets.map((packet) => ({ ...packet, ...calculateDamageModifiers(defender, packet.raw, packet.type) }));
   addAdminLog(`${attacker.name} damage packets vs ${defender.name}: ${resolvedPackets.map((packet) => `${packet.label} => raw ${packet.raw}, final ${packet.damage}${packet.reason ? ` (${packet.reason})` : ""}`).join("; ")}.`);
   let totalDamage = resolvedPackets.reduce((sum, packet) => sum + packet.damage, 0);
+  if (hitReaction.resistance) totalDamage = Math.floor(totalDamage / 2);
   totalDamage = await maybeUseUncannyDodge(defender, attacker, totalDamage);
   totalDamage = await maybeUseStoneEndurance(defender, totalDamage);
+  totalDamage = await maybeUseBattleMasterParry(defender, attacker, totalDamage, !rangedAttack);
+  totalDamage = await maybeUseProtectiveField(defender, totalDamage);
+  totalDamage = await maybeUseSpiritShield(defender, attacker, totalDamage);
   applyDamageToFighter(defender, totalDamage);
   defender.lastDamagedById = attacker.id;
   if (!isPartyHeroId(attacker.id)) {
     await applyMonsterOnHitSpecials(attacker, defender, totalDamage, doublesDamage);
+  }
+  await maybeUseBarbarianAfterDamage(defender, attacker, totalDamage, !rangedAttack);
+  await maybeUseSubclassAfterDamageReactions(defender, attacker, totalDamage, !rangedAttack);
+  if (options.beastFormAttack === "bite" && totalDamage > 0 && !attacker.beastFormHitThisTurn && (attacker.hp ?? 0) < ((attacker.maxHp ?? 1) / 2)) {
+    attacker.beastFormHitThisTurn = true;
+    const healed = Math.min((attacker.maxHp ?? 0) - (attacker.hp ?? 0), Math.max(1, proficiencyBonus(attacker)));
+    if (healed > 0) {
+      attacker.hp += healed;
+      addLog(`${attacker.name}'s Bestial Bite restores ${healed} HP.`, "heal");
+    }
   }
 
   const critText = isCritical ? " Critical hit." : "";
@@ -2610,9 +3364,12 @@ async function makeAttack(attacker, defender, options = {}) {
     `${attacker.name} hits for ${totalDamage} damage (${resolvedPackets.map((packet) => packet.label).join("; ")}).${critText}${adjustmentNote ? ` ${adjustmentNote}` : ""}`,
     "damage",
   );
+  await maybeUseStoneRuneAfterAttack(attacker, defender);
   await applyWeaponRiderSecondary(attacker, defender, rider, attackDamage);
   await applyWildShapeAttackEffects(attacker, defender, attackDamage);
   if (totalDamage > 0) await maybeUseHellishRebuke(defender, attacker);
+  await maybeUseStoneRuneAfterAttack(attacker, defender);
+  await maybeUseBeastClawExtraAttack(attacker, defender, options);
 
   if (!defender.alive && maybeUseUndeadFortitude(defender, totalDamage)) {
     addLog(`${defender.name} refuses to fall and remains at 1 HP.`, "important");
@@ -2621,6 +3378,7 @@ async function makeAttack(attacker, defender, options = {}) {
   if (!defender.alive) {
     addLog(`${defender.name} drops to 0 HP. ${isPartyHeroId(attacker.id) ? "Victory." : "Defeat."}`, "important");
     if (!isPartyHeroId(defender.id)) {
+      triggerMonsterDeathStory(defender);
       if (isPartyHeroId(attacker.id)) playSoundEffect("enemyDefeated");
       awardMonsterXp(defender);
       dropLootForMonster(defender);
@@ -2673,6 +3431,15 @@ function savingThrow(target, ability, dc) {
     indomitable = { roll: rerollResult.roll, rolls: rerollResult.rolls, rawRolls: rerollResult.rawRolls, rollResult: rerollResult, total: rerollTotal };
     total = rerollTotal;
     success = total >= dc;
+  }
+  const fanaticalFocus = fighterAbilityDefinitions(target).find((entry) => entry.id === "fanaticalFocus");
+  if (!success && target.subclassId === "zealot" && (target.level ?? 1) >= 6 && fanaticalFocus && (target.abilityUses?.fanaticalFocus ?? 0) < abilityMaxUses(target, fanaticalFocus)) {
+    const rerollResult = rollD20ForFighter(target);
+    const rerollTotal = rerollResult.roll + bonus;
+    target.abilityUses = { ...(target.abilityUses ?? {}), fanaticalFocus: (target.abilityUses?.fanaticalFocus ?? 0) + 1 };
+    total = rerollTotal;
+    success = total >= dc;
+    addLog(`${target.name}'s Fanatical Focus rerolls the save: ${rerollResult.roll} ${abilityLabel(bonus)} = ${total}.`, "important");
   }
   recordD20OutcomeForFighter(target, success);
   return { ability, roll, rolls: rollResult.rolls, rawRolls: rollResult.rawRolls, rollResult, bonus, proficiency, statusBonus, auraBonus, total, success, indomitable };
@@ -2761,6 +3528,28 @@ async function rollSavingThrow(target, ability, dc, message) {
       }
     }
   }
+  if (!save.success) {
+    const candidate = partyHeroes().find((hero) => {
+      const ability = reactionAbility(hero, "bendLuck");
+      return hero.id !== target.id && heroCanAct(hero) && hasReactionAvailable(hero) && canSpendCombatAbility(hero, ability) && distance(hero.position, target.position) <= 12;
+    });
+    if (candidate && save.total + 3 >= dc) {
+      const useLuck = await showReactionPrompt({
+        actor: candidate,
+        title: "Bend Luck",
+        message: `${target.name} failed by ${dc - save.total}. Spend sorcery to bend luck by +3?`,
+        acceptLabel: "Bend Luck",
+        declineLabel: "Save It",
+      });
+      const ability = reactionAbility(candidate, "bendLuck");
+      if (useLuck && consumeReaction(candidate, "Bend Luck") && canSpendCombatAbility(candidate, ability)) {
+        spendCombatAbilityUse(candidate, ability);
+        save.total += 3;
+        save.success = save.total >= dc;
+        addLog(`${candidate.name}'s Bend Luck adds +3 to ${target.name}'s save.`, "important");
+      }
+    }
+  }
   if (save.indomitable) addLog(`${target.name} uses Indomitable and rerolls ${save.indomitable.roll}.`, "important");
   const rollText = save.indomitable ? `${save.roll} -> ${save.indomitable.roll}` : save.roll;
   addLog(`${target.name} rolls ${ability.toUpperCase()} save: ${rollText} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
@@ -2844,11 +3633,13 @@ function spellcastingAbility(fighter) {
 
 function spellSaveDc(fighter, spell = null) {
   const ability = spell?.saveDcAbility ?? spellcastingAbility(fighter);
-  return 8 + proficiencyBonus(fighter) + abilityMod(fighter, ability);
+  const statusBonus = (fighter?.statusEffects ?? []).reduce((sum, effect) => sum + (effect.saveDcBonus ?? 0), 0);
+  return 8 + proficiencyBonus(fighter) + abilityMod(fighter, ability) + statusBonus;
 }
 
 function spellAttackBonus(fighter, spell = null) {
-  return proficiencyBonus(fighter) + abilityMod(fighter, spell?.attackAbility ?? spell?.saveDcAbility ?? spellcastingAbility(fighter));
+  const statusBonus = (fighter?.statusEffects ?? []).reduce((sum, effect) => sum + (effect.spellAttackBonus ?? effect.attackBonus ?? 0), 0);
+  return proficiencyBonus(fighter) + abilityMod(fighter, spell?.attackAbility ?? spell?.saveDcAbility ?? spellcastingAbility(fighter)) + statusBonus;
 }
 
 function spellBaseLevel(spell) {
@@ -3359,6 +4150,12 @@ async function applySpellDamage(caster, target, spell) {
   }
   if (isSidekickSpellcaster(caster) && spellBaseLevel(spell) === 0 && (caster.level ?? 1) >= 6) raw += Math.max(0, abilityMod(caster, spellcastingAbility(caster)));
   if (isSidekickSpellcaster(caster) && spellBaseLevel(spell) > 0 && (caster.level ?? 1) >= 14 && caster.empoweredSpellSchool === spell.school) raw += Math.max(0, abilityMod(caster, spellcastingAbility(caster)));
+  if (caster.classId === "cleric" && (caster.level ?? 1) >= 8 && spellBaseLevel(spell) === 0 && !caster.blessedStrikeUsedThisTurn) {
+    const blessed = rollDice(1, 8);
+    raw += blessed.total;
+    caster.blessedStrikeUsedThisTurn = true;
+    addLog(`${caster.name}'s Blessed Strike adds ${blessed.total} radiant force.`, "important");
+  }
   if (raw <= 0) return;
   applySpecialDamage(caster, target, raw, spell.effect.type ?? "force", spell.name);
   if (spell.effect?.status && (!save || !save.success)) await applySpellStatus(caster, target, spell, { skipSave: true });
@@ -3369,8 +4166,15 @@ function applySpellHealing(caster, target, spell) {
   const roll = rollDice(dice.count, dice.sides);
   let bonus = spell.effect?.abilityBonus === "spellcasting" ? abilityMod(caster, spell?.saveDcAbility ?? spellcastingAbility(caster)) : spell.effect?.bonus ?? 0;
   if (isSidekickSpellcaster(caster) && spellBaseLevel(spell) > 0 && (caster.level ?? 1) >= 14 && caster.empoweredSpellSchool === spell.school) bonus += Math.max(0, abilityMod(caster, spellcastingAbility(caster)));
-  const healed = applyHealingToHero(target, Math.max(0, roll.total + bonus));
-  addLog(`${caster.name}'s ${spell.name} heals ${target.name} for ${healed} HP (${roll.rolls.join(" + ")} ${abilityLabel(bonus)}).`, "heal");
+  const discipleBonus = caster?.subclassId === "life-domain" && (caster.level ?? 1) >= 3 && spellBaseLevel(spell) > 0 ? 2 + spellCastLevel(spell) : 0;
+  const healed = applyHealingToHero(target, Math.max(0, roll.total + bonus + discipleBonus));
+  const discipleText = discipleBonus > 0 ? ` + Disciple of Life ${discipleBonus}` : "";
+  addLog(`${caster.name}'s ${spell.name} heals ${target.name} for ${healed} HP (${roll.rolls.join(" + ")} ${abilityLabel(bonus)}${discipleText}).`, "heal");
+  if (caster?.subclassId === "life-domain" && (caster.level ?? 1) >= 10 && target?.id !== caster.id && spellBaseLevel(spell) > 0) {
+    const selfHeal = Math.max(1, 2 + spellCastLevel(spell));
+    const restored = applyHealingToHero(caster, selfHeal);
+    if (restored > 0) addLog(`${caster.name}'s Blessed Healer restores ${restored} HP to themself.`, "heal");
+  }
   void maybeFinishEncounterAfterHeroRecovery();
 }
 
@@ -3393,7 +4197,14 @@ async function applySpellAttack(caster, target, spell) {
   const extra = spell.effect?.abilityBonus === "spellcasting" ? abilityMod(caster, spell?.attackAbility ?? spell?.saveDcAbility ?? spellcastingAbility(caster)) : 0;
   const rawDamage = Math.max(1, damageRoll.total + (dice.bonus ?? 0) + extra);
   addAdminLog(`${caster.name}'s ${spell.name} hit damage roll: ${damageRoll.rolls.join(" + ")}${dice.bonus ? ` ${abilityLabel(dice.bonus)}` : ""}${extra ? ` + spell ability ${extra}` : ""} = ${rawDamage} ${spell.effect?.type ?? "force"}.`);
-  applySpecialDamage(caster, target, rawDamage, spell.effect?.type ?? "force", spell.name);
+  let totalDamage = rawDamage;
+  if (caster.classId === "cleric" && (caster.level ?? 1) >= 8 && spellBaseLevel(spell) === 0 && !caster.blessedStrikeUsedThisTurn) {
+    const blessed = rollDice(1, 8);
+    totalDamage += blessed.total;
+    caster.blessedStrikeUsedThisTurn = true;
+    addLog(`${caster.name}'s Blessed Strike adds ${blessed.total} radiant force.`, "important");
+  }
+  applySpecialDamage(caster, target, totalDamage, spell.effect?.type ?? "force", spell.name);
   if (spell.effect?.status) await applySpellStatus(caster, target, spell);
 }
 
@@ -3425,6 +4236,7 @@ async function resolveEldritchBlastBeam(caster, target, beamIndex, beamCount) {
   addAdminLog(`${caster.name}'s Eldritch Blast damage roll: ${damageRoll.rolls.join(" + ")} = ${Math.max(1, damageRoll.total)} force.`);
   applySpecialDamage(caster, target, Math.max(1, damageRoll.total), "force", "Eldritch Blast");
   if (!target.alive) {
+    triggerMonsterDeathStory(target);
     playSoundEffect("enemyDefeated");
     awardMonsterXp(target);
     dropLootForMonster(target);
@@ -3526,6 +4338,7 @@ async function castSpellAtTarget(caster, spell, target) {
     const wasAlive = target.alive;
     await applySpellAttack(caster, target, spell);
     if (wasAlive && !target.alive && !isPartyHeroId(target.id)) {
+      triggerMonsterDeathStory(target);
       if (isPartyHeroId(caster.id)) playSoundEffect("enemyDefeated");
       awardMonsterXp(target);
       dropLootForMonster(target);
@@ -3539,6 +4352,7 @@ async function castSpellAtTarget(caster, spell, target) {
       await applySpellDamage(caster, entry, spell);
       if (!entry.alive && isPartyHeroId(entry.id)) handleHeroDeath();
       if (wasAlive && !entry.alive && !isPartyHeroId(entry.id)) {
+        triggerMonsterDeathStory(entry);
         if (isPartyHeroId(caster.id)) playSoundEffect("enemyDefeated");
         awardMonsterXp(entry);
         dropLootForMonster(entry);
@@ -3565,6 +4379,7 @@ async function castSpellAtTargets(caster, spell, targets) {
       const wasAlive = target.alive;
       await applySpellDamage(caster, target, spell);
       if (wasAlive && !target.alive && !isPartyHeroId(target.id)) {
+        triggerMonsterDeathStory(target);
         if (isPartyHeroId(caster.id)) playSoundEffect("enemyDefeated");
         awardMonsterXp(target);
         dropLootForMonster(target);
@@ -3605,6 +4420,7 @@ async function castSpellAtPoint(caster, spell, position) {
     else if (spell.effect?.kind === "status") await applySpellStatus(caster, target, spell);
     if (!target.alive && isPartyHeroId(target.id)) handleHeroDeath();
     if (wasAlive && !target.alive && !isPartyHeroId(target.id)) {
+      triggerMonsterDeathStory(target);
       if (isPartyHeroId(caster.id)) playSoundEffect("enemyDefeated");
       awardMonsterXp(target);
       dropLootForMonster(target);
@@ -3627,6 +4443,7 @@ async function castSpellInDirection(caster, spell, direction) {
     if (spell.effect?.kind === "damage") await applySpellDamage(caster, target, spell);
     else if (spell.effect?.kind === "status") await applySpellStatus(caster, target, spell);
     if (wasAlive && !target.alive && !isPartyHeroId(target.id)) {
+      triggerMonsterDeathStory(target);
       if (isPartyHeroId(caster.id)) playSoundEffect("enemyDefeated");
       awardMonsterXp(target);
       dropLootForMonster(target);
@@ -3736,6 +4553,11 @@ async function tryMonsterAreaSpecial(monster, namePattern, label, damageType, sa
   if (!hasMonsterSpecial(monster, namePattern) || !monster.hasAction || !shouldUseMonsterSpecial("active")) return false;
   const targets = targetsInMonsterSpecialRange(monster, rangeFeet);
   if (!targets.length) return false;
+  if (await maybeUseSpellInterruptReaction(monster, label)) {
+    monster.hasAction = false;
+    addLog(`${monster.name}'s ${label} is interrupted before it takes hold.`, "important");
+    return true;
+  }
   monster.hasAction = false;
   const dc = monsterSpecialDc(monster);
   const dice = specialDamageDice(monster, namePattern.test("Fireball") ? 8 : 6);
@@ -3748,6 +4570,30 @@ async function tryMonsterAreaSpecial(monster, namePattern, label, damageType, sa
     if (save.success && damage > 0) addLog(`${target.name} takes half damage from ${label}.`);
     if (damage > 0) applySpecialDamage(monster, target, damage, damageType, label);
     if (!target.alive) handleHeroDeath();
+  }
+  return true;
+}
+
+async function maybeUseSpellInterruptReaction(monster, label) {
+  const candidate = partyHeroes().find((hero) => {
+    if (!heroCanAct(hero) || !hasReactionAvailable(hero)) return false;
+    const ability = fighterAbilityDefinitions(hero).find((entry) => entry.subclassEffect?.kind === "interruptSpell");
+    return canSpendCombatAbility(hero, ability) && distance(hero.position, monster.position) <= 12;
+  });
+  if (!candidate) return false;
+  const ability = fighterAbilityDefinitions(candidate).find((entry) => entry.subclassEffect?.kind === "interruptSpell");
+  const useInterrupt = await showReactionPrompt({
+    actor: candidate,
+    title: ability.name,
+    message: `${monster.name} is using ${label}. Spend your reaction to interrupt it?`,
+    acceptLabel: "Interrupt",
+  });
+  if (!useInterrupt || !consumeReaction(candidate, ability.name) || !canSpendCombatAbility(candidate, ability)) return false;
+  spendCombatAbilityUse(candidate, ability);
+  const restore = ability.subclassEffect?.restoreSpellPoints ?? 0;
+  if (restore > 0) {
+    candidate.spellPoints = Math.min(spellPointMaximum(candidate), (candidate.spellPoints ?? 0) + restore);
+    addLog(`${candidate.name} steals ${restore} spell points from the broken magic.`, "important");
   }
   return true;
 }

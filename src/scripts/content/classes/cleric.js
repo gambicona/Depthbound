@@ -39,12 +39,11 @@ window.DungeonContent.register("classes", "cleric", {
   token: "C",
   classFeatures: [
     { level: 1, name: "Spellcasting", description: "You can shape class magic into prepared or known spells." },
-    { level: 2, name: "Channel Divinity", description: "Call on divine power for potent sacred effects." },
-    { level: 8, name: "Blessed Strike", description: "Your attacks or cantrips carry extra divine force." },
-    { level: 10, name: "Divine Intervention", description: "Appeal directly to your deity for miraculous aid." },
+    { level: 2, name: "Channel Divinity", description: "Call on divine power for sacred effects; uses increase at cleric levels 6 and 18 and refresh on a short rest." },
+    { level: 8, name: "Blessed Strike", description: "Once on each of your turns, a weapon hit or damaging cantrip deals an extra 1d8 radiant damage." },
   ],
   abilities: [
-    { id: "channelDivinity", name: "Channel Divinity", level: 2, refresh: "shortRest", uses: 1, usesByLevel: [{ level: 6, uses: 2 }, { level: 18, uses: 3 }], resource: "action", description: "Radiant divine burst against nearby enemies." },
+    { id: "channelDivinity", name: "Channel Divinity", level: 2, refresh: "shortRest", uses: 1, usesByLevel: [{ level: 6, uses: 2 }, { level: 18, uses: 3 }], resource: "action", description: "Radiant divine burst against nearby enemies. Uses increase at cleric levels 6 and 18." },
   ],
   equipment: {
     mainHand: "mace",

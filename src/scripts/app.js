@@ -105,11 +105,7 @@ function render() {
 els.rollInitiative.addEventListener("click", rollInitiative);
 els.selectParty?.addEventListener("click", selectActivePartyForMovement);
 els.attack.addEventListener("click", () => {
-  const target = attackTarget();
-  if (target) {
-    if (objectIsDestructible(target)) attackDestructibleObject(activeFighter(), target);
-    else makeAttack(activeFighter(), target);
-  }
+  void performAttackWithPrompt();
 });
 els.actionButton.addEventListener("click", showActionMenu);
 els.useItem.addEventListener("click", showUseItemMenu);
@@ -130,6 +126,18 @@ els.heroCard.addEventListener("contextmenu", (event) => {
 els.newGame.addEventListener("click", () => {
   showMainMenu();
 });
+const bugReportUrl = window.DungeonConfig?.bugReport?.formUrl ?? "";
+if (els.bugReport) {
+  if (bugReportUrl) {
+    els.bugReport.href = bugReportUrl;
+  }
+  els.bugReport.addEventListener("click", (event) => {
+    if (!bugReportUrl || bugReportUrl.includes("REPLACE_WITH_YOUR_BUG_REPORT_FORM")) {
+      event.preventDefault();
+      window.alert("Bug report form is not connected yet. Add your Google Form URL in src/scripts/config.js.");
+    }
+  });
+}
 els.showDungeonIntro?.addEventListener("click", () => {
   const intro = state.customDungeon?.intro;
   if (!intro?.text && !(intro?.images ?? []).length) return;
@@ -308,6 +316,9 @@ els.fighterInfo.addEventListener("click", (event) => {
     homeBuildPaintColor = button.dataset.color ?? homeBuildPaintColor;
     renderHomeBuilder();
   }
+  if (button.dataset.action === "home-rotate-furniture") {
+    rotateHomeFurnitureSelection();
+  }
   if (button.dataset.action === "home-save-build") {
     saveHomeBuilderChanges();
   }
@@ -458,6 +469,17 @@ els.abilitiesMenu.addEventListener("click", (event) => {
   }
 
   const button = event.target.closest("button");
+  if (event.target.closest("summary")) {
+    trackAbilityMenuSectionToggle(event.target);
+  }
+  if (button?.dataset.action === "toggle-ability-favorite") {
+    toggleAbilityFavorite(button.dataset.favoriteKey);
+    return;
+  }
+  if (button?.dataset.action === "move-ability-favorite") {
+    moveAbilityFavorite(button.dataset.favoriteKey, Number(button.dataset.direction) || 0);
+    return;
+  }
   if (button?.dataset.action === "use-fighter-ability") {
     void useFighterAbility(button.dataset.ability);
   }
@@ -659,11 +681,7 @@ window.addEventListener("keydown", (event) => {
   }
   if (key === "t" && !els.attack.disabled) {
     event.preventDefault();
-    const targetFighter = attackTarget();
-    if (targetFighter) {
-      if (objectIsDestructible(targetFighter)) attackDestructibleObject(activeFighter(), targetFighter);
-      else makeAttack(activeFighter(), targetFighter);
-    }
+    void performAttackWithPrompt();
   }
   if (key === "u" && !els.useItem.disabled) {
     event.preventDefault();

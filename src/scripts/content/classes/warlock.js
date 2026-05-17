@@ -31,10 +31,11 @@ window.DungeonContent.register("classes", "warlock", {
     { level: 1, name: "Eldritch Blast", description: "Hurl a signature beam of force at your enemies." },
     { level: 2, name: "Eldritch Invocations", description: "Learn occult gifts that reshape your warlock talents." },
     { level: 3, name: "Pact Boon", description: "Receive a defining gift from your patron." },
-    { level: 11, name: "Mystic Arcanum", description: "Learn a powerful high-level spell you can invoke once each day." },
+    { level: 11, name: "Mystic Arcanum", description: "Once per long rest, invoke patron magic as a high-power force burst that can briefly banish a foe." },
     { level: 20, name: "Eldritch Master", description: "Restore pact magic through a brief appeal to your patron." },
   ],
   abilities: [
+    { id: "mysticArcanum", name: "Mystic Arcanum", level: 11, refresh: "longRest", uses: 1, resource: "action", description: "Call on a once-per-rest arcanum. A visible enemy takes 6d8 force damage and is briefly banished.", subclassEffect: { kind: "damageTarget", dice: { count: 6, sides: 8 }, damageType: "force", riderStatus: "banished" } },
     { id: "eldritchMaster", name: "Eldritch Master", level: 20, refresh: "longRest", uses: 1, resource: "action", description: "Restore pact spell points." },
   ],
   equipment: { mainHand: "crossbow-light", torso: "leather", quiver: "bolts-20" },

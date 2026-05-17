@@ -283,6 +283,8 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
       monsterSummary: customDungeonMonsterSummary(monsters),
       intro: template.intro ?? { text: "", images: [] },
       outro: template.outro ?? { text: "", images: [] },
+      storyTriggers: Array.isArray(template.storyTriggers) ? cloneData(template.storyTriggers) : [],
+      storyTriggerHistory: {},
     },
     combatStarted: false,
     mode: "exploration",
@@ -419,6 +421,7 @@ function normalizeHomeData(home = null) {
         position: { x: Math.floor(object.position?.x ?? 0), y: Math.floor(object.position?.y ?? 0) },
         width: object.width ?? template.width ?? 1,
         height: object.height ?? template.height ?? 1,
+        rotation: normalizeObjectRotation(object.rotation),
         homePlaced: true,
         items: Array.isArray(object.items) ? object.items.map(normalizeItem) : [],
       };
@@ -444,6 +447,20 @@ function normalizeHomeColorMap(map = {}, allowedKeys = null) {
 function normalizeHomeColor(color) {
   const value = String(color ?? "").trim();
   return /^#[0-9a-fA-F]{6}$/.test(value) ? value.toLowerCase() : null;
+}
+
+function normalizeObjectRotation(rotation = 0) {
+  const numeric = Number(rotation);
+  if (!Number.isFinite(numeric)) return 0;
+  const normalized = ((Math.round(numeric / 90) * 90) % 360 + 360) % 360;
+  return normalized;
+}
+
+function objectRotatedSize(objectOrTemplate = {}, rotation = objectOrTemplate.rotation ?? 0) {
+  const width = Math.max(1, Math.floor(objectOrTemplate.width ?? 1));
+  const height = Math.max(1, Math.floor(objectOrTemplate.height ?? 1));
+  const normalized = normalizeObjectRotation(rotation);
+  return normalized === 90 || normalized === 270 ? { width: height, height: width } : { width, height };
 }
 
 function normalizeHomeWallColorMap(map = {}, cellKeys = new Set(), gridSize = 30) {
@@ -1255,9 +1272,18 @@ async function dataUrlToBlob(dataUrl) {
 
 function combatantRoleLabel(combatant) {
   const species = combatant?.speciesName ? ` ${combatant.speciesName}` : "";
-  if (isClassHero(combatant) && (combatant.id === "hero" || isRosterHeroId(combatant?.id))) return `Level ${combatant.level ?? 1}${species} ${combatant.className ?? "Fighter"}`;
+  const subclass = combatant?.subclassName ? ` (${combatant.subclassName})` : "";
+  if (isClassHero(combatant) && (combatant.id === "hero" || isRosterHeroId(combatant?.id))) return `Level ${combatant.level ?? 1}${species} ${combatant.className ?? "Fighter"}${subclass}`;
   if (isTrainedSidekick(combatant)) return `Level ${combatant.level ?? 1} ${combatant.sidekickClassName ?? combatant.className ?? "Sidekick"}`;
   return combatant.role;
+}
+
+function subclassDefinitionForFighter(fighter) {
+  if (!fighter?.classId || !fighter?.subclassId) return null;
+  const template = getHeroTemplate(fighter.classId);
+  const normal = (template.subclasses ?? []).find((entry) => entry.id === fighter.subclassId) ?? null;
+  const admin = (template.adminSubclasses ?? []).find((entry) => entry.id === fighter.subclassId) ?? null;
+  return fighter.subclassVariant === "full" ? admin ?? normal : normal ?? admin;
 }
 
 function fighterAbilityDefinitions(fighter = state?.fighters?.hero) {
@@ -1271,7 +1297,11 @@ function fighterAbilityDefinitions(fighter = state?.fighters?.hero) {
       }));
   }
   if (fighter && !isClassHero(fighter)) return [...(fighter.abilities ?? [])];
-  const source = [...(fighter?.abilities ?? (isRosterHeroId(fighter?.id) ? getHeroTemplate(fighter?.classId).abilities : []) ?? [])];
+  const subclass = subclassDefinitionForFighter(fighter);
+  const source = [
+    ...(fighter?.abilities ?? (isRosterHeroId(fighter?.id) ? getHeroTemplate(fighter?.classId).abilities : []) ?? []),
+    ...(subclass?.abilities ?? []),
+  ];
   if (fighter?.racialTraits?.dragonDamageType && !source.some((ability) => ability.id === "dragonbornBreath")) {
     source.push({ id: "dragonbornBreath", name: "Breath Weapon", description: "Ancestral 15 ft cone. DEX/CON save by ancestry, half damage on success.", resource: "action", refresh: "shortRest", uses: 1 });
   }
@@ -1280,6 +1310,13 @@ function fighterAbilityDefinitions(fighter = state?.fighters?.hero) {
   }
   return source
     .filter((ability) => ability.id !== "eldritchBlast")
+    .filter((ability) => {
+      if (ability.resourcePool === "arcaneShot") return (fighter?.knownArcaneShots ?? []).includes(ability.id);
+      if (ability.resourcePool === "superiority") return (fighter?.knownManeuvers ?? []).includes(ability.id);
+      if (ability.rune) return (fighter?.knownRunes ?? []).includes(ability.id);
+      return true;
+    })
+    .filter((ability, index, list) => list.findIndex((entry) => entry.id === ability.id) === index)
     .map((ability) => ({
       ...ability,
       usesByLevel: Array.isArray(ability.usesByLevel) ? ability.usesByLevel.map((entry) => ({ ...entry })) : undefined,
@@ -1470,6 +1507,9 @@ function racialCantripSpellIdsForFighter(fighter = state?.fighters?.hero) {
 function abilityMaxUses(fighter, ability) {
   const level = fighter.level ?? 1;
   const poolBonus = ability.resourcePool ? fighter?.extraResourcePoolUses?.[ability.resourcePool] ?? 0 : 0;
+  if (ability.resourcePool === "arcaneShot") return 2 + poolBonus;
+  if (ability.resourcePool === "superiority") return ((level >= 15 ? 6 : level >= 7 ? 5 : 4) + poolBonus);
+  if (ability.resourcePool === "psionicEnergy") return (proficiencyBonus(fighter) * 2) + poolBonus;
   if (ability.resourcePool === "ki") return Math.max(0, level) + poolBonus;
   if (ability.resourcePool === "bardicInspiration") return Math.max(1, abilityMod(fighter, "cha")) + poolBonus;
   if (ability.resourcePool === "wildShape") return 2 + poolBonus;
@@ -1537,6 +1577,7 @@ function maxSpellLevelForFighter(fighter) {
   if (casterType === "pact") return level >= 9 ? 5 : level >= 7 ? 4 : level >= 5 ? 3 : level >= 3 ? 2 : 1;
   if (casterType === "sidekick") return level >= 17 ? 5 : level >= 13 ? 4 : level >= 9 ? 3 : level >= 5 ? 2 : 1;
   if (casterType === "half") return level >= 17 ? 5 : level >= 13 ? 4 : level >= 9 ? 3 : level >= 5 ? 2 : 1;
+  if (casterType === "third") return level >= 19 ? 4 : level >= 13 ? 3 : level >= 7 ? 2 : level >= 3 ? 1 : 0;
   return level >= 17 ? 9 : level >= 15 ? 8 : level >= 13 ? 7 : level >= 11 ? 6 : level >= 9 ? 5 : level >= 7 ? 4 : level >= 5 ? 3 : level >= 3 ? 2 : 1;
 }
 
@@ -1560,11 +1601,18 @@ function ensureSpellPointState(fighter) {
 
 function resetFighterAbilityUses(fighter, refresh = "all") {
   fighter.abilityUses = refresh === "all" ? {} : { ...(fighter.abilityUses ?? {}) };
+  if (fighter.classId === "barbarian" && (refresh === "all" || refresh === "shortRest" || refresh === "longRest")) fighter.relentlessRageDc = 10;
   for (const ability of fighterAbilityDefinitions(fighter)) {
-    if ((fighter.level ?? 1) >= (ability.level ?? 1) && (refresh === "all" || ability.refresh === refresh || ability.refresh === "turn")) {
+    const abilityRefresh = abilityRefreshForFighter(fighter, ability);
+    if ((fighter.level ?? 1) >= (ability.level ?? 1) && (refresh === "all" || abilityRefresh === refresh || abilityRefresh === "turn")) {
       fighter.abilityUses[ability.id] = 0;
     }
   }
+}
+
+function abilityRefreshForFighter(fighter, ability) {
+  if (fighter?.classId === "bard" && ability?.id === "bardicInspiration" && (fighter.level ?? 1) >= 5) return "shortRest";
+  return ability?.refresh ?? "longRest";
 }
 
 function ensureFighterAbilityState(fighter) {
@@ -1596,8 +1644,22 @@ function skillCheckBonus(fighter, ability, skillId) {
   const expertise = new Set(fighter?.expertiseSkills ?? []);
   const prof = proficiencies.has(skillId) ? proficiencyBonus(fighter) : 0;
   const expert = expertise.has(skillId) ? proficiencyBonus(fighter) : 0;
+  const jackOfAllTrades = fighter?.classId === "bard" && (fighter.level ?? 1) >= 2 && !proficiencies.has(skillId)
+    ? Math.floor(proficiencyBonus(fighter) / 2)
+    : 0;
   const statusBonus = (fighter?.statusEffects ?? []).reduce((sum, effect) => sum + (effect.skillBonus ?? 0), 0);
-  return abilityMod(fighter, ability) + prof + expert + statusBonus;
+  const championAthlete = fighter?.subclassId === "champion" && (fighter.level ?? 1) >= 6 && ["str", "dex", "con"].includes(ability) && !proficiencies.has(skillId)
+    ? Math.ceil(proficiencyBonus(fighter) / 2)
+    : 0;
+  const samuraiCourtier = fighter?.subclassId === "samurai" && (fighter.level ?? 1) >= 7 && skillId === "persuasion" ? abilityMod(fighter, "wis") : 0;
+  const racialAnimalHandling = skillId === "animal-handling" && ["forest-gnome", "pureblood"].includes(fighter?.raceSelection?.subraceId ?? fighter?.subrace) ? 2 : 0;
+  return abilityMod(fighter, ability) + prof + expert + jackOfAllTrades + statusBonus + championAthlete + samuraiCourtier + racialAnimalHandling;
+}
+
+function reliableTalentRoll(fighter, skillId, roll) {
+  const proficiencies = new Set(fighter?.skillProficiencies ?? []);
+  if (fighter?.classId === "rogue" && (fighter.level ?? 1) >= 11 && proficiencies.has(skillId) && roll > 1 && roll < 10) return 10;
+  return roll;
 }
 
 function thievesToolsTraining(fighter) {
@@ -1681,7 +1743,7 @@ function skillName(skillId) {
 }
 
 function toolName(toolId) {
-  return toolDefinitions[toolId]?.name ?? String(toolId).replace(/-/g, " ");
+  return toolDefinitions[toolId]?.name ?? String(toolId).replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function raceTraitsForSelection(selection = defaultRaceSelection) {
@@ -2189,6 +2251,8 @@ function objectHasLoot(object) {
 }
 
 function movementCostAtPosition(position) {
+  const mover = (typeof activeFighter === "function" ? activeFighter() : null) ?? (typeof activeHero === "function" ? activeHero() : null);
+  if (mover?.subclassId === "circle-land" && (mover.level ?? 1) >= 10) return 1;
   return objectHasComponent(objectAt(position), "difficultTerrain") ? 2 : 1;
 }
 
@@ -2199,8 +2263,11 @@ function objectIsHazardousTerrain(object) {
 function objectCells(object) {
   const template = objectTemplate(object.type);
   if (!template) return [];
-  const width = object.width ?? template.width ?? 1;
-  const height = object.height ?? template.height ?? 1;
+  const { width, height } = objectRotatedSize({
+    width: object.width ?? template.width ?? 1,
+    height: object.height ?? template.height ?? 1,
+    rotation: object.rotation ?? 0,
+  });
   return Array.from({ length: width * height }, (_, index) => ({
     x: object.position.x + (index % width),
     y: object.position.y + Math.floor(index / width),
@@ -3085,7 +3152,8 @@ function abilityMod(fighter, ability) {
 function abilityScore(fighter, ability) {
   if (isWildShaped(fighter)) return baseAbilityScore(fighter, ability);
   const effects = magicEffects(fighter);
-  const value = baseAbilityScore(fighter, ability) + (effects.abilityScoreBonuses[ability] ?? 0) + (effects.abilityScorePenalties[ability] ?? 0);
+  const primalChampion = fighter?.classId === "barbarian" && (fighter.level ?? 1) >= 20 && ["str", "con"].includes(ability) ? 4 : 0;
+  const value = baseAbilityScore(fighter, ability) + primalChampion + (effects.abilityScoreBonuses[ability] ?? 0) + (effects.abilityScorePenalties[ability] ?? 0);
   const cap = effects.abilityScoreCaps[ability];
   return cap ? Math.min(cap, value) : value;
 }
@@ -3204,6 +3272,18 @@ function calculateDamageModifiers(target, damage, type) {
   const resistances = [...(target.damageResistances ?? []), ...effects.resistances, ...statusResistances];
   const vulnerabilities = [...(target.damageVulnerabilities ?? []), ...effects.vulnerabilities, ...statusVulnerabilities];
   if ((target.statusEffects ?? []).some((effect) => effect.id === "rage") && ["bludgeoning", "piercing", "slashing"].includes(normalizedType)) {
+    resistances.push(normalizedType);
+  }
+  if ((target.statusEffects ?? []).some((effect) => effect.id === "rage") && target.subclassId === "totem-warrior" && (target.knownTotems ?? []).includes("totemBear") && normalizedType !== "psychic") {
+    resistances.push(normalizedType);
+  }
+  if (target.subclassId === "storm-herald" && (target.level ?? 1) >= 6) {
+    const aura = (target.knownStormAuras ?? [])[0];
+    if (aura === "stormAuraDesert" && normalizedType === "fire") resistances.push(normalizedType);
+    if (aura === "stormAuraSea" && normalizedType === "lightning") resistances.push(normalizedType);
+    if (aura === "stormAuraTundra" && normalizedType === "cold") resistances.push(normalizedType);
+  }
+  if (target.subclassId === "psi-warrior" && (target.level ?? 1) >= 10 && normalizedType === "psychic") {
     resistances.push(normalizedType);
   }
 
@@ -3362,6 +3442,89 @@ function opportunityAttackProfile(fighter) {
   return unarmedDamageProfile(fighter);
 }
 
+function barbarianBeastForm(fighter) {
+  const effect = (fighter?.statusEffects ?? []).find((entry) => String(entry.id ?? "").startsWith("beast-form-"));
+  return effect ? String(effect.id).replace("beast-form-", "") : "";
+}
+
+function barbarianBeastClawUsable(fighter) {
+  const main = equippedItem(fighter, "mainHand");
+  const offHand = equippedItem(fighter, "offHand");
+  if (!main && !offHand) return true;
+  if (!offHand && !main?.properties?.includes("two-handed")) return true;
+  return false;
+}
+
+function barbarianBeastNaturalWeapon(fighter, form = barbarianBeastForm(fighter)) {
+  if (!form) return null;
+  const common = {
+    type: "weapon",
+    category: "simple",
+    weaponRange: "melee",
+    properties: [],
+  };
+  if (form === "bite") {
+    return {
+      ...common,
+      id: "beast-bite",
+      name: "Bestial Bite",
+      damage: { count: 1, sides: 8, bonus: abilityMod(fighter, "str"), type: "piercing" },
+      range: { kind: "melee", feet: 5 },
+    };
+  }
+  if (form === "claws") {
+    return {
+      ...common,
+      id: "beast-claws",
+      name: "Bestial Claws",
+      damage: { count: 1, sides: 6, bonus: abilityMod(fighter, "str"), type: "slashing" },
+      range: { kind: "melee", feet: 5 },
+    };
+  }
+  if (form === "tail") {
+    return {
+      ...common,
+      id: "beast-tail",
+      name: "Bestial Tail",
+      properties: ["reach"],
+      damage: { count: 1, sides: 8, bonus: abilityMod(fighter, "str"), type: "piercing" },
+      range: { kind: "melee", feet: 10 },
+    };
+  }
+  return null;
+}
+
+function attackWeaponChoicesForFighter(fighter) {
+  const choices = [];
+  const weapon = activeWeapon(fighter);
+  choices.push({
+    id: weapon?.id ? `weapon:${weapon.id}` : "unarmed",
+    label: weapon?.name ?? "Unarmed Strike",
+    description: damageProfile(fighter, { weapon }).label,
+    options: { weapon },
+  });
+  const form = barbarianBeastForm(fighter);
+  const naturalWeapon = barbarianBeastNaturalWeapon(fighter, form);
+  if (naturalWeapon && (form !== "claws" || barbarianBeastClawUsable(fighter))) {
+    const formDescriptions = {
+      bite: "1d8 piercing. Heals proficiency bonus once per turn if you are below half HP and damage with the bite.",
+      claws: "1d6 slashing. Once per turn, attacking with claws grants one additional claw attack as part of the Attack action.",
+      tail: "1d8 piercing with 10 ft reach. Also unlocks the Tail reaction AC swipe while raging.",
+    };
+    choices.push({
+      id: `beast:${form}`,
+      label: naturalWeapon.name,
+      description: formDescriptions[form] ?? damageProfile(fighter, { weapon: naturalWeapon }).label,
+      options: {
+        weapon: naturalWeapon,
+        beastFormAttack: form,
+        actionLabel: form === "bite" ? "bites" : form === "tail" ? "lashes with their tail" : "slashes with claws",
+      },
+    });
+  }
+  return choices;
+}
+
 function armorClass(fighter) {
   const sidekickDefenseBonus = isSidekickWarrior(fighter) && (fighter.level ?? 1) >= 10 ? 1 : 0;
   if (isWildShaped(fighter)) {
@@ -3424,6 +3587,18 @@ function hostileFightersAdjacentTo(fighter) {
   });
 }
 
+function classMovementSpeedBonus(fighter) {
+  if (!isPartyHeroId(fighter?.id) || !isClassHero(fighter) || isWildShaped(fighter)) return 0;
+  const level = fighter.level ?? 1;
+  const armor = equippedItem(fighter, "torso");
+  const shield = equippedItem(fighter, "offHand");
+  if (fighter.classId === "barbarian" && level >= 5 && armor?.category !== "heavy") return 10;
+  if (fighter.classId === "monk" && level >= 2 && !armor && shield?.type !== "armor") {
+    return level >= 18 ? 30 : level >= 14 ? 25 : level >= 10 ? 20 : level >= 6 ? 15 : 10;
+  }
+  return 0;
+}
+
 function refreshDerivedStats(fighter) {
   fighter.baseMaxHp = fighter.baseMaxHp ?? fighter.maxHp ?? 1;
   const effects = magicEffects(fighter);
@@ -3433,7 +3608,7 @@ function refreshDerivedStats(fighter) {
   if (fighter.hp > fighter.maxHp) fighter.hp = fighter.maxHp;
   fighter.speedFeet = isWildShaped(fighter)
     ? Math.max(5, (fighter.baseSpeedFeet ?? fighter.speedFeet ?? 30) + statusSpeedBonus)
-    : Math.max(5, (fighter.baseSpeedFeet ?? fighter.speedFeet ?? 30) + (effects.speedBonusFeet ?? 0) + statusSpeedBonus);
+    : Math.max(5, (fighter.baseSpeedFeet ?? fighter.speedFeet ?? 30) + (effects.speedBonusFeet ?? 0) + classMovementSpeedBonus(fighter) + statusSpeedBonus);
   if (fighter.abilityScores) {
     fighter.abilityMods = abilityModsFromScores(fighter.abilityScores);
   }
@@ -3670,7 +3845,7 @@ function aliveFighters() {
 
 function aliveMonsters() {
   const heroIds = new Set([...(state.party?.heroIds ?? ["hero"]), ...(state.party?.rosterIds ?? [])]);
-  return Object.values(state.fighters).filter((fighter) => !heroIds.has(fighter.id) && fighter.alive);
+  return Object.values(state.fighters).filter((fighter) => !heroIds.has(fighter.id) && fighter.alive && fighter.team !== "heroes" && !fighter.friendly);
 }
 
 function activeFighter() {
@@ -3731,6 +3906,14 @@ function normalizeLoadedState(loadedState) {
     log: Array.isArray(loadedState.log) ? loadedState.log : [],
     initiative: Array.isArray(loadedState.initiative) ? loadedState.initiative : [],
   };
+
+  if (normalized.customDungeon) {
+    normalized.customDungeon.storyTriggers = Array.isArray(normalized.customDungeon.storyTriggers) ? normalized.customDungeon.storyTriggers : [];
+    normalized.customDungeon.storyTriggerHistory =
+      normalized.customDungeon.storyTriggerHistory && typeof normalized.customDungeon.storyTriggerHistory === "object"
+        ? normalized.customDungeon.storyTriggerHistory
+        : {};
+  }
 
   normalizeMonsterRoomPositions(normalized);
 
@@ -3850,11 +4033,14 @@ function normalizeLoadedState(loadedState) {
     fighter.expertiseTools = uniqueValues(fighter.expertiseTools ?? []).filter((toolId) => fighter.toolProficiencies.includes(toolId));
     fighter.proficiencySchemaVersion = 1;
     fighter.className = fighter.className ?? classTemplate.className ?? "Fighter";
+    const subclass = subclassDefinitionForFighter(fighter);
+    fighter.subclassName = fighter.subclassName ?? subclass?.name;
     fighter.casterType = fighter.casterType ?? classTemplate.casterType;
-    fighter.spellcastingAbility = fighter.spellcastingAbility ?? classTemplate.spellcastingAbility;
-    fighter.spellPointProgression = fighter.spellPointProgression ?? classTemplate.spellPointProgression;
-    fighter.classSpellList = fighter.classSpellList ?? classTemplate.classSpellList ?? classTemplate.spellList ?? classTemplate.spells ?? [];
-    fighter.classCantripList = fighter.classCantripList ?? classTemplate.classCantripList ?? classTemplate.cantripList ?? [];
+    if (subclass?.casterType) fighter.casterType = subclass.casterType;
+    fighter.spellcastingAbility = fighter.spellcastingAbility ?? subclass?.spellcastingAbility ?? classTemplate.spellcastingAbility;
+    fighter.spellPointProgression = fighter.spellPointProgression ?? subclass?.spellPointProgression ?? classTemplate.spellPointProgression;
+    fighter.classSpellList = fighter.classSpellList ?? subclass?.spellList ?? classTemplate.classSpellList ?? classTemplate.spellList ?? classTemplate.spells ?? [];
+    fighter.classCantripList = fighter.classCantripList ?? subclass?.cantripList ?? classTemplate.classCantripList ?? classTemplate.cantripList ?? [];
     fighter.spells = fighter.spells ?? [];
     fighter.baseAttackAbilityMod = fighter.baseAttackAbilityMod ?? scoreToMod(baseAbilityScore(fighter, attackAbilityForWeapon(activeWeapon(fighter), fighter)));
     fighter.level = fighter.level ?? 1;

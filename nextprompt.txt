@@ -1,15 +1,20 @@
+test:
+Dungeon Creator: make text appear (like intro and outro with pictures) at specific trigger points (open a chest, inspect this furniture, walk into this room, kill this monster…)
+
+added fighter and barbarian subclasses. check every one for correct behaviour.
 subclasses
+
+Sidekicks expert and spellcaster availability
+recruitable sidekicks
+
 Spell sound effects
-
-Bug report function
-
-Dungeon Creator: make text with choices appear at specific trigger points (open a chest, inspect this furniture, walk into this room, kill this monster…)
+add shove and grapple attacks
 
 NPCs with (random) quests
 
 ressource points to get ressources (stone pit, con check, get stone, farmable, as configurable file, spawnable in dungeons at walls)
 packs to find (Medizin Pack Proviant Pack, etc) that can either be sold to merchants or even factions for points or be opened to gain whatever is inside
-add stealthing through rooms a possibilty
+add stealthing through rooms a possibelste
 
 Factions with quests (Monsterhunter, buying pelts etc, elementalists, Gravebinder etc)
 Arena fighting pit for glory

@@ -308,6 +308,16 @@ function createTileButton(position) {
   return tile;
 }
 
+function homeGridPositionFromPointerEvent(event) {
+  const rect = els.room?.getBoundingClientRect();
+  const gridSize = currentGridSize();
+  if (!rect?.width || !rect?.height) return null;
+  return {
+    x: Math.max(0, Math.min(gridSize - 1, Math.floor(((event.clientX - rect.left) / rect.width) * gridSize))),
+    y: Math.max(0, Math.min(gridSize - 1, Math.floor(((event.clientY - rect.top) / rect.height) * gridSize))),
+  };
+}
+
 function buildRoom() {
   els.room.innerHTML = "";
   renderedTileKeys = new Set();
@@ -607,10 +617,16 @@ function renderDungeonObjects() {
     if (objectIsTrap(object) && !object.detected && !object.spent && !object.disarmed) continue;
 
     const element = document.createElement("button");
+    const objectRotation = normalizeObjectRotation(object.rotation ?? 0);
+    const objectSize = objectRotatedSize({
+      width: object.width ?? template.width ?? 1,
+      height: object.height ?? template.height ?? 1,
+      rotation: objectRotation,
+    });
     const behaviorClasses = objectComponents(object)
       .map((component) => `feature-${component.type.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`)
       .join(" ");
-    element.className = `dungeon-object ${object.type} ${behaviorClasses}${object.spent ? " spent" : ""}${object.disarmed ? " disarmed" : ""}${object.detected ? " detected" : ""}`;
+    element.className = `dungeon-object ${object.type} ${behaviorClasses}${homeObjectTypeIsFloorCovering(object.type) ? " floor-covering" : ""}${object.spent ? " spent" : ""}${object.disarmed ? " disarmed" : ""}${object.detected ? " detected" : ""}`;
     element.classList.toggle("attackable-object", selectedHeroCanTargetObject(object));
     element.classList.toggle("selected-target", selectedAttackTarget()?.id === object.id);
     element.type = "button";
@@ -622,9 +638,15 @@ function renderDungeonObjects() {
     icon.className = `dungeon-object-icon${iconStatus === "loaded" ? "" : " hidden"}`;
     icon.alt = "";
     icon.draggable = false;
+    icon.style.transform = `rotate(${objectRotation}deg)`;
+    if (objectRotation === 90 || objectRotation === 270) {
+      icon.style.width = `${Math.min(82, (objectSize.height / objectSize.width) * 82)}%`;
+      icon.style.height = `${Math.min(82, (objectSize.width / objectSize.height) * 82)}%`;
+    }
     const label = document.createElement("span");
     label.className = `dungeon-object-label${iconStatus === "loaded" ? " hidden" : ""}`;
     label.textContent = fallbackSymbol;
+    label.style.transform = `rotate(${objectRotation}deg)`;
     if (iconStatus === "loaded") {
       icon.src = iconPath;
       element.classList.add("has-furniture-icon");
@@ -644,12 +666,15 @@ function renderDungeonObjects() {
     element.append(icon, label);
     element.style.left = `${object.position.x * scaledTileSizePx}px`;
     element.style.top = `${object.position.y * scaledTileSizePx}px`;
-    element.style.width = `${(object.width ?? template.width) * scaledTileSizePx}px`;
-    element.style.height = `${(object.height ?? template.height) * scaledTileSizePx}px`;
+    element.style.width = `${objectSize.width * scaledTileSizePx}px`;
+    element.style.height = `${objectSize.height * scaledTileSizePx}px`;
     element.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
       if (isHomeBuilderOpen() && homeBuildTool === "move" && object.homePlaced) {
+        if (homeMoveSelection && homeObjectTypeIsFloorCovering(object.type)) {
+          if (applyHomeBuildAt(homeGridPositionFromPointerEvent(event) ?? object.position, event)) return;
+        }
         selectHomeMoveTarget({ kind: "object", id: object.id, label: template.name });
         return;
       }
@@ -975,6 +1000,7 @@ function renderHeroStatusCard(element, fighter) {
   const loadoutText = isWildShaped(fighter)
     ? `${escapeHtml(fighter.damage?.weaponName ?? "Beast Attack")} / ${escapeHtml(beast?.name ?? "Beast Form")}`
     : `${escapeHtml(weapon?.name ?? "Unarmed")} / ${escapeHtml(armor?.name ?? "No armor")}`;
+  const classResourceText = importantClassResourceText(fighter);
   element.innerHTML = `
     <div class="fighter-top">
       ${combatantArtworkMarkup(fighter, "sidebar-hero-art")}
@@ -1006,12 +1032,112 @@ function renderHeroStatusCard(element, fighter) {
     <button class="temporary-effects-button" type="button" ${temporaryEffects.length ? "" : "disabled"}>
       Temporary effects <span>${temporaryEffects.length}</span>
     </button>
+    ${classResourceText ? `<div class="wallet-line">${escapeHtml(classResourceText)}</div>` : ""}
     <div class="wallet-line">XP: ${fighter.xp ?? 0} / ${xpForNextLevel(fighter.level ?? 1)} - Hit Dice: ${fighter.hitDiceRemaining ?? 0}/${fighter.level ?? 1}${(fighter.spellPointMax ?? 0) > 0 ? ` - Spell Points: ${fighter.spellPoints ?? 0}/${fighter.spellPointMax ?? 0}` : ""} - Rests: ${state.shortRestsUsed ?? 0}/${state.shortRestLimit ?? 3} - Inventory: ${escapeHtml(moneyText(fighter.inventory.money))} - Hero Tokens: ${fighter.inventory.heroTokens ?? 0}</div>
   `;
 
   element.querySelector(".rename-hero").addEventListener("click", renameHero);
   element.querySelector(".open-inventory").addEventListener("click", showInventoryMenu);
   element.querySelector(".temporary-effects-button").addEventListener("click", () => showTemporaryEffectsInfo(fighter));
+}
+
+function resourcePoolSpent(fighter, poolId) {
+  return fighterAbilityDefinitions(fighter)
+    .filter((ability) => ability.resourcePool === poolId)
+    .reduce((sum, ability) => sum + (fighter?.abilityUses?.[ability.id] ?? 0), 0);
+}
+
+function importantClassResourceText(fighter) {
+  const parts = [];
+  const abilities = fighterAbilityDefinitions(fighter);
+  const poolSummary = (poolId, label) => {
+    const ability = abilities.find((entry) => entry.resourcePool === poolId);
+    if (!ability) return;
+    const max = abilityMaxUses(fighter, ability);
+    const remaining = Math.max(0, max - resourcePoolSpent(fighter, poolId));
+    parts.push(`${label}: ${remaining}/${max}`);
+  };
+  poolSummary("superiority", "Superiority Dice");
+  poolSummary("arcaneShot", "Arcane Shots");
+  poolSummary("psionicEnergy", "Psionic Energy");
+  const namedAbilitySummary = (abilityId, label) => {
+    const ability = abilities.find((entry) => entry.id === abilityId);
+    if (!ability) return;
+    const max = abilityMaxUses(fighter, ability);
+    const remaining = Math.max(0, max - (fighter.abilityUses?.[ability.id] ?? 0));
+    parts.push(`${label}: ${remaining}/${max}`);
+  };
+  namedAbilitySummary("giantsMight", "Giant's Might");
+  namedAbilitySummary("fightingSpirit", "Fighting Spirit");
+  namedAbilitySummary("rage", "Rage");
+  return parts.join(" - ");
+}
+
+function subclassGameplayGuideText(subclass) {
+  return (subclass?.gameplayGuide ?? []).join(" ");
+}
+
+function subclassGameplayGuideMarkup(subclass) {
+  const guide = subclass?.gameplayGuide ?? [];
+  if (!guide.length) return "";
+  return `
+    <div class="subclass-guide">
+      <div class="subclass-guide-title"><span class="choice-info-glyph" aria-hidden="true">i</span><b>How to use this subclass</b></div>
+      ${guide.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
+    </div>
+  `;
+}
+
+function inspectDetailsMarkup({ title, meta = "", body = "", emptyText = "" }) {
+  const content = body || (emptyText ? `<p class="empty-note">${escapeHtml(emptyText)}</p>` : "");
+  if (!content) return "";
+  return `
+    <details class="inspect-collapse">
+      <summary>
+        <span>${escapeHtml(title)}</span>
+        ${meta ? `<small>${escapeHtml(meta)}</small>` : ""}
+      </summary>
+      <div class="inspect-collapse-body">${content}</div>
+    </details>
+  `;
+}
+
+function featureLineMarkup(line) {
+  const [name, ...rest] = String(line ?? "").split(":");
+  if (!rest.length) return `<p class="feature-line"><b>${escapeHtml(name)}</b></p>`;
+  return `<p class="feature-line"><b>${escapeHtml(name)}</b>: ${escapeHtml(rest.join(":").trim())}</p>`;
+}
+
+function spellLevelLabel(level) {
+  return level === 0 ? "Cantrips" : `Level ${level} Spells`;
+}
+
+function groupedSpellsByLevel(spells = []) {
+  return [...spells]
+    .sort((a, b) => spellBaseLevel(a) - spellBaseLevel(b) || a.name.localeCompare(b.name))
+    .reduce((groups, spell) => {
+      const level = spellBaseLevel(spell);
+      if (!groups.has(level)) groups.set(level, []);
+      groups.get(level).push(spell);
+      return groups;
+    }, new Map());
+}
+
+function spellbookInspectMarkup(spells = []) {
+  return Array.from(groupedSpellsByLevel(spells).entries())
+    .map(
+      ([level, levelSpells]) => `
+        <details class="inspect-nested-collapse">
+          <summary>${escapeHtml(spellLevelLabel(level))} <small>${levelSpells.length}</small></summary>
+          <div class="inspect-collapse-body">
+            ${levelSpells
+              .map((spell) => `<p><b>${escapeHtml(spell.name)}</b>${spell.description ? ` ${escapeHtml(spell.description)}` : ""}</p>`)
+              .join("")}
+          </div>
+        </details>
+      `,
+    )
+    .join("");
 }
 
 function temporaryEffectDurationText(effect) {
@@ -1025,7 +1151,9 @@ function temporaryEffectDurationText(effect) {
 function temporaryEffectDetails(effect) {
   const parts = [];
   if (effect.acBonus) parts.push(`${abilityLabel(effect.acBonus)} AC`);
-  if (effect.attackBonus) parts.push(`${abilityLabel(effect.attackBonus)} attack`);
+  if (effect.attackBonus) parts.push(`${abilityLabel(effect.attackBonus)} to attack`);
+  if (effect.spellAttackBonus) parts.push(`${abilityLabel(effect.spellAttackBonus)} to spell attacks`);
+  if (effect.saveDcBonus) parts.push(`${abilityLabel(effect.saveDcBonus)} spell save DC`);
   if (effect.damageBonus) parts.push(`${abilityLabel(effect.damageBonus)} damage`);
   if (effect.skillBonus) parts.push(`${abilityLabel(effect.skillBonus)} skill checks`);
   if (effect.saveBonus) parts.push(`${abilityLabel(effect.saveBonus)} saves`);
@@ -1043,6 +1171,219 @@ function temporaryEffectDetails(effect) {
   if (effect.vulnerabilities?.length) parts.push(`vulnerable to ${effect.vulnerabilities.join(", ")}`);
   if (effect.tempHp) parts.push(`${effect.tempHp} temporary HP`);
   return parts.join("; ");
+}
+
+function restRefreshLabel(refresh) {
+  if (refresh === "shortRest") return "short rest";
+  if (refresh === "longRest") return "long rest";
+  if (refresh === "turn") return "turn";
+  if (refresh === "encounter") return "combat";
+  return "rest";
+}
+
+function scaledSubclassValue(hero, value, fallback = 0) {
+  if (typeof value === "number") return value;
+  if (!value || typeof value !== "object") return fallback;
+  const level = hero?.level ?? 1;
+  let total = Number(value.base ?? 0);
+  if (value.levelMultiplier) total += level * value.levelMultiplier;
+  if (value.proficiencyMultiplier) total += proficiencyBonus(hero) * value.proficiencyMultiplier;
+  if (value.ability && value.abilityMultiplier) total += abilityMod(hero, value.ability) * value.abilityMultiplier;
+  for (const entry of value.byLevel ?? []) {
+    if (level >= (entry.level ?? 1)) total = entry.value;
+  }
+  return Math.max(value.min ?? -Infinity, Math.floor(total));
+}
+
+function scaledSubclassDice(hero, dice = {}) {
+  const level = hero?.level ?? 1;
+  let sides = dice.sides ?? 6;
+  for (const entry of dice.sidesByLevel ?? []) {
+    if (level >= (entry.level ?? 1)) sides = entry.sides;
+  }
+  return {
+    ...dice,
+    count: scaledSubclassValue(hero, dice.count, 1),
+    sides: scaledSubclassValue(hero, sides, 6),
+    bonus: scaledSubclassValue(hero, dice.bonus, 0),
+  };
+}
+
+function scaledSubclassStatus(hero, status = {}) {
+  const scaled = { ...status };
+  for (const key of ["acBonus", "attackBonus", "damageBonus", "skillBonus", "saveBonus", "speedBonusFeet", "maxHpBonus", "extraHitDice", "secondWindBonus", "spellPointBonus", "sneakAttackDiceBonus", "tempHp"]) {
+    if (scaled[key] && typeof scaled[key] === "object") scaled[key] = scaledSubclassValue(hero, scaled[key]);
+  }
+  return scaled;
+}
+
+function scaledSubclassAmount(hero, value) {
+  return scaledSubclassValue(hero, value, Number(value ?? 0) || 0);
+}
+
+function diceFormulaText(hero, dice) {
+  if (!dice) return "";
+  const scaled = scaledSubclassDice(hero, dice);
+  const count = scaled.count ?? 1;
+  const sides = scaled.sides ?? 6;
+  const bonus = scaled.bonus ? ` ${scaled.bonus > 0 ? "+" : "-"} ${Math.abs(scaled.bonus)}` : "";
+  return `${count}d${sides}${bonus}`;
+}
+
+function subclassStatusTargetLabel(kind, target) {
+  if (kind === "partyStatus" || target === "party") return "the party";
+  if (kind === "allyStatus" || target === "ally") return "one ally";
+  if (kind === "targetStatus") return "one enemy";
+  return "you";
+}
+
+function subclassEffectMechanicalText(hero, effect = {}) {
+  if (!effect.kind) return "";
+  if (["selfStatus", "allyStatus", "partyStatus", "targetStatus"].includes(effect.kind)) {
+    const target = subclassStatusTargetLabel(effect.kind, effect.target);
+    const status = scaledSubclassStatus(hero, effect.status ?? {});
+    const details = temporaryEffectDetails(status);
+    const duration = temporaryEffectDurationText(status);
+    return details ? `${target} gains ${details} for ${duration}.` : "";
+  }
+  if (effect.kind === "partyHeal") return `Heals the party for ${scaledSubclassAmount(hero, effect.amount)} HP.`;
+  if (effect.kind === "partyHealStatus") {
+    const status = scaledSubclassStatus(hero, effect.status ?? {});
+    const details = temporaryEffectDetails(status);
+    const duration = temporaryEffectDurationText(status);
+    return `Heals the party for ${scaledSubclassAmount(hero, effect.amount)} HP${details ? `, then the party gains ${details} for ${duration}` : ""}.`;
+  }
+  if (effect.kind === "selfHeal") return `Heals you for ${scaledSubclassAmount(hero, effect.amount)} HP.`;
+  if (effect.kind === "restoreSpellPoints") return `Restores ${scaledSubclassAmount(hero, effect.amount)} spell points.`;
+  if (effect.kind === "bonusAttack") return "Make one extra weapon attack.";
+  if (effect.kind === "summonAlly") return `Summons ${effect.name ?? "an ally"} to fight beside the party${effect.durationRounds ? ` for ${effect.durationRounds} rounds` : " for this fight"}.`;
+  if (effect.kind === "dominateTarget") return `Briefly turns one enemy against its allies for ${effect.durationRounds ?? 1} round; powerful foes are weakened instead.`;
+  if (effect.kind === "interruptSpell") return `Reaction prompt: interrupt an enemy spell-like power${effect.restoreSpellPoints ? ` and restore ${effect.restoreSpellPoints} spell points` : ""}.`;
+  if (effect.kind === "revealTraps") {
+    const details = temporaryEffectDetails(scaledSubclassStatus(hero, effect.status ?? {}));
+    return `Reveals nearby traps${details ? ` and gives you ${details}` : ""}.`;
+  }
+  if (effect.kind === "wildSurge") return "Rolls a useful random wild-magic combat boon.";
+  if (effect.kind === "rider") {
+    const damage = diceFormulaText(hero, effect.dice);
+    const rider = effect.riderStatus ? ` and applies ${effect.riderStatus}` : "";
+    return `Your next weapon hit deals ${damage} ${effect.damageType ?? "damage"}${rider}.`;
+  }
+  if (effect.kind === "damageTarget") {
+    const damage = diceFormulaText(hero, effect.dice);
+    const rider = effect.riderStatus ? ` and applies ${effect.riderStatus}` : "";
+    return `Deals ${damage} ${effect.damageType ?? "damage"} to one enemy${rider}.`;
+  }
+  if (effect.kind === "aoeDamage") {
+    const damage = diceFormulaText(hero, effect.dice);
+    const rider = effect.riderStatus ? ` and applies ${effect.riderStatus}` : "";
+    return `Deals ${damage} ${effect.damageType ?? "damage"} in a ${effect.radius ?? 3}-tile burst${rider}.`;
+  }
+  return "";
+}
+
+function subclassAbilityMechanicalText(hero, ability) {
+  if (!ability) return "";
+  const cost = abilityCostLabel(ability);
+  const maxUses = abilityMaxUses(hero, ability);
+  const refresh = abilityRefreshForFighter(hero, ability);
+  const useText = maxUses > 0 ? `${maxUses}/${restRefreshLabel(refresh)}` : restRefreshLabel(refresh);
+  const pool = ability.resourcePool ? ` Spends ${ability.resourcePool}.` : "";
+  const effectText = subclassEffectMechanicalText(hero, ability.subclassEffect);
+  return `${ability.name}: ${cost}, ${useText}.${pool}${effectText ? ` ${effectText}` : ""}`;
+}
+
+function bardicInspirationDieSidesForLevel(level) {
+  return level >= 15 ? 12 : level >= 10 ? 10 : level >= 5 ? 8 : 6;
+}
+
+function classSneakAttackDiceForLevel(level) {
+  return Math.ceil(Math.max(1, level) / 2);
+}
+
+function classMovementBonusText(hero) {
+  const level = hero?.level ?? 1;
+  if (hero?.classId === "barbarian" && level >= 5) return "Your speed increases by 10 ft while you are not wearing heavy armor.";
+  if (hero?.classId === "monk" && level >= 2) {
+    const bonus = level >= 18 ? 30 : level >= 14 ? 25 : level >= 10 ? 20 : level >= 6 ? 15 : 10;
+    return `Your speed increases by ${bonus} ft while you are not wearing armor or using a shield.`;
+  }
+  return "";
+}
+
+function classFeatureInspectionDescription(hero, feature, abilityDefinitions = []) {
+  const level = hero?.level ?? 1;
+  const name = feature.name ?? "";
+  const ability = abilityDefinitions.find((entry) => entry.name === name || entry.id === name);
+  if (hero?.classId === "barbarian") {
+    if (name === "Rage") return `Bonus action. ${abilityMaxUses(hero, ability)} uses per long rest at this level. For 10 rounds, resist bludgeoning, piercing, and slashing damage and add +${rageDamageBonus(hero)} damage to Strength-based melee hits. The damage bonus becomes +3 at level 9 and +4 at level 16.`;
+    if (name === "Reckless Attack") return "Free once per turn. Gain +2 to attack rolls this turn, but your AC is lowered by 2 until the start of your next turn.";
+    if (name === "Fast Movement") return classMovementBonusText(hero) || feature.description;
+    if (name === "Feral Instinct") return "You roll initiative with advantage, helping you act earlier when combat begins.";
+    if (name === "Brutal Critical") return `On a melee critical hit, roll extra weapon damage dice: +${level >= 17 ? 3 : level >= 13 ? 2 : 1} weapon die at this level.`;
+    if (name === "Primal Champion") return "Your Strength and Constitution each increase by 4, raising attacks, damage, HP, and Constitution-based checks.";
+  }
+  if (hero?.classId === "monk") {
+    if (name === "Martial Arts") return `Your unarmed strikes use a d${monkMartialArtsDamageDie(hero)} Martial Arts die at this level. The die becomes d6 at level 5, d8 at level 11, and d10 at level 17.`;
+    if (name === "Ki") return `You have ${abilityMaxUses(hero, { resourcePool: "ki" })} ki at this level, refreshing on a short or long rest. Spend it on monk techniques such as Flurry of Blows and Patient Defense.`;
+    if (name === "Unarmored Movement") return classMovementBonusText(hero) || feature.description;
+    if (name === "Extra Attack") return "When you take the Attack action, you attack twice.";
+    if (name === "Stunning Strike") return "Bonus action before a hit. Spend 1 ki; your next hit stuns the target for 1 round, locking movement and actions.";
+    if (name === "Perfect Self") return "When combat begins and all your ki is spent, you automatically recover 4 ki.";
+  }
+  if (hero?.classId === "paladin") {
+    if (name === "Lay on Hands") return `Action. Your healing pool is ${abilityMaxUses(hero, ability)} HP at this level, equal to 5 x paladin level. Choose yourself or an adjacent wounded ally, then spend up to the remaining pool.`;
+    if (name === "Divine Smite") return "Bonus action before a weapon hit. Spend up to 5 spell points; the next hit deals radiant damage starting at 2d8 and increasing with more spell points.";
+    if (name === "Aura of Protection") return `Allies within 10 ft add +${Math.max(1, abilityMod(hero, "cha"))} to saving throws from your Charisma.`;
+  }
+  if (hero?.classId === "rogue") {
+    if (name === "Sneak Attack") return `Once per turn, deal +${classSneakAttackDiceForLevel(level)}d6 damage with a finesse or ranged weapon when you have advantage or an ally is next to the target.`;
+    if (name === "Cunning Action") return "Bonus action each turn: Dash, Disengage, or Hide.";
+    if (name === "Uncanny Dodge") return "Reaction once per round: when an attack hits you, halve that attack's damage.";
+    if (name === "Evasion") return "On Dexterity saving throws against area damage, take no damage on a success and half damage on a failure.";
+    if (name === "Reliable Talent") return "When you make a proficient skill check, d20 rolls from 2 to 9 count as 10.";
+  }
+  if (hero?.classId === "bard") {
+    if (name === "Bardic Inspiration") return `Bonus action. ${abilityMaxUses(hero, ability)} uses per ${restRefreshLabel(abilityRefreshForFighter(hero, ability))}. Give an ally a d${bardicInspirationDieSidesForLevel(level)} they can add to a missed attack or failed save. The die becomes d8 at level 5, d10 at level 10, and d12 at level 15.`;
+    if (name === "Jack of All Trades") return `Add +${Math.floor(proficiencyBonus(hero) / 2)} to skill checks where you are not proficient.`;
+    if (name === "Font of Inspiration") return "Starting at level 5, Bardic Inspiration refreshes on a short rest instead of only a long rest.";
+  }
+  if (hero?.classId === "cleric") {
+    if (name === "Channel Divinity") return `Action. ${abilityMaxUses(hero, ability)} use${abilityMaxUses(hero, ability) === 1 ? "" : "s"} per short rest. This version releases a radiant burst against nearby enemies; domains may add other uses.`;
+    if (name === "Blessed Strike") return "Once per turn, your weapon hit or damaging cantrip adds 1d8 extra divine damage.";
+  }
+  if (hero?.classId === "druid") {
+    if (name === "Wild Shape") return "Bonus action. 2 uses per short rest. Transform into an unlocked beast form; beast HP absorbs damage first, and overflow carries over when you revert.";
+  }
+  if (hero?.classId === "wizard") {
+    if (name === "Arcane Recovery") return `Free action once per long rest. Recover ${Math.max(1, Math.ceil(level / 2))} spell point${Math.max(1, Math.ceil(level / 2)) === 1 ? "" : "s"}.`;
+    if (name === "Spell Mastery") return "Free action once per short rest at level 18. Recover 4 spell points for your mastered low-level magic.";
+    if (name === "Signature Spells") return "Free action once per long rest at level 20. Recover 10 spell points for your favored wizard spells.";
+  }
+  if (hero?.classId === "warlock") {
+    if (name === "Pact Magic") return `Your spell points are pact magic and come back on a short rest. Current maximum: ${spellPointMaximum(hero)} SP.`;
+    if (name === "Eldritch Blast") return "Action. Fire your signature force blast; it gains more beams as warlock level rises.";
+    if (name === "Mystic Arcanum") return "Action once per long rest at level 11. Blast one visible enemy for 6d8 force damage and briefly banish it.";
+    if (name === "Eldritch Master") return "Action once per long rest at level 20. Restore pact spell points to full.";
+  }
+  if (ability) return `${feature.description ?? ""} ${subclassAbilityMechanicalText(hero, ability)}`.trim();
+  return feature.description ?? "";
+}
+
+function subclassFeatureInspectionDescription(hero, subclass, feature) {
+  const base = feature.description ?? "";
+  const featureName = String(feature.name ?? "").toLowerCase();
+  const relatedAbilities = (subclass?.abilities ?? []).filter((ability) => {
+    if ((ability.level ?? 1) !== (feature.level ?? 1)) return false;
+    const abilityName = String(ability.name ?? "").toLowerCase();
+    return abilityName === featureName || abilityName.includes(featureName) || featureName.includes(abilityName);
+  });
+  const mechanicalText = relatedAbilities
+    .map((ability) => subclassAbilityMechanicalText(hero, ability))
+    .filter(Boolean)
+    .join(" ");
+  if (!mechanicalText) return base;
+  return `${base} ${mechanicalText}`;
 }
 
 function temporaryEffectsForFighter(fighter) {
@@ -1186,6 +1527,13 @@ function showCombatantInfo(fighter) {
   const abilities = ["str", "dex", "con", "int", "wis", "cha"];
   const heroTemplate = heroView ? getHeroTemplate(fighter.classId) : null;
   const racialTraits = heroView && isClassHero(fighter) ? activeRaceFeatureLinesForFighter(fighter).slice(2) : [];
+  const subclass = heroView ? subclassDefinitionForHero(fighter) : null;
+  const subclassFeatures = subclass
+    ? (subclass.features ?? []).filter((feature) => (feature.level ?? 1) <= (fighter.level ?? 1))
+    : [];
+  const classAbilityDefinitions = heroView
+    ? (getHeroTemplate(fighter.classId)?.abilities ?? fighter.abilities ?? [])
+    : [];
   const classFeatures = heroView
     ? Array.from(
         new Map(
@@ -1193,10 +1541,10 @@ function showCombatantInfo(fighter) {
             ...(heroTemplate?.classFeatures ?? [])
               .filter((feature) => (feature.level ?? 1) <= (fighter.level ?? 1))
               .map((feature) => {
-                const ability = fighterAbilityDefinitions(fighter).find((entry) => entry.name === feature.name);
+                const ability = classAbilityDefinitions.find((entry) => entry.name === feature.name);
                 return [feature.name, { name: feature.name, description: feature.description ?? ability?.description ?? "" }];
               }),
-            ...fighterAbilityDefinitions(fighter)
+            ...classAbilityDefinitions
               .filter((ability) => (ability.level ?? 1) <= (fighter.level ?? 1))
               .map((ability) => [ability.name, { name: ability.name, description: ability.description ?? "" }]),
           ],
@@ -1241,32 +1589,49 @@ function showCombatantInfo(fighter) {
               )
               .join("")}
           </div>
+          ${inspectDetailsMarkup({
+            title: "Racial Features",
+            meta: racialTraits.length ? `${racialTraits.length}` : "",
+            body: racialTraits.map(featureLineMarkup).join(""),
+          })}
+          ${inspectDetailsMarkup({
+            title: "Class Features",
+            meta: classFeatures.length ? `${classFeatures.length}` : "",
+            body: classFeatures
+              .map((feature) => {
+                const description = classFeatureInspectionDescription(fighter, feature, classAbilityDefinitions);
+                return `<p><b>${escapeHtml(feature.name)}</b>${description ? ` ${escapeHtml(description)}` : ""}</p>`;
+              })
+              .join(""),
+          })}
           ${
-            racialTraits.length || classFeatures.length
-              ? `
-                <section class="inspect-section">
-                  <h3>Traits</h3>
-                  ${racialTraits.map((trait) => `<p><b>Racial</b> ${escapeHtml(trait)}</p>`).join("")}
-                  ${classFeatures
-                    .map(
-                      (feature) =>
-                        `<p><b>${escapeHtml(feature.name)}</b>${feature.description ? ` ${escapeHtml(feature.description)}` : ""}</p>`,
-                    )
-                    .join("")}
-                </section>
-              `
+            subclass
+              ? inspectDetailsMarkup({
+                  title: `Subclass Features: ${fullSubclassName(subclass)}`,
+                  meta: `${subclassFeatures.length}`,
+                  body: `
+                    ${subclassGameplayGuideMarkup(subclass)}
+                    ${
+                      subclassFeatures.length
+                        ? subclassFeatures
+                            .map(
+                              (feature) => {
+                                const description = subclassFeatureInspectionDescription(fighter, subclass, feature);
+                                return `<p><b>${escapeHtml(feature.name)}</b> <small>Level ${feature.level ?? 1}</small>${description ? ` ${escapeHtml(description)}` : ""}</p>`;
+                              },
+                            )
+                            .join("")
+                        : `<p class="empty-note">No subclass features unlocked yet.</p>`
+                    }
+                  `,
+                })
               : ""
           }
-          ${
-            spells.length
-              ? `
-                <section class="inspect-section">
-                  <h3>Spells</h3>
-                  ${spells.map((spell) => `<p><b>${escapeHtml(spell.name)}</b>${spell.description ? ` ${escapeHtml(spell.description)}` : ""}</p>`).join("")}
-                </section>
-              `
-              : ""
-          }
+          ${inspectDetailsMarkup({
+            title: "Spellbook",
+            meta: spells.length ? `${spells.length} spells - ${fighter.spellPoints ?? 0}/${fighter.spellPointMax ?? 0} SP` : "",
+            body: spells.length ? spellbookInspectMarkup(spells) : "",
+          })}
         `
         : `
           <p class="empty-note">${escapeHtml(fighter.description ?? fighter.role ?? "A hostile creature.")}</p>
@@ -1313,10 +1678,11 @@ function showDungeonObjectInfo(object) {
       ? { name: "Home Chest", kind: "container", width: 1, height: 1, blocksMovement: true, interactable: true, description: "Your home storage chest." }
       : object.type === "dungeonExit"
         ? { name: "Dungeon Exit", kind: "exit", width: 1, height: 1, blocksMovement: false, interactable: true, description: "The way out. Reach it after clearing the exit room to complete the dungeon." }
-        : object.type === "homeExit"
-          ? { name: "Home Door", kind: "exit", width: 1, height: 1, blocksMovement: false, interactable: true, description: "The door leading from home to the next dungeon." }
+      : object.type === "homeExit"
+        ? { name: "Home Door", kind: "exit", width: 1, height: 1, blocksMovement: false, interactable: true, description: "The door leading from home to the next dungeon." }
       : objectTemplate(object.type);
   if (!template) return;
+  void triggerCustomDungeonStory("inspectObject", { objectId: object.id, object });
   const hero = activeHero();
   const objectInteractionAdjacent = (cell) => Math.max(Math.abs(hero.position.x - cell.x), Math.abs(hero.position.y - cell.y)) === 1;
   const objectAdjacent =
@@ -1608,6 +1974,7 @@ let homeBuildTool = null;
 let homeBuildFurnitureId = "home-bookshelf";
 let homeBuildSearch = "";
 let homeBuildPaintColor = "#5a4638";
+let homeBuildRotation = 0;
 let homeBuilderSnapshot = null;
 let homeMoveSelection = null;
 let homePaintPointerId = null;
@@ -1657,15 +2024,31 @@ function homeCellKeys() {
   return new Set((state.home?.cells ?? []).map(positionKey));
 }
 
-function homeObjectOverlaps(type, position, ignoreId = null) {
+function homeObjectCellsForType(type, position, rotation = 0) {
+  const template = objectTemplate(type);
+  if (!template) return [];
+  const { width, height } = objectRotatedSize({ width: template.width ?? 1, height: template.height ?? 1, rotation });
+  return Array.from({ length: width * height }, (_, index) => ({ x: position.x + (index % width), y: position.y + Math.floor(index / width) }));
+}
+
+function homeObjectOverlaps(type, position, ignoreId = null, rotation = 0) {
   const template = objectTemplate(type);
   if (!template) return true;
-  const width = template.width ?? 1;
-  const height = template.height ?? 1;
   const keys = homeCellKeys();
-  const cells = Array.from({ length: width * height }, (_, index) => ({ x: position.x + (index % width), y: position.y + Math.floor(index / width) }));
+  const cells = homeObjectCellsForType(type, position, rotation);
   if (cells.some((cell) => !keys.has(positionKey(cell)))) return true;
-  return (state.dungeonObjects ?? []).some((object) => object.id !== ignoreId && objectCells({ ...object, type: object.type }).some((cell) => cells.some((candidate) => positionKey(candidate) === positionKey(cell))));
+  const candidateIsCovering = homeObjectTypeIsFloorCovering(type);
+  return (state.dungeonObjects ?? []).some((object) => {
+    if (object.id === ignoreId) return false;
+    const existingIsCovering = homeObjectTypeIsFloorCovering(object.type);
+    if (candidateIsCovering !== existingIsCovering) return false;
+    return objectCells({ ...object, type: object.type }).some((cell) => cells.some((candidate) => positionKey(candidate) === positionKey(cell)));
+  });
+}
+
+function homeObjectTypeIsFloorCovering(type, template = objectTemplate(type)) {
+  const tags = template?.tags ?? [];
+  return Boolean(objectComponent(type, "homeDecor") && !template?.blocksMovement && (tags.includes("rug") || tags.includes("floor")));
 }
 
 function homeDoorEdgeFromEvent(position, event) {
@@ -1801,6 +2184,27 @@ function selectHomeMoveTarget(selection) {
   return true;
 }
 
+function rotateHomeFurnitureSelection() {
+  if (!isHomeBuilderOpen()) return;
+  if (homeMoveSelection?.kind === "object") {
+    const object = (state.dungeonObjects ?? []).find((entry) => entry.id === homeMoveSelection.id);
+    if (!object) return;
+    const nextRotation = normalizeObjectRotation((object.rotation ?? 0) + 90);
+    if (homeObjectOverlaps(object.type, object.position, object.id, nextRotation)) {
+      addLog("That rotation needs open home floor.", "important");
+      renderHomeBuilder();
+      return;
+    }
+    object.rotation = nextRotation;
+    syncHomeLayoutToDungeon();
+    renderHomeBuilder();
+    render();
+    return;
+  }
+  homeBuildRotation = normalizeObjectRotation(homeBuildRotation + 90);
+  renderHomeBuilder();
+}
+
 function homeFurnitureCatalogueEntries() {
   const query = homeBuildSearch.trim().toLowerCase();
   return window.DungeonContent
@@ -1808,12 +2212,13 @@ function homeFurnitureCatalogueEntries() {
     .filter((entry) => entry.kind !== "trap")
     .filter(homeCatalogueEntryVisible)
     .filter((entry) => !query || `${entry.name} ${entry.id} ${(entry.tags ?? []).join(" ")}`.toLowerCase().includes(query))
-    .slice(0, 72);
+    .slice(0, 180);
 }
 
 function homeFurnitureCatalogue() {
   const groups = new Map([
     ["homeUtility", { label: "Home Utility", entries: [] }],
+    ["homeDecor", { label: "Home Decor", entries: [] }],
     ["guardroomDecor", { label: "Guardroom Decor", entries: [] }],
     ["natureDecor", { label: "Nature Decor", entries: [] }],
     ["misc", { label: "Misc", entries: [] }],
@@ -1825,6 +2230,7 @@ function homeFurnitureCatalogue() {
 }
 
 function homeFurnitureCategory(entry) {
+  if (objectComponent(entry.id, "homeDecor") || entry.tags?.includes("home-decor")) return "homeDecor";
   if (homeObjectTypeIsStorage(entry.id, entry) || entry.tags?.includes("bed") || entry.tags?.includes("home") || objectComponent(entry.id, "homeBed")) return "homeUtility";
   if (entry.id === "bigRock") return "natureDecor";
   if (
@@ -1871,6 +2277,8 @@ function homeBuilderNewObjectCostCp() {
 function homeFurnitureBuildCostCp(type) {
   const bed = objectComponent(type, "homeBed");
   if (bed?.priceCp !== undefined) return bed.priceCp;
+  const decor = objectComponent(type, "homeDecor");
+  if (decor?.priceCp !== undefined) return decor.priceCp;
   return homeObjectTypeIsStorage(type) ? homeStorageFurnitureCostCp : 0;
 }
 
@@ -1892,6 +2300,8 @@ function renderHomeBuilder() {
   if (!entries.some((entry) => entry.id === homeBuildFurnitureId)) homeBuildFurnitureId = entries[0]?.id ?? "home-bookshelf";
   const normalizedPaintColor = normalizeHomeColor(homeBuildPaintColor) ?? homePaintPalette[0];
   const showPaintTools = ["paintFloor", "paintWall"].includes(homeBuildTool);
+  const movingObject = homeMoveSelection?.kind === "object" ? (state.dungeonObjects ?? []).find((object) => object.id === homeMoveSelection.id) : null;
+  const activeRotation = normalizeObjectRotation(movingObject?.rotation ?? homeBuildRotation);
   const buildCostCp = homeBuilderCostCp();
   const canAffordBuild = homeBuilderCanAfford();
   const costText = buildCostCp > 0 ? moneyText(cpToMoney(buildCostCp)) : "Free";
@@ -1911,6 +2321,9 @@ function renderHomeBuilder() {
       ]
         .map(([tool, label]) => `<button type="button" data-action="home-build-tool" data-tool="${tool}" class="${homeBuildTool === tool ? "active" : ""}">${label}</button>`)
         .join("")}
+    </section>
+    <section class="home-builder-tools" aria-label="Furniture rotation">
+      <button type="button" data-action="home-rotate-furniture" ${homeBuildTool === "furniture" || movingObject ? "" : "disabled"}>Rotate ${activeRotation}°</button>
     </section>
     ${
       showPaintTools
@@ -1974,6 +2387,7 @@ function showHomeBuilder() {
   syncHomeLayoutToDungeon();
   homeBuilderSnapshot = cloneData(state.home);
   homeBuildTool = null;
+  homeBuildRotation = 0;
   homeMoveSelection = null;
   homePaintPointerId = null;
   renderHomeBuilder();
@@ -2001,6 +2415,7 @@ function restoreHomeBuilderChanges() {
   state.home = cloneData(homeBuilderSnapshot);
   state.dungeonObjects = cloneData(state.home.objects ?? []);
   homeMoveSelection = null;
+  homeBuildRotation = 0;
   homePaintPointerId = null;
   syncHomeLayoutToDungeon();
   addLog("Home layout restored to the state from when the builder opened.", "important");
@@ -2047,7 +2462,8 @@ function applyHomeBuildAt(position, event = null) {
     doors.push(door);
     state.home.doors = doors;
   } else if (homeBuildTool === "furniture") {
-    if (!cells.has(key) || homeObjectOverlaps(homeBuildFurnitureId, position)) {
+    const rotation = normalizeObjectRotation(homeBuildRotation);
+    if (!cells.has(key) || homeObjectOverlaps(homeBuildFurnitureId, position, null, rotation)) {
       addLog("That furniture needs open home floor.", "important");
       renderHomeBuilder();
       return true;
@@ -2060,6 +2476,7 @@ function applyHomeBuildAt(position, event = null) {
       position: { ...position },
       width: template.width ?? 1,
       height: template.height ?? 1,
+      rotation,
       homePlaced: true,
       items: [],
     });
@@ -2079,7 +2496,7 @@ function applyHomeBuildAt(position, event = null) {
       state.home.specialPositions = { ...(state.home.specialPositions ?? {}), [homeMoveSelection.id]: { ...position } };
     } else if (homeMoveSelection.kind === "object") {
       const object = (state.dungeonObjects ?? []).find((entry) => entry.id === homeMoveSelection.id);
-      if (!object || homeObjectOverlaps(object.type, position, object.id)) {
+      if (!object || homeObjectOverlaps(object.type, position, object.id, object.rotation ?? 0)) {
         addLog("That furniture needs open home floor.", "important");
         return true;
       }
@@ -2414,6 +2831,8 @@ function homeDoorBlocksComfortBetween(from, to) {
 function homeObjectComfortPoints(object) {
   const bed = objectComponent(object.type, "homeBed");
   if (bed) return bed.comfort ?? 0;
+  const decor = objectComponent(object.type, "homeDecor");
+  if (decor) return Math.max(0, Math.min(10, decor.comfort ?? 1));
   if (homeComfortScores[object.type] !== undefined) return homeComfortScores[object.type];
   return homeObjectIsComfortDecor(object) ? 1 : 0;
 }
@@ -2557,10 +2976,10 @@ function freeCaptiveCreature(objectId) {
   }
 
   const rollResult = rollD20ForFighter(hero);
-  const roll = rollResult.roll;
   const guidance = guidanceSkillBonus();
   const skillId = component.skill ?? "animal-handling";
   const ability = component.ability ?? skillDefinitions[skillId]?.ability ?? "wis";
+  const roll = reliableTalentRoll(hero, skillId, rollResult.roll);
   const bonus = skillCheckBonus(hero, ability, skillId);
   const total = roll + bonus + guidance;
   const dc = component.dc ?? 13;
@@ -2609,6 +3028,11 @@ function roleOptionsMarkup(selectedRole) {
     .join("");
 }
 
+function planningClassLabel(hero) {
+  const subclass = hero?.subclassName ? ` (${hero.subclassName})` : "";
+  return `Level ${hero?.level ?? 1} ${hero?.className ?? "Hero"}${subclass}`;
+}
+
 function showPlanningTableInfo() {
   els.fighterInfo.classList.remove("home-builder-dock");
   const activeIds = state.party?.heroIds ?? ["hero"];
@@ -2630,7 +3054,7 @@ function showPlanningTableInfo() {
       <div class="planning-slot">
         <div>
           <b>${index + 1}. ${hero ? escapeHtml(hero.name) : "Empty Slot"}</b>
-          <span>${hero ? `${hero.dead ? "Dead" : `Level ${hero.level ?? 1} ${hero.className ?? "Hero"}`}${index === 0 ? " - Main" : ""}` : "Add a hero from the roster"}</span>
+          <span>${hero ? `${hero.dead ? "Dead" : escapeHtml(planningClassLabel(hero))}${index === 0 ? " - Main" : ""}` : "Add a hero from the roster"}</span>
         </div>
         ${
           hero
@@ -2670,7 +3094,7 @@ function showPlanningTableInfo() {
             <div class="planning-slot bench-slot">
               <div>
                 <b>${escapeHtml(hero.name)}</b>
-                <span>${hero.dead ? "Dead" : classHero ? `Level ${hero.level ?? 1} ${hero.className ?? "Hero"}` : `${escapeHtml(hero.className ?? "Ally")}${hero.companionControl === "ai" ? " - AI controlled" : " - Player controlled"}`}</span>
+                <span>${hero.dead ? "Dead" : classHero ? escapeHtml(planningClassLabel(hero)) : `${escapeHtml(hero.className ?? "Ally")}${hero.companionControl === "ai" ? " - AI controlled" : " - Player controlled"}`}</span>
               </div>
               ${classHero ? `<select data-action="party-role" data-hero="${escapeAttribute(hero.id)}">${roleOptionsMarkup(partyRoleFor(hero))}</select>` : ""}
               <button type="button" data-action="add-party-hero" data-hero="${escapeAttribute(hero.id)}" ${(classHero && activeClassIds.length >= 4) || hero.dead ? "disabled" : ""}>Add</button>
@@ -2953,6 +3377,7 @@ function takeObjectItem(objectId, itemId) {
   const item = (object.items ?? []).find((entry) => entry.id === itemId);
   if (!item) return;
 
+  void triggerCustomDungeonStory("openObject", { objectId: object.id, object });
   object.items = (object.items ?? []).filter((entry) => entry.id !== itemId);
   addItemToInventory(hero, item, "object-stack");
   addLog(`${hero.name} takes ${item.name} from ${objectTemplate(object.type)?.name ?? "the feature"}.`, "important");
@@ -2974,7 +3399,7 @@ function pickObjectLock(objectId) {
   }
 
   const rollResult = rollD20ForFighter(hero);
-  const roll = rollResult.roll;
+  const roll = reliableTalentRoll(hero, "disarm", rollResult.roll);
   const bonus = thievesToolsCheckBonus(hero);
   const total = roll + bonus;
   const dc = object.lockDc ?? 12;
@@ -3035,7 +3460,7 @@ function disarmTrap(objectId) {
   if (trap.disarmAttemptsByHero[hero.id]) return;
 
   const rollResult = rollD20ForFighter(hero);
-  const roll = rollResult.roll;
+  const roll = reliableTalentRoll(hero, "investigation", rollResult.roll);
   const bonus = skillCheckBonus(hero, "int", "disarm");
   const guidance = guidanceSkillBonus();
   const total = roll + bonus + guidance;
@@ -3268,7 +3693,7 @@ function itemDetails(item) {
       const status = item.use.status;
       const parts = [];
       if (status.acBonus) parts.push(`${abilityLabel(status.acBonus)} AC`);
-      if (status.attackBonus) parts.push(`${abilityLabel(status.attackBonus)} attack`);
+      if (status.attackBonus) parts.push(`${abilityLabel(status.attackBonus)} to attack`);
       if (status.damageBonus) parts.push(`${abilityLabel(status.damageBonus)} damage`);
       if (status.saveBonus) parts.push(`${abilityLabel(status.saveBonus)} saves`);
       if (status.speedBonusFeet) parts.push(`${abilityLabel(status.speedBonusFeet)} ft speed`);
@@ -3338,7 +3763,7 @@ function magicItemDetails(item) {
   const effects = magic.effects ?? {};
   const parts = [];
   if (magic.rarity) parts.push(magic.rarity);
-  if (magic.attackBonus) parts.push(`+${magic.attackBonus} attack`);
+  if (magic.attackBonus) parts.push(`+${magic.attackBonus} to attack`);
   if (magic.damageBonus) parts.push(`+${magic.damageBonus} damage`);
   if (effects.acBonus) parts.push(`+${effects.acBonus} AC`);
   if (effects.maxHpBonus) parts.push(`+${effects.maxHpBonus} max HP`);
@@ -4404,6 +4829,13 @@ function canUseFighterAbility(fighter, ability) {
   return !fighterAbilityUnavailableReason(fighter, ability);
 }
 
+function abilityResourceSpent(fighter, ability) {
+  if (!ability?.resourcePool) return fighter?.abilityUses?.[ability?.id] ?? 0;
+  return fighterAbilityDefinitions(fighter)
+    .filter((entry) => entry.resourcePool === ability.resourcePool)
+    .reduce((sum, entry) => sum + (fighter?.abilityUses?.[entry.id] ?? 0), 0);
+}
+
 function fighterAbilityUnavailableReason(fighter, ability) {
   if (!heroCanAct(fighter) || !ability) return "Unable to act.";
   if (ability.id === "wildShape" && isWildShaped(fighter)) {
@@ -4411,15 +4843,44 @@ function fighterAbilityUnavailableReason(fighter, ability) {
     if (state.mode === "combat" && ability.resource === "bonusAction" && !fighter.hasBonusAction) return "Bonus action already used.";
     return "";
   }
-  if ((fighter.abilityUses?.[ability.id] ?? 0) >= abilityMaxUses(fighter, ability)) return "No uses remaining.";
+  if (abilityResourceSpent(fighter, ability) >= abilityMaxUses(fighter, ability)) return "No uses remaining.";
   if (ability.id === "rage" && fighterWearsHeavyArmor(fighter)) return "Cannot rage while wearing heavy armor.";
   if (ability.id === "layOnHands" && !partyHeroes().some((target) => !target.dead && (target.id === fighter.id || hasMeleeAccess(fighter, target)) && (target.hp ?? 0) < (target.maxHp ?? 0))) {
     return "No wounded adjacent hero.";
   }
   if (ability.id === "actionSurge" && state.mode !== "combat") return "Only usable in combat.";
+  if (["battleragerSpikes", "battleragerCharge", "frenzy", "elementalCleaver", "mightyImpel", "stormAuraPulse", "totemSurge", "unstableBacklash"].includes(ability.id) && !isBarbarianRaging(fighter)) {
+    return "Requires Rage.";
+  }
   if (ability.id === "uncannyDodge") return "Triggers as a reaction when this hero is hit.";
   if (ability.id === "indomitable") return "Triggers automatically when this companion fails a saving throw.";
   if (ability.id === "goliathStoneEndurance") return "Triggers as a reaction when this hero takes damage.";
+  if (ability.subclassEffect?.kind === "interruptSpell") return "Triggers as a reaction prompt when an enemy uses a spell-like power.";
+  if (ability.id === "cuttingWords") return "Triggers as a reaction prompt when an enemy attack threatens a hero.";
+  if (
+    [
+      "maneuverParry",
+      "maneuverRiposte",
+      "maneuverBrace",
+      "protectiveField",
+      "wardingManeuver",
+      "runicShield",
+      "cloudRune",
+      "stoneRune",
+      "shadowMartyr",
+      "spiritShield",
+      "retaliation",
+      "unstableBacklash",
+      "wrathOfTheStorm",
+      "tipsySway",
+      "soulOfVengeance",
+      "multiattackDefense",
+      "bendLuck",
+      "armorOfHexes",
+      "entropicWard",
+    ].includes(ability.id)
+  ) return "Triggers as a reaction prompt when its condition happens.";
+  if (ability.id === "maneuverAmbush") return "Triggers as a prompt when initiative is rolled.";
   if (ability.id === "steadyAim" && state.mode !== "combat") return "Only usable in combat.";
   if (ability.id === "steadyAim" && ((fighter.lastMoveFeet ?? 0) > 0 || (fighter.movementLeft ?? 0) < Math.floor(fighter.speedFeet / feetPerSquare))) return "Steady Aim requires not moving this turn.";
   if (ability.id === "eldritchBlast" && state.mode !== "combat") return "Only usable in combat.";
@@ -4438,69 +4899,234 @@ function hasSpentShortRestAbility(fighter) {
   return availableFighterAbilities(fighter).some((ability) => (fighter.abilityUses?.[ability.id] ?? 0) > 0 && ability.refresh === "shortRest");
 }
 
+function abilityFavoriteKey(ability) {
+  return `ability:${ability?.id ?? ""}`;
+}
+
+function spellFavoriteKey(spell) {
+  return `spell:${spell?.id ?? ""}`;
+}
+
+function heroAbilityFavorites(hero) {
+  if (!hero) return [];
+  hero.abilityFavorites = uniqueValues((hero.abilityFavorites ?? []).filter(Boolean));
+  return hero.abilityFavorites;
+}
+
+function abilityIsFavorite(hero, key) {
+  return heroAbilityFavorites(hero).includes(key);
+}
+
+function favoriteButtonMarkup(hero, key) {
+  const active = abilityIsFavorite(hero, key);
+  return `<button type="button" class="favorite-toggle ${active ? "active" : ""}" data-action="toggle-ability-favorite" data-favorite-key="${escapeAttribute(key)}" title="${active ? "Remove favorite" : "Add favorite"}" aria-label="${active ? "Remove favorite" : "Add favorite"}">${active ? "&hearts;" : "&#9825;"}</button>`;
+}
+
+function favoriteMoveButtonsMarkup(key, favoriteIndex = null, favoriteTotal = 0) {
+  if (favoriteIndex === null) return "";
+  return `
+    <button type="button" class="favorite-move" data-action="move-ability-favorite" data-favorite-key="${escapeAttribute(key)}" data-direction="-1" ${favoriteIndex <= 0 ? "disabled" : ""} title="Move favorite up" aria-label="Move favorite up">↑</button>
+    <button type="button" class="favorite-move" data-action="move-ability-favorite" data-favorite-key="${escapeAttribute(key)}" data-direction="1" ${favoriteIndex >= favoriteTotal - 1 ? "disabled" : ""} title="Move favorite down" aria-label="Move favorite down">↓</button>
+  `;
+}
+
+function abilityCostLabel(ability) {
+  if (ability?.resource === "bonusAction") return "Bonus Action";
+  if (ability?.resource === "reaction") return "Reaction";
+  if (ability?.resource === "action") return "Action";
+  return "Free";
+}
+
+function abilityRowMarkup(hero, ability, { favoriteIndex = null, favoriteTotal = 0 } = {}) {
+  const used = abilityResourceSpent(hero, ability);
+  const maxUses = abilityMaxUses(hero, ability);
+  const unavailableReason = fighterAbilityUnavailableReason(hero, ability);
+  const disabled = unavailableReason ? "disabled" : "";
+  const buttonLabel = ability.id === "wildShape" && isWildShaped(hero) ? "Revert" : "Use";
+  const favoriteKey = abilityFavoriteKey(ability);
+  return `
+    <div class="use-item-row">
+      <div>
+        <b>${escapeHtml(ability.name)} <small class="ability-cost">${escapeHtml(abilityCostLabel(ability))}</small></b>
+        <span>${escapeHtml(ability.description)} Uses: ${used}/${maxUses}.</span>
+        ${unavailableReason ? `<small class="ability-warning">${escapeHtml(unavailableReason)}</small>` : ""}
+      </div>
+      <div class="use-item-actions">
+        ${favoriteMoveButtonsMarkup(favoriteKey, favoriteIndex, favoriteTotal)}
+        ${favoriteButtonMarkup(hero, favoriteKey)}
+        <button type="button" data-action="use-fighter-ability" data-ability="${escapeAttribute(ability.id)}" ${disabled}>${buttonLabel}</button>
+      </div>
+    </div>
+  `;
+}
+
+function spellRowMarkup(hero, spell, { favoriteIndex = null, favoriteTotal = 0 } = {}) {
+  const castLevels = spellAvailableCastLevels(hero, spell);
+  const favoriteKey = spellFavoriteKey(spell);
+  const castButtons = castLevels
+    .map((castLevel) => {
+      const castSpell = spellWithCastLevel(spell, castLevel);
+      const disabled = canCastSpell(hero, castSpell) ? "" : "disabled";
+      const upcast = castLevel > spellBaseLevel(spell) ? ` L${castLevel}` : "";
+      return `<button type="button" data-action="cast-spell" data-spell="${escapeAttribute(spell.id)}" data-cast-level="${castLevel}" ${disabled}>${spellBaseLevel(spell) === 0 ? "Use" : `Cast${upcast}`}</button>`;
+    })
+    .join("");
+  const costText = spellBaseLevel(spell) === 0 ? "At will" : castLevels.map((level) => `L${level}: ${spellPointCost(spellWithCastLevel(spell, level))} SP`).join(", ");
+  const concentration = spell.concentration ? " Concentration." : "";
+  const levelText = spellBaseLevel(spell) === 0 ? "Cantrip" : `L${spellBaseLevel(spell)}`;
+  return `
+    <div class="use-item-row">
+      <div>
+        <b>${escapeHtml(spell.name)} <small>${escapeHtml(levelText)}</small></b>
+        <span>${escapeHtml(spell.description)} ${escapeHtml(spellResourceLabel(spell))}.${concentration} Costs: ${escapeHtml(costText)}.</span>
+      </div>
+      <div class="use-item-actions">
+        ${favoriteMoveButtonsMarkup(favoriteKey, favoriteIndex, favoriteTotal)}
+        ${favoriteButtonMarkup(hero, favoriteKey)}
+        ${castButtons}
+      </div>
+    </div>
+  `;
+}
+
+let openAbilityMenuSections = null;
+
+function abilityDetailsOpen(key, defaultOpen = false) {
+  return openAbilityMenuSections ? openAbilityMenuSections.has(key) : defaultOpen;
+}
+
+function rememberOpenAbilityMenuSections() {
+  if (els.abilitiesMenu?.classList.contains("hidden")) return;
+  openAbilityMenuSections = new Set(
+    Array.from(els.abilitiesBody.querySelectorAll("details[data-ability-section][open]"))
+      .map((details) => details.dataset.abilitySection)
+      .filter(Boolean),
+  );
+}
+
+function abilityCategoryMarkup({ title, meta = "", rows = "", sectionKey, open = false, emptyText = "" }) {
+  if (!rows && !emptyText) return "";
+  const key = sectionKey ?? title;
+  return `
+    <details class="ability-category" data-ability-section="${escapeAttribute(key)}" ${abilityDetailsOpen(key, open) ? "open" : ""}>
+      <summary>
+        <span>${escapeHtml(title)}</span>
+        ${meta ? `<small>${escapeHtml(meta)}</small>` : ""}
+      </summary>
+      <div class="use-item-list">${rows || `<p class="empty-note">${escapeHtml(emptyText)}</p>`}</div>
+    </details>
+  `;
+}
+
+function abilityMenuGroups(hero, entries, spells) {
+  const classAbilityIds = new Set((getHeroTemplate(hero?.classId)?.abilities ?? []).map((ability) => ability.id));
+  const subclassAbilityIds = new Set((subclassDefinitionForFighter(hero)?.abilities ?? []).map((ability) => ability.id));
+  const groups = {
+    class: [],
+    subclass: [],
+    racial: [],
+    other: [],
+  };
+  for (const ability of entries) {
+    if (ability.racialSpellId || ["dragonbornBreath", "goliathStoneEndurance"].includes(ability.id)) groups.racial.push(ability);
+    else if (subclassAbilityIds.has(ability.id)) groups.subclass.push(ability);
+    else if (classAbilityIds.has(ability.id)) groups.class.push(ability);
+    else groups.other.push(ability);
+  }
+  const spellGroups = groupedSpellsByLevel(spells);
+  return { ...groups, spellGroups };
+}
+
+function favoriteRowsForAbilityMenu(hero, entries, spells) {
+  const abilitiesByKey = new Map(entries.map((ability) => [abilityFavoriteKey(ability), ability]));
+  const spellsByKey = new Map(spells.map((spell) => [spellFavoriteKey(spell), spell]));
+  const validFavorites = heroAbilityFavorites(hero).filter((key) => abilitiesByKey.has(key) || spellsByKey.has(key));
+  hero.abilityFavorites = validFavorites;
+  return validFavorites
+    .map((key, index) => {
+      if (abilitiesByKey.has(key)) return abilityRowMarkup(hero, abilitiesByKey.get(key), { favoriteIndex: index, favoriteTotal: validFavorites.length });
+      return spellRowMarkup(hero, spellsByKey.get(key), { favoriteIndex: index, favoriteTotal: validFavorites.length });
+    })
+    .join("");
+}
+
 function renderAbilitiesMenu() {
+  rememberOpenAbilityMenuSections();
   const hero = state.mode === "combat" ? activeFighter() : activeHero();
   const entries = availableFighterAbilities(hero);
   const spells = spellDefinitionsForFighter(hero);
+  const groups = abilityMenuGroups(hero, entries, spells);
+  const favoriteRows = favoriteRowsForAbilityMenu(hero, entries, spells);
+  const spellbookRows = Array.from(groups.spellGroups.entries())
+    .map(
+      ([level, levelSpells]) => `
+        <details class="ability-spell-level" data-ability-section="spell-level:${level}" ${abilityDetailsOpen(`spell-level:${level}`, false) ? "open" : ""}>
+          <summary>${escapeHtml(spellLevelLabel(level))} <small>${levelSpells.length}</small></summary>
+          <div class="use-item-list">${levelSpells.map((spell) => spellRowMarkup(hero, spell)).join("")}</div>
+        </details>
+      `,
+    )
+    .join("");
   els.abilitiesBody.innerHTML = entries.length || spells.length
     ? `
-      <div class="use-item-list">
-        ${entries
-          .map((ability) => {
-            const used = hero.abilityUses?.[ability.id] ?? 0;
-            const maxUses = abilityMaxUses(hero, ability);
-            const unavailableReason = fighterAbilityUnavailableReason(hero, ability);
-            const disabled = unavailableReason ? "disabled" : "";
-            const buttonLabel = ability.id === "wildShape" && isWildShaped(hero) ? "Revert" : "Use";
-            return `
-              <div class="use-item-row">
-                <div>
-                  <b>${escapeHtml(ability.name)}</b>
-                  <span>${escapeHtml(ability.description)} Uses: ${used}/${maxUses}.</span>
-                  ${unavailableReason ? `<small class="ability-warning">${escapeHtml(unavailableReason)}</small>` : ""}
-                </div>
-                <button type="button" data-action="use-fighter-ability" data-ability="${escapeAttribute(ability.id)}" ${disabled}>${buttonLabel}</button>
-              </div>
-            `;
-          })
-          .join("")}
-        ${spells
-          .map((spell) => {
-            const castLevels = spellAvailableCastLevels(hero, spell);
-            const castButtons = castLevels
-              .map((castLevel) => {
-                const castSpell = spellWithCastLevel(spell, castLevel);
-                const disabled = canCastSpell(hero, castSpell) ? "" : "disabled";
-                const upcast = castLevel > spellBaseLevel(spell) ? ` L${castLevel}` : "";
-                return `<button type="button" data-action="cast-spell" data-spell="${escapeAttribute(spell.id)}" data-cast-level="${castLevel}" ${disabled}>${spellBaseLevel(spell) === 0 ? "Use" : `Cast${upcast}`}</button>`;
-              })
-              .join("");
-            const costText = spellBaseLevel(spell) === 0 ? "At will" : castLevels.map((level) => `L${level}: ${spellPointCost(spellWithCastLevel(spell, level))} SP`).join(", ");
-            const concentration = spell.concentration ? " Concentration." : "";
-            const levelText = spellBaseLevel(spell) === 0 ? "Cantrip" : `L${spellBaseLevel(spell)}`;
-            return `
-              <div class="use-item-row">
-                <div>
-                  <b>${escapeHtml(spell.name)} <small>${escapeHtml(levelText)}</small></b>
-                  <span>${escapeHtml(spell.description)} ${escapeHtml(spellResourceLabel(spell))}.${concentration} Costs: ${escapeHtml(costText)}. Spell points: ${hero.spellPoints ?? 0}/${hero.spellPointMax ?? 0}.</span>
-                </div>
-                <div class="use-item-actions">${castButtons}</div>
-              </div>
-            `;
-          })
-          .join("")}
+      <div class="ability-category-list">
+        ${abilityCategoryMarkup({ title: "Favourites", sectionKey: "favorites", meta: `${heroAbilityFavorites(hero).length}`, rows: favoriteRows, open: true, emptyText: "Heart abilities or spells below to pin them here." })}
+        ${abilityCategoryMarkup({ title: "Class Abilities", sectionKey: "class", meta: `${groups.class.length}`, rows: groups.class.map((ability) => abilityRowMarkup(hero, ability)).join("") })}
+        ${abilityCategoryMarkup({ title: "Subclass Abilities", sectionKey: "subclass", meta: `${groups.subclass.length}`, rows: groups.subclass.map((ability) => abilityRowMarkup(hero, ability)).join("") })}
+        ${abilityCategoryMarkup({ title: "Racial Abilities", sectionKey: "racial", meta: `${groups.racial.length}`, rows: groups.racial.map((ability) => abilityRowMarkup(hero, ability)).join("") })}
+        ${abilityCategoryMarkup({ title: "Spellbook", sectionKey: "spellbook", meta: `${spells.length} spells - ${hero.spellPoints ?? 0}/${hero.spellPointMax ?? 0} SP`, rows: spellbookRows })}
+        ${abilityCategoryMarkup({ title: "Other Abilities", sectionKey: "other", meta: `${groups.other.length}`, rows: groups.other.map((ability) => abilityRowMarkup(hero, ability)).join("") })}
       </div>
     `
     : `<p class="empty-note">No extra abilities or spells available yet.</p>`;
 }
 
+function trackAbilityMenuSectionToggle(target) {
+  const details = target?.closest?.("details[data-ability-section]");
+  if (!details) return;
+  const key = details.dataset.abilitySection;
+  if (!key) return;
+  if (!openAbilityMenuSections) openAbilityMenuSections = new Set(["favorites"]);
+  window.setTimeout(() => {
+    if (details.open) openAbilityMenuSections.add(key);
+    else openAbilityMenuSections.delete(key);
+  }, 0);
+}
+
+function toggleAbilityFavorite(key) {
+  const hero = state.mode === "combat" ? activeFighter() : activeHero();
+  if (!hero || !key) return;
+  const favorites = heroAbilityFavorites(hero);
+  hero.abilityFavorites = favorites.includes(key)
+    ? favorites.filter((entry) => entry !== key)
+    : [...favorites, key];
+  renderAbilitiesMenu();
+  render();
+}
+
+function moveAbilityFavorite(key, direction) {
+  const hero = state.mode === "combat" ? activeFighter() : activeHero();
+  const favorites = heroAbilityFavorites(hero);
+  const from = favorites.indexOf(key);
+  const to = Math.max(0, Math.min(favorites.length - 1, from + direction));
+  if (from < 0 || from === to) return;
+  const next = [...favorites];
+  const [entry] = next.splice(from, 1);
+  next.splice(to, 0, entry);
+  hero.abilityFavorites = next;
+  renderAbilitiesMenu();
+  render();
+}
+
 function showAbilitiesMenu() {
+  openAbilityMenuSections = null;
   renderAbilitiesMenu();
   els.abilitiesMenu.classList.remove("hidden");
 }
 
 function hideAbilitiesMenu() {
   els.abilitiesMenu.classList.add("hidden");
+  openAbilityMenuSections = null;
 }
 
 function showHomeMenu() {
@@ -4653,6 +5279,8 @@ function classFeatureNames(hero, level) {
   for (const feature of template.classFeatures ?? []) {
     if (feature.level === level) features.push(feature.name);
   }
+  const subclass = subclassDefinitionForHero(hero);
+  features.push(...(subclass?.featureNamesByLevel?.[level] ?? []));
   if (abilityScoreImprovementLevelsForClass(hero.classId).has(level)) features.push("Ability Score Improvement");
   return features;
 }
@@ -4869,6 +5497,27 @@ function rageDamageBonus(hero) {
   return level >= 16 ? 4 : level >= 9 ? 3 : 2;
 }
 
+function isBarbarianRaging(hero) {
+  return Boolean((hero?.statusEffects ?? []).some((effect) => effect.id === "rage"));
+}
+
+function applyBarbarianWildSurge(hero) {
+  const roll = rollDie(8);
+  const levelBonus = (hero.level ?? 1) >= 14 ? 2 : 0;
+  const effects = [
+    () => applyStatusEffect(hero, { id: "wild-surge-shadow", label: "Wild Surge: Shadow", tempHp: 5 + levelBonus, durationRounds: 10 }),
+    () => applyStatusEffect(hero, { id: "wild-surge-teleport", label: "Wild Surge: Blink", speedBonusFeet: 15 + levelBonus * 5, expiresAtEndOfTurn: true }),
+    () => applyStatusEffect(hero, { id: "wild-surge-thorns", label: "Wild Surge: Thorns", acBonus: 1 + levelBonus, durationRounds: 3 }),
+    () => applyStatusEffect(hero, { id: "wild-surge-force", label: "Wild Surge: Force", weaponRider: true, damageBonus: rollDie(6) + levelBonus, damageType: "force", durationRounds: 10 }),
+    () => applyStatusEffect(hero, { id: "wild-surge-light", label: "Wild Surge: Radiance", attackBonus: 1 + levelBonus, durationRounds: 3 }),
+    () => applyStatusEffect(hero, { id: "wild-surge-vine", label: "Wild Surge: Vines", weaponRider: true, damageBonus: rollDie(6), damageType: "piercing", riderStatus: "restrained", durationRounds: 10 }),
+    () => applyStatusEffect(hero, { id: "wild-surge-shield", label: "Wild Surge: Shield", acBonus: 2 + levelBonus, expiresAtStartOfTurn: true }),
+    () => applyStatusEffect(hero, { id: "wild-surge-might", label: "Wild Surge: Might", skillBonus: 2 + levelBonus, damageBonus: 1 + levelBonus, durationRounds: 3 }),
+  ];
+  effects[roll - 1]?.();
+  addLog(`${hero.name}'s Wild Surge erupts (${roll}).`, "important");
+}
+
 function showAbilityScoreImprovementDialog(hero) {
   return new Promise((resolve) => {
     els.gameDialogTitle.textContent = "Ability Score Improvement";
@@ -4889,7 +5538,7 @@ function showAbilityScoreImprovementDialog(hero) {
         <p class="ability-assignment-error" aria-live="polite"></p>
       </div>
       <button type="submit" data-dialog-action="confirm">Apply Improvement</button>
-      <button type="button" class="ghost-button" data-dialog-action="cancel">Skip</button>
+      <button type="button" class="ghost-button" data-dialog-action="cancel">Cancel Level Up</button>
     `;
 
     const cleanup = (value) => {
@@ -4953,6 +5602,423 @@ function showAbilityScoreImprovementDialog(hero) {
   });
 }
 
+function fighterSubclassDefinitions() {
+  return getHeroTemplate("fighter").subclasses ?? [];
+}
+
+function barbarianSubclassDefinitions() {
+  return getHeroTemplate("barbarian").subclasses ?? [];
+}
+
+function adminSubclassDefinitions(classId) {
+  return getHeroTemplate(classId).adminSubclasses ?? [];
+}
+
+function fighterSubclassById(subclassId) {
+  return fighterSubclassDefinitions().find((subclass) => subclass.id === subclassId) ?? null;
+}
+
+function barbarianSubclassById(subclassId) {
+  return barbarianSubclassDefinitions().find((subclass) => subclass.id === subclassId) ?? null;
+}
+
+function subclassDefinitionForHero(hero) {
+  if (!hero?.classId || !hero?.subclassId) return null;
+  const template = getHeroTemplate(hero.classId);
+  const normal = (template.subclasses ?? []).find((subclass) => subclass.id === hero.subclassId) ?? null;
+  const admin = (template.adminSubclasses ?? []).find((subclass) => subclass.id === hero.subclassId) ?? null;
+  return hero.subclassVariant === "full" ? admin ?? normal : normal ?? admin;
+}
+
+function applyFighterSubclass(hero, subclass) {
+  hero.subclassId = subclass.id;
+  hero.subclassName = fullSubclassName(subclass);
+  hero.subclassVariant = subclass.adminOnly ? "full" : "";
+  hero.noSubclassChosen = false;
+  const classTemplate = getHeroTemplate(hero.classId);
+  if (subclass.casterType) hero.casterType = subclass.casterType;
+  if (subclass.spellcastingAbility) hero.spellcastingAbility = subclass.spellcastingAbility;
+  if (subclass.spellPointProgression) hero.spellPointProgression = { ...subclass.spellPointProgression };
+  if (subclass.spellList) hero.classSpellList = [...subclass.spellList];
+  if (subclass.expandedSpellList) hero.classSpellList = uniqueValues([...(classTemplate.classSpellList ?? classTemplate.spellList ?? []), ...subclass.expandedSpellList]);
+  if (subclass.cantripList) hero.classCantripList = [...subclass.cantripList];
+  if (subclass.expandedCantripList) hero.classCantripList = uniqueValues([...(classTemplate.classCantripList ?? classTemplate.cantripList ?? []), ...subclass.expandedCantripList]);
+  ensureFighterAbilityState(hero);
+  refreshDerivedStats(hero);
+}
+
+const levelUpCancelled = Symbol("levelUpCancelled");
+
+function isLevelUpCancelled(value) {
+  return value === levelUpCancelled || value?.cancelled === true;
+}
+
+function restoreHeroSnapshot(hero, snapshot) {
+  for (const key of Object.keys(hero)) delete hero[key];
+  Object.assign(hero, cloneData(snapshot));
+  refreshDerivedStats(hero);
+}
+
+function subclassOptionCount(subclass, kind, level) {
+  let count = 0;
+  for (const entry of subclass?.optionCounts?.[kind] ?? []) {
+    if (level >= entry.level) count = entry.count;
+  }
+  return count;
+}
+
+async function chooseSubclassOptions({ hero, subclass, kind, property, options, title, message }) {
+  const targetCount = subclassOptionCount(subclass, kind, hero.level ?? 1);
+  const selected = [...(hero[property] ?? [])].filter((id) => options.some((option) => option.id === id && (hero.level ?? 1) >= (option.level ?? 1)));
+  const newlyPicked = [];
+  while (selected.length < targetCount) {
+    const available = options.filter((option) => (hero.level ?? 1) >= (option.level ?? 1) && !selected.includes(option.id));
+    if (!available.length) break;
+    const choice = await showSelectChoiceDialog({
+      title,
+      message: `${message} (${selected.length + 1}/${targetCount})`,
+      actor: hero,
+      label: message,
+      choices: available.map((option) => ({
+        value: option.id,
+        label: option.name,
+        description: option.description,
+      })),
+    });
+    if (!choice) return null;
+    selected.push(choice);
+    newlyPicked.push(choice);
+  }
+  hero[property] = uniqueValues(selected);
+  return newlyPicked
+    .map((id) => options.find((option) => option.id === id)?.name)
+    .filter(Boolean);
+}
+
+async function chooseFighterSubclassOptions(hero, subclass) {
+  if (!subclass) return "";
+  const parts = [];
+  if (subclass.id === "arcane-archer") {
+    const picked = await chooseSubclassOptions({
+      hero,
+      subclass,
+      kind: "arcaneShots",
+      property: "knownArcaneShots",
+      options: subclass.arcaneShotOptions ?? [],
+      title: "Arcane Shot Options",
+      message: "Choose an Arcane Shot option.",
+    });
+    if (picked === null) return null;
+    if (picked.length) parts.push(`Arcane Shots: ${picked.join(", ")}`);
+  }
+  if (subclass.id === "battle-master") {
+    const picked = await chooseSubclassOptions({
+      hero,
+      subclass,
+      kind: "maneuvers",
+      property: "knownManeuvers",
+      options: subclass.maneuverOptions ?? [],
+      title: "Battle Master Maneuvers",
+      message: "Choose a maneuver.",
+    });
+    if (picked === null) return null;
+    if (picked.length) parts.push(`Maneuvers: ${picked.join(", ")}`);
+  }
+  if (subclass.id === "rune-knight") {
+    const picked = await chooseSubclassOptions({
+      hero,
+      subclass,
+      kind: "runes",
+      property: "knownRunes",
+      options: subclass.runeOptions ?? [],
+      title: "Rune Carver",
+      message: "Choose a rune.",
+    });
+    if (picked === null) return null;
+    if (picked.length) parts.push(`Runes: ${picked.join(", ")}`);
+  }
+  ensureFighterAbilityState(hero);
+  return parts.length ? ` ${parts.join(". ")}.` : "";
+}
+
+async function chooseBarbarianSubclassOptions(hero, subclass) {
+  if (!subclass) return "";
+  const parts = [];
+  if (subclass.id === "storm-herald") {
+    const picked = await chooseSubclassOptions({
+      hero,
+      subclass,
+      kind: "stormAuras",
+      property: "knownStormAuras",
+      options: subclass.stormAuraOptions ?? [],
+      title: "Storm Aura",
+      message: "Choose the storm that lives in your rage.",
+    });
+    if (picked === null) return null;
+    if (picked.length) parts.push(`Storm Aura: ${picked.join(", ")}`);
+  }
+  if (subclass.id === "totem-warrior") {
+    const picked = await chooseSubclassOptions({
+      hero,
+      subclass,
+      kind: "totems",
+      property: "knownTotems",
+      options: subclass.totemOptions ?? [],
+      title: "Totem Spirit",
+      message: "Choose a totem spirit.",
+    });
+    if (picked === null) return null;
+    if (picked.length) parts.push(`Totems: ${picked.join(", ")}`);
+  }
+  ensureFighterAbilityState(hero);
+  return parts.length ? ` ${parts.join(". ")}.` : "";
+}
+
+async function chooseClassSubclassOptions(hero, subclass) {
+  if (hero.classId === "fighter") return chooseFighterSubclassOptions(hero, subclass);
+  if (hero.classId === "barbarian") return chooseBarbarianSubclassOptions(hero, subclass);
+  return "";
+}
+
+function classSubclassDefinitions(classId) {
+  if (classId === "fighter") return fighterSubclassDefinitions();
+  if (classId === "barbarian") return barbarianSubclassDefinitions();
+  return getHeroTemplate(classId).subclasses ?? [];
+}
+
+function selectableClassSubclassDefinitions(classId) {
+  const normal = classSubclassDefinitions(classId);
+  if (!adminEnabled()) return normal;
+  return [...normal, ...adminSubclassDefinitions(classId)];
+}
+
+function classSubclassById(classId, subclassId) {
+  if (classId === "fighter") return fighterSubclassById(subclassId);
+  if (classId === "barbarian") return barbarianSubclassById(subclassId);
+  return classSubclassDefinitions(classId).find((subclass) => subclass.id === subclassId) ?? null;
+}
+
+function selectableClassSubclassByChoice(classId, choiceValue) {
+  if (String(choiceValue ?? "").startsWith("admin:")) {
+    const subclassId = String(choiceValue).slice("admin:".length);
+    return adminSubclassDefinitions(classId).find((subclass) => subclass.id === subclassId) ?? null;
+  }
+  return classSubclassById(classId, choiceValue);
+}
+
+function fullSubclassName(subclass) {
+  return subclass?.name ?? "Subclass";
+}
+
+function subclassChoiceTitle(classId) {
+  if (classId === "barbarian") return "Primal Path";
+  if (classId === "fighter") return "Martial Archetype";
+  return "Subclass";
+}
+
+async function chooseClassSubclass(hero) {
+  if (!classSubclassDefinitions(hero.classId).length || hero.subclassId || hero.noSubclassChosen || (hero.level ?? 1) < 3) return "";
+  const title = subclassChoiceTitle(hero.classId);
+  const selectableSubclasses = selectableClassSubclassDefinitions(hero.classId);
+  const subclassId = await showSelectChoiceDialog({
+    title,
+    message: `Choose a subclass for ${hero.name ?? "this hero"}.`,
+    actor: hero,
+    label: "Choose a subclass:",
+    defaultValue: "",
+    choices: [
+      {
+        value: "",
+        label: "No Subclass",
+        description: "Keep this hero on the base class path. They gain no subclass features or subclass choices.",
+        info: "If you want to go real hardcore. You can certainly try.",
+      },
+      ...selectableSubclasses.map((subclass) => ({
+        value: subclass.adminOnly ? `admin:${subclass.id}` : subclass.id,
+        label: fullSubclassName(subclass),
+        description: subclass.summary,
+        info: subclassGameplayGuideText(subclass),
+      })),
+    ],
+  });
+  if (subclassId === "") {
+    hero.noSubclassChosen = true;
+    hero.subclassId = "";
+    hero.subclassName = "";
+    hero.subclassVariant = "";
+    return ` No subclass chosen.`;
+  }
+  if (subclassId === null) return levelUpCancelled;
+  const subclass = selectableClassSubclassByChoice(hero.classId, subclassId);
+  if (!subclass) return ` No subclass chosen.`;
+  applyFighterSubclass(hero, subclass);
+  const optionText = await chooseClassSubclassOptions(hero, subclass);
+  if (optionText === null) return levelUpCancelled;
+
+  const gained = [];
+  if (hero.classId === "fighter" && subclass.id === "arcane-archer") {
+    const skill = await showChoiceDialog({
+      title: "Arcane Archer Lore",
+      message: "Choose your Arcane Archer lore proficiency.",
+      actor: hero,
+      choices: [
+        { value: "arcana", label: "Arcana" },
+        { value: "nature", label: "Nature" },
+      ],
+    });
+    if (!skill) return levelUpCancelled;
+    if (skill) {
+      hero.skillProficiencies = uniqueValues([...(hero.skillProficiencies ?? []), skill]);
+      gained.push(skillName(skill));
+    }
+  }
+  if (hero.classId === "fighter" && subclass.id === "battle-master") {
+    const tool = await chooseUniqueProficiencies({
+      title: "Student of War",
+      message: "Choose an artisan tool proficiency.",
+      count: 1,
+      choices: ["smiths-tools", "alchemists-supplies", "brewers-supplies", "calligraphers-supplies", "carpenters-tools", "cooks-utensils", "masons-tools", "painters-supplies", "potters-tools", "weavers-tools", "woodcarvers-tools"],
+      selected: hero.toolProficiencies ?? [],
+      valuePrefix: "tool:",
+    });
+    if (tool === null) return levelUpCancelled;
+    if (tool?.length) {
+      hero.toolProficiencies = uniqueValues([...(hero.toolProficiencies ?? []), ...tool]);
+      gained.push(tool.map(toolName).join(", "));
+    }
+  }
+  if (hero.classId === "fighter" && subclass.id === "banneret") {
+    hero.skillProficiencies = uniqueValues([...(hero.skillProficiencies ?? []), "persuasion"]);
+    hero.expertiseSkills = uniqueValues([...(hero.expertiseSkills ?? []), "persuasion"]);
+    gained.push("Persuasion expertise");
+  }
+  if (hero.classId === "fighter" && ["cavalier", "samurai"].includes(subclass.id)) {
+    const choices = subclass.id === "cavalier"
+      ? ["animal-handling", "history", "insight", "performance", "persuasion"]
+      : ["history", "insight", "performance", "persuasion"];
+    const skill = await chooseUniqueProficiencies({
+      title: "Bonus Proficiency",
+      message: `Choose a ${subclass.name} skill proficiency.`,
+      count: 1,
+      choices,
+      selected: hero.skillProficiencies ?? [],
+    });
+    if (skill === null) return levelUpCancelled;
+    if (skill?.length) {
+      hero.skillProficiencies = uniqueValues([...(hero.skillProficiencies ?? []), ...skill]);
+      gained.push(skill.map(skillName).join(", "));
+    }
+  }
+  if (hero.classId === "fighter" && subclass.id === "rune-knight") {
+    hero.toolProficiencies = uniqueValues([...(hero.toolProficiencies ?? []), "smiths-tools"]);
+    hero.languages = uniqueValues([...(hero.languages ?? []), "giant"]);
+    gained.push("Smith's tools, Giant");
+  }
+  if (hero.classId === "fighter" && subclass.id === "eldritch-knight") {
+    const cantrips = await chooseClassCantrips(hero, 2, hero.spells ?? [], { cancelAborts: true });
+    if (cantrips.cancelled) return levelUpCancelled;
+    hero.spells = cantrips.spells;
+    hero.unusedCantripChoiceCredits = cantrips.unusedCredits;
+    const spells = await chooseClassSpells(hero, 3, hero.spells ?? [], { cancelAborts: true });
+    if (spells.cancelled) return levelUpCancelled;
+    hero.spells = spells.spells;
+    hero.unusedSpellChoiceCredits = spells.unusedCredits;
+    gained.push("wizard spellcasting");
+  }
+  if (subclass.casterType === "third" && !(hero.classId === "fighter" && subclass.id === "eldritch-knight")) {
+    const cantrips = await chooseClassCantrips(hero, 2, hero.spells ?? [], { cancelAborts: true });
+    if (cantrips.cancelled) return levelUpCancelled;
+    hero.spells = cantrips.spells;
+    hero.unusedCantripChoiceCredits = cantrips.unusedCredits;
+    const spells = await chooseClassSpells(hero, 3, hero.spells ?? [], { cancelAborts: true });
+    if (spells.cancelled) return levelUpCancelled;
+    hero.spells = spells.spells;
+    hero.unusedSpellChoiceCredits = spells.unusedCredits;
+    gained.push("subclass spellcasting");
+  }
+
+  ensureFighterAbilityState(hero);
+  refreshDerivedStats(hero);
+  return ` ${title}: ${fullSubclassName(subclass)}${gained.length ? ` (${gained.join("; ")})` : ""}.${optionText}`;
+}
+
+async function applyClassSubclassLevelChoices(hero) {
+  if (!hero.subclassId) return "";
+  let text = "";
+  if (hero.classId === "fighter" && hero.subclassId === "champion" && (hero.level ?? 1) === 10) {
+    const style = await chooseFightingStyle("fighter");
+    if (!style) return levelUpCancelled;
+    if (style) {
+      hero.fightingStyles = uniqueValues([...(hero.fightingStyles ?? []), style]);
+      text += ` Additional Fighting Style: ${style}.`;
+    }
+  }
+  if (hero.classId === "fighter" && hero.subclassId === "samurai" && hero.subclassVariant === "full" && (hero.level ?? 1) === 7) {
+    const saveChoices = ["wis", "int", "cha"].filter((save) => !(hero.savingThrowProficiencies ?? []).includes(save));
+    const save = saveChoices.includes("wis") ? "wis" : saveChoices[0];
+    if (save) {
+      hero.savingThrowProficiencies = uniqueValues([...(hero.savingThrowProficiencies ?? []), save]);
+      text += ` Elegant Courtier save: ${save.toUpperCase()}.`;
+    }
+  }
+  if (hero.classId === "fighter" && hero.subclassId === "eldritch-knight") {
+    const cantripChoices = ((hero.level ?? 1) === 10 ? 1 : 0) + (hero.unusedCantripChoiceCredits ?? 0);
+    if (cantripChoices > 0) {
+      const result = await chooseClassCantrips(hero, cantripChoices, hero.spells ?? [], { cancelAborts: true });
+      if (result.cancelled) return levelUpCancelled;
+      const gained = result.spells.filter((spellId) => !(hero.spells ?? []).includes(spellId));
+      hero.spells = result.spells;
+      hero.unusedCantripChoiceCredits = result.unusedCredits;
+      if (gained.length) text += ` New Eldritch Knight cantrip: ${gained.map((spellId) => getContentDefinition("spells", spellId)?.name ?? spellId).join(", ")}.`;
+    }
+    const spellChoiceLevels = hero.subclassVariant === "full"
+      ? new Set([4, 7, 8, 10, 11, 13, 14, 16, 19, 20])
+      : new Set([4, 6, 8, 10, 11, 13, 14, 16, 18, 20]);
+    const spellChoices = (spellChoiceLevels.has(hero.level ?? 1) ? 1 : 0) + (hero.unusedSpellChoiceCredits ?? 0);
+    if (spellChoices > 0) {
+      const result = await chooseClassSpells(hero, spellChoices, hero.spells ?? [], { cancelAborts: true });
+      if (result.cancelled) return levelUpCancelled;
+      const gained = result.spells.filter((spellId) => !(hero.spells ?? []).includes(spellId));
+      hero.spells = result.spells;
+      hero.unusedSpellChoiceCredits = result.unusedCredits;
+      if (gained.length) text += ` New Eldritch Knight spell: ${gained.map((spellId) => getContentDefinition("spells", spellId)?.name ?? spellId).join(", ")}.`;
+    }
+  }
+  const subclass = subclassDefinitionForHero(hero);
+  if (subclass?.casterType === "third" && !(hero.classId === "fighter" && hero.subclassId === "eldritch-knight")) {
+    const cantripChoices = ((hero.level ?? 1) === 10 ? 1 : 0) + (hero.unusedCantripChoiceCredits ?? 0);
+    if (cantripChoices > 0) {
+      const result = await chooseClassCantrips(hero, cantripChoices, hero.spells ?? [], { cancelAborts: true });
+      if (result.cancelled) return levelUpCancelled;
+      const gained = result.spells.filter((spellId) => !(hero.spells ?? []).includes(spellId));
+      hero.spells = result.spells;
+      hero.unusedCantripChoiceCredits = result.unusedCredits;
+      if (gained.length) text += ` New subclass cantrip: ${gained.map((spellId) => getContentDefinition("spells", spellId)?.name ?? spellId).join(", ")}.`;
+    }
+    const spellChoiceLevels = new Set([4, 6, 8, 10, 11, 13, 14, 16, 18, 20]);
+    const spellChoices = (spellChoiceLevels.has(hero.level ?? 1) ? 1 : 0) + (hero.unusedSpellChoiceCredits ?? 0);
+    if (spellChoices > 0) {
+      const result = await chooseClassSpells(hero, spellChoices, hero.spells ?? [], { cancelAborts: true });
+      if (result.cancelled) return levelUpCancelled;
+      const gained = result.spells.filter((spellId) => !(hero.spells ?? []).includes(spellId));
+      hero.spells = result.spells;
+      hero.unusedSpellChoiceCredits = result.unusedCredits;
+      if (gained.length) text += ` New subclass spell: ${gained.map((spellId) => getContentDefinition("spells", spellId)?.name ?? spellId).join(", ")}.`;
+    }
+  }
+  if (hero.classId === "fighter" && ["arcane-archer", "battle-master", "rune-knight"].includes(hero.subclassId)) {
+    const optionText = await chooseFighterSubclassOptions(hero, subclassDefinitionForHero(hero));
+    if (optionText === null) return levelUpCancelled;
+    text += optionText;
+  }
+  if (hero.classId === "barbarian" && ["storm-herald", "totem-warrior"].includes(hero.subclassId)) {
+    const optionText = await chooseBarbarianSubclassOptions(hero, subclassDefinitionForHero(hero));
+    if (optionText === null) return levelUpCancelled;
+    text += optionText;
+  }
+  return text;
+}
+
 async function levelUpHero() {
   const hero = activeHero();
   if (state.mode === "home" && canTrainAsSidekick(hero)) {
@@ -4960,6 +6026,12 @@ async function levelUpHero() {
     return;
   }
   if (state.mode !== "home" || !canLevelUp(hero)) return;
+  const levelUpSnapshot = cloneData(hero);
+  const cancelLevelUp = () => {
+    restoreHeroSnapshot(hero, levelUpSnapshot);
+    addLog(`${hero.name}'s level up was cancelled.`, "important");
+    render();
+  };
   const oldConMod = scoreToMod(baseAbilityScore(hero, "con"));
   const racialHpGain = hero.racialHpPerLevel ?? 0;
   const hpRoll = isTrainedSidekick(hero) ? rollDie(hero.hitDie ?? 8) : null;
@@ -4971,10 +6043,19 @@ async function levelUpHero() {
   hero.baseMaxHp = (hero.baseMaxHp ?? hero.maxHp) + hpGain;
   hero.maxHp = hero.baseMaxHp;
   hero.hitDiceRemaining = hero.level;
+  const subclassText = await chooseClassSubclass(hero);
+  if (isLevelUpCancelled(subclassText)) {
+    cancelLevelUp();
+    return;
+  }
   let asiText = "";
   if (abilityScoreImprovementLevelsForClass(hero.classId).has(hero.level ?? 1)) {
     hero.abilityScores = Object.fromEntries(abilities.map((ability) => [ability, baseAbilityScore(hero, ability)]));
     const increases = await showAbilityScoreImprovementDialog(hero);
+    if (!increases) {
+      cancelLevelUp();
+      return;
+    }
     if (increases) {
       for (const ability of abilities) {
         hero.abilityScores[ability] = Math.min(20, hero.abilityScores[ability] + (increases[ability] ?? 0));
@@ -4987,12 +6068,21 @@ async function levelUpHero() {
     }
   }
   ensureFighterAbilityState(hero);
+  const subclassLevelText = await applyClassSubclassLevelChoices(hero);
+  if (isLevelUpCancelled(subclassLevelText)) {
+    cancelLevelUp();
+    return;
+  }
   let spellText = "";
   const cantripChoices =
     (isSidekickSpellcaster(hero) ? sidekickCantripChoiceCountForLevel(hero, hero.level ?? 1) : cantripChoiceCountForClassLevel(hero.classId, hero.level ?? 1)) +
     (hero.unusedCantripChoiceCredits ?? 0);
   if (cantripChoices > 0) {
-    const result = await chooseClassCantrips(hero, cantripChoices, hero.spells ?? []);
+    const result = await chooseClassCantrips(hero, cantripChoices, hero.spells ?? [], { cancelAborts: true });
+    if (result.cancelled) {
+      cancelLevelUp();
+      return;
+    }
     const gained = result.spells.filter((spellId) => !(hero.spells ?? []).includes(spellId));
     hero.spells = result.spells;
     hero.unusedCantripChoiceCredits = result.unusedCredits;
@@ -5002,13 +6092,21 @@ async function levelUpHero() {
     (isSidekickSpellcaster(hero) ? sidekickSpellChoiceCountForLevel(hero, hero.level ?? 1) : spellChoiceCountForClassLevel(hero.classId, hero.level ?? 1)) +
     (hero.unusedSpellChoiceCredits ?? 0);
   if (spellChoices > 0) {
-    const result = await chooseClassSpells(hero, spellChoices, hero.spells ?? []);
+    const result = await chooseClassSpells(hero, spellChoices, hero.spells ?? [], { cancelAborts: true });
+    if (result.cancelled) {
+      cancelLevelUp();
+      return;
+    }
     const gained = result.spells.filter((spellId) => !(hero.spells ?? []).includes(spellId));
     hero.spells = result.spells;
     hero.unusedSpellChoiceCredits = result.unusedCredits;
     if (gained.length) spellText += ` New spell${gained.length === 1 ? "" : "s"}: ${gained.map((spellId) => getContentDefinition("spells", spellId)?.name ?? spellId).join(", ")}.`;
   }
   let expertiseText = isClassHero(hero) ? await chooseLevelUpExpertise(hero) : "";
+  if (expertiseText === null) {
+    cancelLevelUp();
+    return;
+  }
   if (isSidekickExpert(hero) && [3, 15].includes(hero.level ?? 1)) {
     const gained = await chooseExpertiseProficiencies({
       title: "Expertise",
@@ -5018,6 +6116,10 @@ async function levelUpHero() {
       existingSkillExpertise: hero.expertiseSkills ?? [],
       skillsOnly: true,
     });
+    if (!gained) {
+      cancelLevelUp();
+      return;
+    }
     if (gained) {
       hero.expertiseSkills = uniqueValues([...(hero.expertiseSkills ?? []), ...gained.skills]);
       expertiseText = gained.skills.length ? ` Expertise gained: ${gained.skills.map(skillName).join(", ")}.` : "";
@@ -5025,6 +6127,10 @@ async function levelUpHero() {
   }
   if (isSidekickExpert(hero) && (hero.level ?? 1) === 18) {
     const save = await chooseSidekickSavingThrow("Sharp Mind", ["int", "wis", "cha"]);
+    if (!save) {
+      cancelLevelUp();
+      return;
+    }
     if (save) {
       hero.savingThrowProficiencies = uniqueValues([...(hero.savingThrowProficiencies ?? []), save]);
       expertiseText += ` Sharp Mind save: ${save.toUpperCase()}.`;
@@ -5040,6 +6146,10 @@ async function levelUpHero() {
       })),
       actor: hero,
     });
+    if (!school) {
+      cancelLevelUp();
+      return;
+    }
     if (school) {
       hero.empoweredSpellSchool = school;
       expertiseText += ` Empowered school: ${school}.`;
@@ -5052,7 +6162,7 @@ async function levelUpHero() {
   const features = classFeatureNames(hero, hero.level);
   const featureText = features.length ? ` New feature${features.length === 1 ? "" : "s"}: ${features.join(", ")}.` : "";
   const racialHpText = isTrainedSidekick(hero) ? ` (${hpRoll} + CON)` : racialHpGain ? ` (${racialHpGain} from Dwarven Toughness)` : "";
-  const levelUpText = `${hero.name} reaches level ${hero.level} and gains ${hpGain} max HP${racialHpText}.${featureText}${asiText}${spellText}${expertiseText}`;
+  const levelUpText = `${hero.name} reaches level ${hero.level} and gains ${hpGain} max HP${racialHpText}.${featureText}${subclassText}${subclassLevelText}${asiText}${spellText}${expertiseText}`;
   addLog(levelUpText, "important");
   hideHomeMenu();
   render();
@@ -5161,12 +6271,29 @@ async function chooseLayOnHandsTarget(paladin) {
   return targetId ? state.fighters[targetId] : null;
 }
 
+async function chooseLayOnHandsAmount(paladin, target, remainingPool) {
+  const missingHp = Math.max(1, (target.maxHp ?? 0) - (target.hp ?? 0));
+  const suggested = Math.min(remainingPool, missingHp);
+  const raw = await showGameDialog({
+    title: "Lay on Hands",
+    message: `${paladin.name} has ${remainingPool} Lay on Hands HP left. ${target.name} is missing ${missingHp} HP.`,
+    input: { label: "Healing to spend", value: String(suggested), maxLength: 3 },
+    confirmText: "Heal",
+    cancelText: "Cancel",
+  });
+  if (raw === null) return null;
+  const amount = Math.floor(Number(raw));
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return clamp(amount, 1, Math.min(remainingPool, missingHp));
+}
+
 function refundFighterAbilityUse(hero, ability) {
   if (!hero || !ability) return;
   hero.abilityUses[ability.id] = Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1);
   if (state.mode === "combat") {
     if (ability.resource === "bonusAction") hero.hasBonusAction = true;
     if (ability.resource === "action") hero.hasAction = true;
+    if (ability.resource === "reaction") hero.hasReaction = true;
   }
 }
 
@@ -5193,6 +6320,380 @@ async function chooseWildShapeBeast(hero) {
   return beastId ? wildShapeBeastById(beastId) : null;
 }
 
+function subclassEffectDiceTotal(effect = {}, hero = null) {
+  const dice = scaledSubclassDice(hero, effect.dice ?? {});
+  if (!dice.count || !dice.sides) return Math.max(0, scaledSubclassAmount(hero, effect.amount));
+  return rollDice(dice.count, dice.sides).total + (dice.bonus ?? 0);
+}
+
+function subclassEffectStatus(hero, effectStatus = {}) {
+  return { durationRounds: 1, ...scaledSubclassStatus(hero, effectStatus) };
+}
+
+function subclassEffectMonsterTarget() {
+  const selectedTarget = attackTarget();
+  return selectedTarget && !objectIsDestructible(selectedTarget) ? selectedTarget : visibleMonsters()[0] ?? null;
+}
+
+function applyWeaponRiderNamedStatus(actor, target, status) {
+  if (status === "prone") applyStatusEffect(target, { id: "prone", label: "Prone", attackBonus: -2, speedBonusFeet: -10, expiresAtEndOfTurn: true });
+  if (status === "restrained") applyStatusEffect(target, { id: "restrained", label: "Restrained", speedLocked: true, attackBonus: -2, durationRounds: 1 });
+  if (status === "hamstrung") applyStatusEffect(target, { id: "hamstrung", label: "Hamstrung", speedBonusFeet: -10, expiresAtEndOfTurn: true });
+  if (status === "shaken") applyStatusEffect(target, { id: "shaken", label: "Shaken", attackBonus: -2, expiresAtEndOfTurn: true });
+  if (status === "marked") applyStatusEffect(target, { id: `marked-by-${actor.id}`, label: "Marked", attackBonus: -1, expiresAtEndOfTurn: true });
+  if (status === "distracted") applyStatusEffect(target, { id: "distracted", label: "Distracted", acBonus: -2, expiresAtEndOfTurn: true });
+  if (status === "frightened") applyStatusEffect(target, { id: "frightened", label: "Frightened", attackBonus: -2, expiresAtEndOfTurn: true });
+  if (status === "enfeebled") applyStatusEffect(target, { id: "enfeebled", label: "Enfeebled", damageBonus: -2, expiresAtEndOfTurn: true });
+  if (status === "banished") applyStatusEffect(target, { id: "banished", label: "Banished", speedLocked: true, actionLocked: true, expiresAtEndOfTurn: true });
+  if (status === "stunned") applyStatusEffect(target, { id: "stunned", label: "Stunned", speedLocked: true, actionLocked: true, durationRounds: 1 });
+}
+
+function applySubclassRider(hero, effect, label) {
+  const damage = Math.max(1, subclassEffectDiceTotal(effect, hero));
+  applyStatusEffect(hero, {
+    id: `subclass-rider-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    label,
+    weaponRider: true,
+    damageBonus: damage,
+    damageType: effect.damageType ?? "damage",
+    riderStatus: effect.riderStatus ?? null,
+    expiresAtEndOfTurn: true,
+  });
+  addLog(`${hero.name} prepares ${label}; the next hit deals ${damage} extra ${effect.damageType ?? "damage"} damage.`, "important");
+}
+
+function nearestOpenSummonPosition(owner) {
+  const occupied = new Set(Object.values(state.fighters ?? {}).filter((fighter) => fighter.alive).map((fighter) => positionKey(fighter.position)));
+  for (const next of window.DungeonGrid.neighbors(owner.position, currentGridSize())) {
+    if (!dungeonFloorKeys().has(positionKey(next)) || occupied.has(positionKey(next))) continue;
+    if (canTraverseMovementEdge(owner, owner.position, next, [])) return next;
+  }
+  return null;
+}
+
+function summonMonsterIdForProfile(profile = "melee") {
+  if (profile === "rangedKiter") return "skeletonArcher";
+  return "forestWolf";
+}
+
+function scaleSummonedAlly(ally, owner, durationRounds) {
+  const level = owner.level ?? 1;
+  const prof = proficiencyBonus(owner);
+  ally.level = level;
+  ally.maxHp = Math.max(1, (ally.maxHp ?? 1) + level * 2);
+  ally.baseMaxHp = ally.maxHp;
+  ally.hp = ally.maxHp;
+  ally.attackBonus = (ally.attackBonus ?? 3) + Math.max(0, prof - 2);
+  ally.damage = { ...(ally.damage ?? { count: 1, sides: 6, bonus: 0, type: "damage" }), bonus: (ally.damage?.bonus ?? 0) + Math.max(1, Math.floor(level / 4)) };
+  ally.baseDamage = { ...ally.damage };
+  ally.summonedByHeroId = owner.id;
+  ally.summonDurationRounds = durationRounds;
+  ally.renameable = false;
+  return ally;
+}
+
+function addSummonedAllyToCombat(owner, ally) {
+  state.fighters[ally.id] = ally;
+  state.party.heroIds = uniqueValues([...(state.party.heroIds ?? []), ally.id]);
+  state.party.rosterIds = uniqueValues([...(state.party.rosterIds ?? []), ally.id]);
+  if (state.mode === "combat") {
+    const activeIndex = Math.max(0, state.activeIndex ?? 0);
+    state.initiative.splice(activeIndex + 1, 0, { fighterId: ally.id, initiative: state.initiative[activeIndex]?.initiative ?? 10 });
+  }
+}
+
+async function handleGenericSubclassEffect(hero, ability) {
+  const effect = ability.subclassEffect;
+  if (!effect) return false;
+
+  if (effect.kind === "selfStatus") {
+    applyStatusEffect(hero, subclassEffectStatus(hero, effect.status));
+    addLog(`${hero.name} uses ${ability.name}.`, "important");
+    return true;
+  }
+
+  if (effect.kind === "allyStatus") {
+    const target = await chooseAbilityTarget(hero, ability.name, effect.target === "selfOrAlly" ? "Choose yourself or an ally." : "Choose an ally.");
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      renderAbilitiesMenu();
+      return true;
+    }
+    applyStatusEffect(target, subclassEffectStatus(hero, effect.status));
+    addLog(`${hero.name} uses ${ability.name} on ${target.name}.`, "important");
+    return true;
+  }
+
+  if (effect.kind === "partyStatus") {
+    for (const ally of partyHeroes().filter((target) => heroCanAct(target))) applyStatusEffect(ally, subclassEffectStatus(hero, effect.status));
+    addLog(`${hero.name} uses ${ability.name}; the party feels the effect.`, "important");
+    return true;
+  }
+
+  if (effect.kind === "targetStatus") {
+    const target = subclassEffectMonsterTarget();
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${hero.name} has no target for ${ability.name}.`, "important");
+      return true;
+    }
+    applyStatusEffect(target, subclassEffectStatus(hero, effect.status));
+    addLog(`${hero.name} uses ${ability.name} on ${target.name}.`, "important");
+    return true;
+  }
+
+  if (effect.kind === "rider") {
+    applySubclassRider(hero, effect, ability.name);
+    return true;
+  }
+
+  if (effect.kind === "damageTarget") {
+    const target = subclassEffectMonsterTarget();
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${hero.name} has no target for ${ability.name}.`, "important");
+      return true;
+    }
+    const damage = Math.max(1, subclassEffectDiceTotal(effect, hero));
+    applySpecialDamage(hero, target, damage, effect.damageType ?? "damage", ability.name);
+    if (effect.riderStatus) applyWeaponRiderNamedStatus(hero, target, effect.riderStatus);
+    if (!target.alive) {
+      playSoundEffect("enemyDefeated");
+      awardMonsterXp(target);
+      dropLootForMonster(target);
+      void finishEncounterAfterLastMonsterFalls();
+    }
+    return true;
+  }
+
+  if (effect.kind === "aoeDamage") {
+    const targets = visibleMonsters().filter((monster) => distance(hero.position, monster.position) <= (effect.radius ?? 3));
+    if (!targets.length) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${hero.name} has no enemies in range for ${ability.name}.`, "important");
+      return true;
+    }
+    for (const target of targets) {
+      const damage = Math.max(1, subclassEffectDiceTotal(effect, hero));
+      applySpecialDamage(hero, target, damage, effect.damageType ?? "damage", ability.name);
+      if (effect.riderStatus) applyWeaponRiderNamedStatus(hero, target, effect.riderStatus);
+      if (!target.alive) {
+        playSoundEffect("enemyDefeated");
+        awardMonsterXp(target);
+        dropLootForMonster(target);
+      }
+    }
+    void finishEncounterAfterLastMonsterFalls();
+    return true;
+  }
+
+  if (effect.kind === "partyHeal" || effect.kind === "partyHealStatus") {
+    const wounded = partyHeroes().filter((ally) => !ally.dead && (ally.hp ?? 0) < (ally.maxHp ?? 0));
+    const amount = Math.max(1, scaledSubclassAmount(hero, effect.amount));
+    for (const ally of wounded) {
+      const healed = applyHealingToHero(ally, amount);
+      if (healed > 0) addLog(`${hero.name}'s ${ability.name} heals ${ally.name} for ${healed} HP.`, "heal");
+      if (effect.status) applyStatusEffect(ally, subclassEffectStatus(hero, effect.status));
+    }
+    await maybeFinishEncounterAfterHeroRecovery();
+    return true;
+  }
+
+  if (effect.kind === "selfHeal") {
+    const healed = applyHealingToHero(hero, Math.max(1, scaledSubclassAmount(hero, effect.amount)));
+    addLog(`${hero.name} uses ${ability.name} and heals ${healed} HP.`, "heal");
+    await maybeFinishEncounterAfterHeroRecovery();
+    return true;
+  }
+
+  if (effect.kind === "restoreSpellPoints") {
+    ensureSpellPointState(hero);
+    const before = hero.spellPoints ?? 0;
+    hero.spellPoints = Math.min(spellPointMaximum(hero), before + Math.max(1, scaledSubclassAmount(hero, effect.amount)));
+    addLog(`${hero.name} uses ${ability.name} and recovers ${hero.spellPoints - before} spell points.`, "important");
+    return true;
+  }
+
+  if (effect.kind === "bonusAttack") {
+    const target = subclassEffectMonsterTarget();
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${hero.name} has no target for ${ability.name}.`, "important");
+      return true;
+    }
+    hero.hasBonusAction = true;
+    await makeAttack(hero, target, { resource: "bonusAction", actionLabel: `uses ${ability.name}` });
+    return true;
+  }
+
+  if (effect.kind === "summonAlly") {
+    const position = nearestOpenSummonPosition(hero);
+    const target = subclassEffectMonsterTarget();
+    if (!position) {
+      if (target) {
+        const damage = Math.max(1, rollDice(2, 6).total + proficiencyBonus(hero));
+        applySpecialDamage(hero, target, damage, "force", `${ability.name} fallback strike`);
+      } else {
+        applyStatusEffect(hero, { id: `summon-fallback-${ability.id}`, label: ability.name, tempHp: 8 + proficiencyBonus(hero), durationRounds: 3 });
+      }
+      addLog(`${hero.name} cannot place an ally, so ${ability.name} becomes an immediate combat boost.`, "important");
+      return true;
+    }
+    const ally = createFriendlyBeastFromMonster(summonMonsterIdForProfile(effect.profile), {
+      id: `${ability.id}-${hero.id}-${Date.now()}`,
+      name: effect.name ?? ability.name,
+      position,
+      kind: "ally",
+      control: "ai",
+      followHeroId: hero.id,
+      followDistanceSquares: 2,
+    });
+    if (!ally) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${ability.name} cannot find a suitable ally template yet.`, "important");
+      return true;
+    }
+    ally.behavior = effect.profile === "rangedKiter" ? "rangedKiter" : "melee";
+    scaleSummonedAlly(ally, hero, effect.durationRounds ?? 4);
+    addSummonedAllyToCombat(hero, ally);
+    addLog(`${hero.name} summons ${ally.name}, who fights beside the party.`, "important");
+    return true;
+  }
+
+  if (effect.kind === "dominateTarget") {
+    const target = subclassEffectMonsterTarget();
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${hero.name} has no target for ${ability.name}.`, "important");
+      return true;
+    }
+    if ((target.category ?? 0) >= 4 || target.boss || target.elite) {
+      applyStatusEffect(target, { id: "domination-resisted", label: "Beguiled", attackBonus: -3, durationRounds: 1 });
+      addLog(`${target.name} resists full control, but ${ability.name} leaves them beguiled.`, "important");
+    } else {
+      applyStatusEffect(target, { id: "dominated", label: "Dominated", dominatedByHeroId: hero.id, durationRounds: effect.durationRounds ?? 1 });
+      target.team = "heroes";
+      target.friendly = true;
+      addLog(`${hero.name}'s ${ability.name} turns ${target.name} against the monsters for a short time.`, "important");
+    }
+    return true;
+  }
+
+  if (effect.kind === "revealTraps") {
+    for (const object of state.dungeonObjects ?? []) {
+      if (objectIsTrap(object)) object.detected = true;
+      if (object.trap) object.trap.detected = true;
+    }
+    if (effect.status) applyStatusEffect(hero, subclassEffectStatus(hero, effect.status));
+    addLog(`${hero.name}'s ${ability.name} reveals dangerous mechanisms in known rooms.`, "important");
+    return true;
+  }
+
+  if (effect.kind === "wildSurge") {
+    applyBarbarianWildSurge(hero);
+    return true;
+  }
+
+  if (effect.kind === "interruptSpell") {
+    applyStatusEffect(hero, { id: "spell-interrupt-ready", label: ability.name, spellInterrupt: true, restoreSpellPoints: effect.restoreSpellPoints ?? 0, durationRounds: 3 });
+    addLog(`${hero.name} watches for enemy magic. ${ability.name} will trigger as a reaction prompt when possible.`, "important");
+    return true;
+  }
+
+  return false;
+}
+
+async function chooseBeastBarbarianForm(hero) {
+  const form = await showChoiceDialog({
+    title: "Form of the Beast",
+    message: "Choose the natural weapon your Rage creates. It lasts until this Rage ends and does not cost another bonus action.",
+    actor: hero,
+    choices: [
+      { value: "bite", label: "Bite", description: "Your hits tear with fangs. Once each turn, a hit adds piercing damage and can heal you while badly hurt." },
+      { value: "claws", label: "Claws", description: "Your empty hands become claws. Attack with a claw to make one additional claw attack as part of the same Attack action." },
+      { value: "tail", label: "Tail", description: "A lashing tail guards your body, raising your AC while you rage." },
+    ],
+  });
+  return form || "claws";
+}
+
+function fighterSubclassDieSides(hero, kind) {
+  const level = hero?.level ?? 1;
+  if (kind === "superiority") return level >= 18 ? 12 : level >= 10 ? 10 : 8;
+  if (kind === "psionic") return level >= 17 ? 12 : level >= 11 ? 10 : level >= 5 ? 8 : 6;
+  if (kind === "giantsMight") return level >= 18 ? 10 : level >= 10 ? 8 : 6;
+  return 6;
+}
+
+function currentAttackTargetForAbility() {
+  const target = attackTarget();
+  return target && !objectIsDestructible(target) ? target : visibleMonsters()[0] ?? null;
+}
+
+function attackWeaponChoicesForTarget(fighter, target) {
+  if (!fighter || !target) return [];
+  return attackWeaponChoicesForFighter(fighter).filter((choice) => {
+    const profile = damageProfile(fighter, { weapon: choice.options?.weapon });
+    return objectIsDestructible(target)
+      ? isObjectInAttackRangeWithProfile(fighter, target, profile)
+      : isInAttackRangeWithProfile(fighter, target, profile);
+  });
+}
+
+function hideAttackWeaponPrompt() {
+  document.querySelector(".attack-weapon-prompt")?.remove();
+}
+
+function chooseAttackWeaponForTarget(fighter, target) {
+  const choices = attackWeaponChoicesForTarget(fighter, target);
+  if (choices.length <= 1) return Promise.resolve(choices[0]?.options ?? {});
+  hideAttackWeaponPrompt();
+  return new Promise((resolve) => {
+    const prompt = document.createElement("div");
+    prompt.className = "attack-weapon-prompt";
+    prompt.innerHTML = `
+      <div class="attack-weapon-title">Attack with</div>
+      ${choices
+        .map(
+          (choice, index) => `
+            <button type="button" data-attack-weapon="${index}">
+              <b>${escapeHtml(choice.label)}</b>
+              <span>${escapeHtml(choice.description)}</span>
+            </button>
+          `,
+        )
+        .join("")}
+    `;
+    const cleanup = (value) => {
+      document.removeEventListener("pointerdown", handleOutside, true);
+      prompt.remove();
+      resolve(value);
+    };
+    const handleOutside = (event) => {
+      if (prompt.contains(event.target) || event.target.closest("#attack")) return;
+      cleanup(null);
+    };
+    prompt.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-attack-weapon]");
+      if (!button) return;
+      const choice = choices[Number(button.dataset.attackWeapon)];
+      cleanup(choice?.options ?? null);
+    });
+    els.attack?.parentElement?.append(prompt);
+    window.setTimeout(() => document.addEventListener("pointerdown", handleOutside, true), 0);
+  });
+}
+
+async function performAttackWithPrompt() {
+  const fighter = activeFighter();
+  const target = attackTarget();
+  if (!fighter || !target) return;
+  const options = await chooseAttackWeaponForTarget(fighter, target);
+  if (!options) return;
+  if (objectIsDestructible(target)) await attackDestructibleObject(fighter, target, options);
+  else await makeAttack(fighter, target, options);
+}
+
 async function useFighterAbility(abilityId) {
   const hero = state.mode === "combat" ? activeFighter() : activeHero();
   const ability = availableFighterAbilities(hero).find((entry) => entry.id === abilityId);
@@ -5211,6 +6712,15 @@ async function useFighterAbility(abilityId) {
     hero.hasBonusAction = false;
   } else if (state.mode === "combat" && ability.resource === "action" && ability.id !== "eldritchBlast") {
     hero.hasAction = false;
+  } else if (state.mode === "combat" && ability.resource === "reaction") {
+    hero.hasReaction = false;
+  }
+
+  if (await handleGenericSubclassEffect(hero, ability)) {
+    refreshDerivedStats(hero);
+    hideAbilitiesMenu();
+    render();
+    return;
   }
 
   if (ability.id === "secondWind") {
@@ -5224,26 +6734,83 @@ async function useFighterAbility(abilityId) {
       resetDeathSaveCounters(hero);
     }
     addLog(`${hero.name} uses Second Wind and heals ${hero.hp - before} HP (${healingRoll.rolls[0]} + ${hero.level ?? 1}).`, "heal");
+    if (hero.subclassId === "banneret" && (hero.level ?? 1) >= 3) {
+      const allies = partyHeroes().filter((target) => target.id !== hero.id && !target.dead && (target.hp ?? 0) < (target.maxHp ?? 0)).slice(0, 3);
+      for (const ally of allies) {
+        const healed = applyHealingToHero(ally, hero.level ?? 1);
+        if (healed > 0) addLog(`${hero.name}'s Rallying Cry heals ${ally.name} for ${healed} HP.`, "heal");
+      }
+    }
   }
 
   if (ability.id === "actionSurge") {
     hero.hasAction = true;
     addLog(`${hero.name} uses Action Surge and regains an action.`, "important");
+    if (hero.subclassId === "banneret" && (hero.level ?? 1) >= 10) {
+      const allies = partyHeroes().filter((target) => target.id !== hero.id && heroCanAct(target)).slice(0, (hero.level ?? 1) >= 18 ? 2 : 1);
+      for (const ally of allies) {
+        const roll = rollDice(1, 8);
+        applyStatusEffect(ally, { id: `inspiring-surge-${hero.id}`, label: "Inspiring Surge", weaponRider: true, damageBonus: roll.total, damageType: ally.damage?.type ?? "damage", durationRounds: 1 });
+        addLog(`${hero.name}'s Inspiring Surge readies ${ally.name}'s next hit for ${roll.total} extra damage.`, "important");
+      }
+    }
+    if (hero.subclassId === "eldritch-knight" && (hero.level ?? 1) >= 14) {
+      applyStatusEffect(hero, { id: "arcane-charge", label: "Arcane Charge", speedBonusFeet: 30, expiresAtEndOfTurn: true });
+      addLog(`${hero.name}'s Arcane Charge grants a burst of teleport-like movement.`, "important");
+    }
   }
 
   if (ability.id === "rage") {
-    applyStatusEffect(hero, { id: "rage", label: "Rage", damageBonus: rageDamageBonus(hero), durationRounds: 10 });
+    const rageBonus = rageDamageBonus(hero);
+    applyStatusEffect(hero, { id: "rage", label: "Rage", damageBonus: rageBonus, durationRounds: 10 });
     addLog(`${hero.name} enters a Rage.`, "important");
+    if (hero.subclassId === "beast" && (hero.level ?? 1) >= 3) {
+      const form = await chooseBeastBarbarianForm(hero);
+      const labels = { bite: "Bestial Bite", claws: "Bestial Claws", tail: "Bestial Tail" };
+      const effect = {
+        id: `beast-form-${form}`,
+        label: labels[form] ?? "Beast Form",
+        durationRounds: 10,
+      };
+      applyStatusEffect(hero, effect);
+      hero.beastFormHitThisTurn = false;
+      addLog(`${hero.name}'s Rage manifests ${labels[form] ?? "a beast form"}.`, "important");
+    }
+    if (hero.subclassId === "ancestral-guardian" && (hero.level ?? 1) >= 3) {
+      applyStatusEffect(hero, { id: "ancestral-protectors-ready", label: "Ancestral Protectors", weaponRider: true, damageBonus: 0, riderStatus: "marked", durationRounds: 10 });
+      addLog(`${hero.name}'s ancestors gather around the battlefield.`, "important");
+    }
+    if (hero.subclassId === "giant" && (hero.level ?? 1) >= 3) {
+      applyStatusEffect(hero, { id: "giants-havoc", label: "Giant's Havoc", damageBonus: (hero.level ?? 1) >= 14 ? 3 : 2, speedBonusFeet: 5, durationRounds: 10 });
+      addLog(`${hero.name}'s rage swells with giant power.`, "important");
+    }
+    if (hero.subclassId === "zealot" && (hero.level ?? 1) >= 3) {
+      applyStatusEffect(hero, { id: "divine-fury", label: "Divine Fury", durationRounds: 10 });
+      addLog(`${hero.name}'s Divine Fury will add radiant damage to the first melee hit each turn while raging.`, "important");
+    }
+    if (hero.subclassId === "wild-magic" && (hero.level ?? 1) >= 3) {
+      applyBarbarianWildSurge(hero);
+    }
   }
 
   if (ability.id === "recklessAttack") {
     applyStatusEffect(hero, { id: "reckless-attack", label: "Reckless", attackBonus: 2, acBonus: -2, expiresAtStartOfTurn: true });
     addLog(`${hero.name} attacks recklessly.`, "important");
+    if (hero.subclassId === "battlerager" && (hero.level ?? 1) >= 6) {
+      const tempHp = Math.max(1, abilityMod(hero, "con"));
+      applyStatusEffect(hero, { id: "reckless-abandon", label: "Reckless Abandon", tempHp, expiresAtStartOfTurn: true });
+      addLog(`${hero.name}'s Reckless Abandon grants ${tempHp} temporary HP.`, "important");
+    }
   }
 
   if (ability.id === "patientDefense") {
     hero.dodging = true;
     addLog(`${hero.name} takes a defensive stance.`, "important");
+  }
+
+  if (ability.id === "stunningStrike") {
+    applyStatusEffect(hero, { id: "stunning-strike", label: "Stunning Strike", weaponRider: true, damageBonus: 0, damageType: hero.damage?.type ?? "damage", riderStatus: "stunned", expiresAtEndOfTurn: true });
+    addLog(`${hero.name} focuses ki into their next hit.`, "important");
   }
 
   if (ability.id === "cunningActionDash") {
@@ -5291,6 +6858,349 @@ async function useFighterAbility(abilityId) {
     hero.movementLeft = 0;
     applyStatusEffect(hero, { id: "steady-aim", label: "Steady Aim", attackAdvantage: true, expiresAtEndOfTurn: true });
     addLog(`${hero.name} takes Steady Aim. Their next attack has advantage.`, "important");
+  }
+
+  if (ability.resourcePool === "arcaneShot") {
+    const shot = ability.shot ?? "";
+    const diceCount = ["piercing", "seeking"].includes(shot) ? ((hero.level ?? 1) >= 18 ? 2 : 1) : ((hero.level ?? 1) >= 18 ? 4 : 2);
+    const damageTypeByShot = {
+      banishing: "force",
+      beguiling: "psychic",
+      bursting: "force",
+      enfeebling: "necrotic",
+      grasping: "poison",
+      piercing: "piercing",
+      seeking: "force",
+      shadow: "psychic",
+    };
+    const statusByShot = {
+      banishing: "banished",
+      beguiling: "charmed",
+      enfeebling: "enfeebled",
+      grasping: "hamstrung",
+      piercing: null,
+      seeking: null,
+      shadow: "shaken",
+    };
+    const roll = rollDice(diceCount, 6);
+    const attackBonus = shot === "seeking" ? 5 : 0;
+    applyStatusEffect(hero, {
+      id: ability.id,
+      label: ability.name,
+      weaponRider: true,
+      damageBonus: roll.total,
+      damageType: damageTypeByShot[shot] ?? "force",
+      riderStatus: statusByShot[shot],
+      attackBonus,
+      expiresAtEndOfTurn: true,
+    });
+    addLog(`${hero.name} prepares ${ability.name} (${roll.rolls.join(" + ")} ${damageTypeByShot[shot] ?? "force"}).`, "important");
+  }
+
+  if (ability.id === "maneuverRally") {
+    const target = await chooseAbilityTarget(hero, "Rally", "Choose an ally to rally.");
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      renderAbilitiesMenu();
+      return;
+    }
+    const roll = rollDice(1, fighterSubclassDieSides(hero, "superiority"));
+    applyStatusEffect(target, { id: `rallied-by-${hero.id}`, label: "Rallied", tempHp: Math.max(1, roll.total + abilityMod(hero, "cha")), durationRounds: 10 });
+    addLog(`${hero.name} rallies ${target.name} for ${Math.max(1, roll.total + abilityMod(hero, "cha"))} temporary HP.`, "important");
+  }
+
+  if (ability.id === "maneuverCommandersStrike" || ability.id === "maneuverManeuvering") {
+    const target = await chooseAbilityTarget(hero, ability.name, "Choose an ally to coordinate.");
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      renderAbilitiesMenu();
+      return;
+    }
+    const roll = rollDice(1, fighterSubclassDieSides(hero, "superiority"));
+    if (ability.id === "maneuverCommandersStrike") {
+      applyStatusEffect(target, { id: `commanders-strike-${hero.id}`, label: "Commander's Strike", weaponRider: true, damageBonus: roll.total, damageType: target.damage?.type ?? "damage", durationRounds: 1 });
+      addLog(`${hero.name} directs ${target.name}'s next strike for ${roll.total} extra damage.`, "important");
+    } else {
+      target.movementLeft = (target.movementLeft ?? 0) + Math.max(1, Math.floor((target.speedFeet ?? 30) / feetPerSquare / 2));
+      addLog(`${hero.name}'s Maneuvering Attack opens movement for ${target.name}.`, "important");
+    }
+  }
+
+  if (ability.resourcePool === "superiority" && !["maneuverRally", "maneuverCommandersStrike", "maneuverManeuvering", "maneuverParry", "maneuverRiposte", "maneuverBrace"].includes(ability.id)) {
+    const roll = rollDice(1, fighterSubclassDieSides(hero, "superiority"));
+    const maneuver = ability.maneuver ?? "";
+    const riderStatusByManeuver = {
+      disarming: "disarmed",
+      distracting: "distracted",
+      goading: "marked",
+      grappling: "restrained",
+      menacing: "frightened",
+      pushing: "hamstrung",
+      sweeping: "sweeping",
+      trip: "prone",
+    };
+    if (maneuver === "precision") {
+      applyStatusEffect(hero, { id: "precision-attack", label: `Precision d${fighterSubclassDieSides(hero, "superiority")}`, attackBonus: roll.total, expiresAtEndOfTurn: true });
+      addLog(`${hero.name} uses Precision Attack for ${abilityLabel(roll.total)} on the next attack roll.`, "important");
+    } else if (["baitAndSwitch", "evasiveFootwork"].includes(maneuver)) {
+      applyStatusEffect(hero, { id: ability.id, label: ability.name, acBonus: roll.total, expiresAtStartOfTurn: true });
+      addLog(`${hero.name} uses ${ability.name} for ${abilityLabel(roll.total)} AC.`, "important");
+    } else if (["commandingPresence", "tacticalAssessment"].includes(maneuver)) {
+      applyStatusEffect(hero, { id: ability.id, label: ability.name, skillBonus: roll.total, durationRounds: 3 });
+      addLog(`${hero.name} uses ${ability.name} for ${abilityLabel(roll.total)} on upcoming checks.`, "important");
+    } else if (maneuver === "feinting") {
+      applyStatusEffect(hero, { id: ability.id, label: ability.name, attackAdvantage: true, weaponRider: true, damageBonus: roll.total, damageType: hero.damage?.type ?? "damage", expiresAtEndOfTurn: true });
+      addLog(`${hero.name} feints; the next hit adds ${roll.total} damage.`, "important");
+    } else if (maneuver === "lunging") {
+      applyStatusEffect(hero, { id: ability.id, label: ability.name, speedBonusFeet: 5, weaponRider: true, damageBonus: roll.total, damageType: hero.damage?.type ?? "damage", expiresAtEndOfTurn: true });
+      addLog(`${hero.name} lunges; the next hit adds ${roll.total} damage.`, "important");
+    } else if (maneuver === "quickToss") {
+      const target = currentAttackTargetForAbility();
+      if (!target) {
+        refundFighterAbilityUse(hero, ability);
+        addLog(`${hero.name} has no target for Quick Toss.`, "important");
+      } else {
+        applyStatusEffect(hero, { id: ability.id, label: ability.name, weaponRider: true, damageBonus: roll.total, damageType: hero.damage?.type ?? "damage", expiresAtEndOfTurn: true });
+        hero.hasBonusAction = true;
+        await makeAttack(hero, target, { resource: "bonusAction", actionLabel: "uses Quick Toss" });
+      }
+    } else {
+      applyStatusEffect(hero, { id: ability.id, label: ability.name, weaponRider: true, damageBonus: roll.total, damageType: hero.damage?.type ?? "damage", riderStatus: riderStatusByManeuver[maneuver] ?? null, expiresAtEndOfTurn: true });
+      addLog(`${hero.name} prepares ${ability.name} (${roll.total} extra damage).`, "important");
+    }
+  }
+
+  if (ability.id === "unwaveringMark") {
+    const roll = Math.max(1, Math.floor((hero.level ?? 1) / 2));
+    applyStatusEffect(hero, { id: "unwavering-mark", label: "Unwavering Mark", weaponRider: true, damageBonus: roll, damageType: hero.damage?.type ?? "damage", riderStatus: "marked", expiresAtEndOfTurn: true });
+    addLog(`${hero.name} marks their foe; the next weapon hit deals ${roll} extra damage.`, "important");
+  }
+
+  if (ability.id === "wardingManeuver") {
+    const roll = rollDice(1, 8);
+    applyStatusEffect(hero, { id: "warding-maneuver", label: "Warding Maneuver", acBonus: roll.total, resistances: ["bludgeoning", "piercing", "slashing"], expiresAtStartOfTurn: true });
+    addLog(`${hero.name} uses Warding Maneuver for ${abilityLabel(roll.total)} AC and weapon resistance.`, "important");
+  }
+
+  if (ability.id === "ferociousCharger") {
+    const bonus = Math.max(1, abilityMod(hero, "str"));
+    applyStatusEffect(hero, { id: "ferocious-charger", label: "Ferocious Charger", weaponRider: true, damageBonus: bonus, damageType: hero.damage?.type ?? "damage", riderStatus: "prone", expiresAtEndOfTurn: true });
+    addLog(`${hero.name} lowers their shoulder for a Ferocious Charger hit.`, "important");
+  }
+
+  if (ability.id === "fightingSpirit") {
+    const tempHp = (hero.level ?? 1) >= 15 ? 15 : (hero.level ?? 1) >= 10 ? 10 : 5;
+    applyStatusEffect(hero, { id: "fighting-spirit", label: "Fighting Spirit", attackAdvantage: true, tempHp, expiresAtEndOfTurn: true });
+    addLog(`${hero.name} invokes Fighting Spirit and gains ${tempHp} temporary HP.`, "important");
+  }
+
+  if (ability.id === "rapidStrike") {
+    const target = currentAttackTargetForAbility();
+    if (!target || !(hero.statusEffects ?? []).some((effect) => effect.id === "fighting-spirit")) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${hero.name} needs Fighting Spirit and a target for Rapid Strike.`, "important");
+    } else {
+      hero.hasBonusAction = true;
+      await makeAttack(hero, target, { resource: "bonusAction", actionLabel: "uses Rapid Strike" });
+    }
+  }
+
+  if (ability.id === "manifestEcho") {
+    applyStatusEffect(hero, { id: "manifest-echo", label: "Manifest Echo", speedBonusFeet: 15, expiresAtEndOfTurn: true });
+    addLog(`${hero.name} manifests an echo, gaining short-range mobility this turn.`, "important");
+  }
+
+  if (ability.id === "unleashIncarnation") {
+    const target = currentAttackTargetForAbility();
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${hero.name}'s echo has no target.`, "important");
+    } else {
+      hero.hasBonusAction = true;
+      await makeAttack(hero, target, { resource: "bonusAction", actionLabel: "attacks through the echo" });
+    }
+  }
+
+  if (ability.id === "shadowMartyr") {
+    applyStatusEffect(hero, { id: "shadow-martyr", label: "Shadow Martyr", acBonus: 5, expiresAtStartOfTurn: true });
+    addLog(`${hero.name}'s echo interposes as Shadow Martyr.`, "important");
+  }
+
+  if (ability.id === "reclaimPotential") {
+    const roll = rollDice(2, 6);
+    const tempHp = Math.max(1, roll.total + abilityMod(hero, "con"));
+    applyStatusEffect(hero, { id: "reclaim-potential", label: "Reclaim Potential", tempHp, durationRounds: 10 });
+    addLog(`${hero.name} reclaims echo potential for ${tempHp} temporary HP.`, "important");
+  }
+
+  if (ability.id === "psionicStrike") {
+    const roll = rollDice(1, fighterSubclassDieSides(hero, "psionic"));
+    const damage = Math.max(1, roll.total + abilityMod(hero, "int"));
+    applyStatusEffect(hero, { id: "psionic-strike", label: "Psionic Strike", weaponRider: true, damageBonus: damage, damageType: "force", riderStatus: (hero.level ?? 1) >= 7 ? "prone" : null, expiresAtEndOfTurn: true });
+    addLog(`${hero.name} charges a Psionic Strike for ${damage} force damage.`, "important");
+  }
+
+  if (ability.id === "protectiveField") {
+    const roll = rollDice(1, fighterSubclassDieSides(hero, "psionic"));
+    const reduction = Math.max(1, roll.total + abilityMod(hero, "int"));
+    applyStatusEffect(hero, { id: "protective-field", label: "Protective Field", tempHp: reduction, expiresAtStartOfTurn: true });
+    addLog(`${hero.name}'s Protective Field grants ${reduction} temporary HP.`, "important");
+  }
+
+  if (ability.id === "psiPoweredLeap") {
+    applyStatusEffect(hero, { id: "psi-powered-leap", label: "Psi-Powered Leap", speedBonusFeet: hero.speedFeet ?? 30, expiresAtEndOfTurn: true });
+    addLog(`${hero.name} launches with Psi-Powered Leap.`, "important");
+  }
+
+  if (ability.id === "bulwarkOfForce") {
+    const targets = partyHeroes().filter((target) => heroCanAct(target)).slice(0, Math.max(1, abilityMod(hero, "int")));
+    for (const target of targets) applyStatusEffect(target, { id: `bulwark-of-force-${hero.id}`, label: "Bulwark of Force", acBonus: 2, durationRounds: 10 });
+    addLog(`${hero.name} raises a Bulwark of Force around ${targets.map((target) => target.name).join(", ")}.`, "important");
+  }
+
+  if (ability.id === "telekineticMaster") {
+    applyStatusEffect(hero, { id: "telekinetic-master", label: "Telekinetic Master", damageBonus: Math.max(1, abilityMod(hero, "int")), attackAdvantage: true, durationRounds: 3 });
+    addLog(`${hero.name} enters a Telekinetic Master battle focus.`, "important");
+  }
+
+  if (ability.id === "giantsMight") {
+    const roll = rollDice(1, fighterSubclassDieSides(hero, "giantsMight"));
+    applyStatusEffect(hero, { id: "giants-might", label: "Giant's Might", damageBonus: roll.total, skillBonus: 2, durationRounds: 10 });
+    addLog(`${hero.name} grows with Giant's Might (${roll.total} extra weapon damage).`, "important");
+  }
+
+  if (ability.id === "fireRune") {
+    const roll = rollDice(2, 6);
+    applyStatusEffect(hero, { id: "fire-rune", label: "Fire Rune", weaponRider: true, damageBonus: roll.total, damageType: "fire", riderStatus: "restrained", expiresAtEndOfTurn: true });
+    addLog(`${hero.name} invokes the Fire Rune (${roll.total} fire).`, "important");
+  }
+
+  if (ability.id === "frostRune") {
+    applyStatusEffect(hero, { id: "frost-rune", label: "Frost Rune", skillBonus: 2, durationRounds: 10 });
+    addLog(`${hero.name} invokes the Frost Rune.`, "important");
+  }
+
+  if (ability.id === "hillRune") {
+    applyStatusEffect(hero, { id: "hill-rune", label: "Hill Rune", resistances: ["bludgeoning", "piercing", "slashing", "poison"], durationRounds: 10 });
+    addLog(`${hero.name} invokes the Hill Rune.`, "important");
+  }
+
+  if (ability.id === "stormRune") {
+    applyStatusEffect(hero, { id: "storm-rune", label: "Storm Rune", attackAdvantage: true, durationRounds: 10 });
+    addLog(`${hero.name} invokes the Storm Rune.`, "important");
+  }
+
+  if (ability.id === "runicShield") {
+    applyStatusEffect(hero, { id: "runic-shield", label: "Runic Shield", acBonus: 3, expiresAtStartOfTurn: true });
+    addLog(`${hero.name} raises a Runic Shield.`, "important");
+  }
+
+  if (ability.id === "battleragerSpikes" || ability.id === "frenzy") {
+    const target = currentAttackTargetForAbility();
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${hero.name} has no target for ${ability.name}.`, "important");
+    } else {
+      hero.hasBonusAction = true;
+      await makeAttack(hero, target, { resource: "bonusAction", actionLabel: `uses ${ability.name}` });
+    }
+  }
+
+  if (ability.id === "battleragerCharge") {
+    hero.movementLeft = (hero.movementLeft ?? 0) + Math.max(1, Math.floor((hero.speedFeet ?? 30) / feetPerSquare));
+    addLog(`${hero.name} charges forward in a spike-armored rush.`, "important");
+  }
+
+  if (ability.id === "infectiousFury") {
+    const damage = Math.max(1, rollDice(2, 12).total);
+    applyStatusEffect(hero, { id: "infectious-fury", label: "Infectious Fury", weaponRider: true, damageBonus: damage, damageType: "psychic", riderStatus: "shaken", expiresAtEndOfTurn: true });
+    addLog(`${hero.name}'s next hit carries infectious fury for ${damage} psychic damage.`, "important");
+  }
+
+  if (ability.id === "callTheHunt") {
+    const allies = partyHeroes().filter((target) => heroCanAct(target));
+    const tempHp = Math.max(1, 5 + abilityMod(hero, "con"));
+    for (const ally of allies) applyStatusEffect(ally, { id: `call-the-hunt-${hero.id}`, label: "Call the Hunt", tempHp, durationRounds: 10 });
+    applyStatusEffect(hero, { id: "call-the-hunt-damage", label: "Hunt Leader", damageBonus: Math.max(1, allies.length), durationRounds: 10 });
+    addLog(`${hero.name}'s Call the Hunt grants ${tempHp} temporary HP to the party.`, "important");
+  }
+
+  if (ability.id === "intimidatingPresence") {
+    const target = currentAttackTargetForAbility();
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${hero.name} has no target to intimidate.`, "important");
+    } else {
+      applyStatusEffect(target, { id: "intimidated", label: "Frightened", attackBonus: -2, durationRounds: 2 });
+      addLog(`${hero.name}'s presence frightens ${target.name}.`, "important");
+    }
+  }
+
+  if (ability.id === "elementalCleaver") {
+    const damage = rollDice((hero.level ?? 1) >= 14 ? 2 : 1, 6).total;
+    applyStatusEffect(hero, { id: "elemental-cleaver", label: "Elemental Cleaver", weaponRider: true, damageBonus: damage, damageType: "force", expiresAtEndOfTurn: true });
+    addLog(`${hero.name}'s next hit carries ${damage} elemental force.`, "important");
+  }
+
+  if (ability.id === "mightyImpel") {
+    const target = currentAttackTargetForAbility();
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      addLog(`${hero.name} has no target to impel.`, "important");
+    } else {
+      applyStatusEffect(target, { id: "mighty-impel", label: "Hurled", speedBonusFeet: -10, attackBonus: -1, expiresAtEndOfTurn: true });
+      addLog(`${hero.name}'s giant strength hurls ${target.name} off balance.`, "important");
+    }
+  }
+
+  if (ability.id === "stormAuraPulse") {
+    const aura = (hero.knownStormAuras ?? [])[0] ?? "stormAuraDesert";
+    if (aura === "stormAuraTundra") {
+      const tempHp = Math.max(2, abilityMod(hero, "con") + Math.floor((hero.level ?? 1) / 3));
+      for (const ally of partyHeroes().filter((target) => distance(target.position, hero.position) <= 2)) applyStatusEffect(ally, { id: `tundra-aura-${hero.id}`, label: "Tundra Aura", tempHp, expiresAtStartOfTurn: true });
+      addLog(`${hero.name}'s tundra aura grants ${tempHp} temporary HP nearby.`, "important");
+    } else {
+      const target = currentAttackTargetForAbility();
+      if (!target) {
+        refundFighterAbilityUse(hero, ability);
+        addLog(`${hero.name}'s storm has no target.`, "important");
+      } else {
+        const type = aura === "stormAuraSea" ? "lightning" : "fire";
+        const roll = aura === "stormAuraSea" ? rollDice(1, 6) : { total: Math.max(2, Math.floor((hero.level ?? 1) / 2)) };
+        applySpecialDamage(hero, target, roll.total, type, aura === "stormAuraSea" ? "Sea Aura" : "Desert Aura");
+      }
+    }
+  }
+
+  if (ability.id === "totemSurge") {
+    const totems = hero.knownTotems ?? [];
+    if (totems.includes("totemBear")) applyStatusEffect(hero, { id: "bear-totem-surge", label: "Bear Totem", resistances: ["acid", "cold", "fire", "lightning", "necrotic", "poison", "psychic", "radiant", "thunder"], expiresAtStartOfTurn: true });
+    if (totems.includes("totemEagle")) hero.movementLeft = (hero.movementLeft ?? 0) + Math.max(1, Math.floor((hero.speedFeet ?? 30) / feetPerSquare / 2));
+    if (totems.includes("totemWolf")) {
+      const target = currentAttackTargetForAbility();
+      if (target) applyStatusEffect(target, { id: `wolf-totem-${hero.id}`, label: "Wolf Totem", acBonus: -2, expiresAtEndOfTurn: true });
+    }
+    addLog(`${hero.name} calls on their totem spirit.`, "important");
+  }
+
+  if (ability.id === "bolsteringMagic") {
+    const target = await chooseAbilityTarget(hero, "Bolstering Magic", "Choose an ally to bolster with wild magic.");
+    if (!target) {
+      refundFighterAbilityUse(hero, ability);
+      renderAbilitiesMenu();
+      return;
+    }
+    applyStatusEffect(target, { id: `bolstering-magic-${hero.id}`, label: "Bolstering Magic", attackBonus: rollDie(3), skillBonus: rollDie(3), durationRounds: 3 });
+    addLog(`${hero.name}'s Bolstering Magic sparks around ${target.name}.`, "important");
+  }
+
+  if (ability.id === "unstableBacklash") {
+    applyBarbarianWildSurge(hero);
+  }
+
+  if (ability.id === "zealousPresence") {
+    for (const ally of partyHeroes().filter((target) => heroCanAct(target))) applyStatusEffect(ally, { id: `zealous-presence-${hero.id}`, label: "Zealous Presence", attackAdvantage: true, saveBonus: 2, durationRounds: 1 });
+    addLog(`${hero.name}'s Zealous Presence rallies the party.`, "important");
   }
 
   if (ability.id === "eldritchBlast") {
@@ -5351,6 +7261,18 @@ async function useFighterAbility(abilityId) {
     addLog(`${hero.name} uses Eldritch Master and restores pact spell points.`, "important");
   }
 
+  if (ability.id === "spellMastery") {
+    const before = hero.spellPoints ?? 0;
+    hero.spellPoints = Math.min(spellPointMaximum(hero), before + 4);
+    addLog(`${hero.name}'s Spell Mastery restores ${hero.spellPoints - before} spell points.`, "important");
+  }
+
+  if (ability.id === "signatureSpells") {
+    const before = hero.spellPoints ?? 0;
+    hero.spellPoints = Math.min(spellPointMaximum(hero), before + 10);
+    addLog(`${hero.name}'s Signature Spells restore ${hero.spellPoints - before} spell points.`, "important");
+  }
+
   if (ability.id === "bardicInspiration") {
     const target = await chooseAbilityTarget(hero, "Bardic Inspiration", "Choose a hero to inspire.");
     if (!target) {
@@ -5382,11 +7304,17 @@ async function useFighterAbility(abilityId) {
       renderAbilitiesMenu();
       return;
     }
-    const healing = abilityMaxUses(hero, ability);
+    const remainingPool = Math.max(0, abilityMaxUses(hero, ability) - Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1));
+    const healing = await chooseLayOnHandsAmount(hero, target, remainingPool);
+    if (!healing) {
+      refundFighterAbilityUse(hero, ability);
+      renderAbilitiesMenu();
+      return;
+    }
     const healed = applyHealingToHero(target, healing);
-    hero.abilityUses[ability.id] = abilityMaxUses(hero, ability);
+    hero.abilityUses[ability.id] = Math.min(abilityMaxUses(hero, ability), Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1) + healing);
     const targetText = target.id === hero.id ? "" : ` on ${target.name}`;
-    addLog(`${hero.name} uses Lay on Hands${targetText} and heals ${healed} HP.`, "heal");
+    addLog(`${hero.name} spends ${healing} Lay on Hands HP${targetText} and heals ${healed} HP.`, "heal");
     await maybeFinishEncounterAfterHeroRecovery();
   }
 
@@ -5881,11 +7809,12 @@ function renderControls() {
   els.rollInitiative.disabled = !gameHasStarted || state.completed || movementInProgress || state.mode === "combat" || !threatPresent();
   els.attack.disabled = movementInProgress || !heroCanAttack;
   if (els.attackNote) {
-    const weapon = activeWeapon(actingHero);
     const target = attackTarget();
+    const choices = target ? attackWeaponChoicesForTarget(actingHero, target) : attackWeaponChoicesForFighter(actingHero);
+    const weaponText = choices.length > 1 ? "Choose weapon" : choices[0]?.label ?? activeWeapon(actingHero)?.name ?? "Unarmed Strike";
     els.attackNote.textContent = target
-      ? `${weapon?.name ?? "Unarmed Strike"} -> ${objectIsDestructible(target) ? objectTargetName(target) : target.name}`
-      : `${weapon?.name ?? "Unarmed Strike"}`;
+      ? `${weaponText} -> ${objectIsDestructible(target) ? objectTargetName(target) : target.name}`
+      : weaponText;
   }
   els.actionButton.disabled = movementInProgress || !heroCanUseAction;
   els.useItem.disabled = movementInProgress || !heroCanUseItem;
@@ -5956,4 +7885,3 @@ function renderControls() {
   }
   updateBackgroundMusic();
 }
-

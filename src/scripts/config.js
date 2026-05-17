@@ -14,6 +14,10 @@ window.DungeonConfig = {
     theme: "oldGuardroom",
     lootTable: "basicDungeon",
   },
+  bugReport: {
+    formUrl: "https://forms.gle/rLzd1mUpRm7abSB29",
+    responseSheetUrl: "https://docs.google.com/spreadsheets/d/1vwoaKmapIZxBCVdIrFga6rN6hj2vTj9AAO0cHqxAU28/edit",
+  },
   templates: {
     hero: {
       id: "hero",

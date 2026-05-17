@@ -26,13 +26,13 @@ window.DungeonContent.register("classes", "paladin", {
   spells: [],
   token: "P",
   classFeatures: [
-    { level: 1, name: "Lay on Hands", description: "Use a healing pool to restore allies or purge poison and disease." },
-    { level: 2, name: "Divine Smite", description: "Spend spell power on a weapon hit to unleash radiant damage." },
+    { level: 1, name: "Lay on Hands", description: "Use a healing pool equal to 5 x paladin level to restore yourself or adjacent allies." },
+    { level: 2, name: "Divine Smite", description: "Spend spell points before a weapon hit to add radiant damage; more points add more d8s." },
     { level: 5, name: "Extra Attack", description: "Attack more than once when you take the Attack action." },
-    { level: 6, name: "Aura of Protection", description: "Nearby allies benefit from your force of presence on saving throws." },
+    { level: 6, name: "Aura of Protection", description: "Nearby allies add your Charisma modifier to saving throws." },
   ],
   abilities: [
-    { id: "layOnHands", name: "Lay on Hands", level: 1, refresh: "longRest", uses: 5, resourcePool: "layOnHands", resource: "action", description: "Spend your Lay on Hands pool to heal yourself." },
+    { id: "layOnHands", name: "Lay on Hands", level: 1, refresh: "longRest", uses: 5, resourcePool: "layOnHands", resource: "action", description: "Spend any amount from your Lay on Hands pool to heal yourself or an adjacent wounded ally." },
     { id: "divineSmite", name: "Divine Smite", level: 2, refresh: "turn", uses: 1, resource: "bonusAction", description: "Spend spell points to charge your next weapon hit with radiant damage." },
   ],
   equipment: { mainHand: "longsword", offHand: "shield", torso: "chain-mail" },

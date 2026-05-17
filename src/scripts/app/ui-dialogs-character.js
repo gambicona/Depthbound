@@ -693,11 +693,12 @@ function showChoiceDialog({ title, message, choices, actor = null }) {
     els.gameDialogActions.innerHTML = choices
       .map(
         (choice) =>
-          `<button type="button" class="${choice.value === dialogBackValue ? "ghost-button" : ""} ${choice.description ? "choice-with-description" : ""}" data-choice="${escapeAttribute(choice.value)}" ${
+          `<button type="button" class="${choice.value === dialogBackValue ? "ghost-button" : ""} ${choice.description || choice.info ? "choice-with-description" : ""}" data-choice="${escapeAttribute(choice.value)}" ${
             choice.description ? `title="${escapeAttribute(choice.description)}"` : ""
           }>
-            <b>${escapeHtml(choice.label)}</b>
+            <b>${escapeHtml(choice.label)}${choice.info ? ` <span class="choice-info-glyph" title="${escapeAttribute(choice.info)}" aria-label="More information">i</span>` : ""}</b>
             ${choice.description ? `<span class="choice-description">${escapeHtml(choice.description)}</span>` : ""}
+            ${choice.info ? `<span class="choice-info-text">${escapeHtml(choice.info)}</span>` : ""}
           </button>`,
       )
       .join("");
@@ -719,6 +720,74 @@ function showChoiceDialog({ title, message, choices, actor = null }) {
     activeDialogCancel = () => cleanup(null);
     els.gameDialog.classList.remove("hidden");
     els.gameDialogActions.querySelector("[data-choice]")?.focus();
+  });
+}
+
+function selectChoiceDetailMarkup(choice) {
+  if (!choice) return `<p class="choice-description">No choice selected.</p>`;
+  return `
+    ${choice.label ? `<b>${escapeHtml(choice.label)}${choice.info ? ` <span class="choice-info-glyph" title="${escapeAttribute(choice.info)}" aria-label="More information">i</span>` : ""}</b>` : ""}
+    ${choice.description ? `<p>${escapeHtml(choice.description)}</p>` : ""}
+    ${choice.info ? `<p class="choice-info-text">${escapeHtml(choice.info)}</p>` : ""}
+  `;
+}
+
+function showSelectChoiceDialog({ title, message, choices, actor = null, label = "Choose:", defaultValue = null, confirmText = "Choose", cancelText = "Cancel" }) {
+  return new Promise((resolve) => {
+    const initialValue = defaultValue ?? choices[0]?.value ?? "";
+    els.gameDialogTitle.textContent = title;
+    els.gameDialogMessage.innerHTML = actor ? dialogMessageMarkup(message, actor) : escapeHtml(message ?? "");
+    els.gameDialogField.classList.remove("hidden");
+    els.gameDialogField.innerHTML = `
+      <span class="select-choice-field">
+        <span>${escapeHtml(label)}</span>
+        <select data-select-choice>
+          ${choices
+            .map(
+              (choice) =>
+                `<option value="${escapeAttribute(choice.value)}" ${String(choice.value) === String(initialValue) ? "selected" : ""}>${escapeHtml(choice.label)}</option>`,
+            )
+            .join("")}
+        </select>
+      </span>
+      <div class="select-choice-details" data-select-choice-details></div>
+    `;
+    els.gameDialogActions.innerHTML = `
+      <button type="button" data-select-confirm>${escapeHtml(confirmText)}</button>
+      <button type="button" class="ghost-button" data-select-cancel>${escapeHtml(cancelText)}</button>
+    `;
+
+    const select = els.gameDialogField.querySelector("[data-select-choice]");
+    const details = els.gameDialogField.querySelector("[data-select-choice-details]");
+    const selectedChoice = () => choices.find((choice) => String(choice.value) === String(select?.value)) ?? choices[0] ?? null;
+    const renderDetails = () => {
+      details.innerHTML = selectChoiceDetailMarkup(selectedChoice());
+    };
+
+    const cleanup = (value) => {
+      els.gameDialogActions.removeEventListener("click", handleClick);
+      els.gameDialogField.removeEventListener("change", handleChange);
+      els.gameDialog.classList.add("hidden");
+      els.gameDialogField.innerHTML = "";
+      els.gameDialogField.classList.add("hidden");
+      activeDialogCancel = null;
+      resolve(value);
+    };
+
+    const handleClick = (event) => {
+      if (event.target.closest("[data-select-cancel]")) cleanup(null);
+      if (event.target.closest("[data-select-confirm]")) cleanup(select?.value ?? null);
+    };
+    const handleChange = (event) => {
+      if (event.target.closest("[data-select-choice]")) renderDetails();
+    };
+
+    renderDetails();
+    els.gameDialogActions.addEventListener("click", handleClick);
+    els.gameDialogField.addEventListener("change", handleChange);
+    activeDialogCancel = () => cleanup(null);
+    els.gameDialog.classList.remove("hidden");
+    select?.focus();
   });
 }
 
@@ -1944,6 +2013,7 @@ function spellChoiceCountForClassLevel(classId, level) {
   const template = getHeroTemplate(classId);
   const casterType = template.casterType ?? "none";
   if (casterType === "none") return 0;
+  if (classId === "wizard") return level === 1 ? 4 : 2;
   if (casterType === "full") return level === 1 ? 2 : 1;
   if (casterType === "half") return level === 1 || (level > 1 && level % 2 === 1) ? 1 : 0;
   if (casterType === "pact") return level === 1 ? 2 : level >= 3 && level <= 17 && level % 2 === 1 ? 1 : 0;
@@ -1953,6 +2023,7 @@ function spellChoiceCountForClassLevel(classId, level) {
 function cantripChoiceCountForClassLevel(classId, level) {
   const template = getHeroTemplate(classId);
   if (!(template.cantripList ?? []).length) return 0;
+  if (classId === "wizard" && level === 1) return 4;
   if (level === 1) return 3;
   if (level === 4 || level === 10) return 1;
   return 0;
@@ -1978,7 +2049,7 @@ function spellChoiceDescription(spell) {
   return parts.join(" ");
 }
 
-async function chooseClassSpells(classSource, count, chosenSpellIds = []) {
+async function chooseClassSpells(classSource, count, chosenSpellIds = [], { cancelAborts = false } = {}) {
   const chosen = [...chosenSpellIds];
   let unusedCredits = 0;
   for (let index = 0; index < count; index += 1) {
@@ -1987,9 +2058,10 @@ async function chooseClassSpells(classSource, count, chosenSpellIds = []) {
       unusedCredits += 1;
       continue;
     }
-    const choice = await showChoiceDialog({
+    const choice = await showSelectChoiceDialog({
       title: "Choose Spell",
       message: `Choose a ${classSource.className ?? "class"} spell (${index + 1}/${count}).`,
+      label: "Choose a spell:",
       choices: eligible.map((spell) => ({
         value: spell.id,
         label: `${spell.name} (L${spellBaseLevel(spell)})`,
@@ -1997,6 +2069,7 @@ async function chooseClassSpells(classSource, count, chosenSpellIds = []) {
       })),
     });
     if (!choice) {
+      if (cancelAborts) return { spells: chosen, unusedCredits, cancelled: true };
       unusedCredits += count - index;
       break;
     }
@@ -2012,7 +2085,7 @@ function eligibleCantripChoicesFor(classSource, chosenSpellIds = []) {
     .filter((spell) => spell && !chosen.has(spell.id) && spellBaseLevel(spell) === 0);
 }
 
-async function chooseClassCantrips(classSource, count, chosenSpellIds = []) {
+async function chooseClassCantrips(classSource, count, chosenSpellIds = [], { cancelAborts = false } = {}) {
   const chosen = [...chosenSpellIds];
   let unusedCredits = 0;
   for (let index = 0; index < count; index += 1) {
@@ -2021,12 +2094,14 @@ async function chooseClassCantrips(classSource, count, chosenSpellIds = []) {
       unusedCredits += 1;
       continue;
     }
-    const choice = await showChoiceDialog({
+    const choice = await showSelectChoiceDialog({
       title: "Choose Cantrip",
       message: `Choose a ${classSource.className ?? "class"} cantrip (${index + 1}/${count}).`,
+      label: "Choose a cantrip:",
       choices: eligible.map((spell) => ({ value: spell.id, label: spell.name, description: spellChoiceDescription(spell) })),
     });
     if (!choice) {
+      if (cancelAborts) return { spells: chosen, unusedCredits, cancelled: true };
       unusedCredits += count - index;
       break;
     }
@@ -2210,8 +2285,7 @@ async function chooseLevelUpExpertise(hero) {
     allowedTools: activePlan.allowedTools ?? null,
   });
   if (!gained) {
-    hero.unusedExpertiseChoiceCredits = count;
-    return " Expertise choice deferred.";
+    return null;
   }
   hero.expertiseSkills = uniqueValues([...(hero.expertiseSkills ?? []), ...gained.skills]);
   hero.expertiseTools = uniqueValues([...(hero.expertiseTools ?? []), ...gained.tools]);

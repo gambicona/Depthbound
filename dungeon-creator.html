@@ -356,6 +356,42 @@
             <textarea id="outro-images" placeholder="One image URL per line"></textarea>
           </label>
         </section>
+
+        <section class="creator-section">
+          <h2>Story Triggers</h2>
+          <label>
+            Trigger
+            <select id="story-trigger-event">
+              <option value="enterRoom">Walk into room</option>
+              <option value="inspectObject">Inspect furniture/object</option>
+              <option value="openObject">Open/loot chest or object</option>
+              <option value="killMonster">Kill monster</option>
+            </select>
+          </label>
+          <label>
+            Target
+            <select id="story-trigger-target"></select>
+          </label>
+          <label>
+            Title
+            <input id="story-trigger-title" placeholder="Optional scene title" />
+          </label>
+          <label>
+            Text
+            <textarea id="story-trigger-text" placeholder="Narration to show when this trigger fires"></textarea>
+          </label>
+          <label>
+            Image URLs
+            <textarea id="story-trigger-images" placeholder="One image URL per line"></textarea>
+          </label>
+          <label>
+            <input id="story-trigger-once" type="checkbox" checked />
+            Show only once
+          </label>
+          <button id="save-story-trigger" type="button">Add Story Trigger</button>
+          <button id="new-story-trigger" class="ghost-button" type="button">New Trigger</button>
+          <div id="story-trigger-list" class="creator-list"></div>
+        </section>
       </aside>
 
       <section class="creator-stage">

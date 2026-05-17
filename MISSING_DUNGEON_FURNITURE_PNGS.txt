@@ -1,0 +1,333 @@
+Missing Dungeon Furniture PNGs
+==============================
+
+Source catalogue:
+src/scripts/content/furniture/dungeon-furniture-pack.js
+
+Asset folder checked:
+assets/furniture
+
+Filename rule used:
+The game currently derives the furniture png filename from the registered display name:
+"Spike Trap" -> assets/furniture/spike-trap.png
+
+Total registered furniture in dungeon-furniture-pack.js: 134
+Missing png files: 105
+
+- home-cooking-pot | Cooking Pot | expected: assets/furniture/cooking-pot.png
+  Description: A warm kitchen pot. For now it can prepare a free hearty meal before an adventure.
+
+- home-herb-garden | Medicinal Herb Garden | expected: assets/furniture/medicinal-herb-garden.png
+  Description: A small herb bed for medicinal plants. Later it can grow ingredients over time.
+
+- trap | Spike Trap | expected: assets/furniture/spike-trap.png
+  Description: A concealed spike trap. It deals 1d4 piercing damage when a creature steps on it.
+
+- large-tree | Large Tree | expected: assets/furniture/large-tree.png
+  Description: A broad tree trunk fills the space, its roots lifting the ground into uneven ridges.
+
+- ancient-tree | Ancient Tree | expected: assets/furniture/ancient-tree.png
+  Description: An ancient tree rises like a living column. Deep knots and scars mark places worth inspecting.
+
+- hollow-tree | Hollow Tree | expected: assets/furniture/hollow-tree.png
+  Description: A hollow tree gapes open at the base. The dark interior could hide supplies, nests, or teeth.
+
+- fallen-log | Fallen Log | expected: assets/furniture/fallen-log.png
+  Description: A fallen log lies across the path, broad enough for cover and heavy enough to shove with effort.
+
+- rotten-log | Rotten Log | expected: assets/furniture/rotten-log.png
+  Description: A soft, rotten log crumbles with fungus and damp bark. Herbs or burrowing creatures may be inside.
+
+- bush | Bush | expected: assets/furniture/bush.png
+  Description: A thick bush crowds the floor with leaves and tangled branches. Berries or cover may be found in it.
+
+- berry-bush | Berry Bush | expected: assets/furniture/berry-bush.png
+  Description: A berry bush grows low and bright, dotted with fruit that looks ready to pick.
+
+- thorn-bush | Thorn Bush | expected: assets/furniture/thorn-bush.png
+  Description: A thorn bush claws into the path, its hooked branches promising scratches to anyone forcing through.
+
+- dense-bramble | Dense Bramble | expected: assets/furniture/dense-bramble.png
+  Description: Dense bramble knots into a wall of thorns and shadow. It can hide movement, treasure, or trouble.
+
+- hanging-vines | Hanging Vines | expected: assets/furniture/hanging-vines.png
+  Description: Vines hang in loose curtains from above. Some are slack, while others look suspiciously taut.
+
+- root-cluster | Root Cluster | expected: assets/furniture/root-cluster.png
+  Description: A cluster of roots bulges from the ground, making the floor treacherous and cramped.
+
+- mossy-boulder | Mossy Boulder | expected: assets/furniture/mossy-boulder.png
+  Description: A moss-covered boulder rises from the earth. Its slick surface could block sight or punish a careless step.
+
+- animal-burrow | Animal Burrow | expected: assets/furniture/animal-burrow.png
+  Description: A small burrow opens at the base of the wall or roots. Fresh scrapes show something has used it recently.
+
+- bird-nest | Bird Nest | expected: assets/furniture/bird-nest.png
+  Description: A nest of twigs and scraps sits tucked out of the way. Bits of shine are woven through it.
+
+- mushroom-ring | Mushroom Ring | expected: assets/furniture/mushroom-ring.png
+  Description: A ring of mushrooms marks the ground in pale caps. The air around them smells sweet and wrong.
+
+- medicinal-herb-patch | Medicinal Herb Patch | expected: assets/furniture/medicinal-herb-patch.png
+  Description: A patch of useful-looking herbs grows close to the floor, their leaves bruising with a sharp clean scent.
+
+- poison-ivy-patch | Poison Ivy Patch | expected: assets/furniture/poison-ivy-patch.png
+  Description: Glossy ivy sprawls over the ground. Its leaves warn against bare skin and careless boots.
+
+- shallow-stream | Shallow Stream | expected: assets/furniture/shallow-stream.png
+  Description: A shallow stream cuts across the floor, clear enough to see stones and glints beneath the surface.
+
+- muddy-sinkhole | Muddy Sinkhole | expected: assets/furniture/muddy-sinkhole.png
+  Description: A dark patch of mud sags inward. The center looks deeper than the edges admit.
+
+- wasp-nest | Wasp Nest | expected: assets/furniture/wasp-nest.png
+  Description: A papery nest clings nearby, buzzing with angry movement. Disturbing it would be a bad idea.
+
+- beast-crate | Beast Crate | expected: assets/furniture/beast-crate.png
+  Description: A rough wooden crate rattles with frightened movement. Something alive is trapped inside, and the slats have been clawed raw.
+
+- beast-companion-crate | Beast Companion Crate | expected: assets/furniture/beast-companion-crate.png
+  Description: A carefully barred animal crate shakes with nervous breath. The creature inside looks scared rather than savage.
+
+- stalagmite | Stalagmite | expected: assets/furniture/stalagmite.png
+  Description: A sharp stone spike rises from the cave floor, natural cover with an ugly point.
+
+- stalactite-cluster | Stalactite Cluster | expected: assets/furniture/stalactite-cluster.png
+  Description: Needle-like stone hangs overhead in a brittle cluster. The floor below is littered with old shards.
+
+- crystal-growth | Crystal Growth | expected: assets/furniture/crystal-growth.png
+  Description: Crystals jut from the stone in bright growths. A careful hand could harvest useful shards.
+
+- razor-crystal-patch | Razor Crystal Patch | expected: assets/furniture/razor-crystal-patch.png
+  Description: Thin crystals grow like broken glass across the floor, sharp enough to cut boots and skin.
+
+- glow-mushroom | Glow Mushroom | expected: assets/furniture/glow-mushroom.png
+  Description: A glowing mushroom sheds soft light over the ground. Its cap looks useful if handled gently.
+
+- spore-mushroom | Spore Mushroom | expected: assets/furniture/spore-mushroom.png
+  Description: A swollen mushroom trembles with dusty spores. The cap looks ready to burst if disturbed.
+
+- giant-mushroom | Giant Mushroom | expected: assets/furniture/giant-mushroom.png
+  Description: A giant mushroom spreads a thick cap overhead, making a strange umbrella of fungal cover.
+
+- fungal-mat | Fungal Mat | expected: assets/furniture/fungal-mat.png
+  Description: A slick fungal mat coats the ground. Each step presses out a sour, damp smell.
+
+- underground-pool | Underground Pool | expected: assets/furniture/underground-pool.png
+  Description: A still underground pool reflects the ceiling. Ripples move across it without an obvious cause.
+
+- acid-pool | Acid Pool | expected: assets/furniture/acid-pool.png
+  Description: A smoking pool eats at the stone around it. The sharp chemical smell warns everyone back.
+
+- mineral-vein | Mineral Vein | expected: assets/furniture/mineral-vein.png
+  Description: A mineral vein shines in the wall, dense with crystal and ore worth prying loose.
+
+- cave-in-rubble | Cave-In Rubble | expected: assets/furniture/cave-in-rubble.png
+  Description: A cave-in has left heavy rubble in a rough mound. It offers cover and hints at a blocked passage.
+
+- bone-nest | Bone Nest | expected: assets/furniture/bone-nest.png
+  Description: Bones and scraps have been arranged into a nest. Something sleeps here, or wants you to think it does.
+
+- webbed-passage | Webbed Passage | expected: assets/furniture/webbed-passage.png
+  Description: Thick webbing curtains the way ahead. It muffles sound and may hide movement behind it.
+
+- chitin-pile | Chitin Pile | expected: assets/furniture/chitin-pile.png
+  Description: A pile of cracked shells and chitin plates lies discarded. Useful silk or worse may be mixed through it.
+
+- steam-vent | Steam Vent | expected: assets/furniture/steam-vent.png
+  Description: A vent hisses from the stone, breathing hot vapor in short bursts.
+
+- gas-vent | Gas Vent | expected: assets/furniture/gas-vent.png
+  Description: A narrow crack leaks pale gas that curls low across the floor.
+
+- narrow-rock-column | Narrow Rock Column | expected: assets/furniture/narrow-rock-column.png
+  Description: A narrow stone column connects floor and ceiling, splitting sight lines through the room.
+
+- loose-scree | Loose Scree | expected: assets/furniture/loose-scree.png
+  Description: Loose scree shifts underfoot with a dry clatter. Loud movement here could carry far.
+
+- subterranean-egg-cluster | Subterranean Egg Cluster | expected: assets/furniture/subterranean-egg-cluster.png
+  Description: A cluster of pale eggs clings to the ground. Several shells twitch faintly.
+
+- arcane-lectern | Arcane Lectern | expected: assets/furniture/arcane-lectern.png
+  Description: A lectern stands etched with arcane marks. Dusty notes and hidden compartments beg for investigation.
+
+- rune-circle | Rune Circle | expected: assets/furniture/rune-circle.png
+  Description: A circle of runes stains the floor with faint light. Its pattern suggests a trigger, not decoration.
+
+- floating-crystal | Floating Crystal | expected: assets/furniture/floating-crystal.png
+  Description: A crystal hangs in the air, turning slowly and casting fractured light over the room.
+
+- spellbook-stand | Spellbook Stand | expected: assets/furniture/spellbook-stand.png
+  Description: A stand holds the remains of a spellbook or ritual text. The pages look fragile and valuable.
+
+- sealed-scroll-case | Sealed Scroll Case | expected: assets/furniture/sealed-scroll-case.png
+  Description: A sealed scroll case rests in its brackets. Wax, wire, and runes protect what is inside.
+
+- ritual-altar | Ritual Altar | expected: assets/furniture/ritual-altar.png
+  Description: A ritual altar bears burned lines and old offerings. Power still seems to gather around it.
+
+- brazier | Brazier | expected: assets/furniture/brazier.png
+  Description: A brazier burns or smolders with unnatural steadiness, lighting the room and warming the air around it.
+
+- sacred-font | Sacred Font | expected: assets/furniture/sacred-font.png
+  Description: A stone font holds still liquid. Its surface is clean enough to be suspicious.
+
+- incense-burner | Incense Burner | expected: assets/furniture/incense-burner.png
+  Description: An incense burner leaks curling smoke that softens shapes and stings the throat.
+
+- library-shelf | Library Shelf | expected: assets/furniture/library-shelf.png
+  Description: A library shelf holds warped books, scroll tubes, and gaps where something was removed.
+
+- cursed-mirror | Cursed Mirror | expected: assets/furniture/cursed-mirror.png
+  Description: A tall mirror reflects the room a heartbeat late. Looking too long feels unwise.
+
+- animated-statue | Animated Statue | expected: assets/furniture/animated-statue.png
+  Description: A statue stands with lifelike tension in its limbs. Its carved eyes seem ready to move.
+
+- reliquary-cabinet | Reliquary Cabinet | expected: assets/furniture/reliquary-cabinet.png
+  Description: A reliquary cabinet displays locked compartments and old sacred trim. Its contents look worth the risk.
+
+- confession-screen | Confession Screen | expected: assets/furniture/confession-screen.png
+  Description: A carved wooden screen divides the space. Whispers and small items could hide behind it.
+
+- offering-table | Offering Table | expected: assets/furniture/offering-table.png
+  Description: An offering table holds stains, candle wax, and shallow scratches from many desperate hands.
+
+- glyph-carved-pillar | Glyph-Carved Pillar | expected: assets/furniture/glyph-carved-pillar.png
+  Description: A pillar covered in glyphs hums faintly. The carved lines look more like a ward than ornament.
+
+- astral-orrery | Astral Orrery | expected: assets/furniture/astral-orrery.png
+  Description: A delicate orrery models strange stars in brass rings. Its moving pieces invite careful adjustment.
+
+-----------------------------------------------------------------------------------
+
+- summoning-cage | Summoning Cage | expected: assets/furniture/summoning-cage.png
+  Description: A barred cage is etched with binding marks. Something was meant to arrive inside it, or stay there.
+
+- mana-well | Mana Well | expected: assets/furniture/mana-well.png
+  Description: A low well glows with unstable arcane light. The air above it prickles against the skin.
+
+- bog-pool | Bog Pool | expected: assets/furniture/bog-pool.png
+  Description: A stagnant pool spreads across the ground, filmed with rot and faintly bubbling scum.
+
+- deep-mud | Deep Mud | expected: assets/furniture/deep-mud.png
+  Description: Deep mud sucks at the floor, dark and heavy enough to trap a careless foot.
+
+- rotting-stump | Rotting Stump | expected: assets/furniture/rotting-stump.png
+  Description: A rotting stump leans in the muck. Holes in the wood could shelter insects, roots, or small finds.
+
+- dead-tree | Dead Tree | expected: assets/furniture/dead-tree.png
+  Description: A dead tree claws upward with brittle limbs. Several branches look ready to fall.
+
+- hanging-moss | Hanging Moss | expected: assets/furniture/hanging-moss.png
+  Description: Hanging moss drapes the air in damp curtains, hiding shapes beyond it.
+
+- leech-patch | Leech Patch | expected: assets/furniture/leech-patch.png
+  Description: A wet patch writhes with thin dark leeches. The ground itself seems hungry.
+
+- reed-cluster | Reed Cluster | expected: assets/furniture/reed-cluster.png
+  Description: Tall reeds grow in a tight cluster, rustling softly and hiding whatever crouches behind them.
+
+- sunken-chest | Sunken Chest | expected: assets/furniture/sunken-chest.png
+  Description: A chest sits half-sunk in muck and black water. The lid can be reached, but not trusted.
+
+- floating-corpse | Floating Corpse | expected: assets/furniture/floating-corpse.png
+  Description: A corpse floats face-down in foul water. Its pockets and the water beneath it may hold clues.
+
+- crocodile-nest | Crocodile Nest | expected: assets/furniture/crocodile-nest.png
+  Description: A muddy nest of reeds and bones presses into the bank. Fresh tracks circle it.
+
+- witch-totem | Witch Totem | expected: assets/furniture/witch-totem.png
+  Description: A crooked totem of bone, twine, and stained charms watches the room with ugly purpose.
+
+- fungus-rotted-log | Fungus-Rotted Log | expected: assets/furniture/fungus-rotted-log.png
+  Description: A fungus-rotted log collapses into soft layers. Poisonous growths bloom along its side.
+
+- quicksand-patch | Quicksand Patch | expected: assets/furniture/quicksand-patch.png
+  Description: A flat patch of wet sand trembles at the center. The surface looks too smooth to trust.
+
+- poison-flower | Poison Flower | expected: assets/furniture/poison-flower.png
+  Description: A bright flower opens above dark leaves, beautiful and sharp-smelling.
+
+- giant-lily-pad | Giant Lily Pad | expected: assets/furniture/giant-lily-pad.png
+  Description: A giant lily pad floats on murky water. It looks solid until it shifts under weight.
+
+- fetid-gas-bubble | Fetid Gas Bubble | expected: assets/furniture/fetid-gas-bubble.png
+  Description: A swollen bubble rises from the muck, pulsing with trapped swamp gas.
+
+- bone-wind-chime | Bone Wind Chime | expected: assets/furniture/bone-wind-chime.png
+  Description: Bones hang from a corded charm and knock together with tiny hollow sounds.
+
+- soggy-crate | Soggy Crate | expected: assets/furniture/soggy-crate.png
+  Description: A waterlogged crate slumps in the mud. Its boards are weak, but something may remain inside.
+
+- rot-grub-nest | Rot Grub Nest | expected: assets/furniture/rot-grub-nest.png
+  Description: A nest of wet rot and pale larvae churns in the shadows.
+
+- mangrove-root-wall | Mangrove Root Wall | expected: assets/furniture/mangrove-root-wall.png
+  Description: A wall of mangrove roots twists across the path, tough but not impossible to break.
+
+- minecart | Minecart | expected: assets/furniture/minecart.png
+  Description: A battered minecart sits on warped track. It looks movable, heavy, and dangerous if it rolls.
+
+- ore-cart | Ore Cart | expected: assets/furniture/ore-cart.png
+  Description: An ore cart holds grit, stone chips, and mineral crust. Useful scraps may be buried inside.
+
+- anvil | Anvil | expected: assets/furniture/anvil.png
+  Description: A scarred anvil rests on a heavy block. Fresh marks suggest it could still serve a craftsperson.
+
+- forge-furnace | Forge Furnace | expected: assets/furniture/forge-furnace.png
+  Description: A furnace glows with trapped heat, throwing hard light and dangerous warmth.
+
+- cooling-trough | Cooling Trough | expected: assets/furniture/cooling-trough.png
+  Description: A trough of dark cooling water or oil stands beside the work area. The surface hides its depth.
+
+- coal-pile | Coal Pile | expected: assets/furniture/coal-pile.png
+  Description: A pile of coal and black dust slumps against the floor. Small tools or salts could be lost in it.
+
+- molten-slag | Molten Slag | expected: assets/furniture/molten-slag.png
+  Description: Molten slag bubbles in a bright seam, hot enough to paint the room orange.
+
+- tool-rack | Tool Rack | expected: assets/furniture/tool-rack.png
+  Description: A rack of tools and small weapons hangs within reach. Loose hooks make it worth approaching carefully.
+
+- chain-hoist | Chain Hoist | expected: assets/furniture/chain-hoist.png
+  Description: A chain hoist dangles overhead, connected to old gears and a heavy hook.
+
+- steam-pipe | Steam Pipe | expected: assets/furniture/steam-pipe.png
+  Description: A steam pipe runs across the room, ticking as pressure builds inside it.
+
+- pressure-valve | Pressure Valve | expected: assets/furniture/pressure-valve.png
+  Description: A pressure valve juts from the machinery. Its handle is worn from repeated use.
+
+- broken-gear-assembly | Broken Gear Assembly | expected: assets/furniture/broken-gear-assembly.png
+  Description: Broken gears grind and jut from a ruined assembly. Sharp teeth and hidden parts remain.
+
+- oil-barrel | Oil Barrel | expected: assets/furniture/oil-barrel.png
+  Description: An oil barrel sweats dark stains onto the floor. One spark could make it everybody's problem.
+
+- reinforced-crate | Reinforced Crate | expected: assets/furniture/reinforced-crate.png
+  Description: A reinforced crate is banded with metal and old dents. It looks built to protect something.
+
+- workbench | Workbench | expected: assets/furniture/workbench.png
+  Description: A cluttered workbench holds scraps, stains, and half-finished repairs.
+
+- mine-support-beam | Mine Support Beam | expected: assets/furniture/mine-support-beam.png
+  Description: A mine support beam groans under weight. It holds the ceiling with worrying patience.
+
+- powder-keg | Powder Keg | expected: assets/furniture/powder-keg.png
+  Description: A powder keg sits sealed with black dust around the rim. It looks violently useful.
+
+- conveyor-belt | Conveyor Belt | expected: assets/furniture/conveyor-belt.png
+  Description: A conveyor belt cuts through the room, its surface stiff with grime but still aligned to move.
+
+- drill-rig | Drill Rig | expected: assets/furniture/drill-rig.png
+  Description: A drill rig towers over the floor, its bit aimed like a metal spear.
+
+- locked-supply-locker | Locked Supply Locker | expected: assets/furniture/locked-supply-locker.png
+  Description: A locked supply locker stands against the wall. The door is dented, but the lock remains serious.
+
+- undead-crate | Undead Crate | expected: assets/furniture/undead-crate.png
+  Description: A chained crate hums with old binding marks. Bone scrapes softly inside, waiting for the latch to fail.
+

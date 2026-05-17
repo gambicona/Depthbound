@@ -28,13 +28,14 @@ window.DungeonContent.register("classes", "wizard", {
   token: "W",
   classFeatures: [
     { level: 1, name: "Spellcasting", description: "You can shape class magic into prepared or known spells." },
-    { level: 1, name: "Spellbook", description: "Keep wizard spells in a written book and expand them over time." },
     { level: 1, name: "Arcane Recovery", description: "Recover some spent magical energy after a short rest." },
-    { level: 18, name: "Spell Mastery", description: "Cast chosen low-level wizard spells without spending resources." },
-    { level: 20, name: "Signature Spells", description: "Choose favored spells that are always ready and easier to cast." },
+    { level: 18, name: "Spell Mastery", description: "Once per short rest, recover 4 spell points to represent free low-level spell mastery." },
+    { level: 20, name: "Signature Spells", description: "Once per long rest, recover 10 spell points for your favored high-level wizard magic." },
   ],
   abilities: [
     { id: "arcaneRecovery", name: "Arcane Recovery", level: 1, refresh: "longRest", uses: 1, resourcePool: "arcaneRecovery", resource: "none", description: "Recover spell points equal to half wizard level, rounded up." },
+    { id: "spellMastery", name: "Spell Mastery", level: 18, refresh: "shortRest", uses: 1, resource: "none", description: "Recover 4 spell points once per short rest for your mastered low-level magic." },
+    { id: "signatureSpells", name: "Signature Spells", level: 20, refresh: "longRest", uses: 1, resource: "none", description: "Recover 10 spell points once per long rest for your signature wizard spells." },
   ],
   equipment: { mainHand: "quarterstaff", torso: null },
   inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["quarterstaff"] },

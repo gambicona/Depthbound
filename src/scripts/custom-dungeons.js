@@ -13,6 +13,28 @@ function safeParse(text, fallback) {
   }
 }
 
+function normalizeStoryTrigger(trigger, index) {
+  if (!trigger || typeof trigger !== "object") return null;
+  const event = ["enterRoom", "inspectObject", "openObject", "killMonster"].includes(trigger.event) ? trigger.event : "enterRoom";
+  const targetId = String(trigger.targetId ?? "").trim();
+  const text = String(trigger.text ?? "").trim();
+  const images = Array.isArray(trigger.images) ? trigger.images.map(String).map((value) => value.trim()).filter(Boolean) : [];
+  if (!targetId || (!text && images.length === 0)) return null;
+  return {
+    id: String(trigger.id || `story-trigger-${index + 1}`).replace(/[^a-zA-Z0-9_-]/g, "-"),
+    event,
+    targetId,
+    title: String(trigger.title ?? "").trim(),
+    text,
+    images,
+    once: trigger.once !== false,
+  };
+}
+
+function normalizeStoryTriggers(triggers = []) {
+  return Array.isArray(triggers) ? triggers.map(normalizeStoryTrigger).filter(Boolean) : [];
+}
+
 function normalizeTemplate(template) {
   if (!template || typeof template !== "object") return null;
   const id = String(template.id || `custom-${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, "-");
@@ -54,6 +76,7 @@ function normalizeTemplate(template) {
       text: String(template.outro?.text ?? ""),
       images: Array.isArray(template.outro?.images) ? template.outro.images.map(String).filter(Boolean) : [],
     },
+    storyTriggers: normalizeStoryTriggers(template.storyTriggers),
   };
 }
 

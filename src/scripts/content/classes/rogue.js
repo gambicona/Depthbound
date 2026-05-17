@@ -20,7 +20,7 @@ window.DungeonContent.register("classes", "rogue", {
   weaponProficiencies: ["simple", "crossbow-hand", "longsword", "rapier", "shortsword"],
   token: "G",
   classFeatures: [
-    { level: 1, name: "Sneak Attack", description: "Deal extra damage when you strike with precision at the right opening." },
+    { level: 1, name: "Sneak Attack", description: "Once per turn, add scaling d6 damage when you attack with advantage or an ally pins the target." },
     { level: 1, name: "Expertise", description: "Choose two trained proficiencies to double your proficiency bonus." },
     { level: 2, name: "Cunning Action", description: "Use quick bonus actions to Dash, Disengage, or Hide." },
     { level: 5, name: "Uncanny Dodge", description: "Use your reaction to halve damage from an attack you can see." },
@@ -30,6 +30,8 @@ window.DungeonContent.register("classes", "rogue", {
   ],
   abilities: [
     { id: "cunningActionDash", name: "Cunning Action: Dash", level: 2, refresh: "turn", uses: 1, resource: "bonusAction", description: "Dash as a quick action." },
+    { id: "cunningActionDisengage", name: "Cunning Action: Disengage", level: 2, refresh: "turn", uses: 1, resource: "bonusAction", description: "Move carefully as a quick action so leaving melee does not provoke nearby enemies this turn." },
+    { id: "cunningActionHide", name: "Cunning Action: Hide", level: 2, refresh: "turn", uses: 1, resource: "bonusAction", description: "Slip out of sight as a quick action. Your next attack this turn has advantage." },
     { id: "steadyAim", name: "Steady Aim", level: 1, refresh: "turn", uses: 1, resource: "bonusAction", description: "Spend your bonus action and movement for advantage on your next attack, enabling Sneak Attack." },
     { id: "uncannyDodge", name: "Uncanny Dodge", level: 5, refresh: "turn", uses: 1, resource: "reaction", description: "Reaction: halve the damage from one attack that hits you." },
   ],

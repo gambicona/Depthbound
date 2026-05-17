@@ -130,7 +130,12 @@ async function moveFighterAlongPath(fighter, path, silent = false) {
     }
     if (!fighter.alive) break;
 
+    const previousRoomId = roomForPosition(fighter.position)?.id ?? "";
     fighter.position = { ...step };
+    const nextRoom = roomForPosition(fighter.position);
+    if (isPlayerControlledPartyFighter(fighter) && nextRoom && nextRoom.id !== previousRoomId) {
+      void triggerCustomDungeonStory("enterRoom", { roomId: nextRoom.id, room: nextRoom, fighter });
+    }
     movedSteps += 1;
     movedCost += movementCostAtPosition(step);
     collectLootAtPosition(fighter, step);
@@ -326,7 +331,12 @@ async function moveFightersAlongPathsTogether(plans) {
         stoppedBeforeTrap.add(plan.hero.id);
         continue;
       }
+      const previousRoomId = roomForPosition(plan.hero.position)?.id ?? "";
       plan.hero.position = { ...step };
+      const nextRoom = roomForPosition(plan.hero.position);
+      if (isPlayerControlledPartyFighter(plan.hero) && nextRoom && nextRoom.id !== previousRoomId) {
+        void triggerCustomDungeonStory("enterRoom", { roomId: nextRoom.id, room: nextRoom, fighter: plan.hero });
+      }
       anyMovedThisTick = true;
       collectLootAtPosition(plan.hero, step);
       if (triggerTrapAtPosition(plan.hero, step)) {
@@ -384,6 +394,8 @@ function adminTeleportHero(position) {
   }
 
   hero.position = { ...position };
+  const nextRoom = roomForPosition(hero.position);
+  if (nextRoom) void triggerCustomDungeonStory("enterRoom", { roomId: nextRoom.id, room: nextRoom, fighter: hero });
   dragPath = null;
   dragHeroId = null;
   collectLootAtPosition(hero, position);

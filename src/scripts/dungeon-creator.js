@@ -39,6 +39,15 @@ const els = {
   introImages: document.querySelector("#intro-images"),
   outroText: document.querySelector("#outro-text"),
   outroImages: document.querySelector("#outro-images"),
+  storyTriggerEvent: document.querySelector("#story-trigger-event"),
+  storyTriggerTarget: document.querySelector("#story-trigger-target"),
+  storyTriggerTitle: document.querySelector("#story-trigger-title"),
+  storyTriggerText: document.querySelector("#story-trigger-text"),
+  storyTriggerImages: document.querySelector("#story-trigger-images"),
+  storyTriggerOnce: document.querySelector("#story-trigger-once"),
+  saveStoryTrigger: document.querySelector("#save-story-trigger"),
+  newStoryTrigger: document.querySelector("#new-story-trigger"),
+  storyTriggerList: document.querySelector("#story-trigger-list"),
   customItemTemplate: document.querySelector("#custom-item-template"),
   customItemName: document.querySelector("#custom-item-name"),
   customItemDescription: document.querySelector("#custom-item-description"),
@@ -57,6 +66,8 @@ const state = {
   objects: [],
   monsters: [],
   customItems: [],
+  storyTriggers: [],
+  selectedStoryTriggerId: "",
   selectedFurnitureId: "",
   selectedMonsterId: "",
   selectedId: "",
@@ -235,6 +246,7 @@ function templateFromState() {
       text: els.outroText.value.trim(),
       images: els.outroImages.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
     },
+    storyTriggers: clone(state.storyTriggers),
   };
 }
 
@@ -407,6 +419,122 @@ function itemName(itemId) {
   return state.customItems.find((item) => item.id === itemId)?.name ?? window.DungeonContent.get("items", itemId)?.name ?? itemId;
 }
 
+function triggerEventLabel(event) {
+  return {
+    enterRoom: "Walk into room",
+    inspectObject: "Inspect object",
+    openObject: "Open/loot object",
+    killMonster: "Kill monster",
+  }[event] ?? "Story trigger";
+}
+
+function triggerTargetEntries(event = els.storyTriggerEvent.value) {
+  if (event === "enterRoom") {
+    return state.rooms.map((room) => ({ id: room.id, label: `${room.name} (${room.id})` }));
+  }
+  if (event === "killMonster") {
+    return state.monsters.map((monster) => ({ id: monster.id, label: `${monster.name} (${monster.id})` }));
+  }
+  return state.objects.map((object) => {
+    const template = window.DungeonContent.get("furniture", object.type);
+    return { id: object.id, label: `${template?.name ?? object.type} (${object.id})` };
+  });
+}
+
+function renderStoryTriggerTargetSelect() {
+  const current = els.storyTriggerTarget.value;
+  const entries = triggerTargetEntries();
+  els.storyTriggerTarget.innerHTML = entries.length
+    ? entries.map((entry) => `<option value="${entry.id}">${entry.label}</option>`).join("")
+    : `<option value="">Add a matching target first</option>`;
+  if (entries.some((entry) => entry.id === current)) els.storyTriggerTarget.value = current;
+}
+
+function storyTriggerTargetLabel(trigger) {
+  return triggerTargetEntries(trigger.event).find((entry) => entry.id === trigger.targetId)?.label ?? trigger.targetId;
+}
+
+function renderStoryTriggerList() {
+  els.storyTriggerList.innerHTML = state.storyTriggers.length
+    ? state.storyTriggers.map((trigger) => `
+      <div class="creator-list-item">
+        <div>
+          <b>${trigger.title || triggerEventLabel(trigger.event)}</b><br>
+          <span class="small-note">${triggerEventLabel(trigger.event)}: ${storyTriggerTargetLabel(trigger)}${trigger.once === false ? " - repeatable" : ""}</span>
+        </div>
+        <div>
+          <button type="button" data-trigger-action="edit" data-id="${trigger.id}">Edit</button>
+          <button type="button" class="ghost-button" data-trigger-action="delete" data-id="${trigger.id}">Delete</button>
+        </div>
+      </div>
+    `).join("")
+    : `<p class="small-note">No story triggers yet.</p>`;
+}
+
+function clearStoryTriggerForm() {
+  state.selectedStoryTriggerId = "";
+  els.storyTriggerTitle.value = "";
+  els.storyTriggerText.value = "";
+  els.storyTriggerImages.value = "";
+  els.storyTriggerOnce.checked = true;
+  els.saveStoryTrigger.textContent = "Add Story Trigger";
+  renderStoryTriggerTargetSelect();
+}
+
+function loadStoryTriggerForm(trigger) {
+  if (!trigger) return;
+  state.selectedStoryTriggerId = trigger.id;
+  els.storyTriggerEvent.value = trigger.event;
+  renderStoryTriggerTargetSelect();
+  els.storyTriggerTarget.value = trigger.targetId;
+  els.storyTriggerTitle.value = trigger.title ?? "";
+  els.storyTriggerText.value = trigger.text ?? "";
+  els.storyTriggerImages.value = (trigger.images ?? []).join("\n");
+  els.storyTriggerOnce.checked = trigger.once !== false;
+  els.saveStoryTrigger.textContent = "Update Story Trigger";
+}
+
+function storyTriggerFromForm() {
+  const targetId = els.storyTriggerTarget.value;
+  const event = els.storyTriggerEvent.value;
+  const id = state.selectedStoryTriggerId || `story-trigger-${state.storyTriggers.length + 1}-${Date.now()}`;
+  return {
+    id,
+    event,
+    targetId,
+    title: els.storyTriggerTitle.value.trim(),
+    text: els.storyTriggerText.value.trim(),
+    images: els.storyTriggerImages.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
+    once: els.storyTriggerOnce.checked,
+  };
+}
+
+function saveStoryTrigger() {
+  const trigger = storyTriggerFromForm();
+  if (!trigger.targetId) {
+    setStatus("Add the target room, object, or monster before saving this story trigger.");
+    return;
+  }
+  if (!trigger.text && trigger.images.length === 0) {
+    setStatus("Story triggers need text or at least one image URL.");
+    return;
+  }
+  const index = state.storyTriggers.findIndex((entry) => entry.id === trigger.id);
+  if (index >= 0) state.storyTriggers[index] = trigger;
+  else state.storyTriggers.push(trigger);
+  state.selectedStoryTriggerId = trigger.id;
+  setStatus(`Saved story trigger for ${storyTriggerTargetLabel(trigger)}.`);
+  renderAll();
+  loadStoryTriggerForm(trigger);
+}
+
+function removeStoryTriggersForTarget(targetId) {
+  state.storyTriggers = state.storyTriggers.filter((trigger) => trigger.targetId !== targetId);
+  if (state.selectedStoryTriggerId && !state.storyTriggers.some((trigger) => trigger.id === state.selectedStoryTriggerId)) {
+    clearStoryTriggerForm();
+  }
+}
+
 function renderSelected() {
   const selected = selectedEntity();
   if (!selected) {
@@ -502,6 +630,8 @@ function renderAll() {
   renderTools();
   renderFurnitureCatalogue();
   renderMonsterCatalogue();
+  renderStoryTriggerTargetSelect();
+  renderStoryTriggerList();
   renderGrid();
   renderRoomList();
   renderSelected();
@@ -819,12 +949,15 @@ function eraseAt(position) {
   const monster = monsterAt(position);
   if (monster) {
     state.monsters = state.monsters.filter((entry) => entry.id !== monster.id);
+    removeStoryTriggersForTarget(monster.id);
     if (state.selectedId === monster.id) state.selectedId = "";
     return;
   }
   const object = objectAt(position);
   if (object) {
     state.objects = state.objects.filter((entry) => entry.id !== object.id && entry.id !== object.pairId);
+    removeStoryTriggersForTarget(object.id);
+    if (object.pairId) removeStoryTriggersForTarget(object.pairId);
     if (state.selectedId === object.id) state.selectedId = "";
     return;
   }
@@ -886,9 +1019,15 @@ function deleteSelected() {
   const selected = selectedEntity();
   if (!selected) return;
   if (selected.monsterId) state.monsters = state.monsters.filter((entry) => entry.id !== selected.id);
-  else if (selected.type) state.objects = state.objects.filter((entry) => entry.id !== selected.id && entry.id !== selected.pairId);
+  if (selected.monsterId) removeStoryTriggersForTarget(selected.id);
+  else if (selected.type) {
+    state.objects = state.objects.filter((entry) => entry.id !== selected.id && entry.id !== selected.pairId);
+    removeStoryTriggersForTarget(selected.id);
+    if (selected.pairId) removeStoryTriggersForTarget(selected.pairId);
+  }
   else if (selected.cells) {
     state.rooms = state.rooms.filter((entry) => entry.id !== selected.id);
+    removeStoryTriggersForTarget(selected.id);
     state.rooms.forEach((room) => {
       room.connections = (room.connections ?? []).filter((id) => id !== selected.id);
     });
@@ -925,6 +1064,8 @@ function loadTemplate(template) {
   state.objects = clone(template.objects ?? []);
   state.monsters = clone(template.monsters ?? []);
   state.customItems = clone(template.customItems ?? []);
+  state.storyTriggers = clone(template.storyTriggers ?? []);
+  state.selectedStoryTriggerId = "";
   state.exit = clone(template.exit ?? null);
   repairDuplicateRoomIds();
   state.selectedId = "";
@@ -943,6 +1084,7 @@ function loadTemplate(template) {
   els.introImages.value = (template.intro?.images ?? []).join("\n");
   els.outroText.value = template.outro?.text ?? "";
   els.outroImages.value = (template.outro?.images ?? []).join("\n");
+  clearStoryTriggerForm();
   renderItemSelects();
   renderAll();
 }
@@ -956,12 +1098,15 @@ function newBlankDungeon() {
   state.objects = [];
   state.monsters = [];
   state.customItems = [];
+  state.storyTriggers = [];
+  state.selectedStoryTriggerId = "";
   state.exit = null;
   state.selectedId = "";
   state.connectFromRoomId = "";
   state.pendingPortalId = "";
   state.hallwayStart = null;
   state.hallwayCells = [];
+  clearStoryTriggerForm();
   renderAll();
 }
 
@@ -1031,6 +1176,23 @@ function init() {
   });
   els.addLoot.addEventListener("click", addLootToSelected);
   els.deleteSelected.addEventListener("click", deleteSelected);
+  els.storyTriggerEvent.addEventListener("change", renderStoryTriggerTargetSelect);
+  els.saveStoryTrigger.addEventListener("click", saveStoryTrigger);
+  els.newStoryTrigger.addEventListener("click", clearStoryTriggerForm);
+  els.storyTriggerList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-trigger-action]");
+    if (!button) return;
+    const trigger = state.storyTriggers.find((entry) => entry.id === button.dataset.id);
+    if (button.dataset.triggerAction === "edit") {
+      loadStoryTriggerForm(trigger);
+      return;
+    }
+    if (button.dataset.triggerAction === "delete") {
+      state.storyTriggers = state.storyTriggers.filter((entry) => entry.id !== button.dataset.id);
+      clearStoryTriggerForm();
+      renderAll();
+    }
+  });
   els.createCustomItem.addEventListener("click", createCustomItem);
   els.customItemTemplate.addEventListener("change", () => {
     const template = window.DungeonContent.get("items", els.customItemTemplate.value);
@@ -1097,7 +1259,7 @@ function init() {
     }
   });
   ["input", "change"].forEach((eventName) => {
-    [els.name, els.theme, els.goalType, els.goalItem, els.goalMonster, els.goalCount, els.introText, els.introImages, els.outroText, els.outroImages].forEach((element) => {
+    [els.name, els.theme, els.goalType, els.goalItem, els.goalMonster, els.goalCount, els.introText, els.introImages, els.outroText, els.outroImages, els.storyTriggerTitle, els.storyTriggerText, els.storyTriggerImages, els.storyTriggerOnce].forEach((element) => {
       element.addEventListener(eventName, renderExport);
     });
   });
