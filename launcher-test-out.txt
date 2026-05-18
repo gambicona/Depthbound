@@ -1,0 +1,24 @@
+Starting Depthbound playtest server on http://127.0.0.1:8000/
+
+Host on this PC:
+  http://127.0.0.1:8000/index.html?playtest=host
+
+For Hamachi guests:
+  http://YOUR_HAMACHI_IP:8000/index.html?playtest=guest
+
+For local house/LAN guests:
+  Detected LAN: http://192.168.178.32:8000/index.html?playtest=guest
+
+Status/diagnostics:
+  http://127.0.0.1:8000/playtest-status
+
+Watch this window for WARN lines:
+- Large snapshot accepted = sync payload may be too big and cause guest delay
+- Socket write backpressure = browser/network is not keeping up
+- ECONNRESET = a browser/socket disconnected while the server wrote to it
+
+Keep this window open while playtesting. Press Ctrl+C to stop the server.
+
+Depthbound playtest server running at http://0.0.0.0:8000/
+Host URL:  http://localhost:8000/index.html?playtest=host
+Guest URL: http://YOUR_HAMACHI_IP:8000/index.html?playtest=guest

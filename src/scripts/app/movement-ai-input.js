@@ -883,16 +883,24 @@ async function maybeUseAiHealingPotion(ally) {
 
 async function runMonsterAi(monster) {
   if (!monster.alive || partyDefeatedOrDying()) return;
-  if (await maybeUseAiHealingPotion(monster)) {
+  const monsterTurnFinished = () => {
     window.setTimeout(() => {
       if (activeFighter()?.id === monster.id && !partyDefeatedOrDying()) endTurn();
     }, tokenSlideMs);
+  };
+  const actionLocked = (monster.statusEffects ?? []).some((effect) => effect.actionLocked);
+  const movementLocked = (monster.statusEffects ?? []).some((effect) => effect.speedLocked);
+  if (actionLocked && movementLocked) {
+    addLog(`${monster.name} is unable to act or move.`, "important");
+    monsterTurnFinished();
+    return;
+  }
+  if (await maybeUseAiHealingPotion(monster)) {
+    monsterTurnFinished();
     return;
   }
   if (await maybeUseMonsterStartSpecial(monster)) {
-    window.setTimeout(() => {
-      if (activeFighter()?.id === monster.id && !partyDefeatedOrDying()) endTurn();
-    }, tokenSlideMs);
+    monsterTurnFinished();
     return;
   }
 
@@ -983,7 +991,11 @@ async function runMonsterAi(monster) {
         }
       }, tokenSlideMs);
     }, tokenSlideMs);
+    return;
   }
+
+  addLog(`${monster.name} hesitates, unsure how to act.`, "important");
+  monsterTurnFinished();
 }
 
 function heroCanStartMovement() {
@@ -1010,6 +1022,7 @@ function tryOpenDoorFromHeroPosition() {
   if (!heroCanUseDoor()) return false;
 
   const hero = activeHero();
+  if (state.mode === "home" && hero && toggleHomeDoor(hero.position, hero)) return true;
   const door = hero ? canOpenDoor(hero.position) : null;
   return door ? openDoor(door) : false;
 }

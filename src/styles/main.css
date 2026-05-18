@@ -95,6 +95,140 @@ body.menu-active .action-dock {
   display: none;
 }
 
+.playtest-overlay {
+  background: rgba(11, 13, 14, 0.94);
+  border: 1px solid var(--chrome-panel-border);
+  border-radius: 8px;
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.42);
+  color: var(--text);
+  display: grid;
+  gap: 10px;
+  font-size: 13px;
+  max-width: min(360px, calc(100vw - 24px));
+  padding: 12px;
+  position: fixed;
+  right: 12px;
+  top: 12px;
+  z-index: 90;
+}
+
+.playtest-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.playtest-collapse {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 800;
+  height: 24px;
+  justify-content: center;
+  min-width: 24px;
+  padding: 0;
+}
+
+.playtest-overlay.collapsed {
+  gap: 0;
+  max-width: min(260px, calc(100vw - 24px));
+  padding: 8px 10px;
+}
+
+.playtest-overlay.collapsed [data-playtest-body] {
+  display: none;
+}
+
+.playtest-heading span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.playtest-overlay.connected .playtest-heading span {
+  color: var(--green);
+}
+
+.playtest-copy,
+.playtest-empty,
+.playtest-hint {
+  color: var(--muted);
+  margin: 0;
+}
+
+.playtest-reaction {
+  border: 1px solid rgba(215, 168, 79, 0.32);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.playtest-reaction p {
+  color: var(--text);
+  margin: 0;
+}
+
+.playtest-overlay code {
+  color: var(--gold);
+}
+
+.playtest-peer-list,
+.playtest-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.playtest-assignment,
+.playtest-field {
+  display: grid;
+  gap: 5px;
+}
+
+.playtest-assignment select,
+.playtest-field select {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  min-height: 34px;
+  padding: 6px;
+}
+
+.playtest-assignment-options {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  display: grid;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.playtest-assignment-option {
+  align-items: center;
+  display: grid;
+  gap: 7px;
+  grid-template-columns: auto 1fr;
+}
+
+.playtest-assignment-option input {
+  accent-color: var(--gold);
+}
+
+.playtest-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.playtest-actions button {
+  min-height: 34px;
+  padding: 0 10px;
+}
+
 body[data-button-theme="ember"] {
   --button-border: #7c5738;
   --button-bg: linear-gradient(180deg, #a86435, #793727);
@@ -470,7 +604,7 @@ h1 {
 .save-slot-actions {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
 }
 
 .delete-save {
@@ -795,8 +929,9 @@ h1 {
 .tile.walkable.home-painted-floor,
 .tile.walkable.home-painted-floor:nth-child(2n) {
   background:
-    radial-gradient(circle at 26% 24%, rgba(255, 244, 214, 0.08), transparent 34%),
-    linear-gradient(145deg, color-mix(in srgb, var(--home-floor-color), white 11%), color-mix(in srgb, var(--home-floor-color), black 34%));
+    linear-gradient(var(--home-floor-color), var(--home-floor-color)),
+    radial-gradient(circle at 26% 24%, rgba(255, 234, 193, 0.045), transparent 34%),
+    linear-gradient(145deg, var(--floor), #221d1e);
 }
 
 .tile.hidden-tile {
@@ -998,7 +1133,9 @@ h1 {
 }
 
 .wall-edge.home-painted-wall {
-  background: color-mix(in srgb, var(--home-wall-color), white 8%);
+  background:
+    linear-gradient(var(--home-wall-color), var(--home-wall-color)),
+    var(--wall-edge);
   box-shadow: 0 0 5px color-mix(in srgb, var(--home-wall-color), transparent 30%);
 }
 
@@ -1048,13 +1185,26 @@ h1 {
 }
 
 .dungeon-object-icon {
-  height: 82%;
+  height: min(112%, max(86%, 18px));
   object-fit: contain;
   pointer-events: none;
-  width: 82%;
+  width: min(112%, max(86%, 18px));
 }
 
 .dungeon-object-label {
+  display: inline-block;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.home-special-object-icon {
+  height: min(120%, max(96%, 20px));
+  object-fit: contain;
+  pointer-events: none;
+  width: min(120%, max(96%, 20px));
+}
+
+.home-special-object-label {
   display: inline-block;
   line-height: 1;
   pointer-events: none;
@@ -1356,14 +1506,14 @@ h1 {
   display: flex;
   font-size: 0.85rem;
   font-weight: 900;
-  height: var(--token-size);
+  height: min(var(--tile-size), max(var(--token-size), 24px));
   justify-content: center;
   min-height: 0;
   padding: 0;
   pointer-events: auto;
   position: absolute;
   transform: translate(-50%, -50%);
-  width: var(--token-size);
+  width: min(var(--tile-size), max(var(--token-size), 24px));
   -webkit-user-select: none;
   user-select: none;
   z-index: 2;
@@ -3026,6 +3176,17 @@ h1 {
   padding: 6px 9px;
 }
 
+.equip-actions .equip-slot-button.empty-slot {
+  background: linear-gradient(180deg, #268d70, #166d5c);
+  border-color: rgba(114, 223, 181, 0.78);
+}
+
+.equip-actions .equip-slot-button.occupied-slot {
+  background: linear-gradient(180deg, #775a28, #5b3f1d);
+  border-color: rgba(226, 174, 82, 0.72);
+  color: #ffe0a3;
+}
+
 .empty-note {
   color: var(--muted);
   font-size: 0.84rem;
@@ -3137,6 +3298,12 @@ h1 {
   margin-top: 2px;
 }
 
+.use-item-row .use-item-effect {
+  color: #f8edda;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
 .use-item-row button {
   font-size: 0.78rem;
   min-height: 34px;
@@ -3239,7 +3406,7 @@ h1 {
 .home-paint-swatches {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(8, minmax(24px, 1fr));
+  grid-template-columns: auto repeat(8, minmax(24px, 1fr));
 }
 
 .home-paint-swatches button {
@@ -3250,11 +3417,30 @@ h1 {
   padding: 0;
 }
 
+.home-paint-swatches .home-paint-default {
+  aspect-ratio: auto;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 0.68rem;
+  font-weight: 900;
+  padding: 0 8px;
+  text-transform: uppercase;
+}
+
 .home-color-picker {
   align-items: center;
   display: grid;
   gap: 8px;
   grid-template-columns: 1fr auto;
+}
+
+.home-alpha-picker {
+  display: grid;
+  gap: 6px;
+}
+
+.home-alpha-picker input {
+  width: 100%;
 }
 
 .home-color-picker input {

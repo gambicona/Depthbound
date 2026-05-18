@@ -36,11 +36,77 @@ If the Barrow Crown is not found, the first king will rise — and every oath on
 ];
 
 const cache = new Map();
+const overrideStorageKey = "depthbound.campaignDungeonOverrides.v1";
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function safeParse(text, fallback) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return fallback;
+  }
+}
+
+function overrideKey(campaignId, index) {
+  return `${campaignId}:${index}`;
+}
+
+function loadOverrides() {
+  const parsed = safeParse(window.localStorage.getItem(overrideStorageKey), {});
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+}
+
+function saveOverrides(overrides) {
+  window.localStorage.setItem(overrideStorageKey, JSON.stringify(overrides));
+}
+
+function normalizeOverrideTemplate(template, campaignId, index) {
+  if (!template || typeof template !== "object") return null;
+  return {
+    ...clone(template),
+    campaignId,
+    campaignIndex: index,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function getOverride(campaignId, index) {
+  const template = loadOverrides()[overrideKey(campaignId, index)];
+  return template ? normalizeOverrideTemplate(template, campaignId, index) : null;
+}
+
+function saveOverride(campaignId, index, template) {
+  const campaign = campaigns.find((entry) => entry.id === campaignId);
+  if (!campaign || index < 1 || index > campaign.count) return null;
+  const normalized = normalizeOverrideTemplate(template, campaignId, index);
+  if (!normalized) return null;
+  const overrides = loadOverrides();
+  overrides[overrideKey(campaignId, index)] = normalized;
+  saveOverrides(overrides);
+  cache.set(overrideKey(campaignId, index), Promise.resolve(clone(normalized)));
+  return clone(normalized);
+}
+
+function removeOverride(campaignId, index) {
+  const overrides = loadOverrides();
+  delete overrides[overrideKey(campaignId, index)];
+  saveOverrides(overrides);
+  cache.delete(overrideKey(campaignId, index));
+}
+
+function hasOverride(campaignId, index) {
+  return Boolean(loadOverrides()[overrideKey(campaignId, index)]);
+}
 
 async function dungeon(campaignId, index) {
   const campaign = campaigns.find((entry) => entry.id === campaignId);
   if (!campaign || index < 1 || index > campaign.count) return null;
   const key = `${campaignId}:${index}`;
+  const override = getOverride(campaignId, index);
+  if (override) return override;
   if (!cache.has(key)) {
     cache.set(
       key,
@@ -53,9 +119,22 @@ async function dungeon(campaignId, index) {
   return cache.get(key);
 }
 
+async function originalDungeon(campaignId, index) {
+  const campaign = campaigns.find((entry) => entry.id === campaignId);
+  if (!campaign || index < 1 || index > campaign.count) return null;
+  return fetch(`${campaign.folder}/Dungeon${index}.json`)
+    .then((response) => (response.ok ? response.json() : null))
+    .then((template) => template ? { ...template, campaignId, campaignIndex: index } : null)
+    .catch(() => null);
+}
+
 window.DungeonCampaigns = {
   list: () => campaigns.map((campaign) => ({ ...campaign })),
   get: (id) => campaigns.find((campaign) => campaign.id === id) ?? null,
   dungeon,
+  originalDungeon,
+  hasOverride,
+  saveOverride,
+  removeOverride,
 };
 })();

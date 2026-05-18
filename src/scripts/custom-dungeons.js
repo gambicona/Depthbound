@@ -17,7 +17,7 @@ function normalizeStoryTrigger(trigger, index) {
   if (!trigger || typeof trigger !== "object") return null;
   const event = ["enterRoom", "inspectObject", "openObject", "killMonster"].includes(trigger.event) ? trigger.event : "enterRoom";
   const targetId = String(trigger.targetId ?? "").trim();
-  const text = String(trigger.text ?? "").trim();
+  const text = String(trigger.text ?? trigger.body ?? trigger.message ?? trigger.description ?? "").trim();
   const images = Array.isArray(trigger.images) ? trigger.images.map(String).map((value) => value.trim()).filter(Boolean) : [];
   if (!targetId || (!text && images.length === 0)) return null;
   return {
@@ -33,6 +33,27 @@ function normalizeStoryTrigger(trigger, index) {
 
 function normalizeStoryTriggers(triggers = []) {
   return Array.isArray(triggers) ? triggers.map(normalizeStoryTrigger).filter(Boolean) : [];
+}
+
+function normalizeCustomItem(item, index) {
+  if (!item || typeof item !== "object") return null;
+  const id = String(item.id || item.baseItemId || `custom-item-${index + 1}`);
+  const description = String(item.customDescription ?? item.description ?? item.magic?.description ?? item.treasure?.description ?? "").trim();
+  const normalized = clone({
+    ...item,
+    id,
+    baseItemId: id,
+    customDungeonItem: true,
+    customDescription: description,
+    description,
+  });
+  if (normalized.magic) normalized.magic.description = description;
+  if (normalized.treasure) normalized.treasure.description = description;
+  return normalized;
+}
+
+function normalizeCustomItems(items = []) {
+  return Array.isArray(items) ? items.map(normalizeCustomItem).filter(Boolean) : [];
 }
 
 function normalizeTemplate(template) {
@@ -66,14 +87,14 @@ function normalizeTemplate(template) {
     exit: template.exit ?? { roomId: dungeon.rooms.at(-1)?.id ?? dungeon.entranceRoomId, position: dungeon.rooms.at(-1)?.cells?.[0] ?? dungeon.startPosition },
     objects: Array.isArray(template.objects) ? template.objects : [],
     monsters: Array.isArray(template.monsters) ? template.monsters : [],
-    customItems: Array.isArray(template.customItems) ? template.customItems : [],
+    customItems: normalizeCustomItems(template.customItems),
     goal: template.goal ?? { type: "reachExit" },
     intro: {
-      text: String(template.intro?.text ?? ""),
+      text: String(template.intro?.text ?? template.introText ?? ""),
       images: Array.isArray(template.intro?.images) ? template.intro.images.map(String).filter(Boolean) : [],
     },
     outro: {
-      text: String(template.outro?.text ?? ""),
+      text: String(template.outro?.text ?? template.outroText ?? template.completionText ?? ""),
       images: Array.isArray(template.outro?.images) ? template.outro.images.map(String).filter(Boolean) : [],
     },
     storyTriggers: normalizeStoryTriggers(template.storyTriggers),

@@ -58,7 +58,18 @@ async function chooseSaveSlotForAdventure() {
     });
     if (!selected) return null;
     const slotId = Number(selected);
-    if (await confirmSaveSlotOverwrite(slotId, "new")) return slotId;
+    if (!(await confirmSaveSlotOverwrite(slotId, "new"))) continue;
+    const slot = slots.find((entry) => entry.id === slotId);
+    const defaultName = slot?.hasSave ? slot.name : `Save Slot ${slotId}`;
+    const slotName = await showGameDialog({
+      title: "Name Save File",
+      message: `Pick a name for Slot ${slotId}.`,
+      input: { label: "Save name", value: defaultName, maxLength: 32 },
+      confirmText: "Use Name",
+      cancelText: "Back",
+    });
+    if (slotName === null) continue;
+    return { slotId, slotName: slotName || defaultName };
   }
 }
 
@@ -75,6 +86,55 @@ function escapeHtml(value) {
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
+}
+
+function safeExportFilename(name, slotId) {
+  const base = String(name ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return `${base || `save-slot-${slotId}`}-complete-save.json`;
+}
+
+function downloadJsonFile(filename, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function readJsonFileFromUser() {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (!file) {
+        resolve(null);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error);
+      reader.onload = () => {
+        try {
+          resolve(JSON.parse(String(reader.result ?? "")));
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.readAsText(file);
+    }, { once: true });
+    input.click();
+  });
 }
 
 function renderSaveSlots() {
@@ -104,6 +164,7 @@ function renderSaveSlots() {
           <div class="save-slot-actions">
             <button type="button" data-action="save-slot" data-slot="${slot.id}" ${canSaveCurrentGame ? "" : "disabled"}>Save</button>
             <button type="button" data-action="load-slot" data-slot="${slot.id}" ${slot.hasSave ? "" : "disabled"}>Load</button>
+            <button type="button" data-action="${slot.hasSave ? "export-slot" : "import-slot"}" data-slot="${slot.id}">${slot.hasSave ? "Export" : "Import"}</button>
             <button class="delete-save" type="button" data-action="delete-slot" data-slot="${slot.id}" ${slot.hasSave ? "" : "disabled"}>Delete</button>
           </div>
         </div>
@@ -852,7 +913,7 @@ function showDungeonStoryDialog({ title, text = "", images = [], actionLabel = "
 }
 
 function showReactionPrompt({ actor = null, title = "Reaction", message = "", acceptLabel = "Use Reaction", declineLabel = "Skip" } = {}) {
-  return new Promise((resolve) => {
+  const showLocalReactionPrompt = () => new Promise((resolve) => {
     const existing = document.querySelector(".reaction-prompt");
     existing?.remove();
     const prompt = document.createElement("div");
@@ -882,6 +943,15 @@ function showReactionPrompt({ actor = null, title = "Reaction", message = "", ac
     document.body.appendChild(prompt);
     prompt.querySelector("[data-reaction-accept]")?.focus();
   });
+
+  const remoteController = window.DepthboundPlaytest?.guestControllerForHero?.(actor?.id);
+  if (remoteController && window.DepthboundPlaytest?.requestReaction) {
+    const localPrompt = showLocalReactionPrompt();
+    const remotePrompt = window.DepthboundPlaytest.requestReaction(remoteController.id, { title, message, acceptLabel, declineLabel });
+    return Promise.race([localPrompt, remotePrompt]).finally(() => document.querySelector(".reaction-prompt")?.remove());
+  }
+
+  return showLocalReactionPrompt();
 }
 
 function showInitiativeDialog(entries) {
@@ -2363,8 +2433,9 @@ async function createCharacterOptions(raceSelection = defaultRaceSelection, clas
 async function startNewAdventure() {
   window.clearTimeout(monsterTurnTimer);
   if (!(await promptForSaveFolderIfNeeded())) return;
-  const slotId = await chooseSaveSlotForAdventure();
-  if (!slotId) return;
+  const saveSlot = await chooseSaveSlotForAdventure();
+  if (!saveSlot) return;
+  const { slotId, slotName } = saveSlot;
   let chosenName = "";
   let heroOptions = null;
   let chosenTokenArt = "";
@@ -2413,7 +2484,7 @@ async function startNewAdventure() {
   state = createHomeState([initialDungeonState.fighters.hero], [], { cp: 0, sp: 0, gp: 0 }, initialDungeonState.party);
   state.saveSlotId = slotId;
   activeSaveSlot = slotId;
-  await saveAdventure(slotId, { skipOverwriteWarning: true });
+  await saveAdventure(slotId, { skipOverwriteWarning: true, slotName });
   try {
     await saveQuickstart(state);
   } catch (error) {
@@ -2422,6 +2493,7 @@ async function startNewAdventure() {
   roomIsBuilt = false;
   hideMainMenu();
   render();
+  window.DepthboundPlaytest?.syncNow?.();
   centerViewOnHero();
 }
 
@@ -2494,6 +2566,7 @@ async function startNewDungeonWithHero() {
   hideHomeMenu();
   addLog(`${partyMembers.map((hero) => hero.name).join(", ")} leave home for ${state.customDungeon?.name ?? getContentDefinition("themes", state.themeId)?.name ?? "a new dungeon"}.`, "important");
   render();
+  window.DepthboundPlaytest?.syncNow?.();
   centerViewOnHero();
 }
 
@@ -2569,6 +2642,7 @@ async function startCampaignDungeon(campaignId) {
   hideHomeMenu();
   addLog(`${partyMembers.map((hero) => hero.name).join(", ")} leave home for ${template.name}.`, "important");
   render();
+  window.DepthboundPlaytest?.syncNow?.();
   centerViewOnHero();
 }
 
@@ -2606,6 +2680,7 @@ async function returnHomeEarly() {
   const lostItemText = lostItems.length ? lostItems.map((item) => item.name).join(", ") : "no items";
   addLog(`${hero.name} retreats home, losing ${lostItemText} and ${moneyText(cpToMoney(lostCoins))}.`, "important");
   render();
+  window.DepthboundPlaytest?.syncNow?.();
   centerViewOnHero();
 }
 
@@ -2627,6 +2702,7 @@ async function loadAdventure(slotId) {
     hideMainMenu();
     addLog(`Loaded "${payload.name}".`, "important");
     render();
+    window.DepthboundPlaytest?.syncNow?.();
     centerViewOnHero();
     maybeRunMonsterTurn();
   } catch (error) {
@@ -2646,7 +2722,7 @@ async function saveAdventure(slotId = activeSaveSlot, options = {}) {
   }
   const nameInput = els.saveSlots.querySelector(`#save-slot-name-${slotId}`);
   const slot = getSlots().find((entry) => entry.id === slotId);
-  const slotName = nameInput?.value.trim() || slot?.name || `Save Slot ${slotId}`;
+  const slotName = options.slotName?.trim?.() || nameInput?.value.trim() || slot?.name || `Save Slot ${slotId}`;
   const savedAt = new Date().toLocaleString();
   activeSaveSlot = slotId;
   state.saveSlotId = state.saveSlotId ?? slotId;
@@ -2680,5 +2756,37 @@ async function deleteAdventure(slotId) {
   await remove(slotId);
   render();
   updateSaveStatus(`Deleted "${slot.name}".`);
+}
+
+async function exportAdventure(slotId) {
+  const slot = getSlots().find((entry) => entry.id === slotId);
+  if (!slot?.hasSave) return;
+  try {
+    const bundle = await window.DungeonSave.exportCompleteSave(slotId);
+    if (!bundle) {
+      updateSaveStatus("No saved adventure found.");
+      return;
+    }
+    downloadJsonFile(safeExportFilename(bundle.name, slotId), bundle);
+    updateSaveStatus(`Exported "${bundle.name}" with ${bundle.files.length} file${bundle.files.length === 1 ? "" : "s"}.`);
+  } catch (error) {
+    updateSaveStatus(error?.message ?? "Could not export that save.");
+  }
+}
+
+async function importAdventure(slotId) {
+  const slot = getSlots().find((entry) => entry.id === slotId);
+  if (slot?.hasSave) {
+    updateSaveStatus("Choose an empty slot before importing.");
+    return;
+  }
+  try {
+    const bundle = await readJsonFileFromUser();
+    if (!bundle) return;
+    const payload = await window.DungeonSave.importCompleteSave(bundle, slotId);
+    updateSaveStatus(`Imported "${payload.name}" into Slot ${slotId}.`);
+  } catch (error) {
+    updateSaveStatus(error?.message ?? "Could not import that save.");
+  }
 }
 

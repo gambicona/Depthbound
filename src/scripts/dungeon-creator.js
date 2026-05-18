@@ -2,6 +2,113 @@
 const key = (position) => `${position.x},${position.y}`;
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replaceAll('"', "&quot;");
+}
+
+function itemValueCp(item) {
+  if (!item?.cost) return 0;
+  const amount = Number(item.cost.amount) || 0;
+  const rates = { cp: 1, sp: 10, ep: 50, gp: 100, pp: 1000 };
+  return Math.max(0, Math.round(amount * (rates[item.cost.unit] ?? 100)));
+}
+
+function itemValueText(item) {
+  const totalCp = itemValueCp(item);
+  if (totalCp <= 0) return "0 gp";
+  const gp = Math.floor(totalCp / 100);
+  const sp = Math.floor((totalCp % 100) / 10);
+  const cp = totalCp % 10;
+  return [
+    gp ? `${gp} gp` : "",
+    sp ? `${sp} sp` : "",
+    cp ? `${cp} cp` : "",
+  ].filter(Boolean).join(", ");
+}
+
+function itemOptionLabel(item) {
+  return `${item.name} (${itemValueText(item)})`;
+}
+
+function normalizeCreatorCustomItem(item, index = 0) {
+  if (!item || typeof item !== "object") return null;
+  const id = String(item.id || item.baseItemId || `custom-item-${index + 1}`);
+  const description = String(item.customDescription ?? item.description ?? item.magic?.description ?? item.treasure?.description ?? "").trim();
+  const normalized = clone({
+    ...item,
+    id,
+    baseItemId: id,
+    customDungeonItem: true,
+    customDescription: description,
+    description,
+  });
+  if (normalized.magic) normalized.magic.description = description;
+  if (normalized.treasure) normalized.treasure.description = description;
+  return normalized;
+}
+
+function normalizeCreatorStoryTrigger(trigger, index = 0) {
+  if (!trigger || typeof trigger !== "object") return null;
+  const text = String(trigger.text ?? trigger.body ?? trigger.message ?? trigger.description ?? "").trim();
+  const images = Array.isArray(trigger.images) ? trigger.images.map(String).map((value) => value.trim()).filter(Boolean) : [];
+  const targetId = String(trigger.targetId ?? "").trim();
+  if (!targetId || (!text && images.length === 0)) return null;
+  return {
+    id: String(trigger.id || `story-trigger-${index + 1}`).replace(/[^a-zA-Z0-9_-]/g, "-"),
+    event: ["enterRoom", "inspectObject", "openObject", "killMonster"].includes(trigger.event) ? trigger.event : "enterRoom",
+    targetId,
+    title: String(trigger.title ?? "").trim(),
+    text,
+    images,
+    once: trigger.once !== false,
+  };
+}
+
+function furnitureIconFilename(template, type) {
+  const source = template?.name || type || "";
+  return source
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function furnitureIconPath(template, type) {
+  const filename = furnitureIconFilename(template, type);
+  return filename ? `assets/furniture/${filename}.png` : "";
+}
+
+function activateCreatorFurnitureImages(root = document) {
+  root.querySelectorAll("[data-creator-furniture-image]").forEach((image) => {
+    const fallback = image.nextElementSibling;
+    image.addEventListener("load", () => {
+      image.classList.remove("hidden");
+      fallback?.classList.add("hidden");
+    });
+    image.addEventListener("error", () => {
+      image.remove();
+      fallback?.classList.remove("hidden");
+    });
+    if (image.complete) {
+      if (image.naturalWidth > 0) {
+        image.classList.remove("hidden");
+        fallback?.classList.add("hidden");
+      } else {
+        image.remove();
+        fallback?.classList.remove("hidden");
+      }
+    }
+  });
+}
+
 const els = {
   name: document.querySelector("#creator-name"),
   theme: document.querySelector("#creator-theme"),
@@ -16,6 +123,11 @@ const els = {
   roomH: document.querySelector("#room-h"),
   roomName: document.querySelector("#room-name"),
   newDungeon: document.querySelector("#new-dungeon"),
+  randomLayoutControls: document.querySelector("#random-layout-controls"),
+  randomLayout: document.querySelector("#random-layout"),
+  randomRoomCount: document.querySelector("#random-room-count"),
+  hallwayWidth: document.querySelector("#hallway-width"),
+  hallwayWidthLabel: document.querySelector("#hallway-width-label"),
   furnitureSearch: document.querySelector("#furniture-search"),
   furnitureCatalogue: document.querySelector("#furniture-catalogue"),
   monsterSearch: document.querySelector("#monster-search"),
@@ -27,6 +139,8 @@ const els = {
   deleteSelected: document.querySelector("#delete-selected"),
   savedDungeons: document.querySelector("#saved-dungeons"),
   saveDungeon: document.querySelector("#save-dungeon"),
+  campaignDungeons: document.querySelector("#campaign-dungeons"),
+  saveCampaignOverride: document.querySelector("#save-campaign-override"),
   status: document.querySelector("#creator-status"),
   exportJson: document.querySelector("#export-json"),
   copyJson: document.querySelector("#copy-json"),
@@ -35,6 +149,7 @@ const els = {
   goalItem: document.querySelector("#goal-item"),
   goalMonster: document.querySelector("#goal-monster"),
   goalCount: document.querySelector("#goal-count"),
+  goalConsumeItem: document.querySelector("#goal-consume-item"),
   introText: document.querySelector("#intro-text"),
   introImages: document.querySelector("#intro-images"),
   outroText: document.querySelector("#outro-text"),
@@ -53,6 +168,7 @@ const els = {
   customItemDescription: document.querySelector("#custom-item-description"),
   customItemType: document.querySelector("#custom-item-type"),
   customItemWeight: document.querySelector("#custom-item-weight"),
+  customItemValue: document.querySelector("#custom-item-value"),
   createCustomItem: document.querySelector("#create-custom-item"),
 };
 
@@ -75,8 +191,11 @@ const state = {
   pendingPortalId: "",
   hallwayStart: null,
   hallwayCells: [],
+  hallwayWidth: 1,
   roomDrag: null,
+  start: null,
   exit: null,
+  campaignSource: null,
 };
 
 function cellInRoom(room, position) {
@@ -158,6 +277,25 @@ function carvePath(start, end) {
   return cells;
 }
 
+function widenPath(cells, width = state.hallwayWidth) {
+  const corridorWidth = Math.max(1, Math.min(3, Math.floor(Number(width) || 1)));
+  const widened = new Map();
+  for (let index = 0; index < cells.length; index += 1) {
+    const cell = cells[index];
+    const previous = cells[index - 1] ?? cell;
+    const next = cells[index + 1] ?? cell;
+    const horizontal = Math.abs(next.x - previous.x) >= Math.abs(next.y - previous.y);
+    for (let offset = 0; offset < corridorWidth; offset += 1) {
+      const sideOffset = offset - Math.floor(corridorWidth / 2);
+      const widenedCell = horizontal ? { x: cell.x, y: cell.y + sideOffset } : { x: cell.x + sideOffset, y: cell.y };
+      if (widenedCell.x >= 0 && widenedCell.y >= 0 && widenedCell.x < state.gridSize && widenedCell.y < state.gridSize) {
+        widened.set(key(widenedCell), widenedCell);
+      }
+    }
+  }
+  return Array.from(widened.values());
+}
+
 function edgeKey(a, b) {
   return [key(a), key(b)].sort().join("|");
 }
@@ -179,7 +317,13 @@ function rebuildWalkable() {
 function buildDungeon() {
   const walkable = rebuildWalkable();
   const doors = state.rooms.flatMap((room) => (room.doors ?? []).map((door) => ({ ...door, roomId: room.id })));
-  const entranceRoom = state.rooms[0];
+  const fallbackEntranceRoom = state.rooms[0];
+  const startRoom = state.start ? state.rooms.find((room) => room.id === state.start.roomId && cellInRoom(room, state.start.position)) : null;
+  const entranceRoom = startRoom ?? fallbackEntranceRoom;
+  const startPosition =
+    state.start && startRoom
+      ? { ...state.start.position }
+      : entranceRoom?.cells?.find((cell) => !entranceRoom.doors?.some((door) => key(door) === key(cell))) ?? entranceRoom?.cells?.[0] ?? { x: 1, y: 1 };
   return {
     id: state.id,
     gridSize: state.gridSize,
@@ -191,21 +335,32 @@ function buildDungeon() {
     walkable,
     entranceRoomId: entranceRoom?.id ?? "room-1",
     entranceDoor: entranceRoom?.doors?.[0] ?? entranceRoom?.cells?.[0] ?? { x: 1, y: 1 },
-    startPosition: entranceRoom?.cells?.find((cell) => !entranceRoom.doors?.some((door) => key(door) === key(cell))) ?? entranceRoom?.cells?.[0] ?? { x: 1, y: 1 },
+    startPosition,
   };
 }
 
 function goalFromForm() {
   const type = els.goalType.value;
-  if (type === "collectItem") return { type, itemId: els.goalItem.value };
-  if (type === "collectItemCount") return { type, itemId: els.goalItem.value, count: Math.max(1, Number(els.goalCount.value) || 1) };
+  const consumeOnComplete = Boolean(els.goalConsumeItem?.checked);
+  if (type === "collectItem") return { type, itemId: els.goalItem.value, ...(consumeOnComplete ? { consumeOnComplete: true } : {}) };
+  if (type === "collectItemCount") return { type, itemId: els.goalItem.value, count: Math.max(1, Number(els.goalCount.value) || 1), ...(consumeOnComplete ? { consumeOnComplete: true } : {}) };
   if (type === "killMonsterType") return { type, monsterId: els.goalMonster.value, count: Math.max(1, Number(els.goalCount.value) || 1) };
   if (type === "killBoss") return { type };
   if (type === "escortNpc") return { type };
   return { type: "reachExit" };
 }
 
-function templateFromState() {
+function syncSelectedStoryTriggerFromForm() {
+  if (!state.selectedStoryTriggerId) return;
+  const index = state.storyTriggers.findIndex((entry) => entry.id === state.selectedStoryTriggerId);
+  if (index < 0) return;
+  const trigger = storyTriggerFromForm();
+  if (!trigger.targetId || (!trigger.text && trigger.images.length === 0)) return;
+  state.storyTriggers[index] = trigger;
+}
+
+function templateFromState(options = {}) {
+  syncSelectedStoryTriggerFromForm();
   const dungeon = buildDungeon();
   return {
     id: state.id,
@@ -247,6 +402,9 @@ function templateFromState() {
       images: els.outroImages.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
     },
     storyTriggers: clone(state.storyTriggers),
+    ...(options.includeCampaignSource && state.campaignSource
+      ? { campaignId: state.campaignSource.campaignId, campaignIndex: state.campaignSource.campaignIndex }
+      : {}),
   };
 }
 
@@ -279,7 +437,37 @@ function renderThemes() {
 }
 
 function catalogueButton(entry, selectedId) {
-  return `<button type="button" data-id="${entry.id}" class="${entry.id === selectedId ? "active" : ""}"><b>${entry.name}</b><br><span class="small-note">${entry.id}</span></button>`;
+  return `<button type="button" data-id="${escapeAttribute(entry.id)}" class="${entry.id === selectedId ? "active" : ""}"><b>${escapeHtml(entry.name)}</b><br><span class="small-note">${escapeHtml(entry.id)}</span></button>`;
+}
+
+function monsterCategoryLabel(monster) {
+  return Number.isFinite(monster.category) ? `Cat ${monster.category}` : "Cat ?";
+}
+
+function monsterCatalogueButton(entry, selectedId) {
+  return `
+    <button type="button" data-id="${escapeAttribute(entry.id)}" class="monster-catalogue-button ${entry.id === selectedId ? "active" : ""}">
+      <span class="monster-catalogue-title">
+        <b>${escapeHtml(entry.name)}</b>
+        <span class="monster-category-badge" title="Monster category">${escapeHtml(monsterCategoryLabel(entry))}</span>
+      </span>
+      <span class="small-note">${escapeHtml(entry.id)}</span>
+    </button>
+  `;
+}
+
+function furnitureCatalogueButton(entry, selectedId) {
+  const fallbackSymbol = entry.symbol ?? (entry.kind === "trap" ? "!" : "?");
+  const iconPath = furnitureIconPath(entry, entry.id);
+  return `
+    <button type="button" data-id="${escapeAttribute(entry.id)}" class="furniture-catalogue-button ${entry.id === selectedId ? "active" : ""}">
+      <span class="furniture-catalogue-icon">
+        ${iconPath ? `<img class="hidden" data-creator-furniture-image src="${escapeAttribute(iconPath)}" alt="" draggable="false" />` : ""}
+        <span>${escapeHtml(fallbackSymbol)}</span>
+      </span>
+      <b>${escapeHtml(entry.name)}</b>
+    </button>
+  `;
 }
 
 function renderFurnitureCatalogue() {
@@ -289,16 +477,17 @@ function renderFurnitureCatalogue() {
     .filter((entry) => (state.tool === "trap" ? entry.kind === "trap" : entry.kind !== "trap"))
     .filter((entry) => !query || `${entry.name} ${entry.id} ${(entry.tags ?? []).join(" ")}`.toLowerCase().includes(query))
     .sort((a, b) => a.name.localeCompare(b.name));
-  els.furnitureCatalogue.innerHTML = entries.map((entry) => catalogueButton(entry, state.selectedFurnitureId)).join("");
+  els.furnitureCatalogue.innerHTML = entries.map((entry) => furnitureCatalogueButton(entry, state.selectedFurnitureId)).join("");
+  activateCreatorFurnitureImages(els.furnitureCatalogue);
 }
 
 function renderMonsterCatalogue() {
   const query = els.monsterSearch.value.trim().toLowerCase();
   const entries = window.DungeonContent
     .list("monsters")
-    .filter((entry) => !query || `${entry.name} ${entry.id} ${(entry.tags ?? []).join(" ")}`.toLowerCase().includes(query))
+    .filter((entry) => !query || `${entry.name} ${entry.id} ${monsterCategoryLabel(entry)} ${(entry.tags ?? []).join(" ")}`.toLowerCase().includes(query))
     .sort((a, b) => a.name.localeCompare(b.name));
-  els.monsterCatalogue.innerHTML = entries.map((entry) => catalogueButton(entry, state.selectedMonsterId)).join("");
+  els.monsterCatalogue.innerHTML = entries.map((entry) => monsterCatalogueButton(entry, state.selectedMonsterId)).join("");
 }
 
 function renderItemSelects() {
@@ -306,8 +495,8 @@ function renderItemSelects() {
     .list("items")
     .filter((item) => item.type !== "class")
     .sort((a, b) => a.name.localeCompare(b.name));
-  const options = items.map((item) => `<option value="${item.id}">${item.name}</option>`).join("");
-  const customOptions = state.customItems.map((item) => `<option value="${item.id}">${item.name}</option>`).join("");
+  const options = items.map((item) => `<option value="${escapeAttribute(item.id)}">${escapeHtml(itemOptionLabel(item))}</option>`).join("");
+  const customOptions = state.customItems.map((item) => `<option value="${escapeAttribute(item.id)}">${escapeHtml(itemOptionLabel(item))}</option>`).join("");
   els.lootItem.innerHTML = options + customOptions;
   els.goalItem.innerHTML = options + customOptions;
   els.customItemTemplate.innerHTML = options;
@@ -369,7 +558,13 @@ function repairDuplicateRoomIds() {
       .forEach((monster) => {
         monster.roomId = newId;
       });
+    state.storyTriggers
+      .filter((trigger) => trigger.targetId === oldId)
+      .forEach((trigger) => {
+        trigger.targetId = newId;
+      });
     if (state.exit?.roomId === oldId && cellInRoom(room, state.exit.position)) state.exit.roomId = newId;
+    if (state.start?.roomId === oldId && cellInRoom(room, state.start.position)) state.start.roomId = newId;
   }
 }
 
@@ -378,6 +573,7 @@ function renderGrid() {
   const corridorKeys = new Set(state.corridors.map(key));
   const doorKeys = new Set(state.rooms.flatMap((room) => room.doors ?? []).map(key));
   const exitKey = state.exit ? key(state.exit.position) : "";
+  const startKey = state.start ? key(state.start.position) : "";
   const portalKeys = new Set(state.objects.filter((object) => object.type === "portal").map((object) => key(object.position)));
   const hallwayPreviewKeys = new Set(state.hallwayCells.map(key));
   els.grid.style.gridTemplateColumns = `repeat(${state.gridSize}, 22px)`;
@@ -394,6 +590,7 @@ function renderGrid() {
         room ? "room" : "",
         corridorKeys.has(cellKey) ? "corridor" : "",
         doorKeys.has(cellKey) ? "door" : "",
+        startKey === cellKey ? "start" : "",
         exitKey === cellKey ? "exit" : "",
         portalKeys.has(cellKey) ? "portal" : "",
         hallwayPreviewKeys.has(cellKey) ? "selected-room" : "",
@@ -401,11 +598,17 @@ function renderGrid() {
         y === 0 && x % 5 === 0 ? "axis-x" : "",
         x === 0 && y % 5 === 0 ? "axis-y" : "",
       ].filter(Boolean).join(" ");
-      const label = monster ? "M" : object ? (object.type === "portal" ? "P" : "F") : exitKey === cellKey ? "E" : "";
-      cells.push(`<button type="button" class="${classes}" data-x="${x}" data-y="${y}" data-axis-x="${x}" data-axis-y="${y}" title="${room?.name ?? ""}">${label}</button>`);
+      const template = object ? window.DungeonContent.get("furniture", object.type) : null;
+      const label = monster ? "M" : object ? (template?.symbol ?? (object.type === "portal" ? "P" : "F")) : startKey === cellKey ? "S" : exitKey === cellKey ? "E" : "";
+      const iconPath = object ? furnitureIconPath(template, object.type) : "";
+      const content = object && !monster
+        ? `${iconPath ? `<img class="creator-cell-object-icon hidden" data-creator-furniture-image src="${escapeAttribute(iconPath)}" alt="" draggable="false" />` : ""}<span>${escapeHtml(label)}</span>`
+        : escapeHtml(label);
+      cells.push(`<button type="button" class="${classes}" data-x="${x}" data-y="${y}" data-axis-x="${x}" data-axis-y="${y}" title="${escapeAttribute(room?.name ?? "")}">${content}</button>`);
     }
   }
   els.grid.innerHTML = cells.join("");
+  activateCreatorFurnitureImages(els.grid);
 }
 
 function selectedEntity() {
@@ -577,6 +780,7 @@ function renderSelected() {
   }
   els.selectedCard.innerHTML = `
     <b>${selected.name}</b><br>
+    <label>Room name <input data-room-field="name" value="${escapeAttribute(selected.name)}" /></label>
     ${selected.cells.length} cells at ${selected.x}, ${selected.y}
     <div class="room-move-controls" aria-label="Move selected room">
       <span></span>
@@ -621,8 +825,65 @@ function renderSavedDungeons() {
     : `<p class="small-note">No custom dungeons saved yet.</p>`;
 }
 
+async function renderCampaignDungeons() {
+  if (!els.campaignDungeons || !window.DungeonCampaigns) return;
+  els.campaignDungeons.innerHTML = `<p class="small-note">Loading campaign dungeons...</p>`;
+  const campaigns = window.DungeonCampaigns.list();
+  const sections = [];
+  for (const campaign of campaigns) {
+    const rows = await Promise.all(
+      Array.from({ length: campaign.count }, async (_, index) => {
+        const number = index + 1;
+        const template = await window.DungeonCampaigns.dungeon(campaign.id, number);
+        const overridden = window.DungeonCampaigns.hasOverride?.(campaign.id, number);
+        return `
+          <div class="creator-list-item">
+            <div>
+              <b>${number}. ${escapeHtml(template?.name ?? `Dungeon ${number}`)}</b><br>
+              <span class="small-note">${escapeHtml(campaign.name)}${overridden ? " - edited override" : ""}</span>
+            </div>
+            <div>
+              <button type="button" data-action="load-campaign" data-campaign="${escapeAttribute(campaign.id)}" data-index="${number}">Load</button>
+              ${overridden ? `<button type="button" class="ghost-button" data-action="load-original-campaign" data-campaign="${escapeAttribute(campaign.id)}" data-index="${number}">Original</button>` : ""}
+              ${overridden ? `<button type="button" class="ghost-button" data-action="reset-campaign" data-campaign="${escapeAttribute(campaign.id)}" data-index="${number}">Reset</button>` : ""}
+            </div>
+          </div>
+        `;
+      }),
+    );
+    sections.push(`<div class="small-note"><b>${escapeHtml(campaign.name)}</b></div>${rows.join("")}`);
+  }
+  els.campaignDungeons.innerHTML = sections.join("") || `<p class="small-note">No campaign dungeons found.</p>`;
+  renderCampaignSaveState();
+}
+
+function renderCampaignSaveState() {
+  if (!els.saveCampaignOverride) return;
+  const source = state.campaignSource;
+  els.saveCampaignOverride.disabled = !source;
+  els.saveCampaignOverride.textContent = source
+    ? `Save ${source.campaignName ?? source.campaignId} Dungeon ${source.campaignIndex} Override`
+    : "Save Campaign Override";
+}
+
+function canRerollRandomLayout() {
+  return (
+    state.objects.length === 0 &&
+    state.monsters.length === 0 &&
+    state.storyTriggers.length === 0
+  );
+}
+
+function renderRandomLayoutControls() {
+  if (!els.randomLayout) return;
+  const width = Math.max(1, Math.min(3, Number(els.hallwayWidth?.value) || state.hallwayWidth || 1));
+  state.hallwayWidth = width;
+  if (els.hallwayWidthLabel) els.hallwayWidthLabel.textContent = `${width} square${width === 1 ? "" : "s"}`;
+  els.randomLayout.disabled = !canRerollRandomLayout();
+}
+
 function renderExport() {
-  els.exportJson.value = JSON.stringify(templateFromState(), null, 2);
+  els.exportJson.value = JSON.stringify(templateFromState({ includeCampaignSource: Boolean(state.campaignSource) }), null, 2);
 }
 
 function renderAll() {
@@ -636,6 +897,8 @@ function renderAll() {
   renderRoomList();
   renderSelected();
   renderSavedDungeons();
+  renderCampaignSaveState();
+  renderRandomLayoutControls();
   renderExport();
 }
 
@@ -668,7 +931,8 @@ function connectRooms(a, b) {
   const aConnection = nearestBoundaryDoor(a, roomCenter(b));
   const bConnection = nearestBoundaryDoor(b, roomCenter(a));
   if (!aConnection || !bConnection) return;
-  const cells = carvePath(aConnection.outside, bConnection.outside);
+  const baseCells = carvePath(aConnection.outside, bConnection.outside);
+  const cells = widenPath(baseCells);
   const passage = makeCorridorPassage(state.corridorPassages.length, cells, { roomIds: [a.id, b.id] });
   state.corridors = uniqueCells([...state.corridors, ...cells]);
   state.corridorPassages.push(passage);
@@ -686,11 +950,12 @@ function uniqueValues(values) {
 function addManualHallway(start, end, cells) {
   if (!start || !end || cells.length === 0) return;
   if (start.room && end.room && start.room.id === end.room.id) return;
-  const path = uniqueCells(cells);
+  const basePath = uniqueCells(cells);
+  const path = uniqueCells(widenPath(basePath));
   state.corridors = uniqueCells([...state.corridors, ...path]);
   state.corridorPassages.push(makeCorridorPassage(state.corridorPassages.length, path, { roomIds: [start.room?.id, end.room?.id].filter(Boolean) }));
-  if (start.room) start.room.doors.push({ ...start.position, corridor: { ...path[0] }, ...(end.room ? { to: end.room.id } : {}) });
-  if (end.room) end.room.doors.push({ ...end.position, corridor: { ...path.at(-1) }, ...(start.room ? { to: start.room.id } : {}) });
+  if (start.room) start.room.doors.push({ ...start.position, corridor: { ...basePath[0] }, ...(end.room ? { to: end.room.id } : {}) });
+  if (end.room) end.room.doors.push({ ...end.position, corridor: { ...basePath.at(-1) }, ...(start.room ? { to: start.room.id } : {}) });
   if (start.room && end.room) {
     start.room.connections = uniqueValues([...(start.room.connections ?? []), end.room.id]);
     end.room.connections = uniqueValues([...(end.room.connections ?? []), start.room.id]);
@@ -768,6 +1033,9 @@ function moveSelectedRoom(dx, dy) {
   });
   if (state.exit?.roomId === room.id) {
     state.exit.position = { x: state.exit.position.x + delta.x, y: state.exit.position.y + delta.y };
+  }
+  if (state.start?.roomId === room.id) {
+    state.start.position = { x: state.start.position.x + delta.x, y: state.start.position.y + delta.y };
   }
   rebuildAllCorridors();
   renderAll();
@@ -871,15 +1139,24 @@ function createCustomItem() {
   const template = window.DungeonContent.get("items", els.customItemTemplate.value);
   if (!template) return;
   const id = `custom-item-${state.customItems.length + 1}`;
-  state.customItems.push({
+  const description = els.customItemDescription.value.trim() || template.description || template.magic?.description || template.treasure?.description || "";
+  const valueGp = Math.max(0, Number(els.customItemValue.value) || 0);
+  const customItem = {
     ...clone(template),
     id,
     baseItemId: id,
     name: els.customItemName.value.trim() || `${template.name} Variant`,
-    description: els.customItemDescription.value.trim() || template.description || "",
+    description,
+    customDungeonItem: true,
+    customDescription: description,
     type: els.customItemType.value.trim() || template.type,
     weightLb: Number(els.customItemWeight.value) || template.weightLb || 0,
-  });
+    cost: { amount: valueGp, unit: "gp" },
+  };
+  customItem.cost.text = itemValueText(customItem);
+  if (customItem.magic) customItem.magic = { ...customItem.magic, description };
+  if (customItem.treasure) customItem.treasure = { ...customItem.treasure, description };
+  state.customItems.push(customItem);
   renderItemSelects();
   renderExport();
   setStatus(`Created local item ${state.customItems.at(-1).name}.`);
@@ -919,6 +1196,13 @@ function setExit(position) {
   if (!room) return;
   state.exit = { roomId: room.id, position: { ...position } };
   setStatus(`Exit placed at ${position.x}, ${position.y}.`);
+}
+
+function setPartyStart(position) {
+  const room = roomAt(position);
+  if (!room) return;
+  state.start = { roomId: room.id, position: { ...position } };
+  setStatus(`Party start set in ${room.name ?? room.id} at ${position.x}, ${position.y}.`);
 }
 
 function placePortal(position) {
@@ -962,6 +1246,7 @@ function eraseAt(position) {
     return;
   }
   if (state.exit && key(state.exit.position) === key(position)) state.exit = null;
+  if (state.start && key(state.start.position) === key(position)) state.start = null;
   const passage = state.corridorPassages.find((entry) => (entry.cells ?? []).some((cell) => key(cell) === key(position)));
   if (passage) {
     const removedKeys = new Set((passage.cells ?? []).map(key));
@@ -994,6 +1279,8 @@ function handleGridClick(position) {
     placeFurniture(position);
   } else if (state.tool === "monster") {
     placeMonster(position);
+  } else if (state.tool === "start") {
+    setPartyStart(position);
   } else if (state.tool === "exit") {
     setExit(position);
   } else if (state.tool === "portal") {
@@ -1034,6 +1321,7 @@ function deleteSelected() {
     state.objects = state.objects.filter((entry) => entry.roomId !== selected.id);
     state.monsters = state.monsters.filter((entry) => entry.roomId !== selected.id);
     if (state.exit?.roomId === selected.id) state.exit = null;
+    if (state.start?.roomId === selected.id) state.start = null;
     rebuildAllCorridors();
   }
   state.selectedId = "";
@@ -1051,22 +1339,59 @@ function saveDungeon() {
   }
   const saved = window.DungeonCustom.save(templateFromState());
   state.id = saved.id;
+  state.campaignSource = null;
   setStatus(`Saved ${saved.name}. It will appear at the Home Door as a Custom dungeon.`);
   renderAll();
 }
 
-function loadTemplate(template) {
+async function saveCampaignOverride() {
+  if (!state.campaignSource) {
+    setStatus("Load a campaign dungeon first.");
+    return;
+  }
+  const saved = window.DungeonCampaigns?.saveOverride?.(
+    state.campaignSource.campaignId,
+    state.campaignSource.campaignIndex,
+    templateFromState({ includeCampaignSource: true }),
+  );
+  if (!saved) {
+    setStatus("Could not save the campaign override.");
+    return;
+  }
+  setStatus(`Saved override for ${state.campaignSource.campaignName ?? state.campaignSource.campaignId} Dungeon ${state.campaignSource.campaignIndex}.`);
+  await renderCampaignDungeons();
+  renderAll();
+}
+
+function loadTemplate(template, options = {}) {
+  const customItems = Array.isArray(template.customItems) ? template.customItems.map(normalizeCreatorCustomItem).filter(Boolean) : [];
+  const storyTriggers = Array.isArray(template.storyTriggers) ? template.storyTriggers.map(normalizeCreatorStoryTrigger).filter(Boolean) : [];
   state.id = template.id;
+  state.campaignSource = options.campaignSource ?? (
+    template.campaignId && template.campaignIndex
+      ? {
+          campaignId: template.campaignId,
+          campaignIndex: Number(template.campaignIndex),
+          campaignName: window.DungeonCampaigns?.get?.(template.campaignId)?.name ?? template.campaignId,
+        }
+      : null
+  );
   state.gridSize = template.gridSize ?? template.dungeon?.gridSize ?? 36;
   state.rooms = clone(template.dungeon?.rooms ?? []);
   state.corridors = clone(template.dungeon?.corridors ?? []);
   state.corridorPassages = clone(template.dungeon?.corridorPassages ?? []);
   state.objects = clone(template.objects ?? []);
   state.monsters = clone(template.monsters ?? []);
-  state.customItems = clone(template.customItems ?? []);
-  state.storyTriggers = clone(template.storyTriggers ?? []);
+  state.customItems = customItems;
+  state.storyTriggers = storyTriggers;
   state.selectedStoryTriggerId = "";
   state.exit = clone(template.exit ?? null);
+  const startPosition = template.dungeon?.startPosition;
+  const entranceRoomId = template.dungeon?.entranceRoomId;
+  const startRoom = startPosition
+    ? state.rooms.find((room) => room.id === entranceRoomId && cellInRoom(room, startPosition)) ?? state.rooms.find((room) => cellInRoom(room, startPosition))
+    : null;
+  state.start = startRoom && startPosition ? { roomId: startRoom.id, position: { x: Math.floor(startPosition.x), y: Math.floor(startPosition.y) } } : null;
   repairDuplicateRoomIds();
   state.selectedId = "";
   state.connectFromRoomId = "";
@@ -1080,12 +1405,15 @@ function loadTemplate(template) {
   if (template.goal?.itemId) els.goalItem.value = template.goal.itemId;
   if (template.goal?.monsterId) els.goalMonster.value = template.goal.monsterId;
   if (template.goal?.count) els.goalCount.value = String(template.goal.count);
-  els.introText.value = template.intro?.text ?? "";
+  els.goalConsumeItem.checked = Boolean(template.goal?.consumeOnComplete);
+  els.introText.value = template.intro?.text ?? template.introText ?? "";
   els.introImages.value = (template.intro?.images ?? []).join("\n");
-  els.outroText.value = template.outro?.text ?? "";
+  els.outroText.value = template.outro?.text ?? template.outroText ?? template.completionText ?? "";
   els.outroImages.value = (template.outro?.images ?? []).join("\n");
   clearStoryTriggerForm();
   renderItemSelects();
+  if (template.goal?.itemId) els.goalItem.value = template.goal.itemId;
+  if (template.goal?.monsterId) els.goalMonster.value = template.goal.monsterId;
   renderAll();
 }
 
@@ -1101,6 +1429,8 @@ function newBlankDungeon() {
   state.storyTriggers = [];
   state.selectedStoryTriggerId = "";
   state.exit = null;
+  state.campaignSource = null;
+  state.start = null;
   state.selectedId = "";
   state.connectFromRoomId = "";
   state.pendingPortalId = "";
@@ -1110,12 +1440,84 @@ function newBlankDungeon() {
   renderAll();
 }
 
+function randomLayoutRoomOptions(gridSize, requestedRooms) {
+  const density = Math.max(1, Math.sqrt(Math.max(1, requestedRooms)));
+  const maxRoom = Math.max(4, Math.min(11, Math.floor(gridSize / (density + 1))));
+  const minRoom = Math.max(3, Math.min(5, maxRoom - 1));
+  const tight = requestedRooms > Math.max(4, Math.floor(gridSize / 4));
+  return {
+    layout: "branching",
+    roomShapes: maxRoom <= 5 ? ["rectangle", "square"] : ["rectangle", "square", "l", "t"],
+    roomWidth: { min: minRoom, max: maxRoom },
+    roomHeight: { min: minRoom, max: Math.max(minRoom, maxRoom - 1) },
+    squareSize: { min: minRoom, max: maxRoom },
+    corridorLength: { min: Math.max(2, state.hallwayWidth + 1), max: Math.max(4, state.hallwayWidth + 4) },
+    corridorWidth: state.hallwayWidth,
+    corridorStyle: "random-bend",
+    roomPadding: tight ? 1 : 2,
+    corridorPadding: state.hallwayWidth > 1 ? 0 : 1,
+    roomOffset: { min: Math.max(3, minRoom), max: Math.max(5, maxRoom) },
+    roomJitter: { x: [1, Math.max(2, Math.floor(maxRoom / 2))], y: [1, Math.max(2, Math.floor(maxRoom / 2))] },
+    extraConnectionRatio: 0.2,
+    maxAttempts: Math.max(900, requestedRooms * 120),
+  };
+}
+
+function farthestRoomFromStart(rooms, startRoom) {
+  const startCenter = roomCenter(startRoom);
+  return rooms
+    .slice()
+    .sort((a, b) => distance(roomCenter(b), startCenter) - distance(roomCenter(a), startCenter))[0] ?? startRoom;
+}
+
+function randomOpenRoomCell(room) {
+  const doorKeys = new Set((room.doors ?? []).map(key));
+  return room.cells.find((cell) => !doorKeys.has(key(cell))) ?? room.cells[0] ?? { x: 1, y: 1 };
+}
+
+function applyGeneratedDungeonLayout(generated) {
+  state.rooms = clone(generated.rooms ?? []);
+  state.corridors = uniqueCells(clone(generated.corridors ?? []));
+  state.corridorPassages = clone(generated.corridorPassages ?? []);
+  state.objects = [];
+  state.monsters = [];
+  state.selectedId = "";
+  state.connectFromRoomId = "";
+  state.pendingPortalId = "";
+  state.hallwayStart = null;
+  state.hallwayCells = [];
+  const entranceRoom = state.rooms.find((room) => room.id === generated.entranceRoomId) ?? state.rooms[0] ?? null;
+  const exitRoom = entranceRoom ? farthestRoomFromStart(state.rooms, entranceRoom) : state.rooms.at(-1) ?? null;
+  state.start = entranceRoom ? { roomId: entranceRoom.id, position: generated.startPosition ?? randomOpenRoomCell(entranceRoom) } : null;
+  state.exit = exitRoom ? { roomId: exitRoom.id, position: randomOpenRoomCell(exitRoom) } : null;
+}
+
+function generateRandomLayout() {
+  if (!canRerollRandomLayout()) {
+    setStatus("Random Layout is locked once furniture, traps, monsters, or story triggers have been placed. Use New Blank Dungeon first.");
+    return;
+  }
+  state.gridSize = Math.max(16, Math.min(72, Number(els.gridSize.value) || state.gridSize || 36));
+  state.hallwayWidth = Math.max(1, Math.min(3, Number(els.hallwayWidth?.value) || 1));
+  const requestedRooms = Math.max(1, Math.min(80, Number(els.randomRoomCount?.value) || 10));
+  const generated = window.DungeonGenerator.generateDungeon({
+    gridSize: state.gridSize,
+    roomCount: requestedRooms,
+    ...randomLayoutRoomOptions(state.gridSize, requestedRooms),
+  });
+  applyGeneratedDungeonLayout(generated);
+  els.gridSize.value = String(state.gridSize);
+  setStatus(`Random layout created with ${state.rooms.length} of ${requestedRooms} requested rooms.`);
+  renderAll();
+}
+
 function init() {
   renderThemes();
   renderItemSelects();
   els.customItemTemplate.dispatchEvent(new Event("change"));
   newBlankDungeon();
   setTool("select");
+  void renderCampaignDungeons();
 
   els.toolGrid.addEventListener("click", (event) => {
     const button = event.target.closest("[data-tool]");
@@ -1148,6 +1550,12 @@ function init() {
   });
   els.addRoom.addEventListener("click", addRoom);
   els.newDungeon.addEventListener("click", newBlankDungeon);
+  els.randomLayout?.addEventListener("click", generateRandomLayout);
+  els.randomRoomCount?.addEventListener("input", renderRandomLayoutControls);
+  els.hallwayWidth?.addEventListener("input", () => {
+    state.hallwayWidth = Math.max(1, Math.min(3, Number(els.hallwayWidth.value) || 1));
+    renderRandomLayoutControls();
+  });
   els.gridSize.addEventListener("change", newBlankDungeon);
   els.furnitureSearch.addEventListener("input", renderFurnitureCatalogue);
   els.monsterSearch.addEventListener("input", renderMonsterCatalogue);
@@ -1198,9 +1606,10 @@ function init() {
     const template = window.DungeonContent.get("items", els.customItemTemplate.value);
     if (!template) return;
     els.customItemName.value = `${template.name} Variant`;
-    els.customItemDescription.value = template.description ?? "";
+    els.customItemDescription.value = template.description ?? template.magic?.description ?? template.treasure?.description ?? "";
     els.customItemType.value = template.type ?? "";
     els.customItemWeight.value = String(template.weightLb ?? 0);
+    els.customItemValue.value = String(itemValueCp(template) / 100);
   });
   els.selectedCard.addEventListener("click", (event) => {
     const button = event.target.closest("[data-action]");
@@ -1211,6 +1620,17 @@ function init() {
   });
   els.selectedCard.addEventListener("input", (event) => {
     const selected = selectedEntity();
+    const roomInput = event.target.closest("[data-room-field]");
+    if (roomInput && selected?.cells) {
+      if (roomInput.dataset.roomField === "name") {
+        selected.name = roomInput.value.trim() || "Dungeon Room";
+        renderRoomList();
+        renderStoryTriggerTargetSelect();
+        renderExport();
+      }
+      return;
+    }
+
     const objectInput = event.target.closest("[data-object-field]");
     if (objectInput && selected?.type) {
       if (objectInput.dataset.objectField === "locked") selected.locked = objectInput.checked;
@@ -1237,6 +1657,9 @@ function init() {
     renderExport();
   });
   els.saveDungeon.addEventListener("click", saveDungeon);
+  els.saveCampaignOverride?.addEventListener("click", () => {
+    void saveCampaignOverride();
+  });
   els.copyJson.addEventListener("click", renderExport);
   els.importJson.addEventListener("click", () => {
     try {
@@ -1258,8 +1681,45 @@ function init() {
       renderAll();
     }
   });
+  els.campaignDungeons?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-action]");
+    if (!button) return;
+    const campaignId = button.dataset.campaign;
+    const index = Number(button.dataset.index);
+    if (button.dataset.action === "load-campaign") {
+      void window.DungeonCampaigns.dungeon(campaignId, index).then((template) => {
+        if (!template) {
+          setStatus("Could not load that campaign dungeon.");
+          return;
+        }
+        const campaign = window.DungeonCampaigns.get(campaignId);
+        loadTemplate(template, { campaignSource: { campaignId, campaignIndex: index, campaignName: campaign?.name ?? campaignId } });
+        setStatus(`Loaded ${campaign?.name ?? campaignId} Dungeon ${index}. Save Campaign Override to replace it in the campaign menu.`);
+      });
+    }
+    if (button.dataset.action === "load-original-campaign") {
+      void window.DungeonCampaigns.originalDungeon(campaignId, index).then((template) => {
+        if (!template) {
+          setStatus("Could not load the original campaign JSON.");
+          return;
+        }
+        const campaign = window.DungeonCampaigns.get(campaignId);
+        loadTemplate(template, { campaignSource: { campaignId, campaignIndex: index, campaignName: campaign?.name ?? campaignId } });
+        setStatus(`Loaded original JSON for ${campaign?.name ?? campaignId} Dungeon ${index}. Save Campaign Override to replace the edited version.`);
+      });
+    }
+    if (button.dataset.action === "reset-campaign") {
+      window.DungeonCampaigns.removeOverride?.(campaignId, index);
+      if (state.campaignSource?.campaignId === campaignId && state.campaignSource?.campaignIndex === index) {
+        state.campaignSource = null;
+        renderAll();
+      }
+      void renderCampaignDungeons();
+      setStatus("Campaign override removed. The original JSON dungeon will be used again.");
+    }
+  });
   ["input", "change"].forEach((eventName) => {
-    [els.name, els.theme, els.goalType, els.goalItem, els.goalMonster, els.goalCount, els.introText, els.introImages, els.outroText, els.outroImages, els.storyTriggerTitle, els.storyTriggerText, els.storyTriggerImages, els.storyTriggerOnce].forEach((element) => {
+    [els.name, els.theme, els.goalType, els.goalItem, els.goalMonster, els.goalCount, els.goalConsumeItem, els.introText, els.introImages, els.outroText, els.outroImages, els.storyTriggerTitle, els.storyTriggerText, els.storyTriggerImages, els.storyTriggerOnce].forEach((element) => {
       element.addEventListener(eventName, renderExport);
     });
   });

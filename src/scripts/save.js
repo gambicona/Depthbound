@@ -352,6 +352,147 @@ function rememberTokenUrl(path, url) {
   if (path && url) state.tokenUrls.set(path, url);
 }
 
+function collectTokenPaths(value, paths = new Set()) {
+  if (!value || typeof value !== "object") return paths;
+  if (value.type === "custom-file" && value.path) paths.add(String(value.path));
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectTokenPaths(entry, paths));
+    return paths;
+  }
+  Object.values(value).forEach((entry) => collectTokenPaths(entry, paths));
+  return paths;
+}
+
+async function readSidecarFile(path) {
+  if (!path || state.mode !== "file" || !state.directoryHandle) return null;
+  try {
+    const parts = String(path).split("/").filter(Boolean);
+    const filename = parts.pop();
+    let directory = state.directoryHandle;
+    for (const folder of parts) directory = await directory.getDirectoryHandle(folder);
+    const handle = await directory.getFileHandle(filename);
+    const file = await handle.getFile();
+    return {
+      path,
+      name: file.name,
+      type: file.type || "application/octet-stream",
+      lastModified: file.lastModified,
+      dataBase64: await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error);
+        reader.onload = () => resolve(String(reader.result ?? "").split(",")[1] ?? "");
+        reader.readAsDataURL(file);
+      }),
+    };
+  } catch (error) {
+    state.lastError = `Could not read export sidecar: ${path}`;
+    console.warn(state.lastError, error);
+    return null;
+  }
+}
+
+function base64ToBlob(base64, type = "application/octet-stream") {
+  const binary = window.atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return new Blob([bytes], { type });
+}
+
+async function writeSidecarFile(file) {
+  if (!file?.path || !file.dataBase64 || state.mode !== "file" || !state.directoryHandle) return false;
+  const parts = String(file.path).split("/").filter(Boolean);
+  const filename = parts.pop();
+  let directory = state.directoryHandle;
+  for (const folder of parts) directory = await directory.getDirectoryHandle(folder, { create: true });
+  const handle = await directory.getFileHandle(filename, { create: true });
+  const writable = await handle.createWritable();
+  await writable.write(base64ToBlob(file.dataBase64, file.type));
+  await writable.close();
+  return true;
+}
+
+function sidecarDataUrlMap(files) {
+  return new Map(
+    files
+      .filter((file) => file?.path && file.dataBase64)
+      .map((file) => [String(file.path), `data:${file.type || "application/octet-stream"};base64,${file.dataBase64}`]),
+  );
+}
+
+function replaceCustomFileTokensWithDataUrls(value, dataUrls) {
+  if (!value || typeof value !== "object") return value;
+  if (value.type === "custom-file" && value.path && dataUrls.has(String(value.path))) return dataUrls.get(String(value.path));
+  if (Array.isArray(value)) return value.map((entry) => replaceCustomFileTokensWithDataUrls(entry, dataUrls));
+  for (const [key, entry] of Object.entries(value)) value[key] = replaceCustomFileTokensWithDataUrls(entry, dataUrls);
+  return value;
+}
+
+function retargetImportedPayload(payload, slotId) {
+  const next = clone(payload);
+  next.slotId = slotId;
+  next.savedAt = next.savedAt ?? new Date().toISOString();
+  if (next.state) next.state.saveSlotId = slotId;
+  return next;
+}
+
+async function exportCompleteSave(slotId) {
+  const payload = await window.DungeonSave.load(slotId);
+  if (!payload) return null;
+
+  const quickstart = await window.DungeonSave.loadQuickstart();
+  const relatedQuickstart = quickstart?.state?.saveSlotId === slotId ? quickstart : null;
+  const tokenPaths = collectTokenPaths([payload, relatedQuickstart]);
+  const files = [
+    { path: slotFilename(slotId), type: "application/json", data: payload },
+    ...(relatedQuickstart ? [{ path: quickstartFilename, type: "application/json", data: relatedQuickstart }] : []),
+  ];
+
+  for (const tokenPath of tokenPaths) {
+    const sidecar = await readSidecarFile(tokenPath);
+    if (sidecar) files.push(sidecar);
+  }
+
+  return {
+    schemaVersion: 1,
+    app: "Depthbound",
+    exportedAt: new Date().toISOString(),
+    slotId,
+    name: payload.name ?? `Save Slot ${slotId}`,
+    format: "depthbound-complete-save-bundle",
+    files,
+  };
+}
+
+async function importCompleteSave(bundle, slotId) {
+  if (!Number.isInteger(slotId) || slotId < 1 || slotId > slotCount) throw new Error("Choose an empty save slot first.");
+  if (state.slots.some((slot) => slot.id === slotId && slot.hasSave)) throw new Error("That save slot is not empty.");
+  if (!bundle || bundle.format !== "depthbound-complete-save-bundle" || !Array.isArray(bundle.files)) throw new Error("That is not a Depthbound complete save export.");
+
+  const slotFile = bundle.files.find((file) => file?.type === "application/json" && file.data?.state && /^depthbound-slot-\d+\.json$/.test(file.path ?? ""));
+  if (!slotFile) throw new Error("The export is missing its normal save file.");
+  const sidecars = bundle.files.filter((file) => file?.dataBase64);
+  const payload = retargetImportedPayload(slotFile.data, slotId);
+  const quickstartFile = bundle.files.find((file) => file?.path === quickstartFilename && file.data?.state);
+  const quickstart = quickstartFile ? retargetImportedPayload(quickstartFile.data, slotId) : null;
+
+  if (state.mode === "disconnected") throw new Error("Save folder permission is missing. Reconnect the save folder first.");
+  if (state.mode === "file" && state.directoryHandle) {
+    for (const file of sidecars) await writeSidecarFile(file);
+    await writeJsonFile(slotFilename(slotId), payload);
+    if (quickstart) await writeJsonFile(quickstartFilename, quickstart);
+    await refreshSlots();
+    return payload;
+  }
+
+  const dataUrls = sidecarDataUrlMap(sidecars);
+  replaceCustomFileTokensWithDataUrls(payload, dataUrls);
+  if (quickstart) replaceCustomFileTokensWithDataUrls(quickstart, dataUrls);
+  window.localStorage.setItem(`${legacyStoragePrefix}${slotId}`, JSON.stringify(payload));
+  if (quickstart) window.localStorage.setItem(legacyQuickstartKey, JSON.stringify(quickstart));
+  await refreshSlots();
+  return payload;
+}
+
 window.DungeonSave = {
   slotCount,
   init,
@@ -365,6 +506,8 @@ window.DungeonSave = {
   resolveTokenPath,
   rememberTokenUrl,
   cachedTokenUrl: (path) => state.tokenUrls.get(path) ?? "",
+  exportCompleteSave,
+  importCompleteSave,
 
   async remove(slotId) {
     if (state.mode === "disconnected") throw new Error("Save folder permission is missing. Reconnect the save folder first.");

@@ -1,15 +1,12 @@
-test:
-Dungeon Creator: make text appear (like intro and outro with pictures) at specific trigger points (open a chest, inspect this furniture, walk into this room, kill this monster…)
-
-added fighter and barbarian subclasses. check every one for correct behaviour.
-subclasses
-
+fly movement
+difficult terrain
+add shove and grapple attacks
 
 Sidekicks expert and spellcaster availability
 recruitable sidekicks
 
+feats
 Spell sound effects
-add shove and grapple attacks
 
 NPCs with (random) quests
 

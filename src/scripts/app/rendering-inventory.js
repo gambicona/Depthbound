@@ -450,7 +450,7 @@ function buildRoom() {
   chestToken.className = "chest-token hidden";
   chestToken.type = "button";
   chestToken.title = "Home chest";
-  chestToken.textContent = "C";
+  configureFurnitureIconToken(chestToken, { name: "Home Chest" }, "home-chest", "C", "home-special-object-icon", "home-special-object-label");
   const openChest = (event) => {
     event?.preventDefault();
     event?.stopPropagation();
@@ -485,7 +485,7 @@ function buildRoom() {
   planningToken.className = "planning-table-token hidden";
   planningToken.type = "button";
   planningToken.title = "Planning Table";
-  planningToken.textContent = "PT";
+  configureFurnitureIconToken(planningToken, { name: "Planning Table" }, "planning-table", "PT", "home-special-object-icon", "home-special-object-label");
   planningToken.addEventListener("contextmenu", (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -630,6 +630,38 @@ function setFurnitureIconMissing(element, icon, label, iconPath) {
   icon.classList.add("hidden");
   label.classList.remove("hidden");
   element.classList.remove("has-furniture-icon");
+}
+
+function configureFurnitureIconToken(element, template, type, fallbackSymbol, iconClass, labelClass) {
+  const iconPath = furnitureIconPath(template, type);
+  const icon = document.createElement("img");
+  const iconStatus = iconPath ? furnitureIconLoadStatus.get(iconPath) : "missing";
+  icon.className = `${iconClass}${iconStatus === "loaded" ? "" : " hidden"}`;
+  icon.alt = "";
+  icon.draggable = false;
+
+  const label = document.createElement("span");
+  label.className = `${labelClass}${iconStatus === "loaded" ? " hidden" : ""}`;
+  label.textContent = fallbackSymbol;
+
+  if (iconStatus === "loaded") {
+    icon.src = iconPath;
+    element.classList.add("has-furniture-icon");
+  } else if (iconPath && iconStatus !== "missing") {
+    icon.addEventListener("load", () => {
+      setFurnitureIconLoaded(element, icon, label, iconPath);
+    });
+    icon.addEventListener("error", () => {
+      setFurnitureIconMissing(element, icon, label, iconPath);
+    });
+    icon.src = iconPath;
+    if (icon.complete) {
+      if (icon.naturalWidth > 0) setFurnitureIconLoaded(element, icon, label, iconPath);
+      else setFurnitureIconMissing(element, icon, label, iconPath);
+    }
+  }
+
+  element.replaceChildren(icon, label);
 }
 
 function renderDungeonObjects() {
@@ -2005,11 +2037,13 @@ let homeBuildTool = null;
 let homeBuildFurnitureId = "home-bookshelf";
 let homeBuildSearch = "";
 let homeBuildPaintColor = "#5a4638";
+let homeBuildPaintAlpha = 0.35;
 let homeBuildRotation = 0;
 let homeBuilderSnapshot = null;
 let homeMoveSelection = null;
 let homePaintPointerId = null;
 let homeComfortRangePreviewKeys = new Set();
+const homeDefaultPaintValue = "default";
 const homePaintPalette = ["#5a4638", "#7a5c3a", "#6f7357", "#445f66", "#66465d", "#7f3f35", "#3f4c6b", "#2f2d2b"];
 const homeCatalogueStoryLockedIds = new Set(["home-cooking-pot", "home-herb-garden", "portal"]);
 const homeCatalogueAdminOnlyIds = new Set(["beast-crate", "beast-companion-crate", "undead-crate"]);
@@ -2023,6 +2057,17 @@ const homeComfortScores = {
   "armor-stand": 2,
   "arcane-lectern": 5,
 };
+
+function homePaintColorValue() {
+  const color = normalizeHomeColor(homeBuildPaintColor);
+  if (!color) return null;
+  const hex = color.startsWith("#") ? color : homePaintPalette[0];
+  const red = parseInt(hex.slice(1, 3), 16);
+  const green = parseInt(hex.slice(3, 5), 16);
+  const blue = parseInt(hex.slice(5, 7), 16);
+  const alpha = Math.max(0.05, Math.min(1, Number(homeBuildPaintAlpha) || 1));
+  return `rgba(${red}, ${green}, ${blue}, ${Number(alpha.toFixed(2))})`;
+}
 
 function isHomeBuilderOpen() {
   return state?.mode === "home" && els.fighterInfo.classList.contains("home-builder-dock");
@@ -2329,7 +2374,9 @@ function renderHomeBuilder() {
   const groups = homeFurnitureCatalogue();
   const entries = groups.flatMap((group) => group.entries);
   if (!entries.some((entry) => entry.id === homeBuildFurnitureId)) homeBuildFurnitureId = entries[0]?.id ?? "home-bookshelf";
+  const defaultPaintActive = homeBuildPaintColor === homeDefaultPaintValue;
   const normalizedPaintColor = normalizeHomeColor(homeBuildPaintColor) ?? homePaintPalette[0];
+  const paintAlphaPercent = Math.round(Math.max(0.05, Math.min(1, Number(homeBuildPaintAlpha) || 1)) * 100);
   const showPaintTools = ["paintFloor", "paintWall"].includes(homeBuildTool);
   const movingObject = homeMoveSelection?.kind === "object" ? (state.dungeonObjects ?? []).find((object) => object.id === homeMoveSelection.id) : null;
   const activeRotation = normalizeObjectRotation(movingObject?.rotation ?? homeBuildRotation);
@@ -2360,10 +2407,11 @@ function renderHomeBuilder() {
       showPaintTools
         ? `<section class="home-paint-tools" aria-label="Paint colors">
             <div class="home-paint-swatches">
+              <button type="button" data-action="home-paint-color" data-color="${homeDefaultPaintValue}" class="home-paint-default ${defaultPaintActive ? "active" : ""}" aria-label="Use default color">Default</button>
               ${homePaintPalette
                 .map(
                   (color) => `
-                    <button type="button" data-action="home-paint-color" data-color="${escapeAttribute(color)}" class="${normalizedPaintColor === color ? "active" : ""}" style="--swatch-color: ${escapeAttribute(color)}" aria-label="Use color ${escapeAttribute(color)}"></button>
+                    <button type="button" data-action="home-paint-color" data-color="${escapeAttribute(color)}" class="${!defaultPaintActive && normalizedPaintColor === color ? "active" : ""}" style="--swatch-color: ${escapeAttribute(color)}" aria-label="Use color ${escapeAttribute(color)}"></button>
                   `,
                 )
                 .join("")}
@@ -2371,6 +2419,10 @@ function renderHomeBuilder() {
             <label class="home-color-picker">
               <span>Custom</span>
               <input id="home-paint-color" type="color" value="${escapeAttribute(normalizedPaintColor)}" />
+            </label>
+            <label class="home-alpha-picker">
+              <span>Tint ${paintAlphaPercent}%</span>
+              <input id="home-paint-alpha" type="range" min="5" max="100" step="5" value="${paintAlphaPercent}" ${defaultPaintActive ? "disabled" : ""} />
             </label>
           </section>`
         : ""
@@ -2536,15 +2588,18 @@ function applyHomeBuildAt(position, event = null) {
     homeMoveSelection = null;
   } else if (homeBuildTool === "paintFloor") {
     if (!cells.has(key)) return true;
-    const color = normalizeHomeColor(homeBuildPaintColor);
+    const color = homePaintColorValue();
     state.home.floorColors = { ...(state.home.floorColors ?? {}) };
     if (color) state.home.floorColors[key] = color;
+    else delete state.home.floorColors[key];
   } else if (homeBuildTool === "paintWall") {
     const edge = homeDoorEdgeFromEvent(position, event);
     if (!homeWallEdgeExists(position, edge, cells)) return true;
-    const color = normalizeHomeColor(homeBuildPaintColor);
+    const color = homePaintColorValue();
     state.home.wallColors = { ...(state.home.wallColors ?? {}) };
-    if (color) state.home.wallColors[homeWallEdgeKey(position, edge)] = color;
+    const wallKey = homeWallEdgeKey(position, edge);
+    if (color) state.home.wallColors[wallKey] = color;
+    else delete state.home.wallColors[wallKey];
   } else if (homeBuildTool === "erase") {
     if (!removeHomeObjectAt(position)) {
       state.home.doors = home.doors.filter((door) => positionKey(door) !== key || door.to === "outside");
@@ -3273,6 +3328,7 @@ async function createRosterHero() {
   state.fighters[heroId] = prepareRestedHero(hero, homeHeroPositions(state.party.rosterIds).find((entry) => entry.id === heroId)?.position ?? { x: 4, y: 6 });
   roomIsBuilt = false;
   addLog(`${hero.name} joins the roster.`, "important");
+  window.DepthboundPlaytest?.submitRosterHero?.(state.fighters[heroId]);
   render();
   showPlanningTableInfo();
 }
@@ -3690,6 +3746,51 @@ function priceText(cpAmount) {
   return moneyText(cpToMoney(cpAmount));
 }
 
+function statusEffectDetails(status = {}) {
+  const parts = [];
+  if (status.acBonus) parts.push(`${abilityLabel(status.acBonus)} AC`);
+  if (status.attackBonus) parts.push(`${abilityLabel(status.attackBonus)} to attack`);
+  if (status.damageBonus) parts.push(`${abilityLabel(status.damageBonus)} damage`);
+  if (status.saveBonus) parts.push(`${abilityLabel(status.saveBonus)} saves`);
+  if (status.speedBonusFeet) parts.push(`${abilityLabel(status.speedBonusFeet)} ft speed`);
+  if (status.resistances?.length) parts.push(`resist ${status.resistances.join(", ")}`);
+  if (status.vulnerabilities?.length) parts.push(`vulnerable ${status.vulnerabilities.join(", ")}`);
+  return parts;
+}
+
+function statusDurationText(status = {}) {
+  if (status.expiresAtHome) return "until home";
+  if (status.expiresAtEndOfTurn) return "until end of turn";
+  if (status.durationRounds) return `${status.durationRounds} rounds`;
+  return "temporary";
+}
+
+function itemUseEffectText(item) {
+  const use = item?.use;
+  if (!use) return "";
+  if (use.description) return use.description;
+  if (use.kind === "healing" && use.dice) {
+    const bonus = Number(use.bonus) || 0;
+    return `Restore ${use.dice.count ?? 1}d${use.dice.sides ?? 1}${bonus ? ` + ${bonus}` : ""} HP.`;
+  }
+  if (use.status) {
+    const parts = statusEffectDetails(use.status);
+    const effect = parts.length ? parts.join("; ") : use.status.label ?? item.category ?? "temporary effect";
+    return `${effect} for ${statusDurationText(use.status)}.`;
+  }
+  return itemDisplayDescription(item);
+}
+
+function itemUseResourceText(item) {
+  const resource = itemUseResource(item);
+  return resource === "bonusAction" ? "Bonus action" : "Action";
+}
+
+function itemChargeText(item) {
+  if (!item?.use?.charges) return "";
+  return `charges ${item.use.charges.remaining ?? item.use.charges.max}/${item.use.charges.max}`;
+}
+
 function itemDetails(item) {
   if (!item) return "Empty";
   const cost = item.cost?.text ? `; ${item.cost.text}` : "";
@@ -3722,14 +3823,8 @@ function itemDetails(item) {
     }
     if (item.use?.status) {
       const status = item.use.status;
-      const parts = [];
-      if (status.acBonus) parts.push(`${abilityLabel(status.acBonus)} AC`);
-      if (status.attackBonus) parts.push(`${abilityLabel(status.attackBonus)} to attack`);
-      if (status.damageBonus) parts.push(`${abilityLabel(status.damageBonus)} damage`);
-      if (status.saveBonus) parts.push(`${abilityLabel(status.saveBonus)} saves`);
-      if (status.speedBonusFeet) parts.push(`${abilityLabel(status.speedBonusFeet)} ft speed`);
-      if (status.resistances?.length) parts.push(`resist ${status.resistances.join(", ")}`);
-      const duration = status.expiresAtHome ? "until home" : status.durationRounds ? `${status.durationRounds} rounds` : "temporary";
+      const parts = statusEffectDetails(status);
+      const duration = statusDurationText(status);
       return `${parts.join("; ") || item.category || "Consumable"}; ${duration}; ${item.use?.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
     }
     return `${item.category ?? "Consumable"}; ${item.use?.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
@@ -3739,8 +3834,15 @@ function itemDetails(item) {
   return item.type ?? "Item";
 }
 
+function itemDisplayDescription(item) {
+  if (!item) return "";
+  const isCustomDungeonItem = item.customDungeonItem || /^custom-item-\d+/.test(String(item.baseItemId ?? item.itemId ?? item.id ?? ""));
+  if (isCustomDungeonItem) return item.customDescription || item.description || item.magic?.description || item.treasure?.description || "";
+  return item.magic?.description || item.treasure?.description || item.description || "";
+}
+
 function itemInventoryText(item) {
-  const description = item?.magic?.description || item?.treasure?.description || item?.description;
+  const description = itemDisplayDescription(item);
   const starterWarning = item?.starterEquipment ? " Starter equipment has no resale value." : "";
   const proficiencyWarning = missingProficiencyText(activeHero(), item);
   if (!description) return itemDetails(item);
@@ -3749,7 +3851,7 @@ function itemInventoryText(item) {
 }
 
 function itemInventoryMarkup(item) {
-  const description = item?.magic?.description || item?.treasure?.description || item?.description;
+  const description = itemDisplayDescription(item);
   const starterWarning = item?.starterEquipment ? " Starter equipment has no resale value." : "";
   const proficiencyWarning = missingProficiencyText(activeHero(), item);
   if (!description) {
@@ -3920,6 +4022,8 @@ function renderAdminModeTools() {
         <button type="button" data-action="admin-heal">Full Heal</button>
         <button type="button" data-action="admin-refresh">Refresh Actions</button>
         <button type="button" data-action="admin-reveal-current-room">Reveal Room</button>
+        <button type="button" data-action="admin-open-visible-doors">Open Visible Doors</button>
+        <button type="button" data-action="admin-collect-visible-loot">Collect Visible Loot</button>
         <button type="button" data-action="admin-clear-combat">Clear Combat</button>
       </div>
     </section>
@@ -4124,6 +4228,38 @@ function adminClearCombat() {
   renderInventoryMenu();
 }
 
+function adminOpenVisibleDoors() {
+  if (!adminEnabled()) return;
+  const visibleKeys = activeTileKeys();
+  const doors = (state.dungeon?.doors ?? []).filter((door) => {
+    const doorKey = positionKey(door);
+    return visibleKeys.has(doorKey) && isKnownTile(door) && !sharedDoorPassagesAreOpen(door);
+  });
+  const uniqueDoors = Array.from(new Map(doors.map((door) => [`${door.roomId}:${positionKey(door)}`, door])).values());
+  let opened = 0;
+  for (const door of uniqueDoors) {
+    if (openDoor(door)) opened += 1;
+  }
+  addLog(`Admin opened ${opened} visible door${opened === 1 ? "" : "s"}.`, "important");
+  render();
+  renderInventoryMenu();
+}
+
+function adminCollectVisibleLoot() {
+  if (!adminEnabled()) return;
+  const hero = activeHero();
+  if (!hero || !canFighterReceiveInventory(hero)) return;
+  const visibleKeys = activeTileKeys();
+  const visiblePiles = (state.lootPiles ?? []).filter((pile) => visibleKeys.has(positionKey(pile.position)) && isKnownTile(pile.position));
+  let collected = 0;
+  for (const pile of [...visiblePiles]) {
+    if (collectLootAtPosition(hero, pile.position)) collected += 1;
+  }
+  addLog(`Admin collected ${collected} visible loot pile${collected === 1 ? "" : "s"}.`, "important");
+  render();
+  renderInventoryMenu();
+}
+
 function createAdminInventoryItem(templateId) {
   return createItemInstance(templateId, "admin");
 }
@@ -4155,6 +4291,7 @@ function equipActionForItem(fighter, item) {
 
   return usableSlots
     .map((slot) => {
+      const occupied = Boolean(fighter.equipment?.[slot.id]);
       const disabledReason =
         item.type === "armor" && !armorStrengthRequirementMet(fighter, item)
           ? `Requires STR ${item.requirements.strength}`
@@ -4163,7 +4300,7 @@ function equipActionForItem(fighter, item) {
           : "";
       return disabledReason
         ? `<button type="button" disabled>${disabledReason}</button>`
-        : `<button type="button" data-action="equip" data-item="${item.id}" data-slot="${slot.id}">${slot.label}</button>`;
+        : `<button type="button" class="equip-slot-button ${occupied ? "occupied-slot" : "empty-slot"}" data-action="equip" data-item="${item.id}" data-slot="${slot.id}" title="${occupied ? `Replace ${equippedItem(fighter, slot.id)?.name ?? "equipped item"}` : "Empty slot"}">${slot.label}</button>`;
     })
     .join("");
 }
@@ -4673,6 +4810,8 @@ function renderUseItemMenu() {
         ${entries
           .map(({ slot, item }) => {
             const disabled = canUseBeltItem(hero, item) ? "" : "disabled";
+            const effectText = itemUseEffectText(item);
+            const chargeText = itemChargeText(item);
             const targetButtons = dyingPotionTargets(hero, item)
               .map((target) => {
                 const targetDisabled = canUseHealingItemOnTarget(hero, item, target) ? "" : "disabled";
@@ -4683,7 +4822,8 @@ function renderUseItemMenu() {
               <div class="use-item-row">
                 <div>
                   <b>${escapeHtml(item.name)}</b>
-                  <span>${escapeHtml(slot.label)} - ${escapeHtml(itemDetails(item))}</span>
+                  <span>${escapeHtml(slot.label)} - ${escapeHtml(itemUseResourceText(item))}${chargeText ? ` - ${escapeHtml(chargeText)}` : ""}</span>
+                  ${effectText ? `<span class="use-item-effect">${escapeHtml(effectText)}</span>` : ""}
                 </div>
                 <div class="use-item-actions">
                   <button type="button" data-action="use-belt-item" data-item="${item.id}" ${disabled}>Use</button>
@@ -4832,7 +4972,7 @@ function useCombatAction(action, targetId = null) {
   if (action === "dash") {
     fighter.movementLeft = (fighter.movementLeft ?? 0) + baseMovement;
     fighter.hasAction = false;
-    addLog(`${fighter.name} uses Dash and gains ${baseMovement} extra movement.`, "important");
+    addLog(`${fighter.name} uses Dash and gains ${baseMovement * feetPerSquare} ft extra movement.`, "important");
   }
 
   if (action === "dodge") {
@@ -5090,9 +5230,15 @@ function favoriteRowsForAbilityMenu(hero, entries, spells) {
     .join("");
 }
 
+function abilityMenuHero() {
+  return window.DepthboundPlaytest?.role === "guest"
+    ? window.DepthboundPlaytest.selectedHero?.() ?? (state.mode === "combat" ? activeFighter() : activeHero())
+    : state.mode === "combat" ? activeFighter() : activeHero();
+}
+
 function renderAbilitiesMenu() {
   rememberOpenAbilityMenuSections();
-  const hero = state.mode === "combat" ? activeFighter() : activeHero();
+  const hero = abilityMenuHero();
   const entries = availableFighterAbilities(hero);
   const spells = spellDefinitionsForFighter(hero);
   const groups = abilityMenuGroups(hero, entries, spells);
@@ -5134,7 +5280,7 @@ function trackAbilityMenuSectionToggle(target) {
 }
 
 function toggleAbilityFavorite(key) {
-  const hero = state.mode === "combat" ? activeFighter() : activeHero();
+  const hero = abilityMenuHero();
   if (!hero || !key) return;
   const favorites = heroAbilityFavorites(hero);
   hero.abilityFavorites = favorites.includes(key)
@@ -5145,7 +5291,7 @@ function toggleAbilityFavorite(key) {
 }
 
 function moveAbilityFavorite(key, direction) {
-  const hero = state.mode === "combat" ? activeFighter() : activeHero();
+  const hero = abilityMenuHero();
   const favorites = heroAbilityFavorites(hero);
   const from = favorites.indexOf(key);
   const to = Math.max(0, Math.min(favorites.length - 1, from + direction));
@@ -8224,10 +8370,18 @@ function renderLog() {
     els.expandLog.setAttribute("aria-label", combatLogExpanded ? "Collapse log" : "Expand log");
     els.expandLog.setAttribute("aria-expanded", String(combatLogExpanded));
   }
+  const preserveGuestScroll = window.DepthboundPlaytest?.role === "guest";
+  const previousScrollTop = els.log.scrollTop;
+  const previousScrollHeight = els.log.scrollHeight;
+  const nearBottom = previousScrollHeight - previousScrollTop - els.log.clientHeight < 24;
   els.log.innerHTML = state.log
     .map((entry) => `<li class="${escapeAttribute(entry.type ?? "")}">${combatLogTextMarkup(entry.text)}</li>`)
     .join("");
-  els.log.scrollTop = els.log.scrollHeight;
+  if (!preserveGuestScroll || nearBottom) {
+    els.log.scrollTop = els.log.scrollHeight;
+  } else {
+    els.log.scrollTop = Math.max(0, previousScrollTop + els.log.scrollHeight - previousScrollHeight);
+  }
 }
 
 function renderControls() {

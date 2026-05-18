@@ -154,13 +154,17 @@ function carvePath(start, end, style = "horizontal-first") {
 }
 
 function widenPath(cells, width = 1) {
-  const radius = Math.max(0, Math.floor((width - 1) / 2));
+  const corridorWidth = Math.max(1, Math.floor(width));
   const widened = new Map();
-  for (const cell of cells) {
-    for (let y = cell.y - radius; y <= cell.y + radius; y += 1) {
-      for (let x = cell.x - radius; x <= cell.x + radius; x += 1) {
-        widened.set(key({ x, y }), { x, y });
-      }
+  for (let index = 0; index < cells.length; index += 1) {
+    const cell = cells[index];
+    const previous = cells[index - 1] ?? cell;
+    const next = cells[index + 1] ?? cell;
+    const horizontal = Math.abs(next.x - previous.x) >= Math.abs(next.y - previous.y);
+    for (let offset = 0; offset < corridorWidth; offset += 1) {
+      const sideOffset = offset - Math.floor(corridorWidth / 2);
+      const widenedCell = horizontal ? { x: cell.x, y: cell.y + sideOffset } : { x: cell.x + sideOffset, y: cell.y };
+      widened.set(key(widenedCell), widenedCell);
     }
   }
   return Array.from(widened.values());

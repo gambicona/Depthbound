@@ -217,6 +217,12 @@ els.saveSlots.addEventListener("click", async (event) => {
   if (button.dataset.action === "load-slot") {
     await loadAdventure(slotId);
   }
+  if (button.dataset.action === "export-slot") {
+    await exportAdventure(slotId);
+  }
+  if (button.dataset.action === "import-slot") {
+    await importAdventure(slotId);
+  }
   if (button.dataset.action === "delete-slot") {
     await deleteAdventure(slotId);
   }
@@ -386,6 +392,11 @@ els.fighterInfo.addEventListener("input", (event) => {
   }
   if (event.target.id === "home-paint-color") {
     homeBuildPaintColor = event.target.value;
+    renderHomeBuilder();
+  }
+  if (event.target.id === "home-paint-alpha") {
+    homeBuildPaintAlpha = Math.max(0.05, Math.min(1, Number(event.target.value) / 100 || 1));
+    renderHomeBuilder();
   }
 });
 els.closeInventory.addEventListener("click", hideInventoryMenu);
@@ -525,6 +536,12 @@ els.inventoryMenu.addEventListener("click", (event) => {
   }
   if (button.dataset.action === "admin-reveal-current-room") {
     adminRevealCurrentRoom();
+  }
+  if (button.dataset.action === "admin-open-visible-doors") {
+    adminOpenVisibleDoors();
+  }
+  if (button.dataset.action === "admin-collect-visible-loot") {
+    adminCollectVisibleLoot();
   }
   if (button.dataset.action === "admin-clear-combat") {
     adminClearCombat();

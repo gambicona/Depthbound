@@ -1203,6 +1203,14 @@ function expireEndOfTurnEffects(fighter) {
   refreshDerivedStats(fighter);
 }
 
+function clearTurnScopedCombatState(fighter) {
+  if (!fighter) return;
+  expireEndOfTurnEffects(fighter);
+  fighter.dodging = false;
+  fighter.disengaged = false;
+  fighter.canMoveThroughMonsters = false;
+}
+
 function endRages(reason = "") {
   for (const hero of partyHeroes()) {
     const hadRage = (hero.statusEffects ?? []).some((effect) => effect.id === "rage");
@@ -2115,6 +2123,48 @@ function partyBaseItemCount(itemId) {
   return allItems.filter((item) => item.baseItemId === itemId || item.id === itemId).length;
 }
 
+function itemMatchesBaseId(item, itemId) {
+  return Boolean(itemId) && (item?.baseItemId === itemId || item?.itemId === itemId || item?.id === itemId);
+}
+
+function consumeGoalItemsOnComplete() {
+  const goal = state.customDungeon?.goal;
+  if (!goal?.consumeOnComplete || !["collectItem", "collectItemCount"].includes(goal.type) || !goal.itemId) return 0;
+  let remaining = goal.type === "collectItemCount" ? Math.max(1, Number(goal.count) || 1) : 1;
+  let removed = 0;
+  for (const hero of partyHeroes()) {
+    if (remaining <= 0) break;
+    for (const slot of equipmentSlots) {
+      if (itemMatchesBaseId((hero.inventory?.items ?? []).find((item) => item.id === hero.equipment?.[slot.id]), goal.itemId)) {
+        hero.equipment[slot.id] = null;
+      }
+    }
+    const kept = [];
+    for (const item of hero.inventory?.items ?? []) {
+      if (remaining > 0 && itemMatchesBaseId(item, goal.itemId)) {
+        remaining -= 1;
+        removed += 1;
+      } else {
+        kept.push(item);
+      }
+    }
+    hero.inventory.items = kept;
+  }
+  if (remaining > 0 && Array.isArray(state.chest)) {
+    const kept = [];
+    for (const item of state.chest) {
+      if (remaining > 0 && itemMatchesBaseId(item, goal.itemId)) {
+        remaining -= 1;
+        removed += 1;
+      } else {
+        kept.push(item);
+      }
+    }
+    state.chest = kept;
+  }
+  return removed;
+}
+
 let customStoryTriggerQueue = Promise.resolve();
 
 function customStoryTriggerTitle(trigger, context = {}) {
@@ -2236,6 +2286,7 @@ function checkDungeonCompletion(hero = activeHero()) {
   for (const partyHero of partyHeroes()) {
     partyHero.inventory.heroTokens = (partyHero.inventory.heroTokens ?? 0) + tokenAward;
   }
+  const consumedGoalItems = consumeGoalItemsOnComplete();
   playSoundEffect("exitReached");
   const outro = state.customDungeon?.outro;
   const finishDungeon = () => {
@@ -2247,7 +2298,9 @@ function checkDungeonCompletion(hero = activeHero()) {
     state.combatStarted = false;
     roomIsBuilt = false;
     addLog(`${hero.name} reaches the exit. Dungeon complete. The party gained ${tokenAward} Hero Token${tokenAward === 1 ? "" : "s"} each.`, "important");
+    if (consumedGoalItems) addLog(`${consumedGoalItems} goal item${consumedGoalItems === 1 ? " was" : "s were"} left behind.`, "important");
     render();
+    window.DepthboundPlaytest?.syncNow?.();
     centerViewOnHero();
   };
   state.completed = true;
@@ -2342,44 +2395,89 @@ function currentLootCategory() {
   return Math.max(1, categoryForHeroLevel(averagePartyLevel(activeHero())));
 }
 
+const lootBudgetsByLevel = [
+  { level: 1, treasureGp: 100, equipmentGp: 50, magicGp: 0, potionGp: 10 },
+  { level: 2, treasureGp: 250, equipmentGp: 75, magicGp: 500, potionGp: 10 },
+  { level: 3, treasureGp: 500, equipmentGp: 100, magicGp: 900, potionGp: 100 },
+  { level: 4, treasureGp: 750, equipmentGp: 200, magicGp: 1200, potionGp: 100 },
+  { level: 5, treasureGp: 1000, equipmentGp: 400, magicGp: 1800, potionGp: 100 },
+  { level: 6, treasureGp: 1000, equipmentGp: 750, magicGp: 2500, potionGp: 100 },
+  { level: 7, treasureGp: 1500, equipmentGp: 1500, magicGp: 4200, potionGp: 500 },
+  { level: 8, treasureGp: 2500, equipmentGp: 2500, magicGp: 6000, potionGp: 500 },
+  { level: 9, treasureGp: 2500, equipmentGp: 5000, magicGp: 7500, potionGp: 500 },
+  { level: 10, treasureGp: 5000, equipmentGp: 7500, magicGp: 9000, potionGp: 500 },
+  { level: 11, treasureGp: 5000, equipmentGp: 10000, magicGp: 12000, potionGp: 500 },
+  { level: 12, treasureGp: 7500, equipmentGp: 15000, magicGp: 24000, potionGp: 5000 },
+  { level: 13, treasureGp: 7500, equipmentGp: 25000, magicGp: 32000, potionGp: 5000 },
+  { level: 14, treasureGp: 10000, equipmentGp: 35000, magicGp: 45000, potionGp: 5000 },
+  { level: 15, treasureGp: 10000, equipmentGp: 50000, magicGp: 75000, potionGp: 5000 },
+  { level: 16, treasureGp: 15000, equipmentGp: 75000, magicGp: 100000, potionGp: 5000 },
+  { level: 17, treasureGp: 25000, equipmentGp: 100000, magicGp: 180000, potionGp: 5000 },
+  { level: 18, treasureGp: 25000, equipmentGp: 150000, magicGp: 200000, potionGp: 5000 },
+  { level: 19, treasureGp: 50000, equipmentGp: 200000, magicGp: 200000, potionGp: 5000 },
+  { level: 20, treasureGp: 50000, equipmentGp: 200000, magicGp: 200000, potionGp: 5000 },
+];
+
+function lootBudgetForPartyLevel(level = averagePartyLevel(activeHero())) {
+  const partyLevel = Math.max(1, Math.min(20, Math.floor(Number(level) || 1)));
+  return lootBudgetsByLevel.find((budget) => budget.level === partyLevel) ?? lootBudgetsByLevel[0];
+}
+
 function maxLootPriceGpForCategory(category = currentLootCategory()) {
-  const caps = {
-    1: 2500,
-    2: 9000,
-    3: 35000,
-    4: 90000,
-    5: 200000,
-  };
-  return caps[Math.min(5, Math.max(1, category))] ?? 2500;
+  return lootBudgetForPartyLevel(Math.max(1, category) * 2 - 1).magicGp;
+}
+
+function lootItemValueGp(item) {
+  return item?.loot?.priceGp ?? item?.treasure?.valueGp ?? item?.treasure?.valueTierGp ?? itemValueGp(item);
 }
 
 function lootItemAllowedForCategory(item, category = currentLootCategory()) {
-  const priceGp = item.loot?.priceGp ?? item.treasure?.valueGp ?? itemValueGp(item);
+  const priceGp = lootItemValueGp(item);
   return priceGp <= maxLootPriceGpForCategory(category);
 }
 
-function weightedLootPick(items, category = currentLootCategory()) {
+function maxLootValueGpForKind(kind, level = averagePartyLevel(activeHero())) {
+  const budget = lootBudgetForPartyLevel(level);
+  if (kind === "treasure") return budget.treasureGp;
+  if (kind === "equipment") return budget.equipmentGp;
+  if (kind === "potion") return budget.potionGp;
+  if (kind === "magic") return budget.magicGp;
+  return budget.magicGp;
+}
+
+function lootItemAllowedForPartyLevel(item, kind, level = averagePartyLevel(activeHero())) {
+  return lootItemValueGp(item) <= maxLootValueGpForKind(kind, level);
+}
+
+function weightedLootPick(items, options = {}) {
+  const category = options.category ?? currentLootCategory();
+  const maxPriceGp = options.maxPriceGp ?? maxLootValueGpForKind(options.kind ?? "magic", options.level ?? averagePartyLevel(activeHero()));
   const entries = items
-    .filter((item) => lootItemAllowedForCategory(item, category))
+    .filter((item) => lootItemValueGp(item) <= maxPriceGp)
     .map((item) => ({
       item,
-      weight: item.loot?.dropWeight ?? item.treasure?.dropWeight ?? Math.max(1, Math.round(400 / Math.sqrt(Math.max(1, itemValueGp(item))))),
+      weight:
+        item.loot?.dropWeight ??
+        item.treasure?.dropWeight ??
+        Math.max(1, Math.round(400 / Math.sqrt(Math.max(1, lootItemValueGp(item))))),
     }));
   return weightedPick(entries);
 }
 
 function randomMagicLootDrop(category = currentLootCategory()) {
+  const partyLevel = averagePartyLevel(activeHero());
   const item = weightedLootPick(
     window.DungeonContent.list("items").filter((candidate) => candidate.tags?.includes("loot:magic") || candidate.tags?.includes("magic-item")),
-    category,
+    { category, kind: "magic", level: partyLevel },
   );
   return item ? createItemInstance(item.id, "magic-loot") : null;
 }
 
 function randomTreasureDrop(category = currentLootCategory()) {
+  const partyLevel = averagePartyLevel(activeHero());
   const item = weightedLootPick(
     window.DungeonContent.list("items").filter((candidate) => candidate.type === "treasure" || candidate.tags?.includes("treasure")),
-    category,
+    { category, kind: "treasure", level: partyLevel },
   );
   return item ? createItemInstance(item.id, "treasure") : null;
 }
@@ -2391,19 +2489,23 @@ function randomHealingPotionDrop() {
     "potion-superior-healing": 6,
     "potion-supreme-healing": 1,
   };
+  const partyLevel = averagePartyLevel(activeHero());
   const potion = weightedPick(
     dungeonLootItems()
       .filter((item) => item.use?.kind === "healing")
+      .filter((item) => lootItemAllowedForPartyLevel(item, "potion", partyLevel))
       .map((item) => ({ item, weight: rarityWeights[item.id] ?? 1 })),
   );
   return potion ? createItemInstance(potion.id, "loot") : null;
 }
 
 function randomEquipmentDrop() {
+  const partyLevel = averagePartyLevel(activeHero());
   const item = weightedPick(
     dungeonLootItems()
       .filter((candidate) => candidate.use?.kind !== "healing" && candidate.store?.buyable !== false && !candidate.tags?.includes("loot:magic") && candidate.type !== "treasure")
-      .map((candidate) => ({ item: candidate, weight: 1 / Math.max(1, Math.sqrt(itemValueGp(candidate))) })),
+      .filter((candidate) => lootItemAllowedForPartyLevel(candidate, "equipment", partyLevel))
+      .map((candidate) => ({ item: candidate, weight: 1 / Math.max(1, Math.sqrt(lootItemValueGp(candidate))) })),
   );
   return item ? createItemInstance(item.id, "loot") : null;
 }
@@ -2759,14 +2861,25 @@ function openDoor(door) {
 
 function toggleHomeDoor(position, actor = activeHero()) {
   if (state.mode !== "home" || isHomeBuilderOpen()) return false;
-  const door = doorCandidateForPosition(position, actor);
-  if (!door || door.to === "outside" || !actor || distance(actor.position, door) > 1) return false;
-  const doorKey = positionKey(door);
+  if (!actor) return false;
+  const nearbyInteriorDoors = (state.dungeon?.doors ?? [])
+    .filter((door) => door.to !== "outside" && distance(actor.position, door) <= 1)
+    .filter((door) => positionKey(door) === positionKey(position) || positionKey(actor.position) === positionKey(position) || distance(position, door) <= 1);
   const openedDoorKeys = new Set(state.exploration.openedDoorKeys ?? []);
+  const preferredOpenDoor = nearbyInteriorDoors.find((door) => openedDoorKeys.has(positionKey(door)));
+  const candidate = doorCandidateForPosition(position, actor);
+  const door = preferredOpenDoor ?? (candidate?.to !== "outside" ? candidate : nearbyInteriorDoors[0]);
+  if (!door || door.to === "outside" || distance(actor.position, door) > 1) return false;
+  const doorKey = positionKey(door);
   const openedCorridorKeys = new Set(state.exploration.openedCorridorKeys ?? []);
   if (openedDoorKeys.has(doorKey)) {
-    openedDoorKeys.delete(doorKey);
-    if (door.corridor) openedCorridorKeys.delete(positionKey(door.corridor));
+    const relatedDoors = (state.dungeon?.doors ?? []).filter(
+      (entry) => entry.roomId === door.roomId && positionKey(entry) === doorKey,
+    );
+    (relatedDoors.length ? relatedDoors : [door]).forEach((entry) => {
+      openedDoorKeys.delete(positionKey(entry));
+      if (entry.corridor) openedCorridorKeys.delete(positionKey(entry.corridor));
+    });
     state.exploration.openedDoorKeys = Array.from(openedDoorKeys);
     state.exploration.openedCorridorKeys = Array.from(openedCorridorKeys);
     addLog(`${actor.name} closes the door.`, "important");
@@ -2831,6 +2944,7 @@ function threatPresent() {
 function endCurrentEncounter() {
   endRages("as the fight ends");
   removeSummonedAllies("fades as the fight ends");
+  partyHeroes().forEach(clearTurnScopedCombatState);
   state.deathSaveAfterVictoryLogged = false;
   state.combatStarted = false;
   state.mode = "exploration";
@@ -4966,12 +5080,30 @@ async function endTurn() {
   }
 
   render();
+  scheduleMonsterTurnStallGuard(activeFighter());
   maybeRunMonsterTurn();
+}
+
+function scheduleMonsterTurnStallGuard(fighter) {
+  if (!fighter || isPlayerControlledPartyFighter(fighter) || !fighter.alive || partyDefeatedOrDying()) return;
+  const activeMonsterId = fighter.id;
+  window.setTimeout(() => {
+    const current = activeFighter();
+    const visibleDialogOpen = Boolean(els.gameDialog && !els.gameDialog.classList.contains("hidden"));
+    const reactionPromptOpen = Boolean(document.querySelector(".reaction-prompt"));
+    if (!current || current.id !== activeMonsterId || isPlayerControlledPartyFighter(current) || visibleDialogOpen || reactionPromptOpen || partyDefeatedOrDying()) return;
+    addLog(`${current.name}'s turn stalled before acting, so combat advances.`, "important");
+    window.DepthboundPlaytest?.syncNow?.();
+    endTurn();
+  }, Math.max(6500, tokenSlideMs * 14));
 }
 
 function maybeRunMonsterTurn() {
   const fighter = activeFighter();
-  if (!fighter || isPlayerControlledPartyFighter(fighter) || !fighter.alive || partyDefeatedOrDying()) return;
+  if (!fighter || isPlayerControlledPartyFighter(fighter) || !fighter.alive || partyDefeatedOrDying()) {
+    if (adminEnabled?.()) addAdminLog(`Monster turn skipped before scheduling: fighter ${fighter?.id ?? "none"}, playerControlled ${Boolean(fighter && isPlayerControlledPartyFighter(fighter))}, alive ${Boolean(fighter?.alive)}, partyDefeated ${partyDefeatedOrDying()}.`);
+    return;
+  }
 
   els.attack.disabled = true;
   els.useItem.disabled = true;
@@ -4980,13 +5112,35 @@ function maybeRunMonsterTurn() {
   const now = performance.now();
   const dueAt = fighter.nextAiDecisionAt ?? 0;
   const delay = Math.max(tokenSlideMs, dueAt - now);
+  addAdminLog(`Monster AI scheduled for ${fighter.name} in ${Math.round(delay)}ms.`);
   monsterTurnTimer = window.setTimeout(() => {
     const current = activeFighter();
     if (current && !isPlayerControlledPartyFighter(current)) {
+      addAdminLog(`Monster AI starts for ${current.name}.`);
       current.nextAiDecisionAt = performance.now() + monsterAiDecisionIntervalMs;
       pathfindingJobsThisTurn = 0;
       perfStats.aiUpdates += 1;
-      runMonsterAi(current);
+      const activeMonsterId = current.id;
+      window.setTimeout(() => {
+        const stillActive = activeFighter()?.id === activeMonsterId;
+        const visibleDialogOpen = Boolean(els.gameDialog && !els.gameDialog.classList.contains("hidden"));
+        const reactionPromptOpen = Boolean(document.querySelector(".reaction-prompt"));
+        if (!stillActive || visibleDialogOpen || reactionPromptOpen || partyDefeatedOrDying()) return;
+        addLog(`${current.name}'s turn stalled, so combat advances.`, "important");
+        window.DepthboundPlaytest?.syncNow?.();
+        endTurn();
+      }, Math.max(5000, tokenSlideMs * 12));
+      Promise.resolve()
+        .then(() => runMonsterAi(current))
+        .catch((error) => {
+          console.error(error);
+          if (activeFighter()?.id !== activeMonsterId) return;
+          addLog(`${current.name}'s turn could not resolve and is skipped.`, "important");
+          window.DepthboundPlaytest?.syncNow?.();
+          endTurn();
+        });
+    } else {
+      addAdminLog(`Monster AI timer found no monster: active ${current?.name ?? "none"}.`);
     }
   }, delay);
 }

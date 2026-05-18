@@ -344,25 +344,56 @@ function homeHeroPositions(heroIds) {
 }
 
 function defaultHomeCells() {
-  return Array.from({ length: 100 }, (_, index) => ({ x: 10 + (index % 10), y: 10 + Math.floor(index / 10) }));
+  return [
+    [16, 10], [17, 10], [18, 10], [19, 10],
+    [16, 11], [17, 11], [18, 11], [19, 11],
+    [16, 12], [17, 12], [18, 12], [19, 12],
+    [16, 13], [16, 14], [17, 14], [18, 14], [19, 14],
+    [15, 14], [16, 15], [17, 15], [18, 15], [19, 15],
+    [15, 15], [15, 16], [16, 16], [17, 16], [18, 16], [19, 16],
+    [16, 17], [16, 18], [17, 18], [18, 18], [19, 18],
+    [16, 19], [17, 19], [18, 19], [19, 19],
+    [16, 20], [17, 20], [18, 20], [19, 20],
+    [12, 10], [13, 10], [14, 10],
+    [12, 11], [13, 11], [14, 11],
+    [12, 12], [13, 12], [14, 12],
+    [13, 13],
+    [12, 14], [13, 14], [14, 14],
+    [12, 15], [13, 15], [14, 15],
+    [12, 16], [13, 16], [14, 16],
+    [13, 17],
+    [12, 18], [13, 18], [14, 18],
+    [12, 19], [13, 19], [14, 19],
+    [12, 20], [13, 20], [14, 20],
+    [8, 14], [9, 14], [10, 14],
+    [8, 15], [9, 15], [10, 15], [11, 15],
+    [8, 16], [9, 16], [10, 16],
+  ].map(([x, y]) => ({ x, y }));
 }
 
 function createDefaultHomeLayout() {
   return {
     gridSize: 30,
     cells: defaultHomeCells(),
-    doors: [{ x: 19, y: 15, edge: "east", corridor: { x: 20, y: 15 }, roomId: "home-room", to: "outside" }],
+    doors: [
+      { x: 19, y: 15, edge: "east", corridor: { x: 20, y: 15 }, roomId: "home-room", to: "outside" },
+      { x: 11, y: 15, edge: "east", corridor: { x: 12, y: 15 }, roomId: "home-room", to: "home-room" },
+      { x: 13, y: 13, edge: "south", corridor: { x: 13, y: 14 }, roomId: "home-room", to: "home-room" },
+      { x: 13, y: 16, edge: "south", corridor: { x: 13, y: 17 }, roomId: "home-room", to: "home-room" },
+      { x: 16, y: 16, edge: "south", corridor: { x: 16, y: 17 }, roomId: "home-room", to: "home-room" },
+      { x: 16, y: 13, edge: "south", corridor: { x: 16, y: 14 }, roomId: "home-room", to: "home-room" },
+    ],
     herbsReady: true,
     specialPositions: {
-      chest: { x: 18, y: 11 },
-      planningTable: { x: 14, y: 18 },
+      chest: { x: 18, y: 10 },
+      planningTable: { x: 17, y: 19 },
     },
     floorColors: {},
     wallColors: {},
     unlockedFurniture: [],
     objects: [
-      { id: "home-bookshelf", type: "home-bookshelf", position: { x: 11, y: 11 }, width: 1, height: 1, homePlaced: true },
-      { id: "home-starter-bed", type: "shabby-hay-bed", position: { x: 10, y: 19 }, width: 1, height: 1, homePlaced: true, assignedHeroId: "hero" },
+      { id: "home-bookshelf", type: "home-bookshelf", position: { x: 16, y: 10 }, width: 1, height: 1, homePlaced: true },
+      { id: "home-starter-bed", type: "shabby-hay-bed", position: { x: 12, y: 20 }, width: 1, height: 1, homePlaced: true, assignedHeroId: "hero" },
     ],
   };
 }
@@ -446,7 +477,13 @@ function normalizeHomeColorMap(map = {}, allowedKeys = null) {
 
 function normalizeHomeColor(color) {
   const value = String(color ?? "").trim();
-  return /^#[0-9a-fA-F]{6}$/.test(value) ? value.toLowerCase() : null;
+  if (/^#[0-9a-fA-F]{6}$/.test(value)) return value.toLowerCase();
+  const rgba = /^rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(0|1|0?\.\d+)\s*\)$/i.exec(value);
+  if (!rgba) return null;
+  const channels = rgba.slice(1, 4).map(Number);
+  if (channels.some((channel) => channel < 0 || channel > 255)) return null;
+  const alpha = Math.max(0, Math.min(1, Number(rgba[4])));
+  return `rgba(${channels[0]}, ${channels[1]}, ${channels[2]}, ${Number(alpha.toFixed(2))})`;
 }
 
 function normalizeObjectRotation(rotation = 0) {
@@ -2558,24 +2595,29 @@ function tryCreatePortalPair(dungeon, blockedKeys, objects, objectId, themeId = 
   blockedKeys.add(positionKey(second));
 }
 
-function chestLootPool() {
+function chestLootPool(level = averagePartyLevel()) {
+  const budget = lootBudgetForPartyLevel(level);
   return window.DungeonContent.list("items").filter(
-    (item) => (item.use?.kind === "healing" && !item.use?.charges) || item.type === "ammunition" || (item.type === "weapon" && item.store?.buyable !== false),
+    (item) =>
+      ((item.use?.kind === "healing" && !item.use?.charges && lootItemValueGp(item) <= budget.potionGp) ||
+        item.type === "ammunition" ||
+        (item.type === "weapon" && item.store?.buyable !== false && lootItemValueGp(item) <= budget.equipmentGp)),
   );
 }
 
 function randomChestLoot(count = 2, category = currentLootCategory()) {
-  const pool = chestLootPool();
+  const partyLevel = averagePartyLevel(activeHero());
+  const pool = chestLootPool(partyLevel);
   const items = Array.from({ length: count }, () => {
     const template = pool[Math.floor(Math.random() * pool.length)];
     return template ? createItemInstance(template.id, "chest") : null;
   }).filter(Boolean);
-  const treasureChance = Math.min(0.5, 0.18 + category * 0.06);
+  const treasureChance = Math.min(0.5, 0.16 + partyLevel * 0.025);
   if (Math.random() < treasureChance) {
     const treasure = randomTreasureDrop(category);
     if (treasure) items.push(treasure);
   }
-  const magicChance = Math.min(0.14, 0.015 + category * 0.02);
+  const magicChance = Math.min(0.14, Math.max(0, -0.005 + partyLevel * 0.015));
   if (Math.random() < magicChance) {
     const magic = randomMagicLootDrop(category);
     if (magic) items.push(magic);
