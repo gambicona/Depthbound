@@ -361,6 +361,7 @@
       "beast",
       "desert",
       "manticore",
+      "flying",
       "boss"
     ],
     maxHp: 46,
@@ -378,6 +379,7 @@
     },
     initiativeBonus: 2,
     speedFeet: 35,
+    flying: true,
     behavior: "melee",
     token: "S",
 
@@ -2387,6 +2389,7 @@
       "beast",
       "urban",
       "bird",
+      "flying",
       "swarm"
     ],
     maxHp: 10,
@@ -2410,6 +2413,7 @@
     },
     initiativeBonus: 2,
     speedFeet: 30,
+    flying: true,
     behavior: "rangedKiter",
     token: "R",
     tokenArt: "assets/tokens/roof-crow-swarm.jpg",
@@ -2720,7 +2724,8 @@
     tags: [
       "beast",
       "urban",
-      "bird"
+      "bird",
+      "flying"
     ],
     maxHp: 38,
     category: 3,
@@ -2737,6 +2742,7 @@
     },
     initiativeBonus: 4,
     speedFeet: 50,
+    flying: true,
     behavior: "melee",
     token: "R",
 
@@ -3565,7 +3571,8 @@
     tags: [
       "beast",
       "mountain",
-      "bird"
+      "bird",
+      "flying"
     ],
     maxHp: 10,
     category: 1,
@@ -3588,6 +3595,7 @@
     },
     initiativeBonus: 2,
     speedFeet: 30,
+    flying: true,
     behavior: "rangedKiter",
     token: "T",
     tokenArt: "assets/tokens/talon-hawk.jpg",
@@ -3867,7 +3875,8 @@
     tags: [
       "beast",
       "mountain",
-      "bird"
+      "bird",
+      "flying"
     ],
     maxHp: 38,
     category: 3,
@@ -3884,6 +3893,7 @@
     },
     initiativeBonus: 4,
     speedFeet: 50,
+    flying: true,
     behavior: "melee",
     token: "S",
 

@@ -1,0 +1,272 @@
+NEW THEME IMPLEMENTATION INSTRUCTIONS
+
+Purpose:
+Use this when adding a new random dungeon theme. A theme is not only a color file. It should define generation, monster pools, furniture pools, resource nodes, terrain floors, traps, music, asset needs, and index loading.
+
+Core files to inspect first:
+- src/scripts/content/themes/old-guardroom.js
+- src/scripts/content/themes/forest-of-the-beasts.js
+- src/scripts/content/themes/desert-ruins.js
+- src/scripts/content/furniture/dungeon-furniture-pack.js
+- src/scripts/content/furniture/resource-nodes.js
+- src/scripts/app/game-state.js
+- src/scripts/app/ui-dialogs-character.js
+- index.html
+
+1. Create the theme file
+
+Add a new file:
+- src/scripts/content/themes/<theme-id>.js
+
+Register it with:
+- window.DungeonContent.register("themes", "<themeId>", { ... })
+
+The theme id should be stable and camelCase, for example:
+- desertRuins
+- oldGuardroom
+- forestOfTheBeasts
+
+Required sections:
+- name
+- music
+- palette
+- generator
+- monsterTagGroups
+- bossMonsterTagGroups
+- furnitureTagGroups
+- resourceNodeTagGroups
+- terrainFloorIds / terrainFloorWeights / terrainFloors
+- furnitureSpawnChances
+- trapTagGroups
+- traps
+- resourceNodes
+- lootTableIds
+
+2. Palette
+
+Make the palette visually distinct from existing themes.
+
+Required palette keys currently used by the renderer:
+- bg
+- panel
+- panel2
+- line
+- gold
+- green
+- floor
+- floorAlt
+- roomBg
+- roomBorder
+- tileBg
+- tileBgAlt
+- hiddenTile
+- wall
+- wallLine
+- wallDetail
+- wallEdge
+- door
+- doorBorder
+- doorOpen
+- reachable
+- reachableBorder
+- reachableHover
+- pathPreview
+- pathPreviewDot
+- pathPreviewBorder
+- objectBg
+- objectBorder
+- chestBg
+- rockBg
+- trapBg
+- portalBg
+
+Avoid one-note palettes. Do not make another theme that is only brown/orange, only purple, only slate-blue, or only beige unless the subject absolutely demands it.
+
+3. Generator settings
+
+Define dungeon shape and scale defaults:
+- layout
+- roomCountByCategory
+- gridSize
+- roomShapes
+- roomWidth
+- roomHeight
+- squareSize
+- corridorLength
+- corridorWidth
+- corridorStyle
+- extraConnectionRatio
+- roomPadding
+- corridorPadding
+
+Remember that dungeon size options in game-state.js can override room count, grid size, encounter count, and resource-node count. If the theme has unusual room sizes, test Large/Massive/Insane generation.
+
+4. Monster pools
+
+Use tag groups, not individual ids, for normal random theme spawns.
+
+Example:
+- monsterTagGroups: [["beast", "desert"], ["undead", "ghost"]]
+- bossMonsterTagGroups: [["beast", "desert", "boss"], ["undead", "ghost", "boss"]]
+
+Rules:
+- Every group is an AND match.
+- Keep theme-specific tags tight.
+- Add at least one boss-compatible group if the theme can generate bosses.
+- Check that the relevant monster packs are loaded in index.html before the theme.
+- If a new monster family should harvest new resources, update addMonsterMaterialDrops in combat-map.js and add items in materials.js.
+
+5. Furniture pools
+
+Use furnitureTagGroups and furnitureSpawnChances.
+
+Important:
+- Avoid overly generic tags on theme-specific furniture. A tag like "temple", "ruin", "crypt", or "furniture" can leak content into other themes if another theme also uses that tag.
+- Prefer one exact theme tag, for example "desert-ruins", "ice-cavern", "fungal-grotto".
+- Broad tags are fine for truly shared furniture, such as "chest", "rock", "table", "rubble".
+
+If new furniture is needed:
+- Add it in src/scripts/content/furniture/<theme>-pack.js
+- Give every object a stable id.
+- Add fitting tags, dimensions, blocking behavior, interactable/investigatable settings, loot, and tokenArt.
+- Add the furniture pack to index.html before the theme file.
+
+If furniture can trigger an encounter:
+- Use inspectEvent instead of custom one-off logic.
+- Example behavior: 50/50 monster spawn or loot.
+- Scale spawned monster count by party size where possible.
+- Keep monster ids fitting for the biome/theme.
+
+6. Resource nodes
+
+Resource nodes are furniture-like objects from:
+- src/scripts/content/furniture/resource-nodes.js
+
+Theme configuration:
+- resourceNodeTagGroups
+- resourceNodes
+
+Example:
+- resourceNodeTagGroups: [["resource-node", "stone"], ["resource-node", "gem"]]
+- resourceNodes: { min: 1, max: 3, chance: 1 }
+
+Current behavior:
+- One party gather per node, not one gather per hero.
+- Nodes should not be investigatable.
+- Gathering calls an appropriate skill/ability check.
+- Better checks give more resources.
+- Gathering advances dungeon time.
+
+When adding a new resource type:
+- Add a component in src/scripts/content/items/materials.js.
+- Add or update a resource node in resource-nodes.js if it should be gatherable.
+- Make sure the theme includes the right resourceNodeTagGroups.
+
+7. Terrain floors
+
+Theme terrain is configured by:
+- terrainFloorIds
+- terrainFloorWeights
+- terrainFloors
+
+Current terrain floor ids include:
+- water-floor
+- acid-floor
+- lava-floor
+- healing-pool-floor
+
+Rules:
+- Terrain pools prefer room edges and corners.
+- Pools usually spawn in clusters of 3-5 tiles.
+- Terrain can spawn under furniture.
+- Door and hallway blocking should be rare, not impossible.
+- Healing pools should generally be rare and small.
+- Lava should only be used where it makes theme sense.
+
+Example:
+- terrainFloorIds: ["water-floor", "healing-pool-floor"]
+- terrainFloorWeights: { "water-floor": 5, "healing-pool-floor": 0.5 }
+- terrainFloors: { pools: { min: 1, max: 3, chance: 1 }, tilesPerPool: { min: 3, max: 5 } }
+
+8. Traps and loot
+
+Configure traps:
+- trapTagGroups
+- traps.roomChance
+- traps.corridorChance
+- traps.chestChance
+
+Configure loot:
+- lootTableIds: ["basicDungeon"] unless the theme needs its own table.
+
+If the theme has unique loot, create a new loot table or add theme-specific component drops.
+
+9. Music and assets
+
+Theme music keys:
+- exploration
+- combat
+- bossCombat
+
+Paths should point to assets/sounds/music/...
+
+For new furniture art:
+- Add tokenArt paths in the furniture definitions.
+- Create an asset list in implementation notes if assets are missing.
+- Asset list should include music files, furniture pngs, and any special terrain/floor visuals needed.
+
+10. Index loading
+
+Add script tags in index.html in dependency order:
+1. registry
+2. items/materials
+3. monster packs
+4. furniture packs
+5. traps/loot
+6. themes
+7. app scripts
+
+If browser caching is likely, bump the query string on edited loaded files.
+
+11. Selection flow
+
+Random dungeon theme selection is controlled by existing theme registry and UI flow. After adding a theme file and loading it in index.html, confirm it appears in the random dungeon theme selection.
+
+If it does not appear:
+- Check the theme registered successfully.
+- Check index.html load order.
+- Check any filtering in ui-dialogs-character.js.
+
+12. Verification checklist
+
+Run:
+- node --check src/scripts/content/themes/<theme-id>.js
+- node --check any new furniture/monster/item files
+- node --check src/scripts/app/game-state.js if edited
+- node --check src/scripts/app/combat-map.js if edited
+
+Smoke check in Node if useful:
+- Stub window.DungeonContent.
+- require materials, monster packs, furniture packs, and the theme.
+- Confirm the theme registers.
+- Confirm at least one normal monster and one boss can match each configured tag group.
+- Confirm all configured furniture ids/chances refer to registered furniture.
+- Confirm all resource nodes and terrain ids exist.
+
+Browser/playtest checks:
+- Generate Small, Medium, and Massive if practical.
+- Check that theme-specific furniture does not leak into other dungeons.
+- Check that terrain floors appear at the expected rarity.
+- Check monster encounters match the selected size range.
+- Check resource nodes appear in reasonable quantities.
+- Start a combat with theme monsters and watch for console errors.
+
+13. Common mistakes
+
+- Forgetting to load the new theme in index.html.
+- Loading a theme before the monster/furniture pack it relies on.
+- Using broad furniture tags that leak into other themes.
+- Adding resource drops without registering the item in materials.js.
+- Adding monster specialAbility text but no runtime support in combat-map.js.
+- Making every room too busy with furniture, terrain, traps, and resources at once.
+- Forgetting Insane size grid pressure when using large room dimensions.

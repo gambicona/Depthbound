@@ -22,7 +22,7 @@ window.DungeonContent.register("classes", "wizard", {
   weaponProficiencies: ["dagger", "dart", "sling", "quarterstaff", "crossbow-light"],
   spellcastingAbility: "int",
   spellPointProgression: fullCasterSpellPoints,
-  spellList: ["magic_missile", "shield", "burning_hands", "sleep", "grease", "scorching_ray", "web", "misty_step", "fireball", "haste"],
+  spellList: ["magic_missile", "shield", "burning_hands", "sleep", "grease", "scorching_ray", "web", "misty_step", "fireball", "haste", "fly"],
   cantripList: ["mage-hand", "blade-ward", "fire-bolt", "mind-sliver", "thunderclap", "chill-touch", "acid-splash", "booming-blade", "frostbite", "green-flame-blade", "ray-of-frost", "shocking-grasp", "toll-the-dead"],
   spells: [],
   token: "W",

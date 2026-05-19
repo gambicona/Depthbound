@@ -32,6 +32,7 @@ function customHeroTokenEntryMatchesFighter(entry, fighter) {
 }
 
 function recoverHeroTokenArtFromLibrary(fighter) {
+  if (window.DepthboundPlaytest?.role === "guest") return "";
   if (!isRosterHeroId(fighter?.id) || fighter?.tokenArt) return "";
   const entries = loadCustomHeroTokenArt();
   const matching = entries.filter((entry) => customHeroTokenEntryMatchesFighter(entry, fighter));
@@ -102,6 +103,27 @@ function setCombatantTokenArt(token, art) {
   }
 }
 
+const tokenMovementTimers = new Map();
+
+function updateTokenMovementClass(token, fighter) {
+  if (!token || !fighter?.position) return;
+  const nextKey = positionKey(fighter.position);
+  const previousKey = token.dataset.positionKey;
+  token.dataset.positionKey = nextKey;
+  if (!previousKey || previousKey === nextKey) return;
+
+  token.classList.add("token-moving");
+  const existingTimer = tokenMovementTimers.get(fighter.id);
+  if (existingTimer) window.clearTimeout(existingTimer);
+  tokenMovementTimers.set(
+    fighter.id,
+    window.setTimeout(() => {
+      token.classList.remove("token-moving");
+      tokenMovementTimers.delete(fighter.id);
+    }, tokenSlideMs + 90),
+  );
+}
+
 function createCombatantToken(combatant) {
   const token = document.createElement("div");
   const heroToken = isRosterHeroId(combatant.id);
@@ -132,10 +154,15 @@ function createCombatantToken(combatant) {
   tokenLabel.className = "token-label";
   tokenLabel.textContent = combatant.token;
 
+  const wildShapeBadge = document.createElement("span");
+  wildShapeBadge.className = "wildshape-token-badge";
+  wildShapeBadge.textContent = "W";
+  wildShapeBadge.title = "Wild Shape";
+
   tokenImage.addEventListener("load", () => showCombatantTokenArt(token));
   tokenImage.addEventListener("error", () => hideCombatantTokenArt(token));
 
-  token.append(tokenImage, tokenLabel);
+  token.append(tokenImage, tokenLabel, wildShapeBadge);
   setCombatantTokenArt(token, tokenArtPath);
 
   const hpBar = document.createElement("div");
@@ -245,6 +272,14 @@ function createCombatantToken(combatant) {
 }
 function combatantTokenArt(fighter) {
   clearAccidentalGenericHeroToken(fighter);
+  if (window.DepthboundPlaytest?.role === "guest" && fighter?.playtestTokenArtId) {
+    try {
+      const stored = window.localStorage.getItem(`depthbound.playtest.tokenArt.${fighter.playtestTokenArtId}`);
+      if (stored) return stored;
+    } catch {
+      return "";
+    }
+  }
   let art = fighter.tokenArt ?? fighter.tokenImage ?? fighter.art ?? fighter.portrait ?? fighter.avatar ?? "";
   if (!art) art = recoverHeroTokenArtFromLibrary(fighter);
   if (art?.type === "custom-file") {
@@ -688,12 +723,15 @@ function renderDungeonObjects() {
     const behaviorClasses = objectComponents(object)
       .map((component) => `feature-${component.type.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`)
       .join(" ");
-    element.className = `dungeon-object ${object.type} ${behaviorClasses}${homeObjectTypeIsFloorCovering(object.type) ? " floor-covering" : ""}${object.spent ? " spent" : ""}${object.disarmed ? " disarmed" : ""}${object.detected ? " detected" : ""}`;
+    const floorCovering = objectTypeIsFloorCovering(object.type) || homeObjectTypeIsFloorCovering(object.type);
+    element.className = `dungeon-object ${object.type} ${behaviorClasses}${floorCovering ? " floor-covering" : ""}${object.spent ? " spent" : ""}${object.disarmed ? " disarmed" : ""}${object.detected ? " detected" : ""}`;
     element.classList.toggle("attackable-object", selectedHeroCanTargetObject(object));
     element.classList.toggle("selected-target", selectedAttackTarget()?.id === object.id);
     element.type = "button";
     element.title = template.name;
-    const fallbackSymbol = template.symbol ?? (objectIsTrap(object) ? "!" : objectHasLoot(object) ? "$" : "?");
+    const fallbackSymbol = objectHasTag(object, "terrain-floor")
+      ? ""
+      : template.symbol ?? (objectIsTrap(object) ? "!" : objectHasLoot(object) ? "$" : "?");
     const iconPath = furnitureIconPath(template, object.type);
     const icon = document.createElement("img");
     const iconStatus = iconPath ? furnitureIconLoadStatus.get(iconPath) : "missing";
@@ -752,6 +790,11 @@ function renderDungeonObjects() {
         return;
       }
       if (state.mode === "combat" && selectedHeroCanTargetObject(object)) {
+        const monster = preferredMonsterTargetOverObject(object);
+        if (monster) {
+          selectAttackTarget(monster.id);
+          return;
+        }
         selectAttackTarget(object.id);
         return;
       }
@@ -772,6 +815,13 @@ function renderDungeonObjects() {
     });
     objectLayer.append(element);
   }
+}
+
+function preferredMonsterTargetOverObject(object) {
+  const objectKeys = new Set(objectCells(object).map(positionKey));
+  return visibleMonsters()
+    .filter((monster) => objectKeys.has(positionKey(monster.position)))
+    .find((monster) => selectedHeroCanTargetMonster(monster)) ?? null;
 }
 
 function placeExitToken() {
@@ -868,6 +918,7 @@ function placeToken(fighter) {
   if (!token) return;
 
   const scaledTileSizePx = currentTileSizePx();
+  updateTokenMovementClass(token, fighter);
   token.style.left = `${(fighter.position.x + 0.5) * scaledTileSizePx}px`;
   token.style.top = `${(fighter.position.y + 0.5) * scaledTileSizePx}px`;
   const heroToken = isRosterHeroId(fighter.id);
@@ -883,8 +934,11 @@ function placeToken(fighter) {
   token.classList.toggle("selected-hero", heroToken && selectedHeroIds.has(fighter.id));
   token.classList.toggle("in-attack-range", !heroToken && attackTargets().some((target) => target.id === fighter.id));
   token.classList.toggle("selected-target", !heroToken && selectedAttackTarget()?.id === fighter.id);
-    const spellTargeting = currentPendingSpellTargeting();
+  const spellTargeting = currentPendingSpellTargeting();
   token.classList.toggle("spell-click-target", isSpellTokenTargetable(spellTargeting, fighter));
+  token.classList.toggle("flying-token", fighterIsFlying(fighter));
+  token.classList.toggle("wildshaped-druid-token", heroToken && fighter.classId === "druid" && isWildShaped(fighter));
+  token.classList.toggle("dying-hero-token", heroToken && fighter.alive && !fighter.dead && (fighter.hp ?? 0) <= 0);
   const art = combatantTokenArt(fighter);
   setCombatantTokenArt(token, art);
   const hpFill = token.querySelector(".token-hp-fill");
@@ -907,6 +961,7 @@ function renderableFighters(activeTiles = activeTileKeys()) {
 
 function renderRoom() {
   if (!roomIsBuilt) buildRoom();
+  refreshRoomScrollMode?.();
 
   const mapGridSize = currentGridSize();
   const scaledTileSizePx = currentTileSizePx();
@@ -925,7 +980,7 @@ function renderRoom() {
       ? new Set(Array.from({ length: mapGridSize * mapGridSize }, (_, index) => positionKey({ x: index % mapGridSize, y: Math.floor(index / mapGridSize) })))
       : rememberedTileKeys();
   renderTileButtons(rememberedTiles);
-  const walkable = currentWalkable();
+  const walkable = currentWalkable(hero);
   const doorKeys = new Set((state.dungeon?.doors ?? []).map(positionKey));
   const openedDoorKeys = new Set(state.exploration?.openedDoorKeys ?? []);
   const visibleWalls = exposedWallKeys();
@@ -940,7 +995,7 @@ function renderRoom() {
           gridSize: currentGridSize(),
           walkable,
           canTraverse: (from, to, path) => canTraverseMovementEdge(hero, from, to, path),
-          moveCost: (_from, to) => movementCostAtPosition(to),
+          moveCost: (_from, to) => movementCostAtPosition(to, hero),
           stateKey: (position, path) => movementStateKey(hero, position, path),
           canEnterOccupied: (position) => canMoveThroughOccupiedTile(hero, position),
         })
@@ -1087,7 +1142,7 @@ function renderHeroStatusCard(element, fighter) {
     <div class="status-line">
       ${fighter.dodging ? '<span class="status-pill status-dodge">Dodging</span>' : ""}
       ${fighter.disengaged ? '<span class="status-pill status-disengage">Disengaged</span>' : ""}
-      ${(fighter.statusEffects ?? []).map((effect) => `<span class="status-pill status-dodge">${escapeHtml(effect.label ?? effect.id)}</span>`).join("")}
+      ${(fighter.statusEffects ?? []).map((effect) => `<span class="status-pill status-dodge" title="${escapeAttribute(temporaryEffectDetails(effect))}">${escapeHtml(statusEffectPillText(effect))}</span>`).join("")}
       ${fighter.hp <= 0 && !fighter.dead && heroIsStableAtZero(fighter) ? '<span class="status-pill status-dodge">Stable</span>' : ""}
       ${fighter.hp <= 0 && !fighter.dead && !heroIsStableAtZero(fighter) ? `<span class="status-pill status-dodge">Death saves ${fighter.deathSaves?.successes ?? 0}/3 | ${fighter.deathSaves?.failures ?? 0}/3</span>` : ""}
       ${fighter.dead ? '<span class="status-pill status-disengage">Dead</span>' : ""}
@@ -1102,6 +1157,12 @@ function renderHeroStatusCard(element, fighter) {
   element.querySelector(".rename-hero").addEventListener("click", renameHero);
   element.querySelector(".open-inventory").addEventListener("click", showInventoryMenu);
   element.querySelector(".temporary-effects-button").addEventListener("click", () => showTemporaryEffectsInfo(fighter));
+}
+
+function statusEffectPillText(effect) {
+  const label = effect.label ?? effect.id ?? "Effect";
+  const duration = temporaryEffectDurationText(effect);
+  return duration && duration !== "Temporary" ? `${label} (${duration})` : label;
 }
 
 function resourcePoolSpent(fighter, poolId) {
@@ -1204,9 +1265,11 @@ function spellbookInspectMarkup(spells = []) {
 }
 
 function temporaryEffectDurationText(effect) {
-  if (effect.expiresAtHome) return "Until returning home";
+  if (effect.expiresAtHome) return "";
   if (effect.expiresAtStartOfTurn) return "Until start of turn";
   if (effect.expiresAtEndOfTurn) return "Until end of turn";
+  const remainingSeconds = timedEffectRemainingSeconds(effect);
+  if (remainingSeconds != null) return formatDuration(remainingSeconds);
   if (effect.durationRounds) return `${effect.durationRounds} round${effect.durationRounds === 1 ? "" : "s"}`;
   return "Temporary";
 }
@@ -1372,6 +1435,28 @@ function classMovementBonusText(hero) {
     return `Your speed increases by ${bonus} ft while you are not wearing armor or using a shield.`;
   }
   return "";
+}
+
+function proficiencyListText(values = [], formatter = (value) => value) {
+  const entries = uniqueValues(values).filter(Boolean);
+  return entries.length ? entries.map(formatter).join(", ") : "None";
+}
+
+function heroProficienciesMarkup(fighter, classTemplate = null) {
+  const saveText = proficiencyListText(fighter.savingThrowProficiencies ?? classTemplate?.savingThrowProficiencies ?? [], (value) => String(value).toUpperCase());
+  const skillText = proficiencyListText(fighter.skillProficiencies ?? [], skillName);
+  const toolText = proficiencyListText(fighter.toolProficiencies ?? [], toolName);
+  const armorText = proficiencyListText(fighter.armorProficiencies ?? classTemplate?.armorProficiencies ?? [], titleCaseTag);
+  const weaponText = proficiencyListText(fighter.weaponProficiencies ?? classTemplate?.weaponProficiencies ?? [], titleCaseTag);
+  return `
+    <div class="equipment-summary">
+      <div><b>Saving Throws</b><span>${escapeHtml(saveText)}</span></div>
+      <div><b>Skills</b><span>${escapeHtml(skillText)}</span></div>
+      <div><b>Tools</b><span>${escapeHtml(toolText)}</span></div>
+      <div><b>Armor</b><span>${escapeHtml(armorText)}</span></div>
+      <div><b>Weapons</b><span>${escapeHtml(weaponText)}</span></div>
+    </div>
+  `;
 }
 
 function classFeatureInspectionDescription(hero, feature, abilityDefinitions = []) {
@@ -1639,6 +1724,7 @@ function showCombatantInfo(fighter) {
             <div><b>${isSidekickWarrior(fighter) ? "Creature" : "Race"}</b><span>${escapeHtml(isSidekickWarrior(fighter) ? fighterCreatureType(fighter) || "companion" : [fighter.speciesName, fighter.subraceName].filter(Boolean).join(" - ") || "Unknown")}</span></div>
             <div><b>Class</b><span>${escapeHtml(fighter.className ?? "Adventurer")} ${fighter.level ?? 1}</span></div>
             <div><b>Weapon</b><span>${escapeHtml(weaponName)}</span></div>
+            <div><b>Push/Drag/Lift</b><span>${fighter.pushDragLiftLb ?? refreshPushDragLiftStats(fighter)} lb${fighter.racialTraits?.powerfulBuild ? " (Powerful Build)" : ""}</span></div>
           </div>
           <div class="stat-grid ability-grid">
             ${abilities
@@ -1656,6 +1742,11 @@ function showCombatantInfo(fighter) {
             title: "Racial Features",
             meta: racialTraits.length ? `${racialTraits.length}` : "",
             body: racialTraits.map(featureLineMarkup).join(""),
+          })}
+          ${inspectDetailsMarkup({
+            title: "Proficiencies",
+            meta: "Class and training",
+            body: heroProficienciesMarkup(fighter, heroTemplate),
           })}
           ${inspectDetailsMarkup({
             title: "Class Features",
@@ -1690,6 +1781,13 @@ function showCombatantInfo(fighter) {
                 })
               : ""
           }
+          ${inspectDetailsMarkup({
+            title: "Feats",
+            meta: fighterFeatDefinitions(fighter).length ? `${fighterFeatDefinitions(fighter).length}` : "",
+            body: fighterFeatDefinitions(fighter)
+              .map(({ definition }) => `<p><b>${escapeHtml(definition.name)}</b>${definition.description ? ` ${escapeHtml(definition.description)}` : ""}</p>`)
+              .join(""),
+          })}
           ${inspectDetailsMarkup({
             title: "Spellbook",
             meta: spells.length ? `${spells.length} spells - ${fighter.spellPoints ?? 0}/${fighter.spellPointMax ?? 0} SP` : "",
@@ -1772,9 +1870,13 @@ function showDungeonObjectInfo(object) {
       object.trap?.detected) &&
     !heroTriedDisarm;
   const canInvestigate = state.mode !== "combat" && objectCanInspect(object) && objectAdjacent && !object.investigated;
+  const uniqueInteraction = object.uniqueInteractionClaimed ? null : objectComponent(object, "uniqueInteraction");
+  const uniqueInteractionAvailable = Boolean(uniqueInteraction && state.mode !== "combat" && objectAdjacent && canActInCombat);
   const captive = captiveCreatureComponent(object);
   const canFreeCaptive = canFreeCaptiveObject(object);
   const captiveName = captiveCreatureLabel(object);
+  const resourceNode = object.resourceNodeClaimed ? null : objectComponent(object, "resourceNode");
+  const canFarmResourceNode = Boolean(resourceNode && state.mode !== "combat" && objectAdjacent && canActInCombat);
   const destructible = objectIsDestructible(object) ? ensureDestructibleObjectState(object) : null;
   const canAttackObject =
     destructible &&
@@ -1830,6 +1932,26 @@ function showDungeonObjectInfo(object) {
            <button type="button" data-action="free-captive" data-object="${escapeAttribute(object.id)}" ${canFreeCaptive ? "" : "disabled"}>Free ${escapeHtml(captiveName)}</button>`
         : object.captiveFreed
           ? `<p class="empty-note">The crate is open and empty.</p>`
+          : ""
+    }
+    ${
+      resourceNode
+        ? `<p class="empty-note">Farmable resource. ${escapeHtml(resourceNodeCheckLabel(resourceNode))} DC ${resourceNode.dc ?? 12}; takes ${escapeHtml(
+            formatDuration(resourceNode.timeSeconds ?? 900),
+          )}. Better checks produce more material.</p>
+           <button type="button" data-action="farm-resource-node" data-object="${escapeAttribute(object.id)}" ${canFarmResourceNode ? "" : "disabled"}>Gather Resources</button>`
+        : object.resourceNodeClaimed
+          ? `<p class="empty-note">This resource point has already been harvested by the party.</p>`
+          : ""
+    }
+    ${
+      uniqueInteraction
+        ? `<p class="empty-note">${escapeHtml(uniqueInteraction.tooltip ?? uniqueInteractionSummary(uniqueInteraction))}</p>
+           <button type="button" data-action="use-object-interaction" data-object="${escapeAttribute(object.id)}" ${uniqueInteractionAvailable ? "" : "disabled"}>${
+             object.uniqueInteractionClaimed ? "Used" : escapeHtml(uniqueInteraction.label ?? "Use Feature")
+           }</button>`
+        : object.uniqueInteractionClaimed
+          ? `<p class="empty-note">This feature has already been used by the party.</p>`
           : ""
     }
     ${
@@ -2120,6 +2242,11 @@ function homeObjectOverlaps(type, position, ignoreId = null, rotation = 0) {
     if (candidateIsCovering !== existingIsCovering) return false;
     return objectCells({ ...object, type: object.type }).some((cell) => cells.some((candidate) => positionKey(candidate) === positionKey(cell)));
   });
+}
+
+function objectTypeIsFloorCovering(type, template = objectTemplate(type)) {
+  const tags = template?.tags ?? [];
+  return Boolean(!template?.blocksMovement && tags.includes("terrain-floor"));
 }
 
 function homeObjectTypeIsFloorCovering(type, template = objectTemplate(type)) {
@@ -3651,6 +3778,75 @@ function spawnInvestigationAmbush(object) {
   return monster;
 }
 
+function inspectEventMonsterIds(component = {}) {
+  return component.monsterIds ?? (component.monsterId ? [component.monsterId] : []);
+}
+
+function inspectEventSpawnMonsters(object, component = {}) {
+  const hero = activeHero();
+  const objectRoom = roomForPosition(object.position);
+  const monsterIds = inspectEventMonsterIds(component).filter((monsterId) => getMonsterTemplate(monsterId));
+  const monsterId = monsterIds[Math.floor(Math.random() * monsterIds.length)];
+  const monsterTemplate = monsterId ? getMonsterTemplate(monsterId) : null;
+  if (!hero || !objectRoom || !monsterTemplate) return [];
+
+  const blockedKeys = new Set([
+    ...blockingObjectKeys(),
+    ...Object.values(state.fighters)
+      .filter((fighter) => fighter.alive)
+      .map((fighter) => positionKey(fighter.position)),
+  ]);
+  const spawnCount = component.count ?? roomMonsterSpawnCount(monsterTemplate, hero);
+  const positions = clusteredSpawnCells(objectRoom, spawnCount, hero.position, blockedKeys, currentGridSize(), spawnFloorKeysForDungeon());
+  const spawned = positions.slice(0, Math.min(spawnCount, positions.length)).map((position, index) => {
+    const monster = createCombatant({
+      ...monsterTemplate,
+      id: `inspect-event-${monsterTemplate.id}-${Date.now()}-${index + 1}`,
+      name: `${monsterTemplate.name}${spawnCount > 1 ? ` ${index + 1}` : ""}`,
+      position,
+    });
+    applyMonsterCategoryScaling(monster, hero);
+    monster.roomId = objectRoom.id;
+    state.fighters[monster.id] = monster;
+    return monster;
+  });
+  if (spawned.length && state.mode === "combat") spawned.forEach(addMonsterToInitiative);
+  return spawned;
+}
+
+function grantInspectEventLoot(hero, object, component = {}) {
+  const loot = component.loot ?? component;
+  const items = Array.isArray(loot.items) && loot.count
+    ? shuffledCopy(loot.items).slice(0, Math.min(loot.items.length, Math.max(1, Math.floor(Number(loot.count) || 1))))
+    : loot.items;
+  const temporaryComponent = {
+    reward: loot.reward,
+    gold: loot.gold,
+    item: loot.item,
+    items,
+    count: loot.count,
+  };
+  return grantFeatureInspectionReward(hero, object, temporaryComponent);
+}
+
+function resolveInspectEvent(hero, object, component = {}) {
+  const spawnChance = component.spawnChance ?? 0.5;
+  const shouldSpawn = Math.random() < spawnChance;
+  if (shouldSpawn) {
+    const spawned = inspectEventSpawnMonsters(object, component);
+    if (spawned.length) {
+      const names = spawned.map((monster) => monster.name).join(", ");
+      object.lastResult += ` ${names} emerge.`;
+      addLog(`${names} emerge from ${objectTemplate(object.type)?.name ?? "the feature"}.`, "important");
+      return true;
+    }
+  }
+  if (grantInspectEventLoot(hero, object, component)) return true;
+  object.lastResult += " Found nothing out of the ordinary.";
+  addLog(`${hero.name} finds nothing out of the ordinary.`);
+  return false;
+}
+
 function grantFeatureInspectionReward(hero, object, component) {
   if (!component || component.claimed) return false;
   if (component.reward === "smallGold" || component.gold) {
@@ -3671,6 +3867,399 @@ function grantFeatureInspectionReward(hero, object, component) {
   return false;
 }
 
+function resourceNodeCheckLabel(component = {}) {
+  const ability = String(component.ability ?? "wis").toUpperCase();
+  return component.skill ? `${ability} ${skillName(component.skill)}` : ability;
+}
+
+function uniqueInteractionOptions(component = {}) {
+  if (Array.isArray(component.skillOptions) && component.skillOptions.length) return component.skillOptions;
+  if (Array.isArray(component.skills) && component.skills.length) {
+    return component.skills.map((skill) => ({ skill, ability: skillDefinitions[skill]?.ability ?? component.ability ?? "int" }));
+  }
+  const skill = component.skill ?? "investigation";
+  return [{ skill, ability: component.ability ?? skillDefinitions[skill]?.ability ?? "int" }];
+}
+
+function uniqueInteractionCheckLabels(component = {}) {
+  return uniqueInteractionOptions(component).map((option) => `${String(option.ability ?? skillDefinitions[option.skill]?.ability ?? "int").toUpperCase()} ${skillName(option.skill)}`);
+}
+
+function uniqueInteractionSummary(component = {}) {
+  const checks = uniqueInteractionCheckLabels(component).join(", ");
+  return `${checks} DC ${component.dc ?? 13}; takes ${formatDuration(component.timeSeconds ?? 600)}. One party attempt.`;
+}
+
+function bestUniqueInteractionOption(hero, component = {}) {
+  const options = uniqueInteractionOptions(component);
+  return options
+    .map((option) => {
+      const skillId = option.skill ?? "investigation";
+      const ability = option.ability ?? skillDefinitions[skillId]?.ability ?? "int";
+      return { skill: skillId, ability, bonus: skillCheckBonus(hero, ability, skillId) };
+    })
+    .sort((a, b) => b.bonus - a.bonus || skillName(a.skill).localeCompare(skillName(b.skill)))[0] ?? { skill: "investigation", ability: "int", bonus: 0 };
+}
+
+function applyObjectInteractionDamage(hero, object, damage = { count: 1, sides: 6, type: "force" }, label = "backlash") {
+  const roll = rollDice(damage.count ?? 1, damage.sides ?? 6);
+  const rawDamage = Math.max(1, roll.total + (damage.bonus ?? 0));
+  const modified = calculateDamageModifiers(hero, rawDamage, damage.type ?? "damage");
+  applyDamageToFighter(hero, modified.damage);
+  const note = modified.reason ? ` ${hero.name} is ${modified.reason} to ${damage.type} damage.` : "";
+  addLog(`${hero.name} suffers ${modified.damage} ${damage.type ?? "damage"} damage from ${label}.${note}`, "damage");
+  if (!hero.alive) {
+    addLog(`${hero.name} drops to 0 HP.`, "important");
+    handleHeroDeath();
+  }
+  return modified.damage;
+}
+
+function grantObjectInteractionItem(hero, itemId, source = "feature") {
+  const item = createItemInstance(itemId, source);
+  if (!item) return "";
+  addItemToInventory(hero, item, "feature-stack");
+  return item.name;
+}
+
+function healObjectInteractionTarget(target, amount) {
+  const healed = applyHealingToHero(target, amount);
+  return healed > 0 ? `${target.name} restores ${healed} HP.` : `${target.name} is already at full HP.`;
+}
+
+function cleanseCommonBadStatuses(hero) {
+  const removeIds = new Set(["frightened", "shaken", "drained", "poisoned", "nauseated", "sickened", "smoke-choked", "smoke-blinded"]);
+  const before = hero.statusEffects?.length ?? 0;
+  hero.statusEffects = (hero.statusEffects ?? []).filter((effect) => !removeIds.has(effect.id) && !removeIds.has(String(effect.label ?? "").toLowerCase()));
+  refreshDerivedStats(hero);
+  return before - (hero.statusEffects?.length ?? 0);
+}
+
+function revealExitRoomFromFeature() {
+  const roomId = state.exit?.roomId;
+  if (!roomId) return false;
+  state.exploration ??= {};
+  state.exploration.discoveredRoomIds = Array.from(new Set([...(state.exploration.discoveredRoomIds ?? []), roomId]));
+  return true;
+}
+
+function revealNearbyFeatureTraps(object) {
+  const room = roomForPosition(object.position);
+  const roomIds = new Set(room ? [room.id] : []);
+  let revealed = 0;
+  for (const entry of state.dungeonObjects ?? []) {
+    const entryRoom = roomForPosition(entry.position);
+    if (roomIds.size && entryRoom && !roomIds.has(entryRoom.id)) continue;
+    if (objectIsTrap(entry) && !entry.detected) {
+      entry.detected = true;
+      revealed += 1;
+    }
+    if (entry.trap && !entry.trap.detected) {
+      entry.trap.detected = true;
+      revealed += 1;
+    }
+  }
+  return revealed;
+}
+
+function disarmOneNearbyFeatureTrap(object) {
+  const room = roomForPosition(object.position);
+  const candidate = (state.dungeonObjects ?? []).find((entry) => {
+    const entryRoom = roomForPosition(entry.position);
+    if (room && entryRoom?.id !== room.id) return false;
+    return (objectIsTrap(entry) && entry.armed !== false && !entry.disarmed) || entry.trap;
+  });
+  if (!candidate) return false;
+  if (candidate.trap) {
+    delete candidate.trap;
+  } else {
+    candidate.disarmed = true;
+    candidate.armed = false;
+  }
+  return true;
+}
+
+function addObjectInteractionBlessing(hero, component, total, greatSuccess) {
+  const targets = greatSuccess ? partyHeroes().filter((entry) => entry.alive).slice(0, component.maxTargetsOnGreat ?? 99) : [hero];
+  for (const target of targets) {
+    applyStatusEffect(target, {
+      id: component.statusId ?? `feature-${component.effect ?? "blessing"}`,
+      label: component.statusLabel ?? component.label ?? "Blessed",
+      ...(component.status ?? { saveBonus: 1 }),
+      expiresAtHome: component.expiresAtHome ?? true,
+      durationRounds: component.durationRounds,
+    });
+  }
+  return `${targets.map((target) => target.name).join(", ")} gain ${component.statusLabel ?? component.label ?? "a blessing"}.`;
+}
+
+function objectInteractionResistanceType(object, component = {}) {
+  if (component.resistance) return component.resistance;
+  const tags = objectTags(object);
+  if (tags.includes("poison") || tags.includes("swamp") || tags.includes("bog")) return "poison";
+  if (tags.includes("sun-temple") || tags.includes("radiant")) return "radiant";
+  if (tags.includes("fire") || tags.includes("hell") || tags.includes("infernal") || tags.includes("forge")) return "fire";
+  if (tags.includes("undead") || tags.includes("crypt")) return "necrotic";
+  return "force";
+}
+
+function resolveObjectInteractionSuccess(hero, object, component, total, rollResult) {
+  const effect = component.effect ?? "blessing";
+  const dc = component.dc ?? 13;
+  const greatSuccess = total >= dc + (component.greatSuccessMargin ?? 5) || rollResult.roll === 20;
+  const messages = [];
+
+  if (effect === "manaWell") {
+    const max = spellPointMaximum(hero);
+    if (max <= 0) {
+      messages.push("The well hums, but this hero cannot hold spell points.");
+    } else {
+      const abilityModBonus = Math.max(abilityMod(hero, "int"), abilityMod(hero, "wis"), abilityMod(hero, "cha"), 0);
+      const restore = greatSuccess ? Math.max(3, proficiencyBonus(hero) + abilityModBonus) : Math.max(2, proficiencyBonus(hero));
+      const before = hero.spellPoints ?? 0;
+      hero.spellPoints = Math.min(max, before + restore);
+      messages.push(`${hero.name} regains ${hero.spellPoints - before} spell points.`);
+    }
+  } else if (effect === "runeCircle") {
+    messages.push(addObjectInteractionBlessing(hero, component, total, greatSuccess));
+  } else if (effect === "soulCage") {
+    const tempHp = Math.max(3, proficiencyBonus(hero) + Math.max(0, abilityMod(hero, "cha")));
+    for (const target of partyHeroes().filter((entry) => entry.alive)) {
+      applyStatusEffect(target, { id: "freed-soul", label: "Freed Soul", tempHp, durationRounds: 10 });
+    }
+    messages.push(`The freed soul shields the party with ${tempHp} temporary HP.`);
+  } else if (effect === "contractLectern") {
+    for (const target of partyHeroes().filter((entry) => entry.alive)) {
+      applyStatusEffect(target, { id: "contract-loophole", label: "Contract Loophole", resistances: ["fire"], durationRounds: 10 });
+    }
+    messages.push("The party gains fire resistance for the next encounter.");
+    if (greatSuccess) {
+      const name = grantObjectInteractionItem(hero, "devil-blood", "contract");
+      if (name) messages.push(`Found ${name}.`);
+    }
+  } else if (effect === "futureReflection") {
+    applyStatusEffect(hero, { id: "future-reflection", label: "Future Reflection", saveBonus: 2, initiativeBonus: 2, durationRounds: 10 });
+    messages.push(`${hero.name} reads a useful future reflection.`);
+    if (greatSuccess && revealExitRoomFromFeature()) messages.push("The exit room is revealed.");
+  } else if (effect === "spellbookStand") {
+    const max = spellPointMaximum(hero);
+    if (max > 0) {
+      const before = hero.spellPoints ?? 0;
+      hero.spellPoints = Math.min(max, before + (greatSuccess ? 2 : 1));
+      messages.push(`${hero.name} recovers ${hero.spellPoints - before} spell point${hero.spellPoints - before === 1 ? "" : "s"}.`);
+    }
+    if (greatSuccess) {
+      const name = grantObjectInteractionItem(hero, "crystal-shard", "spellbook");
+      if (name) messages.push(`Found ${name}.`);
+    }
+  } else if (effect === "arcaneLectern") {
+    const revealed = revealNearbyFeatureTraps(object);
+    messages.push(revealed ? `${revealed} nearby trap${revealed === 1 ? "" : "s"} revealed.` : "No nearby traps answer the lectern.");
+    if (greatSuccess && disarmOneNearbyFeatureTrap(object)) messages.push("One nearby trap is disarmed.");
+  } else if (effect === "glyphExit") {
+    revealExitRoomFromFeature();
+    messages.push("The glyphs mark the dungeon exit room on the map.");
+  } else if (effect === "confessionScreen") {
+    const removed = cleanseCommonBadStatuses(hero);
+    if (removed > 0) messages.push(`${hero.name} sheds ${removed} harmful effect${removed === 1 ? "" : "s"}.`);
+    else {
+      applyStatusEffect(hero, { id: "confessed", label: "Confessed", saveBonus: 1, durationRounds: 10 });
+      messages.push(`${hero.name} gains +1 to saves for the next encounter.`);
+    }
+  } else if (effect === "offeringBlessing") {
+    messages.push(addObjectInteractionBlessing(hero, { ...component, statusLabel: "Offering Blessing", status: { tempHp: Math.max(2, proficiencyBonus(hero)), saveBonus: 1 } }, total, greatSuccess));
+  } else if (effect === "sacredFont") {
+    const removed = cleanseCommonBadStatuses(hero);
+    messages.push(healObjectInteractionTarget(hero, rollDice(2, 4).total + proficiencyBonus(hero)));
+    if (removed > 0) messages.push(`${removed} harmful effect${removed === 1 ? "" : "s"} cleansed.`);
+    if (greatSuccess) {
+      const name = grantObjectInteractionItem(hero, "sacred-ash", "font");
+      if (name) messages.push(`Created ${name}.`);
+    }
+  } else if (effect === "burialRite") {
+    object.investigated = true;
+    const name = grantObjectInteractionItem(hero, greatSuccess ? "grave-wax" : "bone-dust", "burial");
+    messages.push(name ? `The dead rest quietly. Found ${name}.` : "The dead rest quietly.");
+  } else if (effect === "mirageCrystal") {
+    const revealed = revealNearbyFeatureTraps(object);
+    messages.push(revealed ? `${revealed} nearby hidden danger${revealed === 1 ? "" : "s"} revealed.` : "The illusion thins, but reveals no traps nearby.");
+    if (greatSuccess) applyStatusEffect(hero, { id: "mirage-decoy", label: "Mirage Decoy", acBonus: 2, durationRounds: 10 });
+  } else if (effect === "eggHarvest") {
+    object.investigated = true;
+    const name = grantObjectInteractionItem(hero, objectTags(object).includes("web") ? "spider-silk" : "glowspore-dust", "egg-cluster");
+    messages.push(name ? `Extracted ${name}.` : "The cluster is safely neutralized.");
+  } else if (effect === "safePool") {
+    const removed = cleanseCommonBadStatuses(hero);
+    messages.push(healObjectInteractionTarget(hero, rollDice(1, 6).total + proficiencyBonus(hero)));
+    if (removed > 0) messages.push(`${removed} harmful effect${removed === 1 ? "" : "s"} washed away.`);
+  } else if (effect === "acidCollect") {
+    object.armed = false;
+    object.spent = true;
+    const name = grantObjectInteractionItem(hero, "abyssal-bile", "acid");
+    messages.push(name ? `Neutralized the acid and collected ${name}.` : "The acid is neutralized.");
+  } else if (effect === "forgeHeat") {
+    const itemId = objectTags(object).includes("brimstone") ? "brimstone-chunk" : objectTags(object).includes("slag") ? "slag-glass" : "hellfire-ember";
+    const name = grantObjectInteractionItem(hero, itemId, "forge");
+    if (name) messages.push(`Drew heat into ${name}.`);
+    if (greatSuccess) {
+      applyStatusEffect(hero, { id: "forge-heated-weapon", label: "Forge Heat", weaponRider: true, damageBonus: rollDie(6), damageType: "fire", durationRounds: 10 });
+      messages.push(`${hero.name}'s next weapon hits carry forge fire.`);
+    }
+  } else if (effect === "anvilTune") {
+    applyStatusEffect(hero, { id: "tempered-gear", label: "Tempered Gear", acBonus: 1, damageBonus: 1, expiresAtHome: true });
+    messages.push(`${hero.name}'s gear is tempered for the dungeon.`);
+  } else if (effect === "incenseWard") {
+    const resistance = objectInteractionResistanceType(object, component);
+    applyStatusEffect(hero, { id: `${resistance}-incense-ward`, label: "Incense Ward", resistances: [resistance], durationRounds: 10 });
+    messages.push(`${hero.name} gains ${resistance} resistance for the next encounter.`);
+  } else {
+    messages.push(addObjectInteractionBlessing(hero, component, total, greatSuccess));
+  }
+
+  return messages.filter(Boolean).join(" ");
+}
+
+function resolveObjectInteractionFailure(hero, object, component) {
+  const damage = component.failureDamage ?? { count: 1, sides: 6, type: component.failureType ?? "force" };
+  if (component.failureStatus) applyStatusEffect(hero, { ...component.failureStatus });
+  const label = component.failureLabel ?? component.label ?? objectTemplate(object.type)?.name ?? "the feature";
+  applyObjectInteractionDamage(hero, object, damage, label);
+  if (component.effect === "burialRite" || component.effect === "eggHarvest") {
+    spawnInvestigationAmbush(object);
+  }
+  return component.failureText ?? `${hero.name} mishandles ${objectTemplate(object.type)?.name ?? "the feature"}.`;
+}
+
+function useObjectInteraction(objectId) {
+  const object = dungeonObjectForId(objectId);
+  const hero = activeHero();
+  const template = object ? objectTemplate(object.type) : null;
+  const component = object && !object.uniqueInteractionClaimed ? objectComponent(object, "uniqueInteraction") : null;
+  if (!object || !hero || !template || !component || state.mode === "combat") return;
+  if (!objectAdjacentToHero(object, hero)) {
+    addLog(`${hero.name} needs to be next to ${template.name} to use it.`);
+    renderLog();
+    return;
+  }
+
+  const option = bestUniqueInteractionOption(hero, component);
+  const rollResult = rollD20ForFighter(hero);
+  const roll = reliableTalentRoll(hero, option.skill, rollResult.roll);
+  const guidance = guidanceSkillBonus();
+  const total = roll + option.bonus + guidance;
+  const dc = component.dc ?? 13;
+  const success = total >= dc;
+  const guidanceText = guidance ? ` + Guidance ${guidance}` : "";
+  const checkLabel = `${String(option.ability).toUpperCase()} ${skillName(option.skill)}`;
+  const checkText = `${hero.name} uses ${template.name}: ${checkLabel} ${roll} ${abilityLabel(option.bonus)}${guidanceText} = ${total} vs DC ${dc}.`;
+  object.uniqueInteractionClaimed = true;
+  object.spent = true;
+  object.lastResult = checkText;
+  addLog(checkText, "important");
+  recordD20OutcomeForFighter(hero, success);
+  addAdminCheckLog({ actor: hero, label: `${component.label ?? template.name} interaction`, target: template.name, rollResult, bonus: option.bonus, guidance, total, dc, success, note: component.effect ?? "uniqueInteraction" });
+
+  const resultText = success ? resolveObjectInteractionSuccess(hero, object, component, total, rollResult) : resolveObjectInteractionFailure(hero, object, component);
+  object.lastResult = `${checkText} ${resultText}`;
+  addLog(resultText, success ? "important" : "damage");
+  advanceDungeonTime(component.timeSeconds ?? 600, `${hero.name} using ${template.name}`, { force: true });
+
+  render();
+  showDungeonObjectInfo(object);
+}
+
+function resourceNodeQuantity(reward = {}, component = {}, total = 0, rollResult = {}) {
+  const dc = component.dc ?? 12;
+  if (total < dc) return 0;
+  const baseQuantity = Math.max(1, Math.floor(Number(reward.baseQuantity ?? 1) || 1));
+  const maxQuantity = Math.max(baseQuantity, Math.floor(Number(reward.maxQuantity ?? baseQuantity) || baseQuantity));
+  const step = Math.max(1, Math.floor(Number(reward.quantityStep ?? component.quantityStep ?? 5) || 5));
+  const qualityBonus = Math.floor(Math.max(0, total - dc) / step);
+  const naturalTwentyBonus = rollResult.roll === 20 ? 1 : 0;
+  return Math.min(maxQuantity, baseQuantity + qualityBonus + naturalTwentyBonus);
+}
+
+function resourceNodeRewardEntries(component = {}, total = 0, rollResult = {}) {
+  const rewards = Array.isArray(component.rewards)
+    ? component.rewards
+    : component.itemId
+      ? [{ itemId: component.itemId, baseQuantity: component.baseQuantity, maxQuantity: component.maxQuantity, quantityStep: component.quantityStep }]
+      : [];
+  return rewards
+    .map((reward) => ({
+      itemId: reward.itemId ?? reward.item,
+      quantity: resourceNodeQuantity(reward, component, total, rollResult),
+    }))
+    .filter((entry) => entry.itemId && entry.quantity > 0);
+}
+
+function addResourceNodeRewards(hero, entries = []) {
+  const granted = [];
+  for (const entry of entries) {
+    const item = createItemInstance(entry.itemId, "resource-node");
+    if (!item) continue;
+    item.quantity = Math.max(1, Math.floor(Number(entry.quantity) || 1));
+    addItemToInventory(hero, item, "resource-node-stack");
+    granted.push({ item, quantity: item.quantity });
+  }
+  return granted;
+}
+
+function resourceNodeRewardsText(granted = []) {
+  return granted.map((entry) => `${entry.quantity} ${entry.item.name}`).join(", ");
+}
+
+function farmResourceNode(objectId) {
+  const object = dungeonObjectForId(objectId);
+  const hero = activeHero();
+  const template = object ? objectTemplate(object.type) : null;
+  const component = object && !object.resourceNodeClaimed ? objectComponent(object, "resourceNode") : null;
+  if (!object || !hero || !template || !component || state.mode === "combat") return;
+  if (!objectAdjacentToHero(object, hero)) {
+    addLog(`${hero.name} needs to be next to ${template.name} to gather resources.`);
+    renderLog();
+    return;
+  }
+
+  const rollResult = rollD20ForFighter(hero);
+  const skillId = component.skill ?? null;
+  const ability = component.ability ?? (skillId ? skillDefinitions[skillId]?.ability : null) ?? "wis";
+  const roll = skillId ? reliableTalentRoll(hero, skillId, rollResult.roll) : rollResult.roll;
+  const bonus = skillCheckBonus(hero, ability, skillId);
+  const guidance = guidanceSkillBonus();
+  const total = roll + bonus + guidance;
+  const dc = component.dc ?? 12;
+  const success = total >= dc;
+  const guidanceText = guidance ? ` + Guidance ${guidance}` : "";
+  const checkLabel = resourceNodeCheckLabel(component);
+  const checkText = `${hero.name} gathers from ${template.name}: ${checkLabel} ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${dc}.`;
+  const entries = resourceNodeRewardEntries(component, total, rollResult);
+  const granted = success ? addResourceNodeRewards(hero, entries) : [];
+  const rewardText = granted.length ? ` Gained ${resourceNodeRewardsText(granted)}.` : " No usable resources recovered.";
+
+  object.resourceNodeClaimed = true;
+  object.spent = true;
+  object.lastResult = `${checkText}${rewardText}`;
+  recordD20OutcomeForFighter(hero, success);
+  addLog(object.lastResult, success ? "important" : undefined);
+  addAdminCheckLog({
+    actor: hero,
+    label: `${checkLabel} resource gathering`,
+    target: template.name,
+    rollResult,
+    bonus,
+    guidance,
+    total,
+    dc,
+    success,
+    note: granted.length ? rewardText.trim() : "resource node spent",
+  });
+  advanceDungeonTime(component.timeSeconds ?? component.durationSeconds ?? 900, `${hero.name} gathering from ${template.name}`, { force: true });
+
+  render();
+  showDungeonObjectInfo(object);
+}
+
 function investigateObject(objectId) {
   const object = dungeonObjectForId(objectId);
   const hero = activeHero();
@@ -3679,9 +4268,10 @@ function investigateObject(objectId) {
   if (!objectCells(object).some((cell) => Math.max(Math.abs(hero.position.x - cell.x), Math.abs(hero.position.y - cell.y)) === 1)) return;
 
   object.investigated = true;
+  const inspectEvent = objectComponent(object, "inspectEvent");
   const hiddenLoot = objectComponent(object, "hiddenLoot") ?? objectComponent(object, "harvestableResource");
   const ambush = objectComponent(object, "ambushOnInspect");
-  const inspectDc = hiddenLoot?.dc ?? template.inspectDc ?? template.spotDc ?? 13;
+  const inspectDc = inspectEvent?.dc ?? hiddenLoot?.dc ?? template.inspectDc ?? template.spotDc ?? 13;
   const rollResult = rollD20ForFighter(hero);
   const roll = rollResult.roll;
   const bonus = skillCheckBonus(hero, "int", "investigation");
@@ -3692,12 +4282,14 @@ function investigateObject(objectId) {
   const checkText = `${hero.name} investigates ${template.name}: INT ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${inspectDc}.`;
   object.lastResult = checkText;
   addLog(checkText, "important");
-  addAdminCheckLog({ actor: hero, label: "Investigation check", target: template.name, rollResult, bonus, guidance, total, dc: inspectDc, success: total >= inspectDc, note: hiddenLoot ? "hidden loot/resource possible" : ambush ? "ambush trigger possible" : "generic inspection" });
+  addAdminCheckLog({ actor: hero, label: "Investigation check", target: template.name, rollResult, bonus, guidance, total, dc: inspectDc, success: total >= inspectDc, note: inspectEvent ? "event: monster or loot" : hiddenLoot ? "hidden loot/resource possible" : ambush ? "ambush trigger possible" : "generic inspection" });
 
   const ambushOnNaturalOne = ambush && (ambush.trigger === "natural1" || ambush.naturalOne);
   const ambushByChance = ambush && !ambushOnNaturalOne && Math.random() < (ambush.chance ?? 1);
-  if ((roll === 1 && (ambushOnNaturalOne || !ambush)) || ambushByChance) {
+  if (!inspectEvent && ((roll === 1 && (ambushOnNaturalOne || !ambush)) || ambushByChance)) {
     spawnInvestigationAmbush(object);
+  } else if (total >= inspectDc && inspectEvent && Math.random() < (inspectEvent.chance ?? 1)) {
+    resolveInspectEvent(hero, object, inspectEvent);
   } else if (total >= inspectDc && hiddenLoot && Math.random() < (hiddenLoot.chance ?? 1)) {
     if (!grantFeatureInspectionReward(hero, object, hiddenLoot)) {
       object.lastResult += " Found nothing out of the ordinary.";
@@ -3778,6 +4370,17 @@ function itemUseEffectText(item) {
     const effect = parts.length ? parts.join("; ") : use.status.label ?? item.category ?? "temporary effect";
     return `${effect} for ${statusDurationText(use.status)}.`;
   }
+  if (use.kind === "buff") {
+    const status = itemStatusFromEffects(item, use.effects ?? item.magic?.effects ?? {}, use);
+    const parts = statusEffectDetails(status);
+    return `${parts.join("; ") || "Gain a temporary magic boon"} for ${statusDurationText(status)}.`;
+  }
+  if (use.kind === "weaponBuff") {
+    const extra = use.extraDamage;
+    return extra?.count && extra?.sides
+      ? `Your next weapon hit deals +${extra.count}d${extra.sides} ${extra.type ?? "damage"}.`
+      : "Your next weapon hit gains the listed magic rider.";
+  }
   return itemDisplayDescription(item);
 }
 
@@ -3818,6 +4421,9 @@ function itemDetails(item) {
     return `${item.ammo?.quantity ?? 0} ${item.ammo?.kind ?? "ammo"}${cost}${weight}${starterText}`;
   }
   if (item.type === "consumable") {
+    if (item.use?.kind === "fullHealing") {
+      return `Full heal; ${item.use.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
+    }
     if (item.use?.kind === "healing") {
       return `${item.use.dice.count}d${item.use.dice.sides} + ${item.use.bonus} HP; ${item.use.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
     }
@@ -3826,6 +4432,14 @@ function itemDetails(item) {
       const parts = statusEffectDetails(status);
       const duration = statusDurationText(status);
       return `${parts.join("; ") || item.category || "Consumable"}; ${duration}; ${item.use?.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
+    }
+    if (item.use?.kind === "buff") {
+      const status = itemStatusFromEffects(item, item.use.effects ?? item.magic?.effects ?? {}, item.use);
+      const parts = statusEffectDetails(status);
+      return `${parts.join("; ") || item.category || "Magic buff"}; ${statusDurationText(status)}; ${item.use?.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
+    }
+    if (item.use?.kind === "weaponBuff") {
+      return `${itemUseEffectText(item)}; ${item.use?.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
     }
     return `${item.category ?? "Consumable"}; ${item.use?.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
   }
@@ -4028,6 +4642,61 @@ function renderAdminModeTools() {
       </div>
     </section>
     ${renderAdminMonsterCatalog()}
+    ${renderAdminProgressCatalog()}
+  `;
+}
+
+function renderAdminProgressCatalog() {
+  const entries = npcAdminProgressEntries();
+  const groups = new Map();
+  for (const entry of entries) {
+    const groupId = entry.groupId ?? entry.npcId ?? "general";
+    if (!groups.has(groupId)) {
+      groups.set(groupId, {
+        id: groupId,
+        label: entry.groupLabel ?? entry.npcName ?? entry.npcId ?? "Progress",
+        entries: [],
+      });
+    }
+    groups.get(groupId).entries.push(entry);
+  }
+  const groupMarkup = Array.from(groups.values())
+    .map(
+      (group) => `
+        <details class="admin-progress-group" ${group.entries.some((entry) => entry.active) ? "open" : ""}>
+          <summary>${escapeHtml(group.label)} <span>${group.entries.length}</span></summary>
+          <div class="admin-progress-grid">
+            ${group.entries
+              .map(
+                (entry) => `
+                  <button type="button" class="${entry.active ? "active" : ""}" data-action="set-admin-progress" data-npc="${escapeAttribute(entry.npcId)}" data-progress="${escapeAttribute(entry.id)}">
+                    <b>${escapeHtml(entry.label)}</b>
+                    <span>${escapeHtml(entry.description ?? "")}</span>
+                  </button>
+                `,
+              )
+              .join("")}
+          </div>
+        </details>
+      `,
+    )
+    .join("");
+  return `
+    <section class="admin-catalog admin-progress-catalog" aria-label="Admin progress controls">
+      <div class="admin-catalog-top">
+        <label>Progress</label>
+        <button class="admin-toggle ${adminProgressOpen ? "active" : ""}" type="button" data-action="toggle-admin-progress">
+          ${adminProgressOpen ? "Hide" : "Show"}
+        </button>
+      </div>
+      ${
+        adminProgressOpen
+          ? groupMarkup
+            ? groupMarkup
+            : `<p class="empty-note">No NPC progress controls registered.</p>`
+          : `<p class="empty-note">Progress controls hidden.</p>`
+      }
+    </section>
   `;
 }
 
@@ -4496,6 +5165,15 @@ function draggableItemCard(item, source = "") {
   `;
 }
 
+function canUseCarriedConsumableOutOfCombat(fighter, item) {
+  return Boolean(state.mode !== "combat" && item?.type === "consumable" && canUseBeltItem(fighter, item));
+}
+
+function carriedConsumableUseButton(fighter, item) {
+  if (!canUseCarriedConsumableOutOfCombat(fighter, item)) return "";
+  return `<button type="button" class="small-action-button" data-action="use-carried-consumable" data-item="${escapeAttribute(item.id)}">Use</button>`;
+}
+
 function renderInventoryMenu() {
   const fighter = activeHero();
   refreshDerivedStats(fighter);
@@ -4519,6 +5197,7 @@ function renderInventoryMenu() {
       }
       <div class="wallet-line">${escapeHtml(moneyText(fighter.inventory.money))} - Hero Tokens: ${fighter.inventory.heroTokens ?? 0}</div>
     </div>
+    ${partyResourceInventoryMarkup()}
     ${renderAdminModeTools()}
     ${renderAdminItemCatalog()}
     <section class="paper-doll" aria-label="Equipment slots">
@@ -4547,6 +5226,7 @@ function renderInventoryMenu() {
                   <div class="inventory-item">
                     ${draggableItemCard(item, "inventory")}
                     <div class="equip-actions">
+                      ${carriedConsumableUseButton(fighter, item)}
                       ${equipActionForItem(fighter, item)}
                       ${transferControlsForItem(fighter, item)}
                     </div>
@@ -4602,6 +5282,68 @@ function renderInventoryMenu() {
         : ""
     }
   `;
+}
+
+function partyResourceInventoryMarkup() {
+  const resources = normalizePartyResources(state.partyResources ?? {});
+  const entries = Object.entries(resources);
+  const groupedEntries = new Map();
+  for (const [itemId, quantity] of entries) {
+    const item = getItemTemplate(itemId);
+    const group = item?.category ?? item?.component?.kind ?? "material";
+    if (!groupedEntries.has(group)) groupedEntries.set(group, []);
+    groupedEntries.get(group).push({ itemId, quantity, item });
+  }
+  const groupMarkup = Array.from(groupedEntries.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(
+      ([group, groupEntries]) => `
+        <details class="material-satchel-group" open>
+          <summary>${escapeHtml(group)} <span>${groupEntries.reduce((sum, entry) => sum + entry.quantity, 0)}</span></summary>
+          <div>
+            ${groupEntries
+              .sort((a, b) => (a.item?.name ?? a.itemId).localeCompare(b.item?.name ?? b.itemId))
+              .map(
+                ({ itemId, quantity, item }) => `
+                  <span>
+                    <b>${escapeHtml(item?.name ?? itemId)}</b> x${quantity}
+                    <button type="button" data-action="inspect-party-resource" data-item="${escapeAttribute(itemId)}">Inspect</button>
+                  </span>
+                `,
+              )
+              .join("")}
+          </div>
+        </details>
+      `,
+    )
+    .join("");
+  return `
+    <section class="party-resource-inventory ${questSatchelOpen ? "open" : "collapsed"}">
+      <button type="button" class="quest-satchel-toggle" data-action="toggle-quest-satchel" aria-expanded="${questSatchelOpen ? "true" : "false"}">
+        <span>Material Satchel</span>
+        <small>${entries.length ? `${entries.reduce((sum, [, quantity]) => sum + quantity, 0)} item${entries.reduce((sum, [, quantity]) => sum + quantity, 0) === 1 ? "" : "s"}` : "Empty"}</small>
+      </button>
+      ${
+        questSatchelOpen
+          ? entries.length
+            ? groupMarkup
+            : `<p class="empty-note">No shared materials yet.</p>`
+          : ""
+      }
+    </section>
+  `;
+}
+
+function showPartyResourceInfo(itemId) {
+  const item = getItemTemplate(itemId);
+  const quantity = partyResourceCount(itemId);
+  if (!item || quantity <= 0) return;
+  showGameDialog({
+    title: item.name ?? "Material",
+    message: `${item.flavor?.description ?? item.description ?? item.flavor?.short ?? "A shared crafting material."}\n\nMaterial Satchel: ${quantity}`,
+    confirmText: "Close",
+    cancelText: "Close",
+  });
 }
 
 function unequippedInventoryItems(fighter) {
@@ -4779,8 +5521,58 @@ function refreshPartyItemCharges(refresh) {
   rosterHeroes().forEach((hero) => refreshItemChargesForFighter(hero, refresh));
 }
 
+function statusDurationForItemUse(use = {}) {
+  if (use.duration === "newDungeon" || use.duration === "dungeon") return { expiresAtHome: true };
+  if (use.duration === "turn") return { expiresAtEndOfTurn: true };
+  if (use.duration === "encounter") return { durationRounds: 10 };
+  if (Number(use.durationRounds) > 0) return { durationRounds: Number(use.durationRounds) };
+  return { durationRounds: 3 };
+}
+
+function itemStatusFromEffects(item, effects = {}, use = item?.use ?? {}) {
+  return {
+    id: `item-${item.id}`,
+    label: item.name,
+    acBonus: effects.acBonus ?? 0,
+    attackBonus: effects.attackBonus ?? 0,
+    damageBonus: effects.damageBonus ?? 0,
+    saveBonus: effects.saveBonus ?? 0,
+    skillBonus: effects.skillBonus ?? 0,
+    speedBonusFeet: effects.speedBonusFeet ?? 0,
+    maxHpBonus: effects.maxHpBonus ?? 0,
+    resistances: [...(effects.resistances ?? [])],
+    vulnerabilities: [...(effects.vulnerabilities ?? [])],
+    ...statusDurationForItemUse(use),
+  };
+}
+
+function itemWeaponRiderStatus(item) {
+  const extra = item?.use?.extraDamage ?? item?.magic?.effects?.extraDamage?.[0] ?? item?.magic?.effects?.extraDamage;
+  if (!extra?.count || !extra?.sides) return null;
+  const roll = rollDice(extra.count, extra.sides);
+  return {
+    id: `item-rider-${item.id}`,
+    label: item.name,
+    weaponRider: true,
+    damageBonus: roll.total,
+    damageType: extra.type ?? "damage",
+    rollText: roll.rolls.join(" + "),
+    ...statusDurationForItemUse(item.use ?? { duration: "encounter" }),
+  };
+}
+
+function itemUseConsumesInventory(item) {
+  return item.use?.consume !== false && !item.use?.charges;
+}
+
+function itemUseIsSupported(item) {
+  const kind = item?.use?.kind;
+  return Boolean(["healing", "fullHealing", "buff", "weaponBuff"].includes(kind) || item?.use?.status);
+}
+
 function canUseBeltItem(fighter, item) {
   if (!fighter || !item || !heroCanAct(fighter)) return false;
+  if (!itemUseIsSupported(item)) return false;
   if (!itemHasCharges(item)) return false;
   if (state.mode !== "combat") return true;
   const resource = itemUseResource(item);
@@ -4788,7 +5580,7 @@ function canUseBeltItem(fighter, item) {
 }
 
 function canUseHealingItemOnTarget(actor, item, target) {
-  if (!actor || !target || !item || item.use?.kind !== "healing") return false;
+  if (!actor || !target || !item || !["healing", "fullHealing"].includes(item.use?.kind)) return false;
   if (!itemHasCharges(item)) return false;
   if (!heroCanAct(actor) || target.dead || target.hp > 0) return false;
   if (!isPartyHeroId(actor.id) || !isPartyHeroId(target.id) || actor.id === target.id) return false;
@@ -4797,7 +5589,7 @@ function canUseHealingItemOnTarget(actor, item, target) {
 }
 
 function dyingPotionTargets(actor, item) {
-  if (item?.use?.kind !== "healing") return [];
+  if (!["healing", "fullHealing"].includes(item?.use?.kind)) return [];
   return partyHeroes().filter((target) => canUseHealingItemOnTarget(actor, item, target));
 }
 
@@ -4870,11 +5662,95 @@ function medicineTargetsMarkup(fighter) {
     .join("");
 }
 
+function combatManeuverTarget(fighter) {
+  const target = attackTarget();
+  if (!fighter || !target || objectIsDestructible(target) || !target.alive) return null;
+  return hasMeleeAccess(fighter, target) ? target : null;
+}
+
+function combatManeuverButtonsMarkup(fighter) {
+  const target = combatManeuverTarget(fighter);
+  const disabled = !fighter?.hasAction || !target;
+  const targetName = target ? escapeHtml(target.name) : "target";
+  return `
+    <button type="button" data-action="combat-action" data-combat-action="grapple" ${disabled ? "disabled" : ""}>Grapple ${targetName}</button>
+    <button type="button" data-action="combat-action" data-combat-action="shovePush" ${disabled ? "disabled" : ""}>Shove 5 ft ${targetName}</button>
+    <button type="button" data-action="combat-action" data-combat-action="shoveProne" ${disabled ? "disabled" : ""}>Shove Prone ${targetName}</button>
+  `;
+}
+
+function touchDistance(a, b) {
+  return Math.max(Math.abs((a?.x ?? 0) - (b?.x ?? 0)), Math.abs((a?.y ?? 0) - (b?.y ?? 0)));
+}
+
+function grabEligibleFighter(carrier, target) {
+  if (!carrier?.position || !target?.position || target.id === carrier.id || target.dead) return false;
+  const friendly =
+    isPartyHeroId(target.id) ||
+    target.team === "heroes" ||
+    target.friendly ||
+    target.summonedByHeroId ||
+    target.companionOwnerId;
+  return Boolean(friendly && touchDistance(carrier.position, target.position) <= 1);
+}
+
+function objectWithinGrabReach(carrier, object) {
+  return Boolean(carrier?.position && objectCells(object).some((cell) => touchDistance(carrier.position, cell) <= 1));
+}
+
+function grabCandidateFighters(carrier) {
+  return Object.values(state.fighters ?? {}).filter((target) => grabEligibleFighter(carrier, target));
+}
+
+function grabCandidateObjects(carrier) {
+  return (state.dungeonObjects ?? []).filter((object) => objectCanBeGrabbedBy(carrier, object) && objectWithinGrabReach(carrier, object));
+}
+
+function grabCandidateButtonsMarkup(fighter, disabled = false) {
+  const fighterButtons = grabCandidateFighters(fighter).map((target) =>
+    `<button type="button" data-action="grab-target" data-grab-kind="fighter" data-grab-id="${escapeAttribute(target.id)}" ${disabled ? "disabled" : ""}>Grab ${escapeHtml(target.name)} (auto)</button>`,
+  );
+  const objectButtons = grabCandidateObjects(fighter).map((object) => {
+    const template = objectTemplate(object.type);
+    const weight = objectGrabWeight(object);
+    const dc = pushDragLiftAttemptDc(fighter, weight);
+    const checkText = dc > 0 ? `Athletics DC ${dc}` : "auto";
+    return `<button type="button" data-action="grab-target" data-grab-kind="object" data-grab-id="${escapeAttribute(object.id)}" ${disabled ? "disabled" : ""}>Grab ${escapeHtml(template?.name ?? object.type)} (${weight} lb, ${checkText})</button>`;
+  });
+  return [...fighterButtons, ...objectButtons].join("");
+}
+
+function canOpenGrabMenu(fighter) {
+  if (!gameHasStarted || movementInProgress || !heroCanAct(fighter)) return false;
+  if (state.mode === "combat" && (activeFighter()?.id !== fighter?.id || !combatNeedsHeroTurns())) return false;
+  if (activeGrabForCarrier(fighter)) return true;
+  if (state.mode === "combat" && !fighter?.hasAction) return false;
+  return grabCandidateFighters(fighter).length > 0 || grabCandidateObjects(fighter).length > 0;
+}
+
+function grabbedEntityName(grab) {
+  if (!grab) return "";
+  if (grab.kind === "fighter") return state.fighters?.[grab.targetId]?.name ?? "target";
+  const object = dungeonObjectForId(grab.targetId);
+  return objectTemplate(object?.type)?.name ?? object?.type ?? "object";
+}
+
 function renderActionMenu() {
   const fighter = activeFighter();
   const canUseAttackAction = Boolean(fighter?.hasAction);
-  els.actionMenuBody.innerHTML = fighter && heroCanAct(fighter) && state.mode === "combat"
-    ? `
+  const actingFighter = state.mode === "combat" ? fighter : activeHero();
+  const activeGrab = activeGrabForCarrier(actingFighter);
+  const grabButtons = actingFighter && !activeGrab ? grabCandidateButtonsMarkup(actingFighter, state.mode === "combat" && !actingFighter.hasAction) : "";
+  els.actionMenuBody.innerHTML = actingFighter && heroCanAct(actingFighter) && (state.mode === "combat" || state.mode === "exploration" || state.mode === "home")
+    ? activeGrab
+      ? `
+      <div class="action-options">
+        <button type="button" data-action="release-grab">Release ${escapeHtml(grabbedEntityName(activeGrab))}</button>
+        <p>Stop dragging the grabbed target.</p>
+      </div>
+    `
+      : state.mode === "combat"
+      ? `
       <div class="action-options">
         <button type="button" data-action="combat-action" data-combat-action="dash" ${canUseAttackAction ? "" : "disabled"}>Dash</button>
         <p>Gain extra movement equal to your base movement. Consumes your Attack action.</p>
@@ -4888,6 +5764,18 @@ function renderActionMenu() {
         <p>DEX check DC 12. On success, spend your Bonus action to move through monsters this turn.</p>
         ${medicineTargetsMarkup(fighter)}
         <p>WIS check DC 10 to stabilize an adjacent dying hero. Consumes your Attack action.</p>
+        ${combatManeuverButtonsMarkup(fighter)}
+        <p>Grapple or shove an adjacent enemy with Athletics. Each maneuver consumes one attack from your Attack action.</p>
+        ${activeGrab ? `<button type="button" data-action="release-grab">Release ${escapeHtml(grabbedEntityName(activeGrab))}</button><p>Stop dragging the grabbed target.</p>` : ""}
+        ${grabButtons || `<button type="button" disabled>Grab</button>`}
+        <p>Grab an adjacent ally, companion, or pushable object. Consumes your Attack action; movement costs double while dragging.</p>
+      </div>
+    `
+      : `
+      <div class="action-options">
+        ${activeGrab ? `<button type="button" data-action="release-grab">Release ${escapeHtml(grabbedEntityName(activeGrab))}</button><p>Stop dragging the grabbed target.</p>` : ""}
+        ${grabButtons || `<button type="button" disabled>Grab</button>`}
+        <p>Grab an adjacent ally, companion, or pushable object. Movement costs double while dragging.</p>
       </div>
     `
     : `<p class="empty-note">No action options available.</p>`;
@@ -4902,7 +5790,7 @@ function hideActionMenu() {
   els.actionMenu.classList.add("hidden");
 }
 
-function useCombatAction(action, targetId = null) {
+async function useCombatAction(action, targetId = null) {
   const fighter = activeFighter();
   if (!fighter || !heroCanAct(fighter) || state.mode !== "combat") return;
   const baseMovement = Math.floor(fighter.speedFeet / feetPerSquare);
@@ -4944,6 +5832,15 @@ function useCombatAction(action, targetId = null) {
   }
 
   if (!fighter.hasAction) return;
+
+  if (action === "grapple" || action === "shovePush" || action === "shoveProne") {
+    const target = combatManeuverTarget(fighter);
+    if (!target) return;
+    hideActionMenu();
+    if (action === "grapple") await performGrappleAction(fighter, target);
+    else await performShoveAction(fighter, target, action === "shovePush" ? "push" : "prone");
+    return;
+  }
 
   if (action === "medicine") {
     const targets = adjacentDyingHeroes(fighter);
@@ -4989,6 +5886,62 @@ function useCombatAction(action, targetId = null) {
 
   hideActionMenu();
   render();
+}
+
+function releaseGrabForFighter(fighter = state.mode === "combat" ? activeFighter() : activeHero()) {
+  const grab = activeGrabForCarrier(fighter);
+  if (!grab) return false;
+  state.grabbedEntity = null;
+  addLog(`${fighter.name} releases ${grabbedEntityName(grab)}.`, "important");
+  hideActionMenu();
+  render();
+  return true;
+}
+
+async function useGrabAction(kind, targetId) {
+  const fighter = state.mode === "combat" ? activeFighter() : activeHero();
+  if (!fighter || !heroCanAct(fighter)) return;
+  if (state.mode === "combat" && (activeFighter()?.id !== fighter.id || !combatNeedsHeroTurns() || !fighter.hasAction)) return;
+
+  const valid =
+    kind === "fighter"
+      ? grabCandidateFighters(fighter).some((target) => target.id === targetId)
+      : grabCandidateObjects(fighter).some((object) => object.id === targetId);
+  if (!valid) return;
+
+  if (kind === "object") {
+    const object = dungeonObjectForId(targetId);
+    if (!(await passPushDragLiftCheck(fighter, object))) return;
+  }
+
+  state.grabbedEntity = { carrierId: fighter.id, kind, targetId };
+  if (state.mode === "combat") fighter.hasAction = false;
+  addLog(`${fighter.name} grabs ${grabbedEntityName(state.grabbedEntity)}. Movement costs double while dragging.`, "important");
+  hideActionMenu();
+  render();
+}
+
+async function passPushDragLiftCheck(fighter, object) {
+  const weight = objectGrabWeight(object);
+  if (!object || weight === null || !objectCanBeGrabbedBy(fighter, object)) return false;
+  const dc = pushDragLiftAttemptDc(fighter, weight);
+  if (dc <= 0) return true;
+  const rollResult = rollD20ForFighter(fighter);
+  const roll = reliableTalentRoll(fighter, "athletics", rollResult.roll);
+  const bonus = skillCheckBonus(fighter, "str", "athletics");
+  const total = roll + bonus;
+  const name = objectTemplate(object.type)?.name ?? object.type;
+  const success = total >= dc;
+  recordD20OutcomeForFighter(fighter, success);
+  addLog(`${fighter.name} tries to move ${name}: Athletics ${roll} ${abilityLabel(bonus)} = ${total} vs DC ${dc}.`, "important");
+  addAdminCheckLog({ actor: fighter, label: "Athletics check to push/drag/lift", target: name, rollResult, bonus, total, dc, success, note: `${weight} lb` });
+  if (!success) {
+    addLog(`${fighter.name} cannot get ${name} moving.`, "important");
+    if (state.mode === "combat") fighter.hasAction = false;
+    hideActionMenu();
+    render();
+  }
+  return success;
 }
 
 function availableFighterAbilities(fighter = state.fighters.hero) {
@@ -5315,7 +6268,59 @@ function hideAbilitiesMenu() {
   openAbilityMenuSections = null;
 }
 
+let homeMenuPanel = "main";
+
+function setHomeMenuPanel(panel = "main") {
+  homeMenuPanel = panel;
+  renderHomeAdventurePanels();
+}
+
+function campaignProgressText(campaignId, count) {
+  return `${state.campaignProgress?.[campaignId] ?? 0}/${count}`;
+}
+
+function renderHomeAdventurePanels() {
+  const panels = {
+    main: els.homeMainActions,
+    adventure: els.homeAdventureActions,
+    "main-story": els.homeMainStoryActions,
+    "random-dungeons": els.homeRandomDungeonActions,
+    "custom-dungeons": els.homeCustomDungeonActions,
+  };
+  Object.entries(panels).forEach(([key, panel]) => panel?.classList.toggle("hidden", key !== homeMenuPanel));
+  const barrowCompleted = state.campaignProgress?.["barrow-crown"] ?? 0;
+  const thornwoodCompleted = state.campaignProgress?.["thornwood-pact"] ?? 0;
+  els.goBarrowCrown?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${barrowCompleted}/7`));
+  els.goThornwoodPact?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${thornwoodCompleted}/8`));
+
+  if (els.homeRandomDungeonActions) {
+    const themes = window.DungeonContent
+      .list("themes")
+      .filter((theme) => !theme.hidden)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    els.homeRandomDungeonActions.innerHTML = `
+      ${themes.map((theme) => `<button type="button" data-random-dungeon-theme="${escapeAttribute(theme.id)}">${escapeHtml(theme.name)}</button>`).join("")}
+      <hr />
+      <button type="button" data-home-menu="adventure">Back</button>
+    `;
+  }
+
+  if (els.homeCustomDungeonActions) {
+    const customDungeons = window.DungeonCustom?.list?.() ?? [];
+    els.homeCustomDungeonActions.innerHTML = `
+      ${
+        customDungeons.length
+          ? customDungeons.map((dungeon) => `<button type="button" data-custom-dungeon-id="${escapeAttribute(dungeon.id)}">${escapeHtml(dungeon.name)}</button>`).join("")
+          : `<p class="small-note">No local custom dungeons saved yet.</p>`
+      }
+      <hr />
+      <button type="button" data-home-menu="adventure">Back</button>
+    `;
+  }
+}
+
 function showHomeMenu() {
+  maybeUnlockNpcProgress();
   const hero = activeHero();
   const canTrain = canTrainAsSidekick(hero);
   const canReplaceCompanion = canReplaceDeadBeastMasterCompanion(hero);
@@ -5324,34 +6329,250 @@ function showHomeMenu() {
   els.levelUp.disabled = !canTrain && !canLevelUp(hero);
   els.replaceRangerCompanion?.classList.toggle("hidden", !canReplaceCompanion);
   if (els.replaceRangerCompanion) els.replaceRangerCompanion.disabled = !canReplaceCompanion;
-  const barrowCompleted = state.campaignProgress?.["barrow-crown"] ?? 0;
-  const thornwoodCompleted = state.campaignProgress?.["thornwood-pact"] ?? 0;
-  els.goBarrowCrown?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${barrowCompleted}/7`));
-  els.goThornwoodPact?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${thornwoodCompleted}/8`));
+  setHomeMenuPanel("main");
   els.homeMenu.classList.remove("hidden");
+  maybeTriggerNpcArrivals();
 }
 
 function hideHomeMenu() {
   els.homeMenu.classList.add("hidden");
+  homeMenuPanel = "main";
 }
 
-function storeStockItems() {
+function villageNpcs() {
+  return (window.DungeonContent.list("npcs") ?? [])
+    .filter((npc) => npc.village)
+    .filter((npc) => !npc.village?.hiddenUntilUnlocked || npcIsUnlocked(npc))
+    .sort((a, b) => (a.village?.order ?? 999) - (b.village?.order ?? 999) || a.name.localeCompare(b.name));
+}
+
+function npcIsUnlocked(npc) {
+  if (npc?.village?.unlocked === false) return false;
+  const flag = npc?.village?.unlockFlag;
+  return !flag || Boolean(state?.storyFlags?.[flag] || state?.campaignFlags?.[flag] || state?.questFlags?.[flag]);
+}
+
+function npcEntryLine(npc) {
+  const lines = npc?.dialogue?.entryLines ?? [];
+  if (!lines.length) return "";
+  return lines[Math.floor(Math.random() * lines.length)];
+}
+
+function npcPortraitMarkup(npc, className = "npc-portrait", { clickable = true } = {}) {
+  const fallback = npc?.token?.fallbackLabel ?? npc?.name?.slice(0, 2).toUpperCase() ?? "?";
+  const src = npc?.portrait;
+  const tag = clickable ? "button" : "div";
+  const actionAttributes = clickable ? ` type="button" data-action="inspect-npc" data-npc="${escapeAttribute(npc.id)}" title="Inspect ${escapeAttribute(npc.name ?? "merchant")}"` : "";
+  if (!src) return `<${tag} class="${className} ${clickable ? "npc-portrait-button" : ""} empty"${actionAttributes}><span>${escapeHtml(fallback)}</span></${tag}>`;
+  return `
+    <${tag} class="${className} ${clickable ? "npc-portrait-button" : ""}"${actionAttributes}>
+      <img src="${escapeAttribute(src)}" alt="" onerror="this.remove(); this.parentElement.classList.add('empty'); this.parentElement.innerHTML='<span>${escapeAttribute(fallback)}</span>';" />
+    </${tag}>
+  `;
+}
+
+function showNpcInspection(npcId = activeStoreNpcId) {
+  const npc = window.DungeonContent.get("npcs", npcId);
+  if (!npc) return;
+  els.gameDialogTitle.textContent = npc.title ?? npc.name ?? "Merchant";
+  els.gameDialogMessage.innerHTML = `
+    <section class="npc-inspection">
+      ${npcPortraitMarkup(npc, "npc-inspection-portrait", { clickable: false })}
+      <div>
+        <b>${escapeHtml(npc.title ?? "Merchant")}</b>
+        <span>Name: ${escapeHtml(npc.name ?? "Unknown")}</span>
+      </div>
+      <p>${escapeHtml(npc.inspection ?? npc.description ?? "")}</p>
+    </section>
+  `;
+  els.gameDialogField.classList.add("hidden");
+  els.gameDialogActions.innerHTML = `<button type="button" data-dialog-action="close-npc-inspection">Close</button>`;
+  const cleanup = () => {
+    els.gameDialogActions.removeEventListener("click", handleClick);
+    els.gameDialog.classList.add("hidden");
+    activeDialogCancel = null;
+  };
+  const handleClick = (event) => {
+    if (event.target.closest("[data-dialog-action='close-npc-inspection']")) cleanup();
+  };
+  els.gameDialogActions.addEventListener("click", handleClick);
+  activeDialogCancel = cleanup;
+  els.gameDialog.classList.remove("hidden");
+}
+
+function renderVillageMenu() {
+  els.villageMenu?.classList.remove("npc-chat-open");
+  const npcs = villageNpcs();
+  els.villageBody.innerHTML = `
+    <p class="empty-note">Choose who to visit in the village.</p>
+    ${npcs
+      .map((npc) => {
+        const unlocked = npcIsUnlocked(npc);
+        return `
+          <button type="button" data-action="visit-village-npc" data-npc="${escapeAttribute(npc.id)}" ${unlocked ? "" : "disabled"}>
+            <span>${escapeHtml(npc.village?.label ?? npc.title ?? npc.name)}</span>
+            <small>${escapeHtml(unlocked ? npc.village?.description ?? npc.description ?? npc.name : npc.village?.lockText ?? "Locked")}</small>
+          </button>
+        `;
+      })
+      .join("")}
+    <hr />
+    <button type="button" data-action="close-village">Back</button>
+  `;
+}
+
+function showVillageMenu() {
+  hideHomeMenu();
+  renderVillageMenu();
+  els.villageMenu.classList.remove("hidden");
+}
+
+function hideVillageMenu() {
+  els.villageMenu.classList.add("hidden");
+}
+
+function visitVillageNpc(npcId) {
+  const npc = window.DungeonContent.get("npcs", npcId);
+  if (!npc || !npcIsUnlocked(npc)) return;
+  if (npc.shop?.type) {
+    showStoreMenu(npc.id);
+    return;
+  }
+  const behavior = npcBehavior(npc.id);
+  if (behavior?.visit) {
+    behavior.visit(npc);
+    return;
+  }
+  renderVillageMenu();
+}
+
+function npcBehavior(npcId) {
+  return window.DungeonNpcBehaviors?.[npcId] ?? null;
+}
+
+function acceptNpcQuest(npcId, questId) {
+  npcBehavior(npcId)?.acceptQuest?.(questId);
+}
+
+function completeNpcQuest(npcId, questId) {
+  npcBehavior(npcId)?.completeQuest?.(questId);
+}
+
+function npcAdminProgressEntries() {
+  return Object.values(window.DungeonNpcBehaviors ?? {})
+    .flatMap((behavior) => behavior.adminProgressEntries?.() ?? [])
+    .filter(Boolean);
+}
+
+function setNpcAdminProgress(npcId, progressId) {
+  if (!adminEnabled()) return;
+  npcBehavior(npcId)?.setAdminProgress?.(progressId);
+}
+
+function returnToNpcVisit(npcId) {
+  npcBehavior(npcId)?.returnToVisit?.();
+}
+
+function startNpcChat(npcId, chatStateId) {
+  npcBehavior(npcId)?.startChat?.(chatStateId);
+}
+
+function useNpcChatOption(npcId, chatStateId, optionId) {
+  npcBehavior(npcId)?.useChatOption?.(chatStateId, optionId);
+}
+
+function maybeUnlockNpcProgress() {
+  return Object.values(window.DungeonNpcBehaviors ?? {}).some((behavior) => behavior.maybeUnlockFromProgress?.());
+}
+
+function maybeTriggerNpcArrivals() {
+  return Object.values(window.DungeonNpcBehaviors ?? {}).some((behavior) => behavior.maybeTriggerArrival?.());
+}
+
+function handleNpcDungeonComplete(context) {
+  return Object.values(window.DungeonNpcBehaviors ?? {}).some((behavior) => behavior.onDungeonComplete?.(context));
+}
+
+function recordNpcMonsterKill(monster) {
+  for (const behavior of Object.values(window.DungeonNpcBehaviors ?? {})) behavior.recordMonsterKill?.(monster);
+}
+
+const nonMetalWeaponIds = new Set(["club", "greatclub", "quarterstaff", "shortbow", "longbow", "sling", "blowgun", "crossbow-light", "crossbow-hand", "crossbow-heavy", "hoopak"]);
+
+function itemIsStandardNonMagic(item) {
+  return Boolean(item && item.store?.buyable !== false && !item.tags?.includes("loot:magic") && !item.tags?.includes("magic") && !item.magic && item.type !== "treasure");
+}
+
+function itemIsWeaponsmithStock(item) {
+  return item?.type === "weapon" && itemIsStandardNonMagic(item) && !nonMetalWeaponIds.has(item.id);
+}
+
+function itemIsArmorsmithStock(item) {
+  return item?.type === "armor" && itemIsStandardNonMagic(item);
+}
+
+function itemIsGeneralMerchantStock(item) {
+  return itemIsStandardNonMagic(item) && (item.type === "ammunition" || item.id === "potion-healing");
+}
+
+function storeAcceptsSoldItem(item, npc = storeNpcDefinition()) {
+  const acceptedTypes = npc?.shop?.acceptsSoldTypes ?? ["any"];
+  return acceptedTypes.includes("any") || acceptedTypes.includes(item?.type);
+}
+
+function storeItemSellValueCp(item, npc = storeNpcDefinition()) {
+  if (item?.starterEquipment) return 0;
+  if (item?.sell?.valueCp !== undefined) return Math.max(0, Math.floor(item.sell.valueCp));
+  const sellRate = Number(npc?.shop?.sellRate ?? item?.sell?.rate ?? 0.5) || 0.5;
+  const baseValue = itemValueCp(item);
+  if (baseValue <= 0) return 0;
+  return Math.max(1, Math.floor(baseValue * sellRate));
+}
+
+function storeNpcDefinition() {
+  return window.DungeonContent.get("npcs", activeStoreNpcId) ?? window.DungeonContent.get("npcs", "general-merchant") ?? {
+    id: "general-merchant",
+    name: "General Merchant",
+    title: "General Merchant",
+    shop: { type: "general", sellRate: 0.4, acceptsSoldTypes: ["any"] },
+    dialogue: { entryLines: ["Welcome to my store."] },
+  };
+}
+
+function storeStockItems(npc = storeNpcDefinition()) {
   const query = storeSearch.trim().toLowerCase();
+  const shopType = npc?.shop?.type ?? "general";
   return window.DungeonContent.list("items")
-    .filter((item) => ["weapon", "armor", "ammunition"].includes(item.type) || item.id === "potion-healing")
-    .filter((item) => item.store?.buyable !== false && !item.tags?.includes("loot:magic") && item.type !== "treasure")
+    .filter((item) =>
+      shopType === "weaponsmith"
+        ? itemIsWeaponsmithStock(item)
+        : shopType === "armorsmith"
+          ? itemIsArmorsmithStock(item)
+          : itemIsGeneralMerchantStock(item),
+    )
     .filter((item) => !query || searchableItemText(item).includes(query) || itemDetails(item).toLowerCase().includes(query))
     .sort((a, b) => itemCategoryLabel(a).localeCompare(itemCategoryLabel(b)) || a.name.localeCompare(b.name));
 }
 
 function renderStoreMenu() {
   const hero = activeHero();
+  const npc = storeNpcDefinition();
+  document.querySelector("#store-title").textContent = npc.title ?? "Store";
   const equippedIds = new Set(Object.values(hero.equipment).filter(Boolean));
   const query = storeSearch.trim().toLowerCase();
   const sellableItems = hero.inventory.items
     .filter((item) => !equippedIds.has(item.id))
+    .filter((item) => storeAcceptsSoldItem(item, npc))
     .filter((item) => !query || searchableItemText(item).includes(query) || itemDetails(item).toLowerCase().includes(query));
   els.storeBody.innerHTML = `
+    <section class="npc-card">
+      ${npcPortraitMarkup(npc)}
+      <div>
+        <b>${escapeHtml(npc.name ?? "Merchant")}</b>
+        <span>${escapeHtml(npc.title ?? "Merchant")}</span>
+        <p>${escapeHtml(npcEntryLine(npc) || npc.description || "Welcome.")}</p>
+      </div>
+    </section>
     <div class="store-wallet">${escapeHtml(moneyText(hero.inventory.money))}</div>
     <label class="store-search" for="store-search">
       <span>Search</span>
@@ -5360,7 +6581,7 @@ function renderStoreMenu() {
     <section class="store-section">
       <h3>Buy</h3>
       <div class="store-list">
-        ${storeStockItems()
+        ${storeStockItems(npc)
           .map((item) => {
             const price = itemValueCp(item);
             return `
@@ -5373,7 +6594,7 @@ function renderStoreMenu() {
               </div>
             `;
           })
-          .join("")}
+          .join("") || `<p class="empty-note">Nothing for sale here yet.</p>`}
       </div>
     </section>
     <section class="store-section">
@@ -5383,7 +6604,7 @@ function renderStoreMenu() {
           sellableItems.length
             ? sellableItems
                 .map((item) => {
-                  const price = itemSellValueCp(item);
+                  const price = storeItemSellValueCp(item, npc);
                   const starterWarning = item.starterEquipment ? " - starter gear has no resale value" : "";
                   return `
                     <div class="store-row">
@@ -5396,15 +6617,18 @@ function renderStoreMenu() {
                   `;
                 })
                 .join("")
-            : `<p class="empty-note">No carried items to sell.</p>`
+            : `<p class="empty-note">No carried items this merchant will buy.</p>`
         }
       </div>
     </section>
   `;
 }
 
-function showStoreMenu() {
+function showStoreMenu(npcId = "general-merchant") {
+  activeStoreNpcId = npcId;
+  storeSearch = "";
   hideHomeMenu();
+  hideVillageMenu();
   renderStoreMenu();
   els.storeMenu.classList.remove("hidden");
 }
@@ -5420,6 +6644,7 @@ function buyStoreItem(itemId) {
 
   const price = itemValueCp(template);
   if (template.store?.buyable === false || template.tags?.includes("loot:magic") || template.type === "treasure") return;
+  if (!storeStockItems().some((item) => item.id === itemId)) return;
   if (!spendMoney(hero.inventory.money, price)) return;
   addItemToInventory(hero, createItemInstance(itemId, "store"), "store-stack");
   addLog(`${hero.name} buys ${template.name}.`, "important");
@@ -5434,8 +6659,10 @@ function sellStoreItem(itemId) {
 
   const item = itemForId(hero, itemId);
   if (!item) return;
+  const npc = storeNpcDefinition();
+  if (!storeAcceptsSoldItem(item, npc)) return;
   hero.inventory.items = hero.inventory.items.filter((entry) => entry.id !== itemId);
-  const saleValue = itemSellValueCp(item);
+  const saleValue = storeItemSellValueCp(item, npc);
   addMoney(hero.inventory.money, saleValue);
   addLog(`${hero.name} sells ${item.name} for ${priceText(saleValue)}.${item.starterEquipment ? " Starter equipment has no resale value." : ""}`, "important");
   render();
@@ -5470,7 +6697,7 @@ function classFeatureNames(hero, level) {
   }
   const subclass = subclassDefinitionForHero(hero);
   features.push(...(subclass?.featureNamesByLevel?.[level] ?? []));
-  if (abilityScoreImprovementLevelsForClass(hero.classId).has(level)) features.push("Ability Score Improvement");
+  if (abilityScoreImprovementLevelsForClass(hero.classId).has(level)) features.push("Ability Score Improvement / Feat");
   return features;
 }
 
@@ -5789,6 +7016,306 @@ function showAbilityScoreImprovementDialog(hero) {
     els.gameDialog.classList.remove("hidden");
     els.gameDialogActions.querySelector("input")?.focus();
   });
+}
+
+function featSpellIdsAvailable(feat) {
+  return (feat?.spells ?? []).filter((spellId) => getContentDefinition("spells", canonicalSpellId(spellId)));
+}
+
+function featPrerequisiteMet(hero, feat) {
+  const prerequisite = feat?.prerequisite ?? {};
+  if (prerequisite.ability && abilityScore(hero, prerequisite.ability) < (prerequisite.min ?? 0)) return false;
+  if (prerequisite.spellcasting && !heroCanCastAtLeastOneSpell(hero)) return false;
+  if (prerequisite.armorProficiency && !(hero.armorProficiencies ?? []).includes(prerequisite.armorProficiency)) return false;
+  const race = hero?.raceSelection?.raceId ?? hero?.race ?? "";
+  const subrace = hero?.raceSelection?.subraceId ?? hero?.subrace ?? "";
+  if (prerequisite.species?.length && !prerequisite.species.includes(race) && !prerequisite.species.includes(subrace)) return false;
+  if (prerequisite.subrace?.length && !prerequisite.subrace.includes(subrace)) return false;
+  return true;
+}
+
+function heroCanCastAtLeastOneSpell(hero) {
+  return Boolean(
+      (hero?.spells ?? []).length ||
+      (hero?.classSpellList ?? []).length ||
+      (hero?.classCantripList ?? []).length ||
+      (hero?.casterType && hero.casterType !== "none") ||
+      hero?.spellPointProgression,
+  );
+}
+
+function featChoiceSummary(feat) {
+  const parts = [];
+  for (const choice of feat?.choices ?? []) {
+    if (choice.type === "ability") parts.push(`+${choice.amount ?? 1} ability`);
+    if (choice.type === "save") parts.push("+1 ability and save proficiency");
+    if (choice.type === "skills") parts.push(`${choice.count ?? 1} skill${(choice.count ?? 1) === 1 ? "" : "s"}`);
+    if (choice.type === "expertise") parts.push(`${choice.count ?? 1} expertise`);
+    if (choice.type === "fightingStyle") parts.push("fighting style");
+    if (choice.type === "invocation") parts.push("eldritch invocation");
+    if (choice.type === "damageType") parts.push("damage type");
+    if (choice.type === "maneuvers") parts.push(`${choice.count ?? 1} maneuver${(choice.count ?? 1) === 1 ? "" : "s"}`);
+    if (choice.type === "metamagic") parts.push(`${choice.count ?? 1} metamagic`);
+  }
+  return parts.length ? `Choices: ${parts.join(", ")}.` : "";
+}
+
+function selectableFeatDefinitions(hero) {
+  const known = new Set(fighterFeatIds(hero));
+  return featDefinitions()
+    .filter((feat) => !known.has(feat.id))
+    .filter((feat) => featPrerequisiteMet(hero, feat))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function applyLevelUpAbilityIncrease(hero, ability, amount, oldConMod) {
+  if (!abilities.includes(ability) || !amount) return 0;
+  hero.abilityScores = Object.fromEntries(abilities.map((entry) => [entry, baseAbilityScore(hero, entry)]));
+  hero.abilityScores[ability] = Math.min(20, hero.abilityScores[ability] + amount);
+  const newConMod = scoreToMod(hero.abilityScores.con);
+  const conHpGain = Math.max(0, newConMod - oldConMod) * (hero.level ?? 1);
+  if (conHpGain) {
+    hero.baseMaxHp += conHpGain;
+    hero.maxHp = hero.baseMaxHp;
+  }
+  return conHpGain;
+}
+
+function applyLevelUpAbilityIncreases(hero, increases, oldConMod) {
+  hero.abilityScores = Object.fromEntries(abilities.map((ability) => [ability, baseAbilityScore(hero, ability)]));
+  for (const ability of abilities) {
+    hero.abilityScores[ability] = Math.min(20, hero.abilityScores[ability] + (increases[ability] ?? 0));
+  }
+  const newConMod = scoreToMod(hero.abilityScores.con);
+  const conHpGain = Math.max(0, newConMod - oldConMod) * (hero.level ?? 1);
+  hero.baseMaxHp += conHpGain;
+  hero.maxHp = hero.baseMaxHp;
+  return conHpGain;
+}
+
+async function chooseFeatAbilityIncrease(hero, feat, choice, entry, oldConMod) {
+  const options = (choice.abilities ?? abilities).filter((ability) => baseAbilityScore(hero, ability) < 20);
+  if (!options.length) return "";
+  const ability = await showChoiceDialog({
+    title: feat.name,
+    message: `Choose the ability score increased by ${feat.name}.`,
+    actor: hero,
+    choices: options.map((value) => ({ value, label: `${value.toUpperCase()} ${baseAbilityScore(hero, value)} -> ${Math.min(20, baseAbilityScore(hero, value) + (choice.amount ?? 1))}` })),
+  });
+  if (!ability) return null;
+  entry.choices.ability = ability;
+  const conHpGain = applyLevelUpAbilityIncrease(hero, ability, choice.amount ?? 1, oldConMod);
+  return ` +1 ${ability.toUpperCase()}${conHpGain ? ` (${conHpGain} max HP)` : ""}`;
+}
+
+async function chooseFeatSavingThrow(hero, feat, choice, entry, oldConMod) {
+  const options = (choice.abilities ?? abilities).filter((ability) => !(hero.savingThrowProficiencies ?? []).includes(ability) || baseAbilityScore(hero, ability) < 20);
+  if (!options.length) return "";
+  const ability = await showChoiceDialog({
+    title: feat.name,
+    message: "Choose the ability improved by Resilient and its saving throw proficiency.",
+    actor: hero,
+    choices: options.map((value) => ({ value, label: value.toUpperCase(), description: `Current score ${baseAbilityScore(hero, value)}.` })),
+  });
+  if (!ability) return null;
+  entry.choices.save = ability;
+  const conHpGain = applyLevelUpAbilityIncrease(hero, ability, 1, oldConMod);
+  hero.savingThrowProficiencies = uniqueValues([...(hero.savingThrowProficiencies ?? []), ability]);
+  return ` +1 ${ability.toUpperCase()} and ${ability.toUpperCase()} saves${conHpGain ? ` (${conHpGain} max HP)` : ""}`;
+}
+
+async function chooseFeatFightingStyle(hero, feat, entry) {
+  const existing = new Set(hero.fightingStyles ?? []);
+  const choices = fightingStyleChoicesForClass("fighter").filter((style) => !existing.has(style.value));
+  if (!choices.length) return "";
+  const style = await showChoiceDialog({
+    title: feat.name,
+    message: "Choose a fighting style.",
+    actor: hero,
+    choices,
+  });
+  if (!style) return null;
+  entry.choices.fightingStyle = style;
+  hero.fightingStyles = uniqueValues([...(hero.fightingStyles ?? []), style]);
+  return ` Fighting Style: ${choices.find((choice) => choice.value === style)?.label ?? style}`;
+}
+
+async function chooseFeatOptionsFromList({ hero, feat, entry, type, property, options, count, title, message }) {
+  const selected = [...(hero[property] ?? [])];
+  const names = [];
+  for (let index = 0; index < count; index += 1) {
+    const available = options.filter((option) => !selected.includes(option.id) && (hero.level ?? 1) >= (option.level ?? 1));
+    if (!available.length) break;
+    const choice = await showSelectChoiceDialog({
+      title: title ?? feat.name,
+      message: `${message} (${index + 1}/${count})`,
+      actor: hero,
+      label: message,
+      choices: available.map((option) => ({ value: option.id, label: option.name, description: option.description })),
+    });
+    if (!choice) return null;
+    selected.push(choice);
+    names.push(available.find((option) => option.id === choice)?.name ?? choice);
+  }
+  hero[property] = uniqueValues(selected);
+  entry.choices[type] = uniqueValues([...(entry.choices[type] ?? []), ...selected]);
+  return names.length ? ` ${names.join(", ")}` : "";
+}
+
+async function applyFeatChoice(hero, feat, choice, entry, oldConMod) {
+  if (choice.type === "ability") return chooseFeatAbilityIncrease(hero, feat, choice, entry, oldConMod);
+  if (choice.type === "save") return chooseFeatSavingThrow(hero, feat, choice, entry, oldConMod);
+  if (choice.type === "skills") {
+    const picked = await chooseUniqueProficiencies({
+      title: feat.name,
+      message: "Choose a skill proficiency.",
+      count: choice.count ?? 1,
+      choices: choice.choices ?? allSkillIds,
+      selected: hero.skillProficiencies ?? [],
+    });
+    if (picked === null) return null;
+    hero.skillProficiencies = uniqueValues([...(hero.skillProficiencies ?? []), ...picked]);
+    entry.choices.skills = picked;
+    return picked.length ? ` Skills: ${picked.map(skillName).join(", ")}` : "";
+  }
+  if (choice.type === "expertise") {
+    const gained = await chooseExpertiseProficiencies({
+      title: feat.name,
+      message: "Choose an expertise.",
+      count: choice.count ?? 1,
+      skillProficiencies: hero.skillProficiencies ?? [],
+      toolProficiencies: hero.toolProficiencies ?? [],
+      existingSkillExpertise: hero.expertiseSkills ?? [],
+      existingToolExpertise: hero.expertiseTools ?? [],
+    });
+    if (gained === null) return null;
+    hero.expertiseSkills = uniqueValues([...(hero.expertiseSkills ?? []), ...gained.skills]);
+    hero.expertiseTools = uniqueValues([...(hero.expertiseTools ?? []), ...gained.tools]);
+    entry.choices.expertise = { skills: gained.skills, tools: gained.tools };
+    return [...gained.skills.map(skillName), ...gained.tools.map(toolName)].length ? ` Expertise: ${[...gained.skills.map(skillName), ...gained.tools.map(toolName)].join(", ")}` : "";
+  }
+  if (choice.type === "fightingStyle") return chooseFeatFightingStyle(hero, feat, entry);
+  if (choice.type === "invocation") {
+    return chooseFeatOptionsFromList({
+      hero,
+      feat,
+      entry,
+      type: "invocations",
+      property: "knownInvocations",
+      options: getHeroTemplate("warlock").invocationOptions ?? [],
+      count: choice.count ?? 1,
+      title: feat.name,
+      message: "Choose an eldritch invocation.",
+    });
+  }
+  if (choice.type === "maneuvers") {
+    const battleMaster = fighterSubclassDefinitions().find((subclass) => subclass.id === "battle-master");
+    return chooseFeatOptionsFromList({
+      hero,
+      feat,
+      entry,
+      type: "maneuvers",
+      property: "knownManeuvers",
+      options: battleMaster?.maneuverOptions ?? [],
+      count: choice.count ?? 1,
+      title: feat.name,
+      message: "Choose a maneuver.",
+    });
+  }
+  if (choice.type === "metamagic") {
+    return chooseFeatOptionsFromList({
+      hero,
+      feat,
+      entry,
+      type: "metamagic",
+      property: "knownMetamagic",
+      options: getHeroTemplate("sorcerer").metamagicOptions ?? [],
+      count: choice.count ?? 1,
+      title: feat.name,
+      message: "Choose a metamagic option.",
+    });
+  }
+  if (choice.type === "damageType") {
+    const picked = await showChoiceDialog({
+      title: feat.name,
+      message: "Choose a damage type.",
+      actor: hero,
+      choices: (choice.choices ?? []).map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) })),
+    });
+    if (!picked) return null;
+    entry.choices[choice.property ?? "damageType"] = [picked];
+    return ` ${picked[0].toUpperCase()}${picked.slice(1)}`;
+  }
+  return "";
+}
+
+function applyFeatStaticBenefits(hero, feat) {
+  hero.skillProficiencies = uniqueValues([...(hero.skillProficiencies ?? []), ...(feat.skillProficiencies ?? [])]);
+  hero.toolProficiencies = uniqueValues([...(hero.toolProficiencies ?? []), ...(feat.toolProficiencies ?? [])]);
+  hero.armorProficiencies = proficiencyEntries([...(hero.armorProficiencies ?? []), ...(feat.armorProficiencies ?? [])]);
+  hero.weaponProficiencies = proficiencyEntries([...(hero.weaponProficiencies ?? []), ...(feat.weaponProficiencies ?? [])]);
+  hero.extraResourcePoolUses = { ...(hero.extraResourcePoolUses ?? {}) };
+  for (const [pool, amount] of Object.entries(feat.extraResourcePoolUses ?? {})) {
+    hero.extraResourcePoolUses[pool] = (hero.extraResourcePoolUses[pool] ?? 0) + amount;
+  }
+  const spells = featSpellIdsAvailable(feat);
+  if (spells.length) {
+    hero.spells = uniqueValues([...(hero.spells ?? []), ...spells]);
+    hero.classSpellList = uniqueValues([...(hero.classSpellList ?? []), ...spells.filter((spellId) => (getContentDefinition("spells", canonicalSpellId(spellId))?.level ?? 1) > 0)]);
+    hero.classCantripList = uniqueValues([...(hero.classCantripList ?? []), ...spells.filter((spellId) => (getContentDefinition("spells", canonicalSpellId(spellId))?.level ?? 1) === 0)]);
+  }
+}
+
+async function chooseAndApplyFeat(hero, oldConMod) {
+  const feats = selectableFeatDefinitions(hero);
+  if (!feats.length) return null;
+  const featId = await showSelectChoiceDialog({
+    title: "Choose a Feat",
+    message: "Choose a feat instead of the Ability Score Improvement.",
+    actor: hero,
+    label: "Feat",
+    choices: feats.map((feat) => ({
+      value: feat.id,
+      label: feat.name,
+      description: [feat.description, featChoiceSummary(feat)].filter(Boolean).join(" "),
+    })),
+    confirmText: "Take Feat",
+    cancelText: "Cancel Level Up",
+  });
+  if (!featId) return null;
+  const feat = featDefinition(featId);
+  const entry = { id: feat.id, choices: {} };
+  const notes = [];
+  for (const choice of feat.choices ?? []) {
+    const note = await applyFeatChoice(hero, feat, choice, entry, oldConMod);
+    if (note === null) return null;
+    if (note) notes.push(note.trim());
+  }
+  hero.feats = [...fighterFeatEntries(hero), entry];
+  applyFeatStaticBenefits(hero, feat);
+  ensureFighterAbilityState(hero);
+  refreshDerivedStats(hero);
+  return ` Feat gained: ${feat.name}${notes.length ? ` (${notes.join("; ")})` : ""}.`;
+}
+
+async function chooseAbilityScoreImprovementOrFeat(hero, oldConMod) {
+  const featCount = selectableFeatDefinitions(hero).length;
+  const mode = await showChoiceDialog({
+    title: "Ability Score Improvement",
+    message: featCount ? "Choose normal ability score increases or take a feat." : "No eligible feats are available, so choose normal ability score increases.",
+    actor: hero,
+    choices: [
+      { value: "asi", label: "Ability Scores", description: "Increase one ability score by 2, or two ability scores by 1." },
+      ...(featCount ? [{ value: "feat", label: "Feat", description: "Take one eligible feat instead of ability score increases." }] : []),
+    ],
+  });
+  if (!mode) return null;
+  if (mode === "feat") return chooseAndApplyFeat(hero, oldConMod);
+  hero.abilityScores = Object.fromEntries(abilities.map((ability) => [ability, baseAbilityScore(hero, ability)]));
+  const increases = await showAbilityScoreImprovementDialog(hero);
+  if (!increases) return null;
+  const conHpGain = applyLevelUpAbilityIncreases(hero, increases, oldConMod);
+  return ` Ability scores improved${conHpGain ? `; Constitution adds ${conHpGain} max HP` : ""}.`;
 }
 
 function fighterSubclassDefinitions() {
@@ -6572,22 +8099,12 @@ async function levelUpHero() {
   }
   let asiText = "";
   if (abilityScoreImprovementLevelsForClass(hero.classId).has(hero.level ?? 1)) {
-    hero.abilityScores = Object.fromEntries(abilities.map((ability) => [ability, baseAbilityScore(hero, ability)]));
-    const increases = await showAbilityScoreImprovementDialog(hero);
-    if (!increases) {
+    const asiOrFeatText = await chooseAbilityScoreImprovementOrFeat(hero, oldConMod);
+    if (!asiOrFeatText) {
       cancelLevelUp();
       return;
     }
-    if (increases) {
-      for (const ability of abilities) {
-        hero.abilityScores[ability] = Math.min(20, hero.abilityScores[ability] + (increases[ability] ?? 0));
-      }
-      const newConMod = scoreToMod(hero.abilityScores.con);
-      const conHpGain = Math.max(0, newConMod - oldConMod) * (hero.level ?? 1);
-      hero.baseMaxHp += conHpGain;
-      hero.maxHp = hero.baseMaxHp;
-      asiText = ` Ability scores improved${conHpGain ? `; Constitution adds ${conHpGain} max HP` : ""}.`;
-    }
+    asiText = asiOrFeatText;
   }
   ensureFighterAbilityState(hero);
   const subclassLevelText = await applyClassSubclassLevelChoices(hero);
@@ -6735,13 +8252,17 @@ function applyHealingToHero(target, healing) {
   return target.hp - before;
 }
 
-function useBeltItem(itemId, targetId = null) {
+function useUsableInventoryItem(itemId, targetId = null, options = {}) {
   const hero = state.mode === "combat" ? activeFighter() : activeHero();
   const item = itemForId(hero, itemId);
   const target = targetId ? state.fighters[targetId] : hero;
-  const itemAvailable = usableEquippedItems(hero).some((entry) => entry.item.id === itemId);
+  const requireEquipped = options.requireEquipped !== false;
+  const itemAvailable = requireEquipped
+    ? usableEquippedItems(hero).some((entry) => entry.item.id === itemId)
+    : hero?.inventory?.items?.some((entry) => entry.id === itemId) && !(Object.values(hero.equipment ?? {}).includes(itemId));
   const usingOnDyingHero = Boolean(targetId);
   if (!item || !itemAvailable) return;
+  if (!requireEquipped && (state.mode === "combat" || item.type !== "consumable")) return;
   if (usingOnDyingHero && !canUseHealingItemOnTarget(hero, item, target)) return;
   if (!usingOnDyingHero && !canUseBeltItem(hero, item)) return;
 
@@ -6763,22 +8284,58 @@ function useBeltItem(itemId, targetId = null) {
     playSoundEffect("potionDrink");
     const targetText = target.id === hero.id ? "" : ` on ${target.name}`;
     addLog(`${hero.name} uses ${item.name}${targetText} and heals ${healed} HP (${healingRoll.rolls.join(" + ")} + ${item.use.bonus ?? 0}).`, "heal");
-    if (item.use?.consume !== false && !item.use?.charges) consumeEquippedItem(itemId);
+    if (item.use.secondaryEffect) {
+      const status = itemStatusFromEffects(item, item.use.secondaryEffect, { ...item.use, duration: item.use.secondaryEffect.duration ?? item.use.duration ?? "encounter" });
+      applyStatusEffect(target, status);
+      addLog(`${target.name} gains ${status.label}'s secondary effect.`, "important");
+    }
+    if (itemUseConsumesInventory(item)) consumeEquippedItem(itemId);
+    void maybeFinishEncounterAfterHeroRecovery();
+  } else if (item.use?.kind === "fullHealing") {
+    if (!spendItemCharge(item)) return;
+    const healed = applyHealingToHero(target, Math.max(0, (target.maxHp ?? 0) - (target.hp ?? 0)));
+    playSoundEffect("potionDrink");
+    const targetText = target.id === hero.id ? "" : ` on ${target.name}`;
+    addLog(`${hero.name} uses ${item.name}${targetText} and heals ${healed} HP to full.`, "heal");
+    if (itemUseConsumesInventory(item)) consumeEquippedItem(itemId);
     void maybeFinishEncounterAfterHeroRecovery();
   } else if (item.use?.status) {
     if (!spendItemCharge(item)) return;
     applyStatusEffect(hero, { ...item.use.status });
     addLog(`${hero.name} uses ${item.name} and gains ${item.use.status.label ?? item.name}.`, "important");
-    if (item.use?.consume !== false && !item.use?.charges) consumeEquippedItem(itemId);
-  } else {
+    if (itemUseConsumesInventory(item)) consumeEquippedItem(itemId);
+  } else if (item.use?.kind === "buff") {
     if (!spendItemCharge(item)) return;
-    addLog(`${hero.name} uses ${item.name}.`, "important");
-    if (item.use?.consume !== false && !item.use?.charges) consumeEquippedItem(itemId);
+    const status = itemStatusFromEffects(item, item.use.effects ?? item.magic?.effects ?? {}, item.use);
+    applyStatusEffect(hero, status);
+    addLog(`${hero.name} uses ${item.name} and gains ${statusEffectDetails(status).join("; ") || "a magic boon"} (${statusDurationText(status)}).`, "important");
+    if (itemUseConsumesInventory(item)) consumeEquippedItem(itemId);
+  } else if (item.use?.kind === "weaponBuff") {
+    if (!spendItemCharge(item)) return;
+    const rider = itemWeaponRiderStatus(item);
+    if (rider) {
+      applyStatusEffect(hero, rider);
+      addLog(`${hero.name} uses ${item.name}; the next weapon hit deals +${rider.rollText} ${rider.damageType} damage.`, "important");
+    } else {
+      addLog(`${hero.name} uses ${item.name}, but its weapon coating has no supported damage rider.`, "important");
+    }
+    if (itemUseConsumesInventory(item)) consumeEquippedItem(itemId);
+  } else {
+    addLog(`${hero.name} uses ${item.name}. Its special effect is not implemented in the current item-use UI yet.`, "important");
   }
 
   refreshDerivedStats(hero);
   hideUseItemMenu();
   render();
+  if (!els.inventoryMenu.classList.contains("hidden")) renderInventoryMenu();
+}
+
+function useBeltItem(itemId, targetId = null) {
+  useUsableInventoryItem(itemId, targetId, { requireEquipped: true });
+}
+
+function useCarriedConsumable(itemId) {
+  useUsableInventoryItem(itemId, null, { requireEquipped: false });
 }
 
 async function chooseAbilityTarget(hero, title, message) {
@@ -6928,6 +8485,7 @@ function scaleSummonedAlly(ally, owner, durationRounds) {
   ally.baseDamage = { ...ally.damage };
   ally.summonedByHeroId = owner.id;
   ally.summonDurationRounds = durationRounds;
+  ally.summonExpiresAtDungeonTimeSeconds = dungeonElapsedSeconds({ sync: false }) + durationSecondsFromDefinition({ durationRounds });
   ally.renameable = false;
   return ally;
 }
@@ -7184,6 +8742,27 @@ function hideAttackWeaponPrompt() {
   document.querySelector(".attack-weapon-prompt")?.remove();
 }
 
+function attackWouldThrowWeapon(fighter, target, options = {}) {
+  const weapon = options.weapon ?? (options.weaponSlot ? weaponFromSlot(fighter, options.weaponSlot) : activeWeapon(fighter));
+  if (!weapon?.properties?.includes("thrown")) return false;
+  if (objectIsDestructible(target)) {
+    const adjacent = objectCells(target).some((cell) => attackGridDistance(fighter.position, cell) <= 1);
+    return !adjacent;
+  }
+  return !hasMeleeAccess(fighter, target);
+}
+
+function confirmThrowWeapon(fighter, target, options = {}) {
+  const weapon = options.weapon ?? (options.weaponSlot ? weaponFromSlot(fighter, options.weaponSlot) : activeWeapon(fighter));
+  const targetName = objectIsDestructible(target) ? objectTargetName(target) : target?.name ?? "the target";
+  return showGameDialog({
+    title: "Throw weapon?",
+    message: `Throw ${weapon?.name ?? "this weapon"} at ${targetName}? It will land near the target after the attack.`,
+    confirmText: "Throw",
+    cancelText: "Cancel",
+  });
+}
+
 function chooseAttackWeaponForTarget(fighter, target) {
   const choices = attackWeaponChoicesForTarget(fighter, target);
   if (choices.length <= 1) return Promise.resolve(choices[0]?.options ?? {});
@@ -7230,6 +8809,10 @@ async function performAttackWithPrompt() {
   if (!fighter || !target) return;
   const options = await chooseAttackWeaponForTarget(fighter, target);
   if (!options) return;
+  if (attackWouldThrowWeapon(fighter, target, options)) {
+    const confirmed = await confirmThrowWeapon(fighter, target, options);
+    if (!confirmed) return;
+  }
   if (objectIsDestructible(target)) await attackDestructibleObject(fighter, target, options);
   else await makeAttack(fighter, target, options);
 }
@@ -8013,6 +9596,7 @@ function beginPartyShortRest() {
     refreshItemChargesForFighter(hero, "shortRest");
   }
   addLog("The party takes a short rest. Short-rest abilities refresh for every active hero.", "important");
+  advanceDungeonTime(shortRestDurationSeconds(), "The short rest", { force: true });
   return true;
 }
 
@@ -8317,8 +9901,9 @@ function renderInitiative() {
     .map((entry, index) => {
       const fighter = state.fighters[entry.fighterId];
       const activeClass = index === state.activeIndex ? " active" : "";
+      const selectableClass = isPlayerControlledPartyFighter(fighter) ? " selectable" : "";
       return `
-        <div class="initiative-item${activeClass}">
+        <div class="initiative-item${activeClass}${selectableClass}" data-initiative-fighter="${escapeAttribute(fighter.id)}">
           ${combatantArtworkMarkup(fighter, "initiative-art")}
           <span>${fighter.name}</span>
           <strong>${entry.total}</strong>
@@ -8393,6 +9978,7 @@ function renderControls() {
   const actingHero = heroTurn ? fighter : hero;
   const heroCanAttack = heroTurn && actingHero.hasAction && Boolean(attackTarget());
   const heroCanUseAction = heroTurn && (actingHero.hasAction || actingHero.hasBonusAction || canOffHandAttack(actingHero));
+  const heroCanUseGrabMenu = canOpenGrabMenu(actingHero);
   const heroCanUseItem =
     gameHasStarted &&
     heroCanAct(actingHero) &&
@@ -8415,7 +10001,8 @@ function renderControls() {
       ? `${weaponText} -> ${objectIsDestructible(target) ? objectTargetName(target) : target.name}`
       : weaponText;
   }
-  els.actionButton.disabled = movementInProgress || !heroCanUseAction;
+  els.actionButton.disabled = movementInProgress || !(heroCanUseAction || heroCanUseGrabMenu);
+  els.actionButton.textContent = activeGrabForCarrier(actingHero) ? "Release [X]" : state.mode === "combat" ? "Other [X]" : "Grab [X]";
   els.useItem.disabled = movementInProgress || !heroCanUseItem;
   els.abilities.disabled = movementInProgress || !heroCanOpenAbilities;
   els.shortRest.disabled =
@@ -8435,7 +10022,7 @@ function renderControls() {
   els.endTurn.disabled = movementInProgress || !heroTurn;
 
   els.attack.style.display = state.mode === "combat" ? "" : "none";
-  els.actionButton.style.display = state.mode === "combat" ? "" : "none";
+  els.actionButton.style.display = state.mode === "combat" || heroCanUseGrabMenu ? "" : "none";
   els.endTurn.style.display = state.mode === "combat" ? "" : "none";
   els.shortRest.style.display = state.mode === "combat" ? "none" : "";
   els.returnHome.style.display = "";
@@ -8471,6 +10058,7 @@ function renderControls() {
   }
   if (els.roomTitle) els.roomTitle.textContent = state.mode === "home" ? "Home" : state.room.name;
   els.showDungeonIntro?.classList.toggle("hidden", !state.customDungeon?.intro?.text && !(state.customDungeon?.intro?.images ?? []).length);
+  renderDungeonClock();
   els.roundLabel.textContent = state.mode === "combat" ? `Round ${state.round}` : "Out of turn order";
 
   if (state.completed) {
@@ -8486,4 +10074,15 @@ function renderControls() {
     els.turnLabel.textContent = `${fighter.name}'s turn`;
   }
   updateBackgroundMusic();
+}
+
+function renderDungeonClock() {
+  if (!els.dungeonTimerLabel || !els.toggleDungeonTimer) return;
+  const active = gameHasStarted && state?.mode !== "home";
+  els.dungeonTimerLabel.textContent = active ? `Time ${formatDungeonClockTime(dungeonElapsedSeconds({ sync: false }))}` : "Time 00:00:00";
+  const paused = dungeonClockIsPaused();
+  els.toggleDungeonTimer.textContent = paused ? "Resume" : "Pause";
+  els.toggleDungeonTimer.setAttribute("aria-pressed", paused ? "true" : "false");
+  els.toggleDungeonTimer.disabled = !active || state?.completed;
+  els.toggleDungeonTimer.title = state?.mode === "combat" ? "Paused combat time stops round-based durations." : "";
 }

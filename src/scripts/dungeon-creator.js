@@ -129,11 +129,21 @@ const els = {
   hallwayWidth: document.querySelector("#hallway-width"),
   hallwayWidthLabel: document.querySelector("#hallway-width-label"),
   furnitureSearch: document.querySelector("#furniture-search"),
+  furnitureKindFilter: document.querySelector("#furniture-kind-filter"),
+  furnitureTagFilter: document.querySelector("#furniture-tag-filter"),
+  furnitureSort: document.querySelector("#furniture-sort"),
   furnitureCatalogue: document.querySelector("#furniture-catalogue"),
   monsterSearch: document.querySelector("#monster-search"),
+  monsterCategoryFilter: document.querySelector("#monster-category-filter"),
+  monsterTagFilter: document.querySelector("#monster-tag-filter"),
+  monsterSort: document.querySelector("#monster-sort"),
   monsterCatalogue: document.querySelector("#monster-catalogue"),
   monsterIsBoss: document.querySelector("#monster-is-boss"),
   selectedCard: document.querySelector("#selected-card"),
+  itemSearch: document.querySelector("#item-search"),
+  itemTypeFilter: document.querySelector("#item-type-filter"),
+  itemTagFilter: document.querySelector("#item-tag-filter"),
+  itemSort: document.querySelector("#item-sort"),
   lootItem: document.querySelector("#loot-item"),
   addLoot: document.querySelector("#add-loot"),
   deleteSelected: document.querySelector("#delete-selected"),
@@ -211,7 +221,21 @@ function roomAt(position) {
 }
 
 function objectAt(position) {
-  return state.objects.find((object) => objectCellsForCreator(object).some((cell) => cell.x === position.x && cell.y === position.y)) ?? null;
+  const objects = objectsAt(position);
+  return objects.find((object) => !objectIsTerrainFloor(object)) ?? objects[0] ?? null;
+}
+
+function objectsAt(position) {
+  return state.objects.filter((object) => objectCellsForCreator(object).some((cell) => cell.x === position.x && cell.y === position.y));
+}
+
+function objectTypeIsTerrainFloor(type) {
+  const template = window.DungeonContent.get("furniture", type);
+  return Boolean((template?.tags ?? []).includes("terrain-floor"));
+}
+
+function objectIsTerrainFloor(object) {
+  return Boolean(objectTypeIsTerrainFloor(object?.type));
 }
 
 function objectCellsForCreator(object) {
@@ -228,8 +252,13 @@ function monsterAt(position) {
   return state.monsters.find((monster) => monster.position.x === position.x && monster.position.y === position.y) ?? null;
 }
 
-function occupied(position, exceptId = "") {
-  return Boolean(monsterAt(position) && monsterAt(position).id !== exceptId) || Boolean(objectAt(position) && objectAt(position).id !== exceptId);
+function occupied(position, exceptId = "", incomingType = "") {
+  const incomingIsTerrainFloor = objectTypeIsTerrainFloor(incomingType);
+  if (!incomingIsTerrainFloor && monsterAt(position) && monsterAt(position).id !== exceptId) return true;
+  return objectsAt(position).some((object) => {
+    if (object.id === exceptId) return false;
+    return incomingIsTerrainFloor ? objectIsTerrainFloor(object) : !objectIsTerrainFloor(object);
+  });
 }
 
 function roomCenter(room) {
@@ -412,13 +441,33 @@ function setStatus(text) {
   els.status.textContent = text;
 }
 
+function furnitureEntryMatchesTool(entry, tool = state.tool) {
+  if (!entry) return false;
+  if (tool === "trap") return entry.kind === "trap";
+  if (tool === "furniture") return entry.kind !== "trap";
+  return true;
+}
+
+function ensureSelectedFurnitureForTool(tool = state.tool) {
+  if (!["furniture", "trap"].includes(tool)) return;
+  const selected = window.DungeonContent.get("furniture", state.selectedFurnitureId);
+  if (furnitureEntryMatchesTool(selected, tool)) return;
+  const first = window.DungeonContent
+    .list("furniture")
+    .filter((entry) => furnitureEntryMatchesTool(entry, tool))
+    .sort((a, b) => a.name.localeCompare(b.name))[0];
+  state.selectedFurnitureId = first?.id ?? "";
+}
+
 function setTool(tool) {
   state.tool = tool;
   state.connectFromRoomId = "";
   state.pendingPortalId = "";
   state.hallwayStart = null;
   state.hallwayCells = [];
+  ensureSelectedFurnitureForTool(tool);
   renderTools();
+  if (["furniture", "trap"].includes(tool)) renderFurnitureCatalogue();
 }
 
 function renderTools() {
@@ -436,6 +485,67 @@ function renderThemes() {
     .join("");
 }
 
+function uniqueSorted(values) {
+  return Array.from(new Set(values.filter(Boolean).map(String))).sort((a, b) => a.localeCompare(b));
+}
+
+function optionList(values, allLabel = "All") {
+  return [`<option value="">${escapeHtml(allLabel)}</option>`, ...values.map((value) => `<option value="${escapeAttribute(value)}">${escapeHtml(value)}</option>`)].join("");
+}
+
+function preserveSelectValue(select, renderOptions) {
+  if (!select) return;
+  const current = select.value;
+  select.innerHTML = renderOptions();
+  if ([...select.options].some((option) => option.value === current)) select.value = current;
+}
+
+function entrySearchText(entry, fields = []) {
+  return [
+    entry?.name,
+    entry?.id,
+    entry?.type,
+    entry?.category,
+    entry?.kind,
+    entry?.placement,
+    entry?.role,
+    entry?.description,
+    entry?.magic?.description,
+    entry?.treasure?.description,
+    ...(entry?.tags ?? []),
+    ...(entry?.components ?? []).map((component) => component?.type ?? component),
+    ...fields,
+  ].join(" ").toLowerCase();
+}
+
+function queryTerms(input) {
+  return String(input?.value ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+function entryMatchesSearch(entry, input, fields = []) {
+  const terms = queryTerms(input);
+  if (!terms.length) return true;
+  const searchable = entrySearchText(entry, fields);
+  return terms.every((term) => searchable.includes(term));
+}
+
+function entryHasTag(entry, tag) {
+  return !tag || (entry?.tags ?? []).includes(tag);
+}
+
+function compareByName(a, b) {
+  return String(a.name ?? a.id).localeCompare(String(b.name ?? b.id));
+}
+
+function renderCatalogueFilters() {
+  preserveSelectValue(els.furnitureKindFilter, () => optionList(uniqueSorted(window.DungeonContent.list("furniture").map((entry) => entry.floor ? "floor" : entry.kind ?? "furniture")), "All kinds"));
+  preserveSelectValue(els.furnitureTagFilter, () => optionList(uniqueSorted(window.DungeonContent.list("furniture").flatMap((entry) => entry.tags ?? [])), "All tags"));
+  preserveSelectValue(els.monsterCategoryFilter, () => optionList(uniqueSorted(window.DungeonContent.list("monsters").map((entry) => Number.isFinite(entry.category) ? `Category ${entry.category}` : "")), "All categories"));
+  preserveSelectValue(els.monsterTagFilter, () => optionList(uniqueSorted(window.DungeonContent.list("monsters").flatMap((entry) => entry.tags ?? [])), "All tags"));
+  preserveSelectValue(els.itemTypeFilter, () => optionList(uniqueSorted(window.DungeonContent.list("items").filter((item) => item.type !== "class").map((item) => item.type ?? item.category ?? "item")), "All types"));
+  preserveSelectValue(els.itemTagFilter, () => optionList(uniqueSorted(window.DungeonContent.list("items").filter((item) => item.type !== "class").flatMap((item) => item.tags ?? [])), "All tags"));
+}
+
 function catalogueButton(entry, selectedId) {
   return `<button type="button" data-id="${escapeAttribute(entry.id)}" class="${entry.id === selectedId ? "active" : ""}"><b>${escapeHtml(entry.name)}</b><br><span class="small-note">${escapeHtml(entry.id)}</span></button>`;
 }
@@ -451,7 +561,7 @@ function monsterCatalogueButton(entry, selectedId) {
         <b>${escapeHtml(entry.name)}</b>
         <span class="monster-category-badge" title="Monster category">${escapeHtml(monsterCategoryLabel(entry))}</span>
       </span>
-      <span class="small-note">${escapeHtml(entry.id)}</span>
+      <span class="small-note">${escapeHtml(entry.id)}${entry.tags?.length ? ` - ${escapeHtml(entry.tags.slice(0, 5).join(", "))}` : ""}</span>
     </button>
   `;
 }
@@ -465,45 +575,96 @@ function furnitureCatalogueButton(entry, selectedId) {
         ${iconPath ? `<img class="hidden" data-creator-furniture-image src="${escapeAttribute(iconPath)}" alt="" draggable="false" />` : ""}
         <span>${escapeHtml(fallbackSymbol)}</span>
       </span>
-      <b>${escapeHtml(entry.name)}</b>
+      <span>
+        <b>${escapeHtml(entry.name)}</b><br>
+        <span class="small-note">${escapeHtml([entry.floor ? "floor" : entry.kind, ...(entry.tags ?? []).slice(0, 3)].filter(Boolean).join(" - "))}</span>
+      </span>
     </button>
   `;
 }
 
 function renderFurnitureCatalogue() {
-  const query = els.furnitureSearch.value.trim().toLowerCase();
+  const kindFilter = els.furnitureKindFilter?.value ?? "";
+  const tagFilter = els.furnitureTagFilter?.value ?? "";
+  const sort = els.furnitureSort?.value ?? "name";
   const entries = window.DungeonContent
     .list("furniture")
-    .filter((entry) => (state.tool === "trap" ? entry.kind === "trap" : entry.kind !== "trap"))
-    .filter((entry) => !query || `${entry.name} ${entry.id} ${(entry.tags ?? []).join(" ")}`.toLowerCase().includes(query))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .filter((entry) => furnitureEntryMatchesTool(entry))
+    .filter((entry) => !kindFilter || (kindFilter === "floor" ? entry.floor : (entry.kind ?? "furniture") === kindFilter))
+    .filter((entry) => entryHasTag(entry, tagFilter))
+    .filter((entry) => entryMatchesSearch(entry, els.furnitureSearch, [entry.floor ? "floor" : ""]))
+    .sort((a, b) => {
+      if (sort === "id") return a.id.localeCompare(b.id);
+      if (sort === "kind") return String(a.floor ? "floor" : a.kind ?? "").localeCompare(String(b.floor ? "floor" : b.kind ?? "")) || compareByName(a, b);
+      return compareByName(a, b);
+    });
   els.furnitureCatalogue.innerHTML = entries.map((entry) => furnitureCatalogueButton(entry, state.selectedFurnitureId)).join("");
   activateCreatorFurnitureImages(els.furnitureCatalogue);
 }
 
-function renderMonsterCatalogue() {
-  const query = els.monsterSearch.value.trim().toLowerCase();
-  const entries = window.DungeonContent
+function filteredMonsterEntries() {
+  const categoryFilter = els.monsterCategoryFilter?.value ?? "";
+  const tagFilter = els.monsterTagFilter?.value ?? "";
+  const sort = els.monsterSort?.value ?? "name";
+  const categoryValue = Number(categoryFilter.replace("Category ", ""));
+  return window.DungeonContent
     .list("monsters")
-    .filter((entry) => !query || `${entry.name} ${entry.id} ${monsterCategoryLabel(entry)} ${(entry.tags ?? []).join(" ")}`.toLowerCase().includes(query))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .filter((entry) => !categoryFilter || entry.category === categoryValue)
+    .filter((entry) => entryHasTag(entry, tagFilter))
+    .filter((entry) => entryMatchesSearch(entry, els.monsterSearch, [monsterCategoryLabel(entry)]))
+    .sort((a, b) => {
+      if (sort === "id") return a.id.localeCompare(b.id);
+      if (sort === "category") return (a.category ?? 999) - (b.category ?? 999) || compareByName(a, b);
+      return compareByName(a, b);
+    });
+}
+
+function renderMonsterCatalogue() {
+  const entries = filteredMonsterEntries();
   els.monsterCatalogue.innerHTML = entries.map((entry) => monsterCatalogueButton(entry, state.selectedMonsterId)).join("");
 }
 
-function renderItemSelects() {
-  const items = window.DungeonContent
+function filteredItemEntries() {
+  const typeFilter = els.itemTypeFilter?.value ?? "";
+  const tagFilter = els.itemTagFilter?.value ?? "";
+  const sort = els.itemSort?.value ?? "name";
+  return window.DungeonContent
     .list("items")
     .filter((item) => item.type !== "class")
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .filter((item) => !typeFilter || (item.type ?? item.category ?? "item") === typeFilter)
+    .filter((item) => entryHasTag(item, tagFilter))
+    .filter((entry) => entryMatchesSearch(entry, els.itemSearch, [itemValueText(entry)]))
+    .sort((a, b) => {
+      if (sort === "id") return a.id.localeCompare(b.id);
+      if (sort === "type") return String(a.type ?? "").localeCompare(String(b.type ?? "")) || compareByName(a, b);
+      if (sort === "value") return itemValueCp(a) - itemValueCp(b) || compareByName(a, b);
+      return compareByName(a, b);
+    });
+}
+
+function renderItemSelects() {
+  const items = filteredItemEntries();
   const options = items.map((item) => `<option value="${escapeAttribute(item.id)}">${escapeHtml(itemOptionLabel(item))}</option>`).join("");
-  const customOptions = state.customItems.map((item) => `<option value="${escapeAttribute(item.id)}">${escapeHtml(itemOptionLabel(item))}</option>`).join("");
-  els.lootItem.innerHTML = options + customOptions;
-  els.goalItem.innerHTML = options + customOptions;
+  const customOptions = state.customItems
+    .filter((item) => !items.some((entry) => entry.id === item.id))
+    .filter((item) => entryMatchesSearch(item, els.itemSearch, [itemValueText(item)]))
+    .filter((item) => !els.itemTypeFilter?.value || (item.type ?? item.category ?? "item") === els.itemTypeFilter.value)
+    .filter((item) => entryHasTag(item, els.itemTagFilter?.value ?? ""))
+    .map((item) => `<option value="${escapeAttribute(item.id)}">${escapeHtml(itemOptionLabel(item))}</option>`)
+    .join("");
+  const currentLoot = els.lootItem.value;
+  const currentGoal = els.goalItem.value;
+  const currentTemplate = els.customItemTemplate.value;
+  els.lootItem.innerHTML = options + customOptions || `<option value="">No matching items</option>`;
+  els.goalItem.innerHTML = options + customOptions || `<option value="">No matching items</option>`;
   els.customItemTemplate.innerHTML = options;
+  if ([...els.lootItem.options].some((option) => option.value === currentLoot)) els.lootItem.value = currentLoot;
+  if ([...els.goalItem.options].some((option) => option.value === currentGoal)) els.goalItem.value = currentGoal;
+  if ([...els.customItemTemplate.options].some((option) => option.value === currentTemplate)) els.customItemTemplate.value = currentTemplate;
   els.goalMonster.innerHTML = window.DungeonContent
     .list("monsters")
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((monster) => `<option value="${monster.id}">${monster.name}</option>`)
+    .sort((a, b) => compareByName(a, b))
+    .map((monster) => `<option value="${escapeAttribute(monster.id)}">${escapeHtml(monster.name)}</option>`)
     .join("") + state.monsters.filter((monster) => monster.customized).map((monster) => `<option value="${monster.id}">${monster.name}</option>`).join("");
 }
 
@@ -585,6 +746,7 @@ function renderGrid() {
       const room = roomMap.get(cellKey);
       const monster = monsterAt(position);
       const object = objectAt(position);
+      const terrainObject = objectsAt(position).find(objectIsTerrainFloor);
       const classes = [
         "creator-cell",
         room ? "room" : "",
@@ -593,6 +755,8 @@ function renderGrid() {
         startKey === cellKey ? "start" : "",
         exitKey === cellKey ? "exit" : "",
         portalKeys.has(cellKey) ? "portal" : "",
+        terrainObject ? `object-${String(terrainObject.type).replace(/[^a-z0-9_-]/gi, "-")}` : "",
+        object ? `object-${String(object.type).replace(/[^a-z0-9_-]/gi, "-")}` : "",
         hallwayPreviewKeys.has(cellKey) ? "selected-room" : "",
         room?.id === state.connectFromRoomId || room?.id === state.selectedId ? "selected-room" : "",
         y === 0 && x % 5 === 0 ? "axis-x" : "",
@@ -604,7 +768,7 @@ function renderGrid() {
       const content = object && !monster
         ? `${iconPath ? `<img class="creator-cell-object-icon hidden" data-creator-furniture-image src="${escapeAttribute(iconPath)}" alt="" draggable="false" />` : ""}<span>${escapeHtml(label)}</span>`
         : escapeHtml(label);
-      cells.push(`<button type="button" class="${classes}" data-x="${x}" data-y="${y}" data-axis-x="${x}" data-axis-y="${y}" title="${escapeAttribute(room?.name ?? "")}">${content}</button>`);
+      cells.push(`<button type="button" class="${classes}" data-x="${x}" data-y="${y}" data-axis-x="${x}" data-axis-y="${y}" title="${escapeAttribute(object ? template?.name ?? object.type : room?.name ?? "")}">${content}</button>`);
     }
   }
   els.grid.innerHTML = cells.join("");
@@ -1113,7 +1277,7 @@ function moveSelectedObject(dx, dy) {
   const nextObject = { ...object, position };
   if (
     !room ||
-    objectCellsForCreator(nextObject).some((cell) => !roomAt(cell) || roomAt(cell).id !== room.id || occupied(cell, object.id))
+    objectCellsForCreator(nextObject).some((cell) => !roomAt(cell) || roomAt(cell).id !== room.id || occupied(cell, object.id, object.type))
   ) return;
   object.position = position;
   object.roomId = room.id;
@@ -1129,7 +1293,7 @@ function rotateSelectedObject() {
   if (width === height) return;
   const rotated = { ...object, width: height, height: width };
   const room = roomAt(object.position);
-  if (!room || objectCellsForCreator(rotated).some((cell) => !roomAt(cell) || roomAt(cell).id !== room.id || occupied(cell, object.id))) return;
+  if (!room || objectCellsForCreator(rotated).some((cell) => !roomAt(cell) || roomAt(cell).id !== room.id || occupied(cell, object.id, object.type))) return;
   object.width = height;
   object.height = width;
   renderAll();
@@ -1157,6 +1321,7 @@ function createCustomItem() {
   if (customItem.magic) customItem.magic = { ...customItem.magic, description };
   if (customItem.treasure) customItem.treasure = { ...customItem.treasure, description };
   state.customItems.push(customItem);
+  renderCatalogueFilters();
   renderItemSelects();
   renderExport();
   setStatus(`Created local item ${state.customItems.at(-1).name}.`);
@@ -1165,9 +1330,11 @@ function createCustomItem() {
 function placeFurniture(position) {
   const room = roomAt(position);
   if (!room || !state.selectedFurnitureId) return;
+  const template = window.DungeonContent.get("furniture", state.selectedFurnitureId);
+  if (!furnitureEntryMatchesTool(template, state.tool)) return;
   const id = `${state.selectedFurnitureId}-${state.objects.length + 1}`;
   const object = { id, type: state.selectedFurnitureId, position: { ...position }, items: [], roomId: room.id };
-  if (objectCellsForCreator(object).some((cell) => !roomAt(cell) || roomAt(cell).id !== room.id || occupied(cell))) return;
+  if (objectCellsForCreator(object).some((cell) => !roomAt(cell) || roomAt(cell).id !== room.id || occupied(cell, "", object.type))) return;
   state.objects.push(object);
   state.selectedId = id;
 }
@@ -1207,7 +1374,7 @@ function setPartyStart(position) {
 
 function placePortal(position) {
   const room = roomAt(position);
-  if (!room || occupied(position)) return;
+  if (!room || occupied(position, "", "portal")) return;
   if (!state.pendingPortalId) {
     const id = `portal-custom-${state.objects.length + 1}`;
     state.objects.push({ id, type: "portal", position: { ...position }, items: [], roomId: room.id });
@@ -1513,6 +1680,7 @@ function generateRandomLayout() {
 
 function init() {
   renderThemes();
+  renderCatalogueFilters();
   renderItemSelects();
   els.customItemTemplate.dispatchEvent(new Event("change"));
   newBlankDungeon();
@@ -1558,7 +1726,11 @@ function init() {
   });
   els.gridSize.addEventListener("change", newBlankDungeon);
   els.furnitureSearch.addEventListener("input", renderFurnitureCatalogue);
+  [els.furnitureKindFilter, els.furnitureTagFilter, els.furnitureSort].forEach((element) => element?.addEventListener("change", renderFurnitureCatalogue));
   els.monsterSearch.addEventListener("input", renderMonsterCatalogue);
+  [els.monsterCategoryFilter, els.monsterTagFilter, els.monsterSort].forEach((element) => element?.addEventListener("change", renderMonsterCatalogue));
+  els.itemSearch?.addEventListener("input", renderItemSelects);
+  [els.itemTypeFilter, els.itemTagFilter, els.itemSort].forEach((element) => element?.addEventListener("change", renderItemSelects));
   els.furnitureCatalogue.addEventListener("click", (event) => {
     const button = event.target.closest("[data-id]");
     if (!button) return;

@@ -25,11 +25,13 @@ const availability = {
   "burning-hands": ["wizard", "sorcerer"],
   "scorching-ray": ["wizard", "sorcerer"],
   "misty-step": ["wizard", "sorcerer"],
+  invisibility: ["bard", "sorcerer", "warlock", "wizard"],
   shatter: ["wizard", "bard"],
   web: ["wizard"],
   "lightning-bolt": ["wizard", "sorcerer"],
   grease: ["wizard"],
   haste: ["wizard", "sorcerer"],
+  fly: ["sorcerer", "warlock", "wizard"],
   "hideous-laughter": ["bard"],
   heroism: ["bard", "paladin"],
   "hypnotic-pattern": ["bard"],
@@ -44,6 +46,7 @@ const availability = {
   "hail-of-thorns": ["ranger"],
   "fog-cloud": ["ranger"],
   longstrider: ["ranger"],
+  "pass-without-trace": ["druid", "ranger"],
   silence: ["ranger"],
   "cordon-of-arrows": ["ranger"],
   fireball: ["wizard", "sorcerer"],
@@ -59,6 +62,7 @@ const availability = {
   "mind-sliver": ["sorcerer", "warlock", "wizard"],
   "eldritch-blast": ["warlock"],
   "hellish-rebuke": ["warlock"],
+  "inflict-wounds": ["cleric"],
   thunderclap: ["artificer", "bard", "druid", "sorcerer", "warlock", "wizard"],
   "chill-touch": ["sorcerer", "warlock", "wizard"],
   "acid-splash": ["artificer", "sorcerer", "wizard"],
@@ -102,6 +106,7 @@ const quick = "bonusAction";
 const weaponRider = "weaponRider";
 const reaction = "reaction";
 const concentration3 = { concentration: true, duration: { kind: "rounds", rounds: 3 } };
+const concentration10 = { concentration: true, duration: { kind: "rounds", rounds: 10 } };
 const oneRound = { duration: { kind: "rounds", rounds: 1 } };
 
 spell("dragonborn-breath", {
@@ -283,9 +288,22 @@ spell("aasimar-radiant-soul", {
   resource: action,
   range: { kind: "self", feet: 0 },
   target: "self",
-  effect: { kind: "status", status: { id: "aasimar-radiant-soul", label: "Radiant Soul", damageBonus: 4, speedBonusFeet: 10, durationRounds: 10 } },
+  effect: { kind: "status", status: { id: "aasimar-radiant-soul", label: "Radiant Soul", flying: true, damageBonus: 4, speedBonusFeet: 10, durationRounds: 10 } },
   racialAbilityId: "aasimarRadiantSoul",
-  description: "Racial action. Divine form: +4 damage and +10 ft speed for 10 rounds. Refreshes on long rest.",
+  description: "Racial action. Divine wings: Flying, +4 damage, and +10 ft speed for 10 rounds. Refreshes on long rest.",
+});
+
+spell("gem-dragonborn-flight", {
+  name: "Gem Flight",
+  level: 3,
+  cost: 0,
+  costsByLevel: { 3: 0 },
+  resource: "bonusAction",
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  effect: { kind: "status", status: { id: "gem-dragonborn-flight", label: "Gem Flight", flying: true, durationRounds: 10 } },
+  racialAbilityId: "gemDragonbornFlight",
+  description: "Racial bonus action. Spectral gem wings grant Flying for 10 rounds. Refreshes on long rest.",
 });
 
 spell("aasimar-radiant-consumption", {
@@ -354,9 +372,9 @@ spell("air-genasi-levitate", {
   range: { kind: "self", feet: 0 },
   target: "self",
   saveDcAbility: "con",
-  effect: { kind: "status", status: { id: "levitating", label: "Levitating", acBonus: 2, speedBonusFeet: 10, durationRounds: 3 } },
+  effect: { kind: "status", status: { id: "levitating", label: "Levitating", flying: true, acBonus: 2, speedBonusFeet: 10, durationRounds: 3 } },
   racialAbilityId: "airGenasiLevitate",
-  description: "Racial action. Float above danger: +2 AC and +10 ft speed for 3 rounds. Refreshes on long rest.",
+  description: "Racial action. Float above danger: Flying, +2 AC, and +10 ft speed for 3 rounds. Refreshes on long rest.",
 });
 
 spell("fire-genasi-burning-hands", {
@@ -445,11 +463,12 @@ spell("shield-of-faith", {
   resource: quick,
   range: { kind: "ranged", feet: 60 },
   target: "ally",
-  ...concentration3,
-  effect: { kind: "status", status: { id: "shield-of-faith", label: "Shield of Faith", acBonus: 2, durationRounds: 3 } },
+  concentration: true,
+  duration: { kind: "minutes", minutes: 10 },
+  effect: { kind: "status", status: { id: "shield-of-faith", label: "Shield of Faith", acBonus: 2, durationMinutes: 10 } },
   upcast: { targetsPerLevel: 1 },
   aiCategory: "defensive-reaction",
-  description: "Concentration, 3 rounds. Ally gains +2 AC. Upcast: +1 target.",
+  description: "Concentration, 10 minutes. Ally gains +2 AC. Upcast: +1 target.",
 });
 
 spell("spiritual-weapon", {
@@ -676,6 +695,19 @@ spell("misty-step", {
   description: "Quick teleport to a visible empty square within 30 ft.",
 });
 
+spell("invisibility", {
+  name: "Invisibility",
+  level: 2,
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "ally",
+  ...concentration3,
+  effect: { kind: "status", status: { id: "invisible", label: "Invisible", acBonus: 2, attackBonus: 2, durationRounds: 3 } },
+  upcast: { targetsPerLevel: 1 },
+  aiCategory: "escape-mobility",
+  description: "Concentration, 3 rounds. Ally gains better defense and attack openings.",
+});
+
 spell("shatter", {
   name: "Shatter",
   level: 2,
@@ -741,6 +773,21 @@ spell("haste", {
   effect: { kind: "status", status: { id: "haste", label: "Haste", acBonus: 2, speedBonusFeet: 30, attackBonus: 1, durationRounds: 3 } },
   aiCategory: "buff-opener",
   description: "Concentration, 3 rounds. Ally gains speed, +2 AC, and +1 attacks.",
+});
+
+spell("fly", {
+  name: "Fly",
+  level: 3,
+  school: "transmutation",
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "ally",
+  concentration: true,
+  duration: { kind: "minutes", minutes: 10 },
+  effect: { kind: "status", status: { id: "fly", label: "Flying", flying: true, speedOverrideFeet: 60, durationMinutes: 10 } },
+  upcast: { targetsPerLevel: 1 },
+  aiCategory: "escape-mobility",
+  description: "Concentration, 10 minutes. Ally becomes Flying and has at least 60 ft speed. Upcast: +1 target.",
 });
 
 spell("fireball", {
@@ -850,10 +897,11 @@ spell("aid", {
   resource: action,
   range: { kind: "ranged", feet: 30 },
   target: "ally",
+  duration: { kind: "hours", hours: 8 },
   effect: { kind: "status", status: { id: "aid", label: "Aid", maxHpBonus: 5, tempHp: 5 } },
   upcast: { tempHpPerLevel: 5 },
   aiCategory: "efficient-heal",
-  description: "Bolster an ally with extra max HP and temporary HP.",
+  description: "Eight-hour bolster. Ally gains extra max HP and temporary HP.",
 });
 
 spell("branding-smite", {
@@ -925,10 +973,23 @@ spell("longstrider", {
   resource: quick,
   range: { kind: "touch", feet: 5 },
   target: "ally",
+  duration: { kind: "hours", hours: 1 },
   effect: { kind: "status", status: { id: "longstrider", label: "Longstrider", speedBonusFeet: 10 } },
   upcast: { targetsPerLevel: 1 },
   aiCategory: "escape-mobility",
-  description: "Encounter mobility buff. Ally gains +10 ft speed.",
+  description: "One-hour mobility buff. Ally gains +10 ft speed.",
+});
+
+spell("pass-without-trace", {
+  name: "Pass without Trace",
+  level: 2,
+  resource: action,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  ...concentration3,
+  effect: { kind: "status", status: { id: "pass-without-trace", label: "Pass without Trace", skillBonus: 10, durationRounds: 3 } },
+  aiCategory: "escape-mobility",
+  description: "Concentration, 3 rounds. Greatly boosts skill checks in the slim model.",
 });
 
 spell("silence", {
@@ -977,9 +1038,10 @@ spell("mage_armor", {
   resource: action,
   range: { kind: "touch", feet: 5 },
   target: "ally",
+  duration: { kind: "hours", hours: 8 },
   effect: { kind: "status", status: { id: "mage-armor", label: "Mage Armor", acBonus: 3 } },
   aiCategory: "buff-opener",
-  description: "Encounter defense. Ally gains +3 AC while unarmored in the slim model.",
+  description: "Eight-hour defense. Ally gains +3 AC while unarmored in the slim model.",
 });
 
 spell("mirror_image", {
@@ -1012,10 +1074,11 @@ spell("armor_of_agathys", {
   resource: action,
   range: { kind: "self", feet: 0 },
   target: "self",
+  duration: { kind: "hours", hours: 1 },
   effect: { kind: "status", status: { id: "armor-of-agathys", label: "Armor of Agathys", tempHp: 5 } },
   upcast: { tempHpPerLevel: 5 },
   aiCategory: "defensive-reaction",
-  description: "Gain 5 temporary HP per spell level and cold retaliation in the slim model.",
+  description: "One-hour ward. Gain 5 temporary HP per spell level and cold retaliation in the slim model.",
 });
 
 spell("arms_of_hadar", {
@@ -1055,6 +1118,18 @@ spell("hellish-rebuke", {
   upcast: { dicePerLevel: 1 },
   aiCategory: "finish-target",
   description: "Reaction-style fire blast for 2d10, DEX save half. Upcast: +1d10.",
+});
+
+spell("inflict-wounds", {
+  name: "Inflict Wounds",
+  level: 1,
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "enemy",
+  effect: { kind: "attackDamage", dice: { count: 3, sides: 10 }, type: "necrotic" },
+  upcast: { dicePerLevel: 1 },
+  aiCategory: "finish-target",
+  description: "Melee spell attack for 3d10 necrotic. Upcast: +1d10.",
 });
 
 spell("cause_fear", {
@@ -1403,6 +1478,8 @@ const spellAliases = {
   burning_hands: "burning-hands",
   scorching_ray: "scorching-ray",
   misty_step: "misty-step",
+  pass_without_trace: "pass-without-trace",
+  inflict_wounds: "inflict-wounds",
   lightning_bolt: "lightning-bolt",
   hideous_laughter: "hideous-laughter",
   divine_favor: "divine-favor",

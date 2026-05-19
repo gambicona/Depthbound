@@ -26,6 +26,7 @@ window.DungeonContent.register("monsters", "armoryHaunt", {
   ],
   initiativeBonus: 3,
   speedFeet: 30,
+  flying: true,
   behavior: "melee",
   token: "W",
   tokenArt: "assets/tokens/armory-haunt.jpg",
@@ -35,6 +36,7 @@ window.DungeonContent.register("monsters", "armoryHaunt", {
     "old-guardroom",
     "caster",
     "haunt",
+    "flying",
     "slashing"
   ]
 });
@@ -898,6 +900,7 @@ window.DungeonContent.register("monsters", "lanternWraith", {
   ],
   initiativeBonus: 2,
   speedFeet: 30,
+  flying: true,
   behavior: "rangedKiter",
   token: "L",
   tokenArt: "assets/tokens/lantern-wraith.jpg",
@@ -909,6 +912,7 @@ window.DungeonContent.register("monsters", "lanternWraith", {
     "ranged",
     "caster",
     "haunt",
+    "flying",
     "necrotic"
   ]
 });

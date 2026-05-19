@@ -204,7 +204,7 @@ window.DungeonContent.register("monsters", "mossbackBear", {
 window.DungeonContent.register("monsters", "razorbeakRaptor", {
   name: "Razorbeak Raptor",
   role: "Fast forest striker",
-  tags: ["beast", "forest", "bird"],
+  tags: ["beast", "forest", "bird", "flying"],
   maxHp: 22,
   category: 2,
   xp: 130,
@@ -223,6 +223,7 @@ window.DungeonContent.register("monsters", "razorbeakRaptor", {
   ],
   initiativeBonus: 4,
   speedFeet: 45,
+  flying: true,
   behavior: "melee",
   token: "R",
   tokenArt: "assets/tokens/razorbeak-raptor.jpg",

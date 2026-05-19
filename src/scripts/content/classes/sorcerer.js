@@ -31,7 +31,7 @@ window.DungeonContent.register("classes", "sorcerer", {
   weaponProficiencies: ["dagger", "dart", "sling", "quarterstaff", "crossbow-light"],
   spellcastingAbility: "cha",
   spellPointProgression: fullCasterSpellPoints,
-  spellList: ["magic_missile", "shield", "mage_armor", "burning_hands", "thunderwave", "scorching_ray", "mirror_image", "misty_step", "fireball", "lightning_bolt"],
+  spellList: ["magic_missile", "shield", "mage_armor", "burning_hands", "thunderwave", "scorching_ray", "mirror_image", "misty_step", "fireball", "lightning_bolt", "fly"],
   cantripList: ["mage-hand", "blade-ward", "fire-bolt", "mind-sliver", "thunderclap", "chill-touch", "acid-splash", "booming-blade", "frostbite", "green-flame-blade", "poison-spray", "ray-of-frost", "shocking-grasp"],
   spells: [],
   token: "S",

@@ -1,0 +1,49 @@
+Desert Ruins asset list
+
+Theme id:
+- desertRuins
+
+Music assets to provide:
+- assets/sounds/music/desertRuins-exploration.mp3
+- assets/sounds/music/desertRuins-combat.mp3
+- assets/sounds/music/desertRuins-boss-combat.mp3
+
+New Desert Ruins furniture PNGs to provide:
+- assets/furniture/sand-drift.png
+- assets/furniture/sun-cracked-obelisk.png
+- assets/furniture/broken-amphora.png
+- assets/furniture/burial-urn.png
+- assets/furniture/date-palm-skeleton.png
+- assets/furniture/dry-well.png
+- assets/furniture/sun-brazier.png
+- assets/furniture/fallen-sandstone-block.png
+- assets/furniture/scarab-burrow.png
+- assets/furniture/mirage-crystal.png
+
+Resource node PNGs that matter especially for Desert Ruins:
+- assets/furniture/stone-outcrop.png
+- assets/furniture/gem-seam.png
+
+Existing furniture likely reused by Desert Ruins. These already have PNGs in the current asset pool, but keep them in mind if replacing or upgrading the visual set:
+- assets/furniture/big-rock.png
+- assets/furniture/dungeon-chest.png
+- assets/furniture/iron-banded-chest.png
+- assets/furniture/stone-sarcophagus.png
+- assets/furniture/broken-sarcophagus.png
+- assets/furniture/rubble-pile.png
+- assets/furniture/offering-bowl.png
+- assets/furniture/altar.png
+- assets/furniture/broken-altar.png
+- assets/furniture/cracked-statue.png
+- assets/furniture/bookshelf.png
+- assets/furniture/sealed-reliquary.png
+
+Monster/token assets:
+- Desert beast tokenArt paths are already referenced in beast-biome-pack.js.
+- Zombie token artwork depends on zombie-undead-pack.js definitions.
+
+Resource/drop notes:
+- Desert beast monsters use the existing beast material drop table: beast-hide, beast-claw, beast-fang, monster-blood, raw-meat.
+- Zombie/undead monsters use the existing undead material drop table: bone-dust, cracked-rib-bone, skull-fragment, grave-wax.
+- Desert Ruins resource nodes currently allow stone-outcrop and gem-seam, which reward stone-chip and crystal-shard.
+- No new resource item templates are required for this theme yet.

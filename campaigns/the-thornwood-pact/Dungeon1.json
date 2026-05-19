@@ -380,7 +380,35 @@
       "y": 7
     }
   },
-  "objects": [],
+  "objects": [
+    {
+      "id": "green-vines-berry-bush-1",
+      "type": "berry-bush",
+      "position": {
+        "x": 5,
+        "y": 4
+      },
+      "items": ["green-vines"]
+    },
+    {
+      "id": "green-vines-hanging-vines-1",
+      "type": "hanging-vines",
+      "position": {
+        "x": 7,
+        "y": 5
+      },
+      "items": ["green-vines"]
+    },
+    {
+      "id": "green-vines-herb-patch-1",
+      "type": "medicinal-herb-patch",
+      "position": {
+        "x": 5,
+        "y": 7
+      },
+      "items": ["green-vines"]
+    }
+  ],
   "monsters": [],
   "customItems": [],
   "goal": {

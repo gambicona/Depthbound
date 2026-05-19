@@ -56,9 +56,19 @@ window.DungeonContent.register("themes", "forestOfTheBeasts", {
   },
   monsterTagGroups: [
     ["beast", "forest"],
+    ["plant", "forest"],
+    ["plant", "jungle"],
+    ["plant", "fungus"],
+    ["elemental", "water"],
+    ["elemental", "air"],
   ],
   bossMonsterTagGroups: [
     ["beast", "forest", "boss"],
+    ["plant", "forest", "boss"],
+    ["plant", "jungle", "boss"],
+    ["plant", "fungus", "boss"],
+    ["elemental", "water", "boss"],
+    ["elemental", "air", "boss"],
   ],
   furnitureTagGroups: [
     ["forest"],
@@ -66,6 +76,26 @@ window.DungeonContent.register("themes", "forestOfTheBeasts", {
     ["rock"],
     ["chest"],
   ],
+  resourceNodeTagGroups: [
+    ["resource-node", "forest"],
+    ["resource-node", "wilds"],
+    ["resource-node", "plant"],
+    ["resource-node", "wood"],
+  ],
+  terrainFloorIds: ["water-floor", "healing-pool-floor"],
+  terrainFloorWeights: {
+    "water-floor": 5,
+    "healing-pool-floor": 0.75,
+  },
+  terrainFloors: {
+    pools: { min: 1, max: 3, chance: 1 },
+    tilesPerPool: { min: 3, max: 5 },
+    tileOverrides: {
+      "healing-pool-floor": { min: 2, max: 3 },
+    },
+    hallwayChance: 0.04,
+    doorChance: 0.025,
+  },
   furnitureSpawnChances: {
     bigRock: 0.28,
     chest: 0.2,
@@ -98,6 +128,6 @@ window.DungeonContent.register("themes", "forestOfTheBeasts", {
     corridorChance: 0.02,
     chestChance: 0.25,
   },
-  lootTableIds: ["basicDungeon"],
+  lootTableIds: ["basicDungeon", "magicForestItems"],
 });
 })();

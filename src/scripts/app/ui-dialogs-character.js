@@ -1845,7 +1845,12 @@ function switchInteractiveTutorialScene(scene) {
   const chestMoney = state.chestMoney ?? {};
   const party = state.party;
   if (scene === "home") {
-    state = createHomeState(heroes, chest, chestMoney, { ...party, campaignProgress: state.campaignProgress ?? {} });
+    state = createHomeState(heroes, chest, chestMoney, {
+      ...party,
+      campaignProgress: state.campaignProgress ?? {},
+      questFlags: state.questFlags ?? {},
+      partyResources: state.partyResources ?? {},
+    });
     state.isTutorial = true;
     state.tutorialScene = "home";
     selectedHeroIds = new Set([state.party.activeHeroId]);
@@ -2523,7 +2528,50 @@ async function chooseDungeonChoice() {
   });
 }
 
-async function startNewDungeonWithHero() {
+async function chooseRandomDungeonChoice() {
+  const themes = availableDungeonThemes();
+  if (themes.length <= 1) return themes[0]?.id ?? defaultContent.theme;
+  const themeId = await showChoiceDialog({
+    title: "Random Dungeons",
+    message: "Choose a dungeon theme.",
+    choices: themes.map((theme) => ({ value: theme.id, label: theme.name })),
+  });
+  return themeId;
+}
+
+async function chooseCustomDungeonChoice() {
+  const customDungeons = availableCustomDungeons();
+  if (!customDungeons.length) {
+    await showChoiceDialog({
+      title: "Custom Dungeons",
+      message: "No local custom dungeons are saved yet.",
+      choices: [{ value: "ok", label: "Continue" }],
+    });
+    return "";
+  }
+  if (customDungeons.length <= 1) return customDungeons[0]?.id ?? "";
+  return showChoiceDialog({
+    title: "Custom Dungeons",
+    message: "Choose a local custom dungeon.",
+    choices: customDungeons.map((dungeon) => ({ value: dungeon.id, label: dungeon.name })),
+  });
+}
+
+async function chooseDungeonSizeChoice(themeId) {
+  const theme = getContentDefinition("themes", themeId);
+  const choices = dungeonSizeOptions.map((size) => ({
+    value: size.id,
+    label: size.name,
+    description: size.description,
+  }));
+  return showChoiceDialog({
+    title: "Choose Size",
+    message: `How large should ${theme?.name ?? "this dungeon"} be?`,
+    choices,
+  });
+}
+
+async function startDungeonChoiceWithHero(choice) {
   const partyIds = state.party?.heroIds ?? ["hero"];
   const partyMembers = partyIds.map((id) => state.fighters[id]).filter((hero) => hero && !hero.dead);
   if (partyMembers.length === 0) {
@@ -2531,8 +2579,10 @@ async function startNewDungeonWithHero() {
     render();
     return;
   }
-  const choice = await chooseDungeonChoice();
   if (!choice) return;
+  const themeId = choice.startsWith("theme:") ? choice.replace(/^theme:/, "") : "";
+  const dungeonSizeId = themeId ? await chooseDungeonSizeChoice(themeId) : "";
+  if (themeId && !dungeonSizeId) return;
   const previousState = state;
   const comfortScores = homeComfortScoresForActiveParty(state);
   const customTemplate = choice.startsWith("custom:") ? window.DungeonCustom?.get(choice.slice("custom:".length)) : null;
@@ -2548,7 +2598,7 @@ async function startNewDungeonWithHero() {
   if (choice.startsWith("custom:")) {
     state = createCustomDungeonStateForParty(partyMembers, state, choice.slice("custom:".length));
   } else {
-    state = createDungeonStateForParty(partyMembers, state, choice.replace(/^theme:/, ""));
+    state = createDungeonStateForParty(partyMembers, state, themeId, dungeonSizeId);
   }
   if (!state) {
     state = previousState;
@@ -2564,10 +2614,27 @@ async function startNewDungeonWithHero() {
   }
   roomIsBuilt = false;
   hideHomeMenu();
-  addLog(`${partyMembers.map((hero) => hero.name).join(", ")} leave home for ${state.customDungeon?.name ?? getContentDefinition("themes", state.themeId)?.name ?? "a new dungeon"}.`, "important");
+  addLog(`${partyMembers.map((hero) => hero.name).join(", ")} leave home for ${state.dungeonSizeName ? `${state.dungeonSizeName} ` : ""}${state.customDungeon?.name ?? getContentDefinition("themes", state.themeId)?.name ?? "a new dungeon"}.`, "important");
   render();
   window.DepthboundPlaytest?.syncNow?.();
   centerViewOnHero();
+}
+
+async function startNewDungeonWithHero() {
+  const choice = await chooseDungeonChoice();
+  return startDungeonChoiceWithHero(choice);
+}
+
+async function startRandomDungeonWithHero(themeId = "") {
+  const selectedThemeId = themeId || await chooseRandomDungeonChoice();
+  if (!selectedThemeId) return;
+  return startDungeonChoiceWithHero(`theme:${selectedThemeId}`);
+}
+
+async function startCustomDungeonWithHero(customDungeonId = "") {
+  const selectedCustomDungeonId = customDungeonId || await chooseCustomDungeonChoice();
+  if (!selectedCustomDungeonId) return;
+  return startDungeonChoiceWithHero(`custom:${selectedCustomDungeonId}`);
 }
 
 async function showCampaignMenu(campaignId) {
@@ -2656,6 +2723,7 @@ async function returnHomeEarly() {
   });
   if (!confirmed) return;
 
+  const movedMaterials = moveInventoryPartyResourcesToSatchel(rosterHeroes());
   const hero = activeHero();
   const equippedIds = new Set(Object.values(hero.equipment).filter(Boolean));
   const carriedItems = hero.inventory.items.filter((item) => !equippedIds.has(item.id));
@@ -2672,6 +2740,8 @@ async function returnHomeEarly() {
   state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, {
     ...state.party,
     campaignProgress: state.campaignProgress ?? {},
+    questFlags: state.questFlags ?? {},
+    partyResources: state.partyResources ?? {},
     home: state.home,
     monsterCompendium: state.monsterCompendium,
   });
@@ -2679,6 +2749,7 @@ async function returnHomeEarly() {
   roomIsBuilt = false;
   const lostItemText = lostItems.length ? lostItems.map((item) => item.name).join(", ") : "no items";
   addLog(`${hero.name} retreats home, losing ${lostItemText} and ${moneyText(cpToMoney(lostCoins))}.`, "important");
+  if (movedMaterials > 0) addLog(`${movedMaterials} material${movedMaterials === 1 ? "" : "s"} stay safe in the party's Material Satchel.`, "important");
   render();
   window.DepthboundPlaytest?.syncNow?.();
   centerViewOnHero();

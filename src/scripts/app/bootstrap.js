@@ -26,11 +26,14 @@ let adminTeleportEnabled = false;
 let adminGodMode = false;
 let inventoryAdminOpen = false;
 let adminMonsterCatalogOpen = false;
+let adminProgressOpen = false;
 let combatLogExpanded = false;
 let roomScrollAnimation = null;
 let inventoryAdminSearch = "";
 let adminMonsterSearch = "";
 let storeSearch = "";
+let activeStoreNpcId = "general-merchant";
+let questSatchelOpen = false;
 let adminItemInstanceCounter = 0;
 let activeDialogCancel = null;
 let currentMusicKey = "";
@@ -52,8 +55,8 @@ let renderedTileKeys = new Set();
 let pathfindingJobsThisTurn = 0;
 let perfOverlayElement = null;
 const activeCorridorRadius = 14;
-const monsterAiDecisionIntervalMs = 250;
-const monsterPathfindingBudgetPerTurn = 6;
+const monsterAiDecisionIntervalMs = Number(window.DungeonPlaytestTuning?.performance?.monsterAiDecisionIntervalMs ?? 250) || 250;
+const monsterPathfindingBudgetPerTurn = Number(window.DungeonPlaytestTuning?.performance?.monsterPathfindingBudgetPerTurn ?? 6) || 6;
 const perfStats = {
   frames: 0,
   lastSecondAt: performance.now(),
@@ -274,7 +277,7 @@ const speciesDefinitions = {
     },
     subraces: {
       chromatic: { name: "Chromatic", dragonCategory: "chromatic" },
-      gem: { name: "Gem", dragonCategory: "gem" },
+      gem: { name: "Gem", dragonCategory: "gem", traits: ["Gem Flight active at level 5 as spectral wings."] },
       metallic: { name: "Metallic", dragonCategory: "metallic" },
     },
   },
@@ -340,9 +343,21 @@ const speciesDefinitions = {
       traits: ["Celestial Resistance: necrotic and radiant damage resistance.", "Healing Hands: heal a nearby hero once per long rest."],
     },
     subraces: {
-      protector: { name: "Protector", abilityBonuses: { wis: 1 }, traits: ["Radiant Soul active at level 3 as a radiant combat transformation."] },
+      protector: { name: "Protector", abilityBonuses: { wis: 1 }, traits: ["Radiant Soul active at level 3 as a flying radiant combat transformation."] },
       scourge: { name: "Scourge", abilityBonuses: { con: 1 }, traits: ["Radiant Consumption active at level 3 as a dangerous radiant combat transformation."] },
       fallen: { name: "Fallen", abilityBonuses: { str: 1 }, traits: ["Necrotic Shroud active at level 3 as a frightening necrotic combat transformation."] },
+    },
+  },
+  aarakocra: {
+    name: "Aarakocra",
+    base: {
+      abilityBonuses: { dex: 2, wis: 1 },
+      speedFeet: 50,
+      flying: true,
+      traits: ["Flight: this character is flying for movement and floor-trigger rules."],
+    },
+    subraces: {
+      "elemental-evil": { name: "Elemental Evil" },
     },
   },
   goliath: {
@@ -352,7 +367,8 @@ const speciesDefinitions = {
       speedFeet: 30,
       damageResistances: ["cold"],
       skillProficiencies: ["athletics"],
-      traits: ["Natural Athlete: Athletics proficiency.", "Stone's Endurance: reaction damage reduction once per short rest.", "Mountain Born: cold damage resistance."],
+      powerfulBuild: true,
+      traits: ["Natural Athlete: Athletics proficiency.", "Powerful Build: counts as one size larger for carrying and push/drag/lift weight.", "Stone's Endurance: reaction damage reduction once per short rest.", "Mountain Born: cold damage resistance."],
     },
     subraces: {
       "elemental-evil": { name: "Elemental Evil" },
@@ -379,7 +395,7 @@ const speciesDefinitions = {
       traits: ["Elemental heritage."],
     },
     subraces: {
-      air: { name: "Air", abilityBonuses: { dex: 1 }, speedFeet: 30, spellTraits: ["Levitate active at level 3"] },
+      air: { name: "Air", abilityBonuses: { dex: 1 }, speedFeet: 30, spellTraits: ["Levitate active at level 3 as a flying defensive lift"] },
       earth: { name: "Earth", abilityBonuses: { str: 1 }, spellTraits: ["Blade Ward cantrip", "Pass without Trace stored for future stealth rules"] },
       fire: { name: "Fire", abilityBonuses: { int: 1 }, damageResistances: ["fire"], traits: ["Fire Resistance: fire damage resistance."], spellTraits: ["Produce Flame cantrip", "Burning Hands active at level 3"] },
       water: { name: "Water", abilityBonuses: { wis: 1 }, damageResistances: ["acid"], traits: ["Acid Resistance: acid damage resistance."], spellTraits: ["Acid Splash cantrip"] },
@@ -497,7 +513,16 @@ const els = {
   closeActionMenu: document.querySelector("#close-action-menu"),
   homeMenu: document.querySelector("#home-menu"),
   closeHomeMenu: document.querySelector("#close-home-menu"),
-  goStore: document.querySelector("#go-store"),
+  homeMainActions: document.querySelector("#home-main-actions"),
+  homeAdventureActions: document.querySelector("#home-adventure-actions"),
+  homeMainStoryActions: document.querySelector("#home-main-story-actions"),
+  homeRandomDungeonActions: document.querySelector("#home-random-dungeon-actions"),
+  homeCustomDungeonActions: document.querySelector("#home-custom-dungeon-actions"),
+  goVillage: document.querySelector("#go-village"),
+  goAdventure: document.querySelector("#go-adventure"),
+  villageMenu: document.querySelector("#village-menu"),
+  villageBody: document.querySelector("#village-body"),
+  closeVillage: document.querySelector("#close-village"),
   buildHome: document.querySelector("#build-home"),
   goBarrowCrown: document.querySelector("#go-barrow-crown"),
   goThornwoodPact: document.querySelector("#go-thornwood-pact"),
@@ -508,9 +533,12 @@ const els = {
   storeMenu: document.querySelector("#store-menu"),
   storeBody: document.querySelector("#store-body"),
   closeStore: document.querySelector("#close-store"),
+  backStoreVillage: document.querySelector("#back-store-village"),
   log: document.querySelector("#combat-log"),
   roundLabel: document.querySelector("#round-label"),
   turnLabel: document.querySelector("#turn-label"),
+  dungeonTimerLabel: document.querySelector("#dungeon-timer-label"),
+  toggleDungeonTimer: document.querySelector("#toggle-dungeon-timer"),
   initiativeList: document.querySelector("#initiative-list"),
   rollInitiative: document.querySelector("#roll-initiative"),
   selectParty: document.querySelector("#select-party"),

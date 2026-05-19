@@ -1,0 +1,159 @@
+Furniture Unique Interaction Ideas
+
+Purpose:
+This is a design pass only. Nothing here has been implemented yet.
+The goal is to identify furniture that deserves a very distinct interaction instead of just "inspect for loot" or "step on hazard".
+
+General rule:
+Only make a furniture interaction unique if it changes a decision. If it is just another small loot roll, keep it generic.
+
+Suggested interaction shape:
+- One party attempt per object unless otherwise stated.
+- give tooltip on what it does and what skill to use so the player can choose the best fitting hero
+- Add dungeon time cost where useful: 5 minutes for quick interaction, 10 minutes for careful work, 20 minutes for complex machinery or rituals.
+- Better rolls should improve the result. Example: DC success gives the basic reward, success by 5 gives bonus reward, success by 10 gives a rare reward or no drawback.
+- Failure should usually cost time, trigger a hazard, make noise, or give a smaller reward instead of doing nothing.
+
+Underused skills to lean into:
+- Arcana: mana wells, crystals, portals, runes, arcane machinery.
+- Religion: altars, reliquaries, fonts, idols, undead burial objects, infernal contracts.
+- History: statues, obelisks, old records, sarcophagi, noble trophies.
+- Insight: cursed mirrors, contracts, confession screens, strange idols.
+- Performance: instruments, ritual resonance, calming echo chambers, infernal choirs.
+- Persuasion / Intimidation / Deception: soul cages, contracts, cursed mirrors, sentient objects.
+- Sleight of Hand: valves, locks, chain hoists, delicate traps, scroll cases.
+- Animal Handling: nests, burrows, beast crates, egg sacs.
+- Acrobatics: chasms, conveyor belts, unstable beams, quicksand escape.
+
+Highest-priority unique interactions
+
+mana-well | Mana Well
+- Check: Arcana DC 13.
+- Success: the using spellcaster regains spell points equal to proficiency bonus, minimum 2.
+- Success by 5: regain proficiency bonus + INT/WIS/CHA spellcasting modifier, minimum 3.
+- Failure: force damage or mana backlash; possibly lose 1 spell point if they have any.
+- Time: 10 minutes.
+- Notes: This is the cleanest "spellcaster resource fountain" object.
+
+rune-circle | Rune Circle
+- Check: Arcana or Religion DC 14.
+- Success: Hero gain +1 to spell save DC or +1 to saving throws against magic until next long rest/home.
+- Success by 5: apply to two party members.
+- Failure: rune flare, force damage, or summons a fitting guardian.
+- Time: 10 minutes.
+
+soul-cage | Soul Cage
+- Check: Persuasion, Intimidation, or Religion DC 16.
+- Success: free or command a soul. Freeing gives party-wide temp HP; commanding gives one necrotic/psychic damage pulse in next combat.
+- Failure: psychic damage and frightened/shaken.
+- Time: 10 minutes.
+
+contract-lectern | Contract Lectern
+- Check: Insight, Religion, or Deception DC 15.
+- Success: find a loophole; party gains fire resistance for one encounter or removes one curse-like penalty.
+- Success by 5: also gain a small treasure/contract token.
+- Failure: infernal fine print; one party member gains fire vulnerability for next encounter or loses hit points.
+- Time: 10 minutes.
+
+
+cursed-mirror | Cursed Mirror
+- Check: Insight or Arcana DC 14.
+- Success: read a future reflection; party gains advantage/bonus on next initiative or next saving throw.
+- Success by 5: reveal the nearest boss/treasure room.
+- Failure: psychic damage or a mirrored duplicate monster spawns.
+- Time: 5 minutes.
+
+spellbook-stand | Spellbook Stand
+- Check: Arcana DC 13.
+- Success: a wizard/warlock/sorcerer gains 1 spell point or a one-use scroll-like cast of a low spell.
+- Success by 5: gain both.
+- Failure: book snaps shut and deals force damage.
+- Time: 10 minutes.
+
+arcane-lectern | Arcane Lectern
+- Check: Arcana or History DC 14.
+- Success: identify the dungeon's active magical hazards, revealing traps or terrain floors in nearby rooms.
+- Success by 5: disarm one visible magical trap at range.
+- Failure: glyph misread; active trap pulse.
+- Time: 10 minutes.
+
+glyph-carved-pillar | Glyph-Carved Pillar
+- Check: Arcana or Sleight of Hand DC 15.
+- Success: rotate glyphs to mark the exit of the dungeon.
+- Failure: force trap triggers.
+- Time: 10 minutes.
+
+confession-screen | Confession Screen
+- Check: Insight, Persuasion, or Religion DC 13.
+- Success: one party member sheds fear/guilt; remove frightened/shaken/drained if present, or gain +1 save bonus next combat.
+- Failure: intrusive whispers; WIS save or shaken.
+- Time: 5 minutes.
+
+offering-bowl / offering-table / ritual-altar / altar / broken-altar
+- Check: Religion DC 13, or History DC 15 for old cult context.
+- Success: leave a small coin/material offering for a blessing. Blessing could be temp HP, +1 save, or undead/fiend ward.
+- Success by 5: blessing affects whole party.
+- Failure: improper rite; trap/hazard pulse or hostile spawn.
+- Time: 10 minutes.
+
+sacred-font
+- Check: Religion or Medicine DC 13.
+- Success: purify; restore HP or remove poisoned/diseased-like status.
+- Success by 5: create one holy-water style consumable.
+- Failure: tainted water; poison/necrotic damage.
+- Time: 10 minutes.
+
+
+burial-urn / broken-sarcophagus / stone-sarcophagus
+- Check: Religion or History DC 14.
+- Success: respectfully open; treasure without undead ambush.
+- Failure: ghost/skeleton ambush or necrotic damage.
+- Time: 10 minutes.
+
+
+mirage-crystal
+- Check: Arcana or Insight DC 14.
+- Success: dispel false images; reveal hidden furniture/traps in nearby rooms.
+- Success by 5: create a one-use illusion decoy.
+- Failure: party suffers perception penalty until next room.
+- Time: 5 minutes.
+
+
+subterranean-egg-cluster / webbed-egg-sac / rot-grub-nest
+- Check: Nature, Medicine, or Animal Handling DC 14.
+- Success: extract rare biological material.
+- Failure: poison/acid hazard or hatchling ambush.
+- Time: 10 minutes.
+
+blackwater-spring / underground-pool / bog-pool
+- Check: Nature, Medicine, or Survival DC 13.
+- Success: identify safe use; restore small HP, remove poison, or harvest reagent depending pool.
+- Failure: poison/necrotic damage.
+- Time: 5 minutes.
+
+
+acid-weeping-wall / acid-pool / acid-floor
+- Check: Nature, Arcana, or Alchemist-style Investigation DC 14.
+- Success: neutralize/collect acid; gain acid vial or clear a few tiles.
+- Failure: acid splash.
+- Time: 10 minutes.
+
+lava-floor / molten-slag / brimstone-cluster / hell-forge / forge-furnace
+- Check: Arcana, Athletics, or smith-flavored Investigation DC 14.
+- Success: draw heat into forge material; gain hellfire-ember, slag-glass, or temporary fire damage on next weapon hit.
+- Failure: fire damage.
+- Time: 10 minutes.
+
+anvil
+- Check: History, Athletics, or relevant crafting/tinker hook DC 13.
+- Success: tune a weapon/armor for one dungeon: +1 damage on one weapon or +1 AC until next combat ends.
+- Success by 5: no material cost.
+- Failure: time loss or damaged tool/material.
+- Time: 20 minutes.
+
+
+incense-burner / brazier / infernal-brazier / sun-brazier
+- Check: Religion, Arcana, or Medicine DC 13.
+- Success: grant resistance to poison/fire/radiant depending theme.
+- Failure: smoke condition or fire damage.
+- Time: 5 minutes.

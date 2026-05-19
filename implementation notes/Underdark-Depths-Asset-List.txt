@@ -1,0 +1,61 @@
+UNDERDARK DEPTHS ASSET LIST
+
+Purpose:
+Assets needed for the Underdark Depths random dungeon theme.
+
+Theme music:
+- assets/sounds/music/underdarkDepths-exploration.mp3
+- assets/sounds/music/underdarkDepths-combat.mp3
+- assets/sounds/music/underdarkDepths-boss-combat.mp3
+
+New furniture PNGs:
+- assets/furniture/glowcap-grove.png
+- assets/furniture/mycelium-nest.png
+- assets/furniture/crystal-stalagmite-cluster.png
+- assets/furniture/chitin-husk.png
+- assets/furniture/webbed-egg-sac.png
+- assets/furniture/blind-stone-idol.png
+- assets/furniture/blackwater-spring.png
+- assets/furniture/acid-weeping-wall.png
+- assets/furniture/echo-chasm.png
+- assets/furniture/petrified-mushroom-tree.png
+
+New resource node PNG:
+- assets/furniture/glowcap-cluster-node.png
+
+Existing shared cave/underdark furniture used:
+- stalagmite.png
+- stalactite-cluster.png
+- crystal-growth.png
+- razor-crystal-patch.png
+- glow-mushroom.png
+- spore-mushroom.png
+- giant-mushroom.png
+- fungal-mat.png
+- underground-pool.png
+- acid-pool.png
+- mineral-vein.png
+- cave-in-rubble.png
+- bone-nest.png
+- webbed-passage.png
+- chitin-pile.png
+- steam-vent.png
+- gas-vent.png
+- narrow-rock-column.png
+- loose-scree.png
+- subterranean-egg-cluster.png
+
+Terrain:
+- Uses existing water-floor.
+- Uses existing acid-floor.
+- Uses existing healing-pool-floor rarely.
+
+Monster tokens:
+- Uses beast underground monsters from beast-biome-pack.js.
+- Uses plant underdark monsters from plant-creature-pack.js.
+- See Plant-Creature-Pack-Asset-List.txt for plant token assets.
+
+Notes:
+- Theme id: underdarkDepths.
+- Theme-specific furniture tag: underdark-depths.
+- The beast pack currently uses the tag "underground" for underdark-style beasts, while plant creatures use "underdark". The theme intentionally matches both naming styles.

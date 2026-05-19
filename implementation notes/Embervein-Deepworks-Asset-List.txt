@@ -1,0 +1,70 @@
+The Embervein Deepworks Asset List
+
+Music:
+- assets/sounds/music/emberveinDeepworks-exploration.mp3
+- assets/sounds/music/emberveinDeepworks-combat.mp3
+- assets/sounds/music/emberveinDeepworks-boss-combat.mp3
+
+Furniture images already referenced by the existing forge/mine furniture:
+- assets/furniture/minecart.png
+- assets/furniture/ore-cart.png
+- assets/furniture/anvil.png
+- assets/furniture/forge-furnace.png
+- assets/furniture/cooling-trough.png
+- assets/furniture/coal-pile.png
+- assets/furniture/molten-slag.png
+- assets/furniture/tool-rack.png
+- assets/furniture/chain-hoist.png
+- assets/furniture/steam-pipe.png
+- assets/furniture/pressure-valve.png
+- assets/furniture/broken-gear-assembly.png
+- assets/furniture/oil-barrel.png
+- assets/furniture/reinforced-crate.png
+- assets/furniture/workbench.png
+- assets/furniture/mine-support-beam.png
+- assets/furniture/powder-keg.png
+- assets/furniture/conveyor-belt.png
+- assets/furniture/drill-rig.png
+- assets/furniture/locked-supply-locker.png
+
+Monster token images:
+- assets/tokens/soot-tunnel-rat.jpg
+- assets/tokens/coal-dust-goblin.jpg
+- assets/tokens/bent-gear-scarab.jpg
+- assets/tokens/sootbeard-shift-boss.jpg
+- assets/tokens/furnace-mephit.jpg
+- assets/tokens/ore-shell-crawler.jpg
+- assets/tokens/deep-dwarf-chain-guard.jpg
+- assets/tokens/chain-hoist-overseer.jpg
+- assets/tokens/slag-slime.jpg
+- assets/tokens/animated-anvil.jpg
+- assets/tokens/steam-pipe-gremlin.jpg
+- assets/tokens/furnace-ward-guardian.jpg
+- assets/tokens/magma-vein-loper.jpg
+- assets/tokens/powder-keg-saboteur.jpg
+- assets/tokens/broken-gear-horror.jpg
+- assets/tokens/slagmaw-brute.jpg
+- assets/tokens/black-furnace-drow-overseer.jpg
+- assets/tokens/smoke-belcher.jpg
+- assets/tokens/awakened-support-beam.jpg
+- assets/tokens/red-valve-engine.jpg
+- assets/tokens/ore-eating-wormling.jpg
+- assets/tokens/hellfire-stoker.jpg
+- assets/tokens/salamander-forge-noble.jpg
+- assets/tokens/master-of-broken-gears.jpg
+- assets/tokens/adamantine-mine-golem.jpg
+- assets/tokens/glass-slag-elemental.jpg
+- assets/tokens/infernal-chainwright.jpg
+- assets/tokens/ironthane-of-the-deepworks.jpg
+- assets/tokens/conveyor-belt-devourer.jpg
+- assets/tokens/living-black-oil.jpg
+- assets/tokens/volcanic-deep-drake.jpg
+- assets/tokens/forgeheart-colossus.jpg
+- assets/tokens/embervein-pit-engineer.jpg
+- assets/tokens/orevein-titan.jpg
+- assets/tokens/pressure-core-elemental.jpg
+- assets/tokens/queen-of-cinders-and-chains.jpg
+- assets/tokens/primordial-slag-ancient.jpg
+- assets/tokens/catastrophe-engine.jpg
+- assets/tokens/world-anvil-dragon.jpg
+- assets/tokens/the-embervein-awakened.jpg

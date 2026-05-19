@@ -177,6 +177,11 @@ function checkConcentrationAfterDamage(fighter, damage) {
   if (isSidekickSpellcaster(fighter) && (fighter.level ?? 1) >= 20) return;
   const dc = Math.max(10, Math.floor(damage / 2));
   const save = savingThrow(fighter, "con", dc);
+  if (!save.success && fighterHasFeat(fighter, "war-caster")) {
+    const reroll = savingThrow(fighter, "con", dc);
+    if (reroll.total > save.total) Object.assign(save, reroll);
+    addLog(`${fighter.name}'s War Caster focus rerolls concentration: ${reroll.roll} ${abilityLabel(reroll.bonus)} = ${reroll.total}.`, "important");
+  }
   if (warlockKnowsInvocation(fighter, "eldritchMind")) {
     save.total += 5;
     save.success = save.total >= dc;
@@ -415,11 +420,13 @@ function resetTurnResources(fighter) {
   fighter.zealotDivineFuryUsedThisTurn = false;
   fighter.beastFormHitThisTurn = false;
   fighter.beastClawExtraUsedThisTurn = false;
+  fighter.mobileNoOpportunityFrom = [];
   fighter.hasBonusAction = !actionLocked;
   fighter.hasReaction = !actionLocked;
   fighter.dodging = false;
   fighter.disengaged = false;
   fighter.canMoveThroughMonsters = false;
+  standUpFromProneAtTurnStart(fighter);
   void applyPersistentSpellAreasAtTurnStart(fighter);
   if (fighter.subclassId === "champion" && (fighter.level ?? 1) >= 18 && fighter.hp > 0 && fighter.hp <= Math.floor((fighter.maxHp ?? 1) / 2)) {
     const healed = Math.min((fighter.maxHp ?? 1) - fighter.hp, Math.max(1, 5 + abilityMod(fighter, "con")));
@@ -1090,28 +1097,7 @@ async function maybeUseWarriorDefender(attacker, target) {
 }
 
 function tickStatusDurations(fighter) {
-  if (!fighter?.statusEffects?.length) return;
-  const expired = [];
-  const expiredEffects = [];
-  fighter.statusEffects = fighter.statusEffects
-    .map((effect) => {
-      if (!effect.durationRounds) return effect;
-      return { ...effect, durationRounds: effect.durationRounds - 1 };
-    })
-    .filter((effect) => {
-      const keep = !effect.durationRounds || effect.durationRounds > 0;
-      if (!keep) {
-        expired.push(effect.label ?? effect.id);
-        expiredEffects.push(effect);
-      }
-      return keep;
-    });
-  if (expiredEffects.some((effect) => effect.id === "dominated")) {
-    fighter.team = undefined;
-    fighter.friendly = false;
-    addLog(`${fighter.name} shakes off domination and turns hostile again.`, "important");
-  }
-  if (expired.length) addLog(`${fighter.name}'s ${expired.join(", ")} ${expired.length === 1 ? "expires" : "expire"}.`);
+  expireTimedEffectsForFighter(fighter);
 }
 
 function removeSummonedAllies(reason = "fade") {
@@ -1135,6 +1121,182 @@ function attacksPerAttackAction(fighter) {
   if (!["barbarian", "fighter", "monk", "paladin", "ranger"].includes(fighter?.classId)) return 1;
   if (fighter.classId === "fighter") return level >= 20 ? 4 : level >= 11 ? 3 : level >= 5 ? 2 : 1;
   return level >= 5 ? 2 : 1;
+}
+
+function consumeAttackFromAction(fighter) {
+  if (!fighter?.hasAction) return false;
+  fighter.attacksRemaining = Math.max(0, (fighter.attacksRemaining ?? attacksPerAttackAction(fighter)) - 1);
+  fighter.hasAction = fighter.attacksRemaining > 0;
+  return true;
+}
+
+function fighterStatusEffect(fighter, id) {
+  return (fighter?.statusEffects ?? []).find((effect) => effect.id === id) ?? null;
+}
+
+function removeStatusEffect(fighter, id) {
+  if (!fighter) return false;
+  const before = fighter.statusEffects?.length ?? 0;
+  fighter.statusEffects = (fighter.statusEffects ?? []).filter((effect) => effect.id !== id);
+  if ((fighter.statusEffects?.length ?? 0) === before) return false;
+  refreshDerivedStats(fighter);
+  return true;
+}
+
+function standUpFromProneAtTurnStart(fighter) {
+  if (!fighterStatusEffect(fighter, "prone") || isPlayerControlledPartyFighter(fighter)) return false;
+  const costFeet = Math.max(feetPerSquare, Math.ceil((fighter.speedFeet ?? 30) / 2 / feetPerSquare) * feetPerSquare);
+  const costSquares = Math.max(1, Math.ceil(costFeet / feetPerSquare));
+  fighter.movementLeft = Math.max(0, (fighter.movementLeft ?? 0) - costSquares);
+  removeStatusEffect(fighter, "prone");
+  addLog(`${fighter.name} gets back up from prone, spending ${costSquares * feetPerSquare} ft of movement.`, "important");
+  return true;
+}
+
+function rollContestCheck(actor, ability, skillId = null) {
+  const rollResult = rollD20ForFighter(actor);
+  const roll = skillId ? reliableTalentRoll(actor, skillId, rollResult.roll) : rollResult.roll;
+  const bonus = skillId ? skillCheckBonus(actor, ability, skillId) : abilityMod(actor, ability);
+  return { actor, ability, skillId, rollResult, roll, bonus, total: roll + bonus };
+}
+
+function rollAthleticsContest(actor) {
+  return rollContestCheck(actor, "str", "athletics");
+}
+
+function rollBestStrengthDexContest(actor) {
+  const strBonus = abilityMod(actor, "str");
+  const dexBonus = abilityMod(actor, "dex");
+  return rollContestCheck(actor, dexBonus > strBonus ? "dex" : "str");
+}
+
+function logContestCheck(result, label, targetTotal, success) {
+  const skillText = result.skillId ? " (Athletics)" : "";
+  addAdminCheckLog({
+    actor: result.actor,
+    label: `${label} ${result.ability.toUpperCase()}${skillText}`,
+    rollResult: result.rollResult,
+    bonus: result.bonus,
+    total: result.total,
+    dc: targetTotal,
+    success,
+  });
+}
+
+function contestedManeuverCheck(attacker, defender, label) {
+  const attackerCheck = rollAthleticsContest(attacker);
+  const defenderCheck = rollBestStrengthDexContest(defender);
+  const success = attackerCheck.total > defenderCheck.total;
+  addLog(
+    `${attacker.name} ${label}: Athletics ${attackerCheck.roll} ${abilityLabel(attackerCheck.bonus)} = ${attackerCheck.total} vs ${defender.name}'s ${defenderCheck.ability.toUpperCase()} ${defenderCheck.roll} ${abilityLabel(defenderCheck.bonus)} = ${defenderCheck.total}.`,
+    "important",
+  );
+  logContestCheck(attackerCheck, label, defenderCheck.total, success);
+  logContestCheck(defenderCheck, `resists ${label}`, attackerCheck.total, !success);
+  recordD20OutcomeForFighter(attacker, success);
+  return { attackerCheck, defenderCheck, success };
+}
+
+function applyGrappledCondition(target, grappler) {
+  applyStatusEffect(target, { id: "grappled", label: "Grappled", speedLocked: true, grappledBy: grappler.id });
+  addLog(`${target.name} is grappled and cannot move.`, "important");
+}
+
+function applyProneCondition(target, source = "shove") {
+  applyStatusEffect(target, { id: "prone", label: "Prone", attackBonus: -2, prone: true, source });
+  addLog(`${target.name} falls prone.`, "important");
+}
+
+function canPushTargetToPosition(attacker, target, position) {
+  if (!position || !window.DungeonGrid.isInsideGrid(position, currentGridSize())) return false;
+  if (!currentWalkable(target).has(positionKey(position))) return false;
+  if (window.DungeonGrid.isOccupied(position, state.fighters, target)) return false;
+  const dx = Math.abs(position.x - target.position.x);
+  const dy = Math.abs(position.y - target.position.y);
+  if (dx + dy === 1) return canTraverseMovementEdge(target, target.position, position, []);
+  if (Math.max(dx, dy) !== 1) return false;
+  const cornerA = { x: position.x, y: target.position.y };
+  const cornerB = { x: target.position.x, y: position.y };
+  const walkable = currentWalkable(target);
+  return (
+    (walkable.has(positionKey(cornerA)) && canTraverseMovementEdge(target, target.position, cornerA, []) && canTraverseMovementEdge(target, cornerA, position, [])) ||
+    (walkable.has(positionKey(cornerB)) && canTraverseMovementEdge(target, target.position, cornerB, []) && canTraverseMovementEdge(target, cornerB, position, []))
+  );
+}
+
+function shovePushDestination(attacker, target) {
+  const dx = Math.sign(target.position.x - attacker.position.x);
+  const dy = Math.sign(target.position.y - attacker.position.y);
+  if (!dx && !dy) return null;
+  return { x: target.position.x + dx, y: target.position.y + dy };
+}
+
+function pushTargetAway(attacker, target) {
+  const destination = shovePushDestination(attacker, target);
+  if (!canPushTargetToPosition(attacker, target, destination)) {
+    addLog(`${target.name} cannot be pushed farther away from ${attacker.name}.`, "important");
+    return false;
+  }
+  target.position = destination;
+  triggerTrapAtPosition(target, destination);
+  addLog(`${attacker.name} shoves ${target.name} 5 ft away.`, "important");
+  return true;
+}
+
+async function performGrappleAction(attacker, target) {
+  if (!attacker?.hasAction || !target?.alive || objectIsDestructible(target) || !hasMeleeAccess(attacker, target)) return false;
+  if (!consumeAttackFromAction(attacker)) return false;
+  const contest = contestedManeuverCheck(attacker, target, "tries to grapple");
+  if (contest.success) applyGrappledCondition(target, attacker);
+  else addLog(`${target.name} avoids the grapple.`, "important");
+  render();
+  return true;
+}
+
+async function performShoveAction(attacker, target, mode = "prone") {
+  if (!attacker?.hasAction || !target?.alive || objectIsDestructible(target) || !hasMeleeAccess(attacker, target)) return false;
+  if (!consumeAttackFromAction(attacker)) return false;
+  const contest = contestedManeuverCheck(attacker, target, mode === "push" ? "tries to shove away" : "tries to shove prone");
+  if (contest.success) {
+    if (mode === "push") pushTargetAway(attacker, target);
+    else applyProneCondition(target);
+  } else {
+    addLog(`${target.name} holds their ground.`, "important");
+  }
+  render();
+  return true;
+}
+
+async function attemptGrappleEscape(grappled) {
+  const effect = fighterStatusEffect(grappled, "grappled");
+  if (!effect) return false;
+  const grappler = state.fighters?.[effect.grappledBy];
+  if (!grappler?.alive || !hasMeleeAccess(grappler, grappled)) {
+    removeStatusEffect(grappled, "grappled");
+    addLog(`${grappled.name} is no longer grappled.`, "important");
+    render();
+    return false;
+  }
+  if (!grappled.hasAction) return false;
+  const escapeCheck = rollBestStrengthDexContest(grappled);
+  const holdCheck = rollAthleticsContest(grappler);
+  const escaped = escapeCheck.total > holdCheck.total;
+  grappled.hasAction = false;
+  grappled.attacksRemaining = 0;
+  addLog(
+    `${grappled.name} tries to escape the grapple: ${escapeCheck.ability.toUpperCase()} ${escapeCheck.roll} ${abilityLabel(escapeCheck.bonus)} = ${escapeCheck.total} vs ${grappler.name}'s Athletics ${holdCheck.roll} ${abilityLabel(holdCheck.bonus)} = ${holdCheck.total}.`,
+    "important",
+  );
+  logContestCheck(escapeCheck, "escapes grapple with", holdCheck.total, escaped);
+  logContestCheck(holdCheck, "maintains grapple with", escapeCheck.total, !escaped);
+  if (escaped) {
+    removeStatusEffect(grappled, "grappled");
+    addLog(`${grappled.name} breaks free of ${grappler.name}'s grapple.`, "important");
+  } else {
+    addLog(`${grappled.name} cannot break free.`, "important");
+  }
+  render();
+  return true;
 }
 
 function sneakAttackDice(fighter) {
@@ -1257,6 +1419,10 @@ function scrollRoomToGridPoint(point) {
   els.roomScroll.scrollTop = clamp(scrollTop, 0, maxScrollTop);
 }
 
+function refreshRoomScrollMode() {
+  els.roomScroll?.classList.toggle("home-builder-scroll", typeof isHomeBuilderOpen === "function" && isHomeBuilderOpen());
+}
+
 function animateScrollRoomToGridPoint(point, duration = 180) {
   if (!point || !els.roomScroll || !els.room) return;
 
@@ -1329,9 +1495,9 @@ function renderKeepingGridFocus(point) {
   window.requestAnimationFrame(() => scrollRoomToGridPoint(point));
 }
 
-function currentWalkable() {
+function currentWalkable(fighter = null) {
   const walkable = new Set((state.dungeon?.walkable ?? []).map(positionKey));
-  blockingObjectKeys().forEach((tileKey) => walkable.delete(tileKey));
+  blockingObjectKeys(fighter).forEach((tileKey) => walkable.delete(tileKey));
   return walkable;
 }
 
@@ -1551,7 +1717,7 @@ function surroundingCells(position) {
   return cells;
 }
 
-function visibleWalkable() {
+function visibleWalkable(fighter = null) {
   const known = new Set();
   const openedKeys = currentOpenedKeys();
   const discovered = currentDiscoveredRoomIds();
@@ -1576,7 +1742,7 @@ function visibleWalkable() {
       known.add(positionKey(door));
     }
   }
-  blockingObjectKeys().forEach((tileKey) => known.delete(tileKey));
+  blockingObjectKeys(fighter).forEach((tileKey) => known.delete(tileKey));
   return known;
 }
 
@@ -1936,7 +2102,8 @@ function canOffHandAttack(fighter) {
   const main = weaponFromSlot(fighter, "mainHand");
   const offHand = weaponFromSlot(fighter, "offHand");
   if (!main?.damage || !offHand?.damage) return false;
-  if (!main.properties?.includes("light") || !offHand.properties?.includes("light")) return false;
+  if (!fighterHasFeat(fighter, "dual-wielder") && (!main.properties?.includes("light") || !offHand.properties?.includes("light"))) return false;
+  if (fighterHasFeat(fighter, "dual-wielder") && (main.properties?.includes("two-handed") || offHand.properties?.includes("two-handed") || weaponIsRanged(main) || weaponIsRanged(offHand))) return false;
   const target = attackTarget();
   if (!target) return false;
   const profile = damageProfile(fighter, { weapon: offHand, includeDamageModifier: false });
@@ -1969,6 +2136,7 @@ function hostileTo(fighter, candidate) {
 function canOpportunityAttack(attacker, defender, from, to) {
   if (state.mode !== "combat" || !attacker.alive || !defender.alive || !hostileTo(attacker, defender)) return false;
   if (defender.disengaged) return false;
+  if (fighterHasFeat(defender, "mobile") && (defender.mobileNoOpportunityFrom ?? []).includes(attacker.id)) return false;
   const profile = opportunityAttackProfile(attacker);
   const range = profileRangeSquares(profile);
   const hadThreat = attackGridDistance(attacker.position, from) <= range;
@@ -2075,6 +2243,10 @@ async function opportunityAttack(attacker, defender) {
   totalDamage = await maybeUseProtectiveField(defender, totalDamage);
   applyDamageToFighter(defender, totalDamage);
   defender.lastDamagedById = attacker.id;
+  if (fighterHasFeat(attacker, "sentinel") && defender.alive) {
+    defender.movementLeft = 0;
+    addLog(`${attacker.name}'s Sentinel stops ${defender.name}'s movement.`, "important");
+  }
   await maybeUseSubclassAfterDamageReactions(defender, attacker, totalDamage, true);
   const adjustmentNote = resolvedPackets
     .filter((packet) => packet.reason)
@@ -2290,16 +2462,33 @@ function checkDungeonCompletion(hero = activeHero()) {
   playSoundEffect("exitReached");
   const outro = state.customDungeon?.outro;
   const finishDungeon = () => {
+    const completedContext = {
+      themeId: state.themeId,
+      campaignId: state.campaignId,
+      campaignIndex: state.campaignIndex,
+    };
     const completedCampaign = state.campaignId && state.campaignIndex ? { ...state.campaignProgress } : state.campaignProgress;
+    const questFlags = { ...(state.questFlags ?? {}) };
+    const partyResources = normalizePartyResources(state.partyResources ?? {});
     if (state.campaignId && state.campaignIndex) {
       completedCampaign[state.campaignId] = Math.max(completedCampaign[state.campaignId] ?? 0, state.campaignIndex);
     }
-    state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, { ...state.party, campaignProgress: completedCampaign, home: homeWithRegrownResources(state.home), monsterCompendium: state.monsterCompendium });
+    state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, {
+      ...state.party,
+      campaignProgress: completedCampaign,
+      questFlags,
+      partyResources,
+      home: homeWithRegrownResources(state.home),
+      monsterCompendium: state.monsterCompendium,
+    });
     state.combatStarted = false;
     roomIsBuilt = false;
+    handleNpcDungeonComplete(completedContext);
+    maybeUnlockNpcProgress();
     addLog(`${hero.name} reaches the exit. Dungeon complete. The party gained ${tokenAward} Hero Token${tokenAward === 1 ? "" : "s"} each.`, "important");
     if (consumedGoalItems) addLog(`${consumedGoalItems} goal item${consumedGoalItems === 1 ? " was" : "s were"} left behind.`, "important");
     render();
+    maybeTriggerNpcArrivals();
     window.DepthboundPlaytest?.syncNow?.();
     centerViewOnHero();
   };
@@ -2343,17 +2532,93 @@ function rollLootQuantity(loot) {
 function definedLootForMonster(monster) {
   return (monster.extraLoot ?? [])
     .map((loot) => {
+      if (loot.chance !== undefined && Math.random() > Number(loot.chance)) return null;
       if (loot.kind === "randomEquipment") return randomEquipmentDrop();
       if (loot.kind !== "item" || !loot.itemId) return null;
       const item = createItemInstance(loot.itemId, "loot");
       if (!item) return null;
+      const quantity = rollLootQuantity(loot);
       if (item.ammo) {
-        item.ammo.quantity = Math.max(0, rollLootQuantity(loot));
+        item.ammo.quantity = Math.max(0, quantity);
         item.name = `${item.ammo.kind[0].toUpperCase()}${item.ammo.kind.slice(1)}s (${item.ammo.quantity})`;
+      } else if (item.stackable || item.type === "component") {
+        item.quantity = Math.max(1, quantity);
       }
       return item;
     })
     .filter(Boolean);
+}
+
+function addMonsterMaterialDrops(monster) {
+  if (!monster || monster.materialDropsAdded) return;
+  monster.materialDropsAdded = true;
+  const ids = new Set([monster.baseMonsterId, monster.templateId, monster.id, ...(monster.tags ?? [])].filter(Boolean));
+  const add = (itemId, options = {}) => {
+    monster.extraLoot = [...(monster.extraLoot ?? []), { kind: "item", itemId, ...options }];
+  };
+  if (ids.has("undead") || ids.has("skeletal") || ids.has("skeleton")) {
+    add("bone-dust", { chance: 0.18 });
+    add("cracked-rib-bone", { chance: 0.08 });
+    add("skull-fragment", { chance: 0.035 });
+    add("grave-wax", { chance: ids.has("old-guardroom") ? 0.04 : 0.02 });
+  }
+  if (ids.has("ghost") || ids.has("specter") || ids.has("wraith") || ids.has("banshee") || ids.has("spirit")) {
+    add("ectoplasm", { chance: 0.24 });
+    add("grave-wax", { chance: 0.08 });
+    add("soul-echo", { chance: ids.has("boss") ? 0.14 : 0.045 });
+  }
+  if (ids.has("beast")) {
+    add("beast-hide", { chance: 0.22 });
+    add("beast-claw", { chance: 0.12 });
+    add("beast-fang", { chance: 0.12 });
+    add("monster-blood", { chance: 0.1 });
+    add("raw-meat", { chance: 0.18 });
+  }
+  if (ids.has("plant")) {
+    add("living-wood", { chance: ids.has("treant") || ids.has("tree") || ids.has("wood") || ids.has("guardian") ? 0.22 : 0.1 });
+    add("thorn-spike", { chance: ids.has("thorn") || ids.has("bramble") || ids.has("vine") ? 0.2 : 0.08 });
+    add("verdant-sap", { chance: ids.has("forest") || ids.has("jungle") || ids.has("flower") ? 0.16 : 0.08 });
+    add("glowspore-dust", { chance: ids.has("fungus") || ids.has("spore") || ids.has("myconid") || ids.has("mold") ? 0.22 : 0.045 });
+    add("medicinal-herb", { chance: 0.08 });
+  }
+  if (ids.has("construct")) {
+    add("iron-scrap", { chance: 0.28, quantityDice: { count: 1, sides: 2 } });
+    add("arcane-gear", { chance: 0.1 });
+    add("crystal-shard", { chance: 0.06 });
+  }
+  if (ids.has("embervein-deepworks") || ids.has("embervein") || ids.has("deepworks")) {
+    add("coal-chunk", { chance: ids.has("soot") || ids.has("coal") || ids.has("smoke") ? 0.18 : 0.06 });
+    add("embervein-ore", { chance: ids.has("ore") || ids.has("earth") || ids.has("mine") || ids.has("dungeon-core") ? 0.18 : 0.08 });
+    add("slag-glass", { chance: ids.has("slag") || ids.has("fire") || ids.has("glass") ? 0.16 : 0.06 });
+    add("pressure-core", { chance: ids.has("steam") || ids.has("gear") || ids.has("construct") || ids.has("engine") ? 0.11 : ids.has("boss") ? 0.08 : 0.025 });
+  }
+  if (ids.has("devil")) {
+    add("devil-blood", { chance: 0.2 });
+    add("hellfire-ember", { chance: ids.has("fire") || ids.has("furnace") || ids.has("hellfire") ? 0.14 : 0.075 });
+    add("infernal-iron-shard", { chance: ids.has("chain") || ids.has("soldier") || ids.has("barbed") || ids.has("brute") ? 0.14 : 0.07 });
+  }
+  if (ids.has("demon")) {
+    add("demon-ichor", { chance: 0.22 });
+    add("abyssal-bile", { chance: ids.has("plague") || ids.has("acid") || ids.has("hezrou") || ids.has("maw") ? 0.15 : 0.075 });
+    add("mutated-flesh", { chance: ids.has("mutation") || ids.has("brute") || ids.has("titan") ? 0.13 : 0.06 });
+    add("chaos-shard", { chance: ids.has("rift") || ids.has("gate") || ids.has("boss") || ids.has("demon-prince") ? 0.12 : 0.04 });
+  }
+  if (ids.has("elemental")) {
+    add("elemental-mote", { chance: 0.24 });
+    if (ids.has("fire") || ids.has("ash") || ids.has("smoke") || ids.has("lava") || ids.has("magma") || ids.has("heat")) {
+      add("flame-essence", { chance: ids.has("boss") ? 0.18 : 0.1 });
+    }
+    if (ids.has("air") || ids.has("storm") || ids.has("wind") || ids.has("lightning") || ids.has("thunder") || ids.has("gale")) {
+      add("storm-essence", { chance: ids.has("boss") ? 0.18 : 0.1 });
+    }
+    if (ids.has("earth") || ids.has("stone") || ids.has("crystal") || ids.has("mud") || ids.has("sand") || ids.has("ore") || ids.has("metal")) {
+      add("earth-essence", { chance: ids.has("boss") ? 0.18 : 0.1 });
+    }
+    if (ids.has("water") || ids.has("ice") || ids.has("frost") || ids.has("steam") || ids.has("mist") || ids.has("brine") || ids.has("coral") || ids.has("acid")) {
+      add("water-essence", { chance: ids.has("boss") ? 0.18 : 0.1 });
+    }
+    add("primal-core", { chance: ids.has("boss") ? 0.13 : 0.025 });
+  }
 }
 
 function itemValueGp(item) {
@@ -2386,8 +2651,14 @@ function weightedPick(entries) {
 }
 
 function dungeonLootItems() {
-  const table = getContentDefinition("lootTables", defaultContent.lootTable);
-  const ids = table?.itemIds?.length ? new Set(table.itemIds) : null;
+  const theme = getContentDefinition("themes", state?.themeId ?? defaultContent.theme);
+  const tableIds = theme?.lootTableIds?.length ? theme.lootTableIds : [defaultContent.lootTable];
+  const ids = new Set();
+  for (const tableId of tableIds) {
+    const table = getContentDefinition("lootTables", tableId);
+    for (const itemId of table?.itemIds ?? []) ids.add(itemId);
+  }
+  if (!ids.size) return window.DungeonContent.list("items");
   return window.DungeonContent.list("items").filter((item) => !ids || ids.has(item.id));
 }
 
@@ -2467,7 +2738,7 @@ function weightedLootPick(items, options = {}) {
 function randomMagicLootDrop(category = currentLootCategory()) {
   const partyLevel = averagePartyLevel(activeHero());
   const item = weightedLootPick(
-    window.DungeonContent.list("items").filter((candidate) => candidate.tags?.includes("loot:magic") || candidate.tags?.includes("magic-item")),
+    dungeonLootItems().filter((candidate) => candidate.tags?.includes("loot:magic") || candidate.tags?.includes("magic-item")),
     { category, kind: "magic", level: partyLevel },
   );
   return item ? createItemInstance(item.id, "magic-loot") : null;
@@ -2511,6 +2782,8 @@ function randomEquipmentDrop() {
 }
 
 function dropLootForMonster(monster) {
+  recordNpcMonsterKill(monster);
+  addMonsterMaterialDrops(monster);
   const loot = createLootForMonster(monster);
   addLootPile(loot);
 }
@@ -2650,29 +2923,137 @@ function maybeMonsterPickUpThrownWeapon(monster, lootIndex) {
   return true;
 }
 
-function triggerTrapAtPosition(fighter, position) {
-  const trap = objectAt(position);
-  const hazard = trap ? objectComponent(trap, "hazardOnEnter") ?? objectComponent(trap, "hazardOnMovement") : null;
-  if (!trap || !fighter.alive) return false;
-  if (hazard && trap.armed !== false && !trap.disarmed) {
-    const damage = hazard.damage ?? objectTemplate(trap.type)?.damage ?? { count: 1, sides: 4, type: "damage" };
-    const damageRoll = rollDice(damage.count, damage.sides);
-    const modified = calculateDamageModifiers(fighter, damageRoll.total, damage.type);
-    applyDamageToFighter(fighter, modified.damage);
-    trap.lastResult = `${fighter.name} is hurt by ${objectTemplate(trap.type)?.name ?? "a hazard"} for ${modified.damage} ${damage.type} damage.`;
-    addLog(`${trap.lastResult}${modified.reason ? ` ${fighter.name} is ${modified.reason} to ${damage.type} damage.` : ""}`, "damage");
-    if (hazard.once) {
-      trap.armed = false;
-      trap.spent = true;
+function triggerTrapAtPosition(fighter, position, options = {}) {
+  if (!fighter?.alive) return false;
+  let triggered = false;
+  for (const trap of objectsAtPosition(position)) {
+    if (!fighter.alive) break;
+    if (fighterIsFlying(fighter) && objectHasTag(trap, "floor")) continue;
+    const hazard = objectComponent(trap, "hazardOnEnter") ?? objectComponent(trap, "hazardOnMovement");
+    if (hazard && trap.armed !== false && !trap.disarmed) {
+      triggered = applyObjectHazardToFighter(fighter, trap, hazard) || triggered;
     }
-    if (!fighter.alive) {
-      addLog(`${fighter.name} drops to 0 HP.`, "important");
-      handleHeroDeath();
+    if (!options.skipForcedMovement) triggered = applyForcedMovementFloorToFighter(fighter, trap) || triggered;
+    if (hazard) continue;
+    if (!objectIsTrap(trap) || trap.armed === false || trap.disarmed) continue;
+    triggered = triggerFloorTrap(fighter, trap) || triggered;
+  }
+  if (fighter.alive) triggered = triggerHealingPoolAtPosition(fighter, position) || triggered;
+  return triggered;
+}
+
+function triggerTerrainHazardsAtTurnStart(fighter) {
+  if (!fighter?.alive || !fighter.position) return false;
+  let triggered = false;
+  for (const object of objectsAtPosition(fighter.position)) {
+    if (!fighter.alive) break;
+    if (!objectHasTag(object, "terrain-floor")) continue;
+    if (fighterIsFlying(fighter) && objectHasTag(object, "floor")) continue;
+    const hazard = objectComponent(object, "hazardOnEnter") ?? objectComponent(object, "hazardOnMovement");
+    if (hazard && object.armed !== false && !object.disarmed) {
+      triggered = applyObjectHazardToFighter(fighter, object, hazard, "starts their turn in") || triggered;
     }
+    triggered = applyForcedMovementFloorToFighter(fighter, object, "starts their turn in") || triggered;
+  }
+  return triggered;
+}
+
+function forcedMovementDestination(fighter, object, distanceSquares = 1) {
+  const cells = adjacentCells(fighter.position)
+    .sort(() => Math.random() - 0.5)
+    .map((cell) => {
+      let destination = cell;
+      const dx = Math.sign(cell.x - object.position.x);
+      const dy = Math.sign(cell.y - object.position.y);
+      for (let step = 1; step < distanceSquares; step += 1) {
+        destination = { x: destination.x + dx, y: destination.y + dy };
+      }
+      return destination;
+    });
+  const walkable = currentWalkable(fighter);
+  return cells.find((cell) => {
+    if (!window.DungeonGrid.isInsideGrid(cell, currentGridSize())) return false;
+    if (!walkable.has(positionKey(cell))) return false;
+    if (window.DungeonGrid.isOccupied(cell, state.fighters, fighter)) return false;
+    return canTraverseMovementEdge(fighter, fighter.position, cell, []);
+  }) ?? null;
+}
+
+function applyForcedMovementFloorToFighter(fighter, object, verb = "is caught in") {
+  if (!fighter?.alive || !objectHasTag(object, "terrain-floor")) return false;
+  const movement = objectComponent(object, "forcedMovementFloor");
+  if (!movement || object.armed === false || object.disarmed) return false;
+  const saveAbility = movement.saveAbility ?? "str";
+  const dc = movement.dc ?? 13;
+  const label = movement.label ?? objectTemplate(object.type)?.name ?? "forced current";
+  const save = savingThrow(fighter, saveAbility, dc);
+  addLog(`${fighter.name} ${verb} ${label}: ${saveAbility.toUpperCase()} ${save.roll} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}.`, save.success ? "" : "important");
+  if (save.success) return false;
+  if (movement.statusOnFail) applyStatusEffect(fighter, { ...movement.statusOnFail });
+  const destination = forcedMovementDestination(fighter, object, movement.distanceSquares ?? 1);
+  if (!destination) {
+    addLog(`${fighter.name} braces against ${label} and cannot be moved.`, "important");
     return true;
   }
-  if (!objectIsTrap(trap) || trap.armed === false || trap.disarmed) return false;
+  fighter.position = destination;
+  addLog(`${label} shoves ${fighter.name} 5 ft.`, "important");
+  triggerTrapAtPosition(fighter, destination, { skipForcedMovement: true });
+  return true;
+}
 
+async function resolveTurnStartHazardsForActiveFighter() {
+  const fighter = activeFighter();
+  triggerTerrainHazardsAtTurnStart(fighter);
+  if (!fighter || fighter.alive) return false;
+  render();
+  if (state.combatStarted && combatMonsters().length === 0 && !partyDefeatedOrDying()) {
+    await finishEncounterAfterLastMonsterFalls();
+    return true;
+  }
+  if (state.combatStarted && combatNeedsHeroTurns() && !partyDefeatedOrDying()) {
+    window.setTimeout(endTurn, tokenSlideMs);
+    return true;
+  }
+  return true;
+}
+
+function applyObjectHazardToFighter(fighter, object, hazard, verb = "is hurt by") {
+  const template = objectTemplate(object.type);
+  const damage = hazard.damage ?? template?.damage ?? { count: 1, sides: 4, type: "damage" };
+  const damageRoll = rollDice(damage.count, damage.sides);
+  const modified = calculateDamageModifiers(fighter, damageRoll.total, damage.type);
+  applyDamageToFighter(fighter, modified.damage);
+  const name = template?.name ?? "a hazard";
+  object.lastResult =
+    verb === "is hurt by"
+      ? `${fighter.name} is hurt by ${name} for ${modified.damage} ${damage.type} damage.`
+      : `${fighter.name} ${verb} ${name} and takes ${modified.damage} ${damage.type} damage.`;
+  addLog(`${object.lastResult}${modified.reason ? ` ${fighter.name} is ${modified.reason} to ${damage.type} damage.` : ""}`, "damage");
+  if (hazard.once) {
+    object.armed = false;
+    object.spent = true;
+  }
+  if (!fighter.alive) {
+    addLog(`${fighter.name} drops to 0 HP.`, "important");
+    handleFighterDefeatedByTerrain(fighter);
+  }
+  return true;
+}
+
+function handleFighterDefeatedByTerrain(fighter) {
+  if (!fighter || fighter.terrainDeathHandled) return;
+  fighter.terrainDeathHandled = true;
+  if (isPartyHeroId(fighter.id)) {
+    handleHeroDeath();
+    return;
+  }
+  if (fighter.team === "heroes" || fighter.friendly || fighter.summonedByHeroId || fighter.companionOwnerId) return;
+  triggerMonsterDeathStory(fighter);
+  awardMonsterXp(fighter);
+  dropLootForMonster(fighter);
+}
+
+function triggerFloorTrap(fighter, trap) {
   const template = objectTemplate(trap.type);
   const trapDamage = template.damage ?? objectComponent(trap, "trap")?.damage ?? { count: 1, sides: 4, type: "piercing" };
   const damageRoll = rollDice(trapDamage.count, trapDamage.sides);
@@ -2694,9 +3075,42 @@ function triggerTrapAtPosition(fighter, position) {
 
   if (!fighter.alive) {
     addLog(`${fighter.name} drops to 0 HP.`, "important");
-    handleHeroDeath();
+    handleFighterDefeatedByTerrain(fighter);
   }
   return true;
+}
+
+function triggerHealingPoolAtPosition(fighter, position) {
+  if (!healingPoolCanAffectFighter(fighter)) return false;
+  let healed = false;
+  for (const object of objectsAtPosition(position)) {
+    const healingPool = objectComponent(object, "healingPool");
+    if (!healingPool || !objectHasTag(object, "terrain-floor")) continue;
+    if (fighterIsFlying(fighter) && objectHasTag(object, "floor")) continue;
+    const healedIds = new Set(object.healedFighterIds ?? []);
+    if (healedIds.has(fighter.id)) continue;
+    const dice = healingPool.dice ?? { count: 2, sides: 4 };
+    const healingRoll = rollDice(dice.count, dice.sides);
+    const amount = applyHealingToHero(fighter, healingRoll.total);
+    object.healedFighterIds = [...healedIds, fighter.id];
+    object.lastResult = amount > 0
+      ? `${fighter.name} recovers ${amount} HP from ${objectTemplate(object.type)?.name ?? "a healing pool"}.`
+      : `${fighter.name} steps into ${objectTemplate(object.type)?.name ?? "a healing pool"}, but is already at full health.`;
+    addLog(`${object.lastResult} (${healingRoll.rolls.join(" + ")})`, "heal");
+    healed = true;
+  }
+  return healed;
+}
+
+function healingPoolCanAffectFighter(fighter) {
+  return Boolean(
+    fighter?.alive &&
+      (isPartyHeroId(fighter.id) ||
+        fighter.team === "heroes" ||
+        fighter.friendly ||
+        fighter.summonedByHeroId ||
+        fighter.companionOwnerId),
+  );
 }
 
 function triggerPortalAtPosition(fighter, position) {
@@ -2948,6 +3362,7 @@ function endCurrentEncounter() {
   state.deathSaveAfterVictoryLogged = false;
   state.combatStarted = false;
   state.mode = "exploration";
+  ensureDungeonClock().lastRealMs = Date.now();
   state.initiative = [];
   state.activeIndex = 0;
   partyHeroes().forEach(resetTurnResources);
@@ -2955,7 +3370,7 @@ function endCurrentEncounter() {
 }
 
 function combatBlockingOverlayOpen() {
-  return [els.mainMenu, els.fighterInfo, els.inventoryMenu, els.useItemMenu, els.abilitiesMenu, els.homeMenu, els.storeMenu, els.gameDialog].some(
+  return [els.mainMenu, els.fighterInfo, els.inventoryMenu, els.useItemMenu, els.abilitiesMenu, els.homeMenu, els.villageMenu, els.storeMenu, els.gameDialog].some(
     (element) => element && !element.classList.contains("hidden"),
   );
 }
@@ -3080,6 +3495,7 @@ async function rollInitiative() {
 
   const monsters = threateningMonsters();
   if (monsters.length === 0) return;
+  syncDungeonClock();
   const heroEntries = partyHeroes().map((hero) => {
     const rollResult = rollD20ForFighter(hero, { advantage: (isSidekickWarrior(hero) && (hero.level ?? 1) >= 7) || (hero.classId === "barbarian" && (hero.level ?? 1) >= 7) });
     const heroRoll = rollResult.roll;
@@ -3175,6 +3591,7 @@ async function rollInitiative() {
     "important",
   );
   addTurnStartLog(activeFighter());
+  if (await resolveTurnStartHazardsForActiveFighter()) return;
 
   render();
   maybeRunMonsterTurn();
@@ -3205,6 +3622,8 @@ async function attackDestructibleObject(attacker, object, options = {}) {
 
   const weapon = options.weapon ?? (options.weaponSlot ? weaponFromSlot(attacker, options.weaponSlot) : activeWeapon(attacker));
   const attackDamage = damageProfile(attacker, { weapon, includeDamageModifier: options.includeDamageModifier });
+  const thrownAsMelee = weapon?.properties?.includes("thrown") && objectCells(object).some((cell) => attackGridDistance(attacker.position, cell) <= 1);
+  if (thrownAsMelee) attackDamage.range = { kind: "melee", feet: 5 };
   if (!isObjectInAttackRangeWithProfile(attacker, object, attackDamage)) {
     addLog(`${attacker.name} is too far away to attack ${objectTargetName(object)}. Move closer first.`);
     render();
@@ -3225,7 +3644,11 @@ async function attackDestructibleObject(attacker, object, options = {}) {
     }
   }
   spendAmmunition(attacker, weapon);
-  const rangedAttack = weaponIsRanged(weapon) || ["ranged", "thrown"].includes(attackDamage.range?.kind);
+  if (weapon?.properties?.includes("thrown") && !thrownAsMelee) {
+    recordMonsterThrownWeaponUse(attacker, weapon);
+    dropThrownWeapon(attacker, weapon, objectTargetPosition(object, attacker));
+  }
+  const rangedAttack = !thrownAsMelee && (weaponIsRanged(weapon) || ["ranged", "thrown"].includes(attackDamage.range?.kind));
   playSoundEffect(rangedAttack ? "rangedAttack" : "meleeAttack");
 
   const attackRollResult = rollD20ForFighter(attacker);
@@ -3313,11 +3736,15 @@ async function makeAttack(attacker, defender, options = {}) {
   }
 
   const rangedAttack = !thrownAsMelee && (weaponIsRanged(weapon) || ["ranged", "thrown"].includes(attackDamage.range?.kind));
+  if (fighterHasFeat(attacker, "mobile") && !rangedAttack) {
+    attacker.mobileNoOpportunityFrom = uniqueValues([...(attacker.mobileNoOpportunityFrom ?? []), defender.id]);
+  }
   playSoundEffect(rangedAttack ? "rangedAttack" : "meleeAttack");
   const adjacentHostiles = hostileFightersAdjacentTo(attacker).length > 0;
-  const rangedDisadvantage = rangedAttack && adjacentHostiles;
+  const rangedDisadvantage = rangedAttack && adjacentHostiles && !fighterHasFeat(attacker, "crossbow-expert") && !fighterHasFeat(attacker, "gunner");
   const attackAdvantage =
     (attacker.statusEffects ?? []).some((effect) => effect.attackAdvantage) ||
+    (fighterHasFeat(attacker, "grappler") && fighterStatusEffect(defender, "grappled")?.grappledBy === attacker.id) ||
     (warlockKnowsInvocation(attacker, "devilsSight") && targetIsInMagicalDarkness(defender)) ||
     (warlockKnowsInvocation(attacker, "witchSight") && targetIsCursedOrObscured(defender));
   const defenderDodge = defender.dodging;
@@ -3478,6 +3905,7 @@ async function makeAttack(attacker, defender, options = {}) {
   addAdminLog(`${attacker.name} damage packets vs ${defender.name}: ${resolvedPackets.map((packet) => `${packet.label} => raw ${packet.raw}, final ${packet.damage}${packet.reason ? ` (${packet.reason})` : ""}`).join("; ")}.`);
   let totalDamage = resolvedPackets.reduce((sum, packet) => sum + packet.damage, 0);
   if (hitReaction.resistance) totalDamage = Math.floor(totalDamage / 2);
+  totalDamage = maybeUseMonsterDamageReduction(defender, attacker, totalDamage, !rangedAttack);
   totalDamage = await maybeUseUncannyDodge(defender, attacker, totalDamage);
   totalDamage = await maybeUseStoneEndurance(defender, totalDamage);
   totalDamage = await maybeUseBattleMasterParry(defender, attacker, totalDamage, !rangedAttack);
@@ -3491,6 +3919,9 @@ async function makeAttack(attacker, defender, options = {}) {
   }
   if (!isPartyHeroId(attacker.id)) {
     await applyMonsterOnHitSpecials(attacker, defender, totalDamage, doublesDamage);
+  }
+  if (!isPartyHeroId(defender.id)) {
+    await applyMonsterReactiveSpecials(defender, attacker, totalDamage, !rangedAttack, attackDamage.type);
   }
   await maybeUseBarbarianAfterDamage(defender, attacker, totalDamage, !rangedAttack);
   await maybeUseSubclassAfterDamageReactions(defender, attacker, totalDamage, !rangedAttack);
@@ -3519,13 +3950,16 @@ async function makeAttack(attacker, defender, options = {}) {
   await maybeUseStoneRuneAfterAttack(attacker, defender);
   await maybeUseBeastClawExtraAttack(attacker, defender, options);
 
-  if (!defender.alive && maybeUseUndeadFortitude(defender, totalDamage)) {
+  if (!defender.alive && maybeUseMonsterDeathDefiance(defender, resolvedPackets)) {
+    addLog(`${defender.name} claws back from the edge at 1 HP.`, "important");
+  } else if (!defender.alive && maybeUseUndeadFortitude(defender, totalDamage)) {
     addLog(`${defender.name} refuses to fall and remains at 1 HP.`, "important");
   }
 
   if (!defender.alive) {
     addLog(`${defender.name} drops to 0 HP. ${isPartyHeroId(attacker.id) ? "Victory." : "Defeat."}`, "important");
     if (!isPartyHeroId(defender.id)) {
+      await maybeTriggerMonsterDeathBurst(defender);
       triggerMonsterDeathStory(defender);
       if (isPartyHeroId(attacker.id)) playSoundEffect("enemyDefeated");
       awardMonsterXp(defender);
@@ -3561,10 +3995,164 @@ function shouldUseMonsterSpecial(kind = "active") {
   return Math.random() < chance;
 }
 
+function maybeUseMonsterDamageReduction(defender, attacker, incomingDamage, meleeAttack) {
+  if (isPartyHeroId(defender?.id) || incomingDamage <= 0 || !shouldUseMonsterSpecial("defensive")) return incomingDamage;
+  defender.usedSpecials = defender.usedSpecials ?? {};
+  const roundKey = `parry-${state.round ?? 0}`;
+  if (meleeAttack && hasMonsterSpecial(defender, /parrying fade/i) && !defender.usedSpecials[roundKey]) {
+    defender.usedSpecials[roundKey] = true;
+    const reduction = rollDice(1, 6).total;
+    addLog(`${defender.name} uses Parrying Fade and reduces the hit by ${reduction}.`, "important");
+    return Math.max(0, incomingDamage - reduction);
+  }
+  if (hasMonsterSpecial(defender, /mirror double/i) && !defender.usedSpecials.MirrorDouble) {
+    defender.usedSpecials.MirrorDouble = true;
+    const reduced = Math.floor(incomingDamage / 2);
+    addLog(`${defender.name}'s Mirror Double blurs the attack, reducing the damage by ${incomingDamage - reduced}.`, "important");
+    return reduced;
+  }
+  if (meleeAttack && hasMonsterSpecial(defender, /parry storm/i) && !defender.usedSpecials[roundKey]) {
+    defender.usedSpecials[roundKey] = true;
+    const reduction = rollDice(1, 8).total + 4;
+    addLog(`${defender.name}'s Parry Storm reduces the hit by ${reduction}.`, "important");
+    return Math.max(0, incomingDamage - reduction);
+  }
+  if (hasMonsterSpecial(defender, /ironbark guard/i) && !defender.usedSpecials[roundKey]) {
+    defender.usedSpecials[roundKey] = true;
+    const reduction = 5;
+    addLog(`${defender.name}'s Ironbark Guard reduces the hit by ${reduction}.`, "important");
+    return Math.max(0, incomingDamage - reduction);
+  }
+  if (hasMonsterSpecial(defender, /ancient bark/i)) {
+    const cap = Math.max(1, Math.floor((defender.maxHp ?? 1) * 0.25));
+    if (incomingDamage > cap) {
+      addLog(`${defender.name}'s Ancient Bark caps the hit at ${cap} damage.`, "important");
+      return cap;
+    }
+  }
+  if (hasMonsterSpecial(defender, /grove body/i) && !defender.usedSpecials[roundKey]) {
+    defender.usedSpecials[roundKey] = true;
+    const reduced = Math.ceil(incomingDamage * 0.75);
+    addLog(`${defender.name}'s Grove Body disperses part of the blow.`, "important");
+    return reduced;
+  }
+  if (hasMonsterSpecial(defender, /adamantine frame|hard light of the forge|gear assembly/i) && !defender.usedSpecials[roundKey]) {
+    defender.usedSpecials[roundKey] = true;
+    const reduction = Math.max(3, 2 + monsterCategory(defender));
+    addLog(`${defender.name}'s hardened frame reduces the hit by ${reduction}.`, "important");
+    return Math.max(0, incomingDamage - reduction);
+  }
+  if (hasMonsterSpecial(defender, /burning guard|furnace shield|mirror heat|cyclone guard|hurricane guard|storm shell|current guard|glacial guard|stone hide|guarding slab|iron stance|mountain heart|tremor shell|diamond refraction|glass refract|black glass body|living cover|idol ward|open sea body|endless body|vortex body|worldstorm body|firestorm body|molten body/i) && !defender.usedSpecials[roundKey]) {
+    defender.usedSpecials[roundKey] = true;
+    const reduction = Math.max(2, monsterCategory(defender) + 2);
+    addLog(`${defender.name}'s elemental guard reduces the hit by ${reduction}.`, "important");
+    return Math.max(0, incomingDamage - reduction);
+  }
+  return incomingDamage;
+}
+
+async function applyMonsterReactiveSpecials(defender, attacker, incomingDamage, meleeAttack, incomingDamageType) {
+  if (!attacker?.alive || incomingDamage <= 0 || !meleeAttack || !shouldUseMonsterSpecial("defensive")) return;
+  const names = monsterSpecialNames(defender).join(" | ");
+  if (/cinder body/i.test(names)) {
+    applySpecialDamage(defender, attacker, Math.max(1, monsterCategory(defender)), "fire", "Cinder Body");
+  }
+  if (/barbed hide/i.test(names)) {
+    const roll = rollDice(1, 6);
+    applySpecialDamage(defender, attacker, Math.max(1, roll.total + Math.floor(monsterCategory(defender) / 2)), "piercing", "Barbed Hide");
+  }
+  if (/eidolic reversal|ghostly riposte/i.test(names) && incomingDamageType !== "radiant") {
+    const dice = specialDamageDice(defender, 6);
+    const roll = rollDice(dice.count, dice.sides);
+    applySpecialDamage(defender, attacker, Math.max(1, Math.floor((roll.total + dice.bonus) / 2)), "force", /eidolic reversal/i.test(names) ? "Eidolic Reversal" : "Ghostly Riposte");
+  }
+  if (/abyssal riposte/i.test(names)) {
+    const dice = specialDamageDice(defender, 8);
+    const roll = rollDice(dice.count, dice.sides);
+    applySpecialDamage(defender, attacker, Math.max(1, roll.total + dice.bonus), "slashing", "Abyssal Riposte");
+  }
+  if (/thorn nest|thorn hide|crown of thorns|rooted counter/i.test(names)) {
+    const dice = specialDamageDice(defender, 6);
+    const roll = rollDice(dice.count, dice.sides);
+    const type = /rooted counter/i.test(names) ? "bludgeoning" : "piercing";
+    applySpecialDamage(defender, attacker, Math.max(1, Math.floor((roll.total + dice.bonus) / 2)), type, /rooted counter/i.test(names) ? "Rooted Counter" : "Thorns");
+  }
+  if (/crushing shell|shard burst|overpressure burst/i.test(names)) {
+    const dice = specialDamageDice(defender, /overpressure burst/i.test(names) ? 8 : 6);
+    const roll = rollDice(dice.count, dice.sides);
+    const type = /shard burst/i.test(names) ? "slashing" : /overpressure burst/i.test(names) ? "thunder" : "bludgeoning";
+    applySpecialDamage(defender, attacker, Math.max(1, Math.floor((roll.total + dice.bonus) / 2)), type, /overpressure burst/i.test(names) ? "Overpressure Burst" : /shard burst/i.test(names) ? "Shard Burst" : "Crushing Shell");
+    if (/crushing shell/i.test(names)) pushTargetAway(defender, attacker);
+  }
+  if (/molten body|firestorm body|burning guard|cinder crown|black glass body|vortex body|worldstorm body|storm shell|tremor shell|shatter spines|open sea body|endless body|blackwater seep/i.test(names)) {
+    const dice = specialDamageDice(defender, 6);
+    const roll = rollDice(dice.count, dice.sides);
+    const damageType = /molten|firestorm|burning|cinder/i.test(names)
+      ? "fire"
+      : /vortex|worldstorm|storm shell/i.test(names)
+        ? "thunder"
+        : /open sea|endless body/i.test(names)
+          ? "cold"
+          : /blackwater/i.test(names)
+            ? "acid"
+            : /shatter|glass/i.test(names)
+              ? "slashing"
+              : "bludgeoning";
+    applySpecialDamage(defender, attacker, Math.max(1, Math.floor((roll.total + dice.bonus) / 2)), damageType, "Elemental Body");
+    if (/vortex|worldstorm|storm shell|tremor shell/i.test(names)) pushTargetAway(defender, attacker);
+  }
+  if (isPartyHeroId(attacker.id) && !attacker.alive) handleHeroDeath();
+}
+
+function maybeUseMonsterDeathDefiance(monster, damagePackets = []) {
+  if (isPartyHeroId(monster?.id)) return false;
+  if (!hasMonsterSpecial(monster, /king's return|unfinished death|final bargain|prince's second form|fungal rebirth|primordial regrowth|black rebirth|infernal wishflame|endless gale|mountain heart|older than roads|endless body|absolute stillness/i)) return false;
+  monster.usedSpecials = monster.usedSpecials ?? {};
+  if (monster.usedSpecials.DeathDefiance) return false;
+  const radiantDamage = damagePackets.some((packet) => packet.type === "radiant" && packet.damage > 0);
+  const fireDamage = damagePackets.some((packet) => packet.type === "fire" && packet.damage > 0);
+  if (radiantDamage && !hasMonsterSpecial(monster, /final bargain/i)) return false;
+  if (fireDamage && hasMonsterSpecial(monster, /fungal rebirth|primordial regrowth/i)) return false;
+  monster.usedSpecials.DeathDefiance = true;
+  monster.hp = 1;
+  monster.alive = true;
+  applyStatusEffect(monster, { id: "death-defiance", label: "Death Defiance", acBonus: 1, attackBonus: 1, expiresAtEndOfTurn: true });
+  return true;
+}
+
+async function maybeTriggerMonsterDeathBurst(monster) {
+  if (!hasMonsterSpecial(monster, /death throes|greater death throes|industrial catastrophe|continental melt|end-breath ash|pebble scatter|iceberg break|split the heavens|worldspring eruption/i)) return false;
+  const rangeFeet = hasMonsterSpecial(monster, /greater death throes/i) ? 30 : 20;
+  const targets = monsterTargetableHeroes().filter((hero) => hero.alive && distance(hero.position, monster.position) <= rangeFeet / feetPerSquare);
+  if (!targets.length) return false;
+  const label = hasMonsterSpecial(monster, /industrial catastrophe/i) ? "Industrial Catastrophe" : hasMonsterSpecial(monster, /continental melt/i) ? "Continental Melt" : hasMonsterSpecial(monster, /end-breath ash/i) ? "End-Breath Ash" : hasMonsterSpecial(monster, /pebble scatter/i) ? "Pebble Scatter" : hasMonsterSpecial(monster, /iceberg break/i) ? "Iceberg Break" : hasMonsterSpecial(monster, /split the heavens/i) ? "Split the Heavens" : hasMonsterSpecial(monster, /worldspring eruption/i) ? "Worldspring Eruption" : hasMonsterSpecial(monster, /greater death throes/i) ? "Greater Death Throes" : "Death Throes";
+  const dc = monsterSpecialDc(monster);
+  const dice = specialDamageDice(monster, hasMonsterSpecial(monster, /greater death throes|industrial catastrophe|continental melt/i) ? 10 : 6);
+  addLog(`${monster.name}'s ${label} erupts as it falls.`, "important");
+  for (const target of targets.slice(0, 6)) {
+    const save = await rollSavingThrow(target, "dex", dc, `${monster.name}'s ${label} forces ${target.name} to make a DEX save.`);
+    const roll = rollDice(dice.count, dice.sides);
+    const raw = Math.max(1, roll.total + dice.bonus);
+    const damage = evasionAdjustedDamage(target, save, raw);
+    const type = hasMonsterSpecial(monster, /industrial catastrophe|split the heavens/i)
+      ? "thunder"
+      : hasMonsterSpecial(monster, /pebble scatter/i)
+        ? "bludgeoning"
+        : hasMonsterSpecial(monster, /iceberg break/i)
+          ? "cold"
+          : hasMonsterSpecial(monster, /worldspring eruption/i)
+            ? "force"
+            : "fire";
+    if (damage > 0) applySpecialDamage(monster, target, damage, type, label);
+    if (!target.alive) handleHeroDeath();
+  }
+  return true;
+}
+
 function savingThrow(target, ability, dc) {
   const rollResult = rollD20ForFighter(target);
   const roll = rollResult.roll;
-  const statusBonus = (target.statusEffects ?? []).reduce((sum, effect) => sum + (effect.saveBonus ?? 0), 0);
+  const statusBonus = (target.statusEffects ?? []).reduce((sum, effect) => sum + (effect.saveBonus ?? 0), 0) + (magicEffects(target).saveBonus ?? 0);
   const auraBonus = auraSaveBonus(target);
   const proficiency = (target.savingThrowProficiencies ?? []).includes(ability) ? rangerCompanionProficiencyBonus(target) : 0;
   const bonus = abilityMod(target, ability) + proficiency + statusBonus + auraBonus;
@@ -3706,6 +4294,7 @@ async function rollSavingThrow(target, ability, dc, message) {
 }
 
 function applyStatusEffect(target, effect) {
+  effect = prepareTimedEffect(effect);
   target.statusEffects = (target.statusEffects ?? []).filter((entry) => entry.id !== effect.id);
   target.statusEffects.push(effect);
   refreshDerivedStats(target);
@@ -3724,7 +4313,10 @@ function applySpecialDamage(source, target, damage, type, label) {
     addLog(`God mode prevents ${source.name}'s ${label} damage to ${target.name}.`, "important");
     return 0;
   }
+  const previousElementalAdept = target.incomingElementalAdeptTypes;
+  if (fighterHasFeat(source, "elemental-adept")) target.incomingElementalAdeptTypes = featChoiceValue(source, "elemental-adept", "elementalAdeptTypes") ?? [];
   const modified = calculateDamageModifiers(target, damage, type);
+  target.incomingElementalAdeptTypes = previousElementalAdept;
   applyDamageToFighter(target, modified.damage);
   const note = modified.reason ? ` ${target.name} is ${modified.reason} to ${type} damage.` : "";
   addLog(`${source.name}'s ${label} deals ${modified.damage} ${type} damage to ${target.name}.${note}`, "damage");
@@ -3787,7 +4379,7 @@ function spellSaveDc(fighter, spell = null) {
 
 function spellAttackBonus(fighter, spell = null) {
   const statusBonus = (fighter?.statusEffects ?? []).reduce((sum, effect) => sum + (effect.spellAttackBonus ?? effect.attackBonus ?? 0), 0);
-  return proficiencyBonus(fighter) + abilityMod(fighter, spell?.attackAbility ?? spell?.saveDcAbility ?? spellcastingAbility(fighter)) + statusBonus;
+  return proficiencyBonus(fighter) + abilityMod(fighter, spell?.attackAbility ?? spell?.saveDcAbility ?? spellcastingAbility(fighter)) + statusBonus + (magicEffects(fighter).attackBonus ?? 0);
 }
 
 function spellBaseLevel(spell) {
@@ -3844,11 +4436,11 @@ function canSpendMetamagic(caster, spell, ability) {
 }
 
 function spellHasTimedEffect(spell) {
-  return Boolean(spell?.duration?.rounds || spell?.effect?.status?.durationRounds || persistentAreaSpellIds().has(spell?.id));
+  return Boolean(durationSecondsFromDefinition(spell?.duration ?? {}) || durationSecondsFromDefinition(spell?.effect?.status ?? {}) || persistentAreaSpellIds().has(spell?.id));
 }
 
 function spellCanUseMetamagic(caster, spell, ability) {
-  if (caster?.classId !== "sorcerer" || !spell || !ability || spell.metamagic) return false;
+  if (!(caster?.classId === "sorcerer" || fighterHasFeat(caster, "metamagic-adept")) || !spell || !ability || spell.metamagic) return false;
   if (ability.id === "metamagicDistant") return (spell.range?.feet ?? 0) > 0 && spell.target !== "self";
   if (ability.id === "metamagicEmpowered") return ["damage", "attackDamage"].includes(spell.effect?.kind);
   if (ability.id === "metamagicExtended") return spellHasTimedEffect(spell);
@@ -3872,7 +4464,13 @@ function applyMetamagicToSpell(caster, spell, ability) {
   if (ability.id === "metamagicEmpowered") next.metamagic.damageBonus = Math.max(1, abilityMod(caster, spellcastingAbility(caster)));
   if (ability.id === "metamagicExtended") {
     if (next.duration?.rounds) next.duration.rounds *= 2;
+    if (next.duration?.minutes) next.duration.minutes *= 2;
+    if (next.duration?.hours) next.duration.hours *= 2;
+    if (next.duration?.seconds) next.duration.seconds *= 2;
     if (next.effect?.status?.durationRounds) next.effect.status.durationRounds *= 2;
+    if (next.effect?.status?.durationMinutes) next.effect.status.durationMinutes *= 2;
+    if (next.effect?.status?.durationHours) next.effect.status.durationHours *= 2;
+    if (next.effect?.status?.durationSeconds) next.effect.status.durationSeconds *= 2;
     next.metamagic.extended = true;
   }
   if (ability.id === "metamagicHeightened") next.metamagic.saveDcBonus = 3;
@@ -3892,7 +4490,7 @@ function spendMetamagic(caster, spell) {
 }
 
 async function chooseMetamagicForSpell(caster, spell) {
-  if (caster?.classId !== "sorcerer" || !(caster.knownMetamagic ?? []).length) return canCastSpell(caster, spell) ? spell : null;
+  if (!(caster?.classId === "sorcerer" || fighterHasFeat(caster, "metamagic-adept")) || !(caster.knownMetamagic ?? []).length) return canCastSpell(caster, spell) ? spell : null;
   const choices = [];
   if (canCastSpell(caster, spell)) {
     choices.push({ value: "none", label: "No Metamagic", description: "Cast the spell normally." });
@@ -3927,7 +4525,7 @@ async function chooseMetamagicForSpell(caster, spell) {
 
 function canStartSpellCast(caster, spell) {
   if (canCastSpell(caster, spell)) return true;
-  if (caster?.classId !== "sorcerer" || !(caster.knownMetamagic ?? []).length) return false;
+  if (!(caster?.classId === "sorcerer" || fighterHasFeat(caster, "metamagic-adept")) || !(caster.knownMetamagic ?? []).length) return false;
   return fighterAbilityDefinitions(caster)
     .filter((ability) => ability.metamagicOption)
     .some((ability) => spellCanUseMetamagic(caster, spell, ability) && canSpendMetamagic(caster, spell, ability) && canCastSpell(caster, applyMetamagicToSpell(caster, spell, ability)));
@@ -4234,6 +4832,7 @@ function ensureSpellAreas() {
 function createPersistentSpellArea(caster, spell, position) {
   if (!persistentAreaSpellIds().has(spell?.id) || !position) return;
   const durationRounds = spell.duration?.rounds ?? spell.effect?.status?.durationRounds ?? 3;
+  const durationSeconds = durationSecondsFromDefinition(spell.duration ?? { durationRounds });
   const area = {
     id: `${spell.id}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     spellId: spell.id,
@@ -4243,6 +4842,8 @@ function createPersistentSpellArea(caster, spell, position) {
     position: { ...position },
     castLevel: spellCastLevel(spell),
     durationRounds,
+    durationSeconds,
+    expiresAtDungeonTimeSeconds: dungeonElapsedSeconds({ sync: false }) + durationSeconds,
   };
   ensureSpellAreas().push(area);
   addLog(`${spell.name} persists in the area for ${durationRounds} rounds.`, "important");
@@ -4264,15 +4865,7 @@ function persistentAreaTileKeys() {
 
 function agePersistentSpellAreasForCaster(caster) {
   if (!caster?.id || !state?.spellAreas?.length) return;
-  const expired = [];
-  state.spellAreas = state.spellAreas
-    .map((area) => (area.casterId === caster.id ? { ...area, durationRounds: (area.durationRounds ?? 1) - 1 } : area))
-    .filter((area) => {
-      const keep = (area.durationRounds ?? 0) > 0;
-      if (!keep) expired.push(area.spellName ?? area.spellId);
-      return keep;
-    });
-  for (const name of expired) addLog(`${name} fades from the battlefield.`);
+  expireTimedSpellAreas();
 }
 
 async function applyPersistentSpellAreasAtTurnStart(fighter) {
@@ -4713,6 +5306,9 @@ async function applySpellStatus(caster, target, spell, options = {}) {
     label: spell.effect?.status?.label ?? spell.name,
   };
   if (spell.duration?.rounds && !effect.durationRounds && !effect.expiresAtEndOfTurn && !effect.expiresAtStartOfTurn) effect.durationRounds = spell.duration.rounds;
+  if (spell.duration?.minutes && !effect.durationMinutes && !effect.expiresAtEndOfTurn && !effect.expiresAtStartOfTurn) effect.durationMinutes = spell.duration.minutes;
+  if (spell.duration?.hours && !effect.durationHours && !effect.expiresAtEndOfTurn && !effect.expiresAtStartOfTurn) effect.durationHours = spell.duration.hours;
+  if (spell.duration?.seconds && !effect.durationSeconds && !effect.expiresAtEndOfTurn && !effect.expiresAtStartOfTurn) effect.durationSeconds = spell.duration.seconds;
   if (spell.concentration) effect.concentrationId = concentrationId(caster);
   if (spell.resource === "weaponRider") effect.weaponRider = true;
   if (effect.weaponRider && effect.damageDice) {
@@ -4889,14 +5485,34 @@ async function chooseAndCastSpell(spellId, castLevel = null) {
 }
 
 function pushTargetAway(source, target) {
-  const dx = Math.sign(target.position.x - source.position.x);
-  const dy = Math.sign(target.position.y - source.position.y);
-  const destination = { x: target.position.x + dx, y: target.position.y + dy };
-  if (!window.DungeonGrid.isInsideGrid(destination, currentGridSize())) return false;
-  if (!movementWalkableFor(target).has(positionKey(destination))) return false;
-  if (!canTraverseMovementEdge(target, target.position, destination, [])) return false;
-  if (window.DungeonGrid.isOccupied(destination, state.fighters, target)) return false;
+  const destination = shovePushDestination(source, target);
+  if (!canPushTargetToPosition(source, target, destination)) {
+    addLog(`${target.name} cannot be pushed farther away from ${source.name}.`, "important");
+    return false;
+  }
   target.position = destination;
+  triggerTrapAtPosition(target, destination);
+  addLog(`${source.name} pushes ${target.name} 5 ft away.`, "important");
+  return true;
+}
+
+function pullTargetToward(source, target) {
+  const dx = Math.sign(source.position.x - target.position.x);
+  const dy = Math.sign(source.position.y - target.position.y);
+  if (!dx && !dy) return false;
+  const candidates = [
+    { x: target.position.x + dx, y: target.position.y + dy },
+    dx ? { x: target.position.x + dx, y: target.position.y } : null,
+    dy ? { x: target.position.x, y: target.position.y + dy } : null,
+  ].filter(Boolean);
+  const destination = candidates.find((position) => canPushTargetToPosition(source, target, position));
+  if (!destination) {
+    addLog(`${target.name} cannot be pulled closer to ${source.name}.`, "important");
+    return false;
+  }
+  target.position = destination;
+  triggerTrapAtPosition(target, destination);
+  addLog(`${source.name} pulls ${target.name} 5 ft closer.`, "important");
   return true;
 }
 
@@ -4907,25 +5523,169 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
   const normalized = names.join(" | ");
   const dc = monsterSpecialDc(monster);
 
-  if (/venom|poison|sickening|claw fever|deep venom/i.test(normalized)) {
-    const save = await rollSavingThrow(target, "con", dc, `${monster.name}'s venom forces ${target.name} to make a CON save.`);
+  if (/venom|poison|sickening|claw fever|deep venom|infernal sting|rotting tendrils|wyrmwood sap/i.test(normalized)) {
+    const label = /infernal sting/i.test(normalized) ? "infernal sting" : "venom";
+    const save = await rollSavingThrow(target, "con", dc, `${monster.name}'s ${label} forces ${target.name} to make a CON save.`);
     if (!save.success) {
-      const dice = specialDamageDice(monster, critical ? 8 : 6);
+      const dice = specialDamageDice(monster, /infernal sting/i.test(normalized) ? 4 : critical ? 8 : 6);
       const roll = rollDice(dice.count, dice.sides);
-      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "poison", "venom");
+      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "poison", label);
       if (/sickening|claw fever/i.test(normalized)) {
         applyStatusEffect(target, { id: "sickened", label: "Sickened", attackBonus: -1, expiresAtEndOfTurn: true });
+      }
+      if (/wyrmwood sap/i.test(normalized)) {
+        applyStatusEffect(target, { id: "sap-sickened", label: "Sap-Sickened", attackBonus: -1, expiresAtEndOfTurn: true });
       }
     }
   }
 
-  if (/crippling|hamstring|web|snare|dragging grasp|drowning grip/i.test(normalized)) {
+  if (/dread whisper|condemning mark/i.test(normalized)) {
+    const save = await rollSavingThrow(target, "wis", dc, `${monster.name}'s dread presence forces ${target.name} to make a WIS save.`);
+    if (!save.success) {
+      applyStatusEffect(target, { id: `dread-${monster.id}`, label: /condemning mark/i.test(normalized) ? "Condemned" : "Shaken", attackBonus: -1, expiresAtEndOfTurn: true });
+      addLog(`${target.name}'s attacks are shaken until the end of their next turn.`, "important");
+    }
+  }
+
+  if (/dust bite|dust cough|coal toss|black smoke cloud|smoke|smoke veil|sandblind ambush/i.test(normalized)) {
+    const save = await rollSavingThrow(target, "con", dc, `${monster.name}'s choking dust forces ${target.name} to make a CON save.`);
+    if (!save.success) {
+      applyStatusEffect(target, { id: "smoke-choked", label: "Smoke-Choked", attackBonus: -1, expiresAtEndOfTurn: true });
+      addLog(`${target.name} coughs through grit and smoke until the end of their next turn.`, "important");
+    }
+  }
+
+  if (/kindle|heated spear|melt armor|lava wake|ignite ground|white-hot beam|magma breath|boiling spray|scalding puff|burning guard|cinder crown/i.test(normalized)) {
+    const save = await rollSavingThrow(target, "dex", dc, `${monster.name}'s burning strike forces ${target.name} to make a DEX save.`);
+    if (!save.success) {
+      const dice = specialDamageDice(monster, critical ? 8 : 6);
+      const roll = rollDice(dice.count, dice.sides);
+      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "fire", "Elemental Flame");
+      if (/melt armor|white-hot beam/i.test(normalized)) applyStatusEffect(target, { id: "melted-armor", label: "Armor Melted", acBonus: -1, expiresAtEndOfTurn: true });
+    }
+  }
+
+  if (/ash cough|choking grasp|suffocating rain|dead sky|airless bite|drying wind|silence of no air|thin air aura|mist choke|drowning mist/i.test(normalized)) {
+    const save = await rollSavingThrow(target, "con", dc, `${monster.name}'s choking element forces ${target.name} to make a CON save.`);
+    if (!save.success) {
+      applyStatusEffect(target, { id: "element-choked", label: "Choked", attackBonus: -1, speedBonusFeet: -5, expiresAtEndOfTurn: true });
+      addLog(`${target.name} struggles for air until the end of their next turn.`, "important");
+    }
+  }
+
+  if (/glass splinters|glasswind cut|razor pass|needle draft|needle spray|bleeding edge|shard pin|hailglass volley|aurora slash|prismatic lance|salt lash/i.test(normalized)) {
+    const save = await rollSavingThrow(target, "dex", dc, `${monster.name}'s cutting element forces ${target.name} to make a DEX save.`);
+    if (!save.success) {
+      const dice = specialDamageDice(monster, critical ? 8 : 6);
+      const roll = rollDice(dice.count, dice.sides);
+      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "slashing", "Elemental Shards");
+      if (/shard pin|hailglass volley|needle/i.test(normalized)) applyStatusEffect(target, { id: "pinned-shards", label: "Shard-Pinned", speedBonusFeet: -10, expiresAtEndOfTurn: true });
+    }
+  }
+
+  if (/static bite|lightning lash|crackling pulse|queenly thunderbolt|stormlord descent|rod draw|lesser stormcall|thunderclap|choir blast/i.test(normalized)) {
+    const save = await rollSavingThrow(target, "dex", dc, `${monster.name}'s storm strike forces ${target.name} to make a DEX save.`);
+    if (!save.success) {
+      const dice = specialDamageDice(monster, critical ? 8 : 6);
+      const roll = rollDice(dice.count, dice.sides);
+      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), /thunder|choir/i.test(normalized) ? "thunder" : "lightning", "Elemental Storm");
+      target.hasReaction = false;
+    }
+  }
+
+  if (/life drain|greater life drain|abyssal drain|astral reap|devour soul|unending appetite/i.test(normalized)) {
+    const save = await rollSavingThrow(target, "con", dc, `${monster.name}'s life drain forces ${target.name} to make a CON save.`);
+    if (!save.success) {
+      const dice = specialDamageDice(monster, /greater|abyssal|astral|devour soul|unending appetite/i.test(normalized) ? 8 : 6);
+      const roll = rollDice(dice.count, dice.sides);
+      const dealt = applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "necrotic", "life drain");
+      applyStatusEffect(target, { id: "drained", label: "Drained", speedBonusFeet: -5, expiresAtEndOfTurn: true });
+      if (/abyssal drain|devour soul|unending appetite/i.test(normalized) && dealt > 0) {
+        const healed = applyHealingToHero(monster, /devour soul|unending appetite/i.test(normalized) ? Math.ceil(dealt / 2) : dealt);
+        if (healed > 0) addLog(`${monster.name} steals ${healed} HP from the draining wound.`, "heal");
+      }
+    }
+  }
+
+  if (/hellspines|stygian brand|hellbow pin/i.test(normalized)) {
+    const ability = /hellbow pin/i.test(normalized) ? "str" : "dex";
+    const save = await rollSavingThrow(target, ability, dc, `${monster.name}'s pinning strike forces ${target.name} to make a ${ability.toUpperCase()} save.`);
+    if (!save.success) {
+      const speedPenalty = /stygian brand/i.test(normalized) ? -10 : -5;
+      applyStatusEffect(target, { id: "pinned", label: "Pinned", speedBonusFeet: speedPenalty, speedLocked: /hellbow pin/i.test(normalized), expiresAtEndOfTurn: true });
+      addLog(`${target.name}'s movement is hindered until the end of their next turn.`, "important");
+    }
+  }
+
+  if (/ruin scratch|mind-pounce|mindrot sermon/i.test(normalized)) {
+    const save = await rollSavingThrow(target, "wis", dc, `${monster.name}'s ruinous strike forces ${target.name} to make a WIS save.`);
+    if (!save.success) {
+      applyStatusEffect(target, { id: "ruined-reactions", label: "Ruined", attackBonus: -1, expiresAtEndOfTurn: true });
+      target.hasReaction = false;
+      addLog(`${target.name}'s reaction is torn away until their next turn.`, "important");
+    }
+  }
+
+  if (/needling malice|ruin hymn|mindrot cloud|corruptive sporulation/i.test(normalized)) {
+    const save = await rollSavingThrow(target, "wis", dc, `${monster.name}'s malice forces ${target.name} to make a WIS save.`);
+    if (!save.success) {
+      applyStatusEffect(target, { id: "maliced", label: "Maliced", saveBonus: -1, expiresAtEndOfTurn: true });
+      addLog(`${target.name}'s next saves are weakened until the end of their next turn.`, "important");
+    }
+  }
+
+  if (/blood scent|blood in the water|salt the wound|bite and tear|feeding frenzy|flesh verdict|engulfing mass|acid maw|thousand maws|devouring bloom/i.test(normalized) && (target.hp ?? 0) <= Math.ceil((target.maxHp ?? 1) / 2)) {
+    const dice = specialDamageDice(monster, /flesh verdict/i.test(normalized) ? 8 : 6);
+    const roll = rollDice(dice.count, dice.sides);
+    const type = /flesh verdict|blood scent|devouring bloom/i.test(normalized) ? "necrotic" : /acid maw/i.test(normalized) ? "acid" : "slashing";
+    const dealt = applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), type, "frenzy");
+    if (/engulfing mass|devouring bloom/i.test(normalized) && dealt > 0) {
+      const healed = applyHealingToHero(monster, Math.max(1, Math.floor(dealt / 2)));
+      if (healed > 0) addLog(`${monster.name} feeds and regains ${healed} HP.`, "heal");
+    }
+  }
+
+  if (/spectral chain|hooking chain|chain coil|living chains|dragging lash|hookcap pull|canopy snatch|luring scent|hook and drag|dragged into the teeth|drop the hook|tidal pull|pull under|baronial undertow|leviathan drag|burial pull/i.test(normalized)) {
+    const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s chain forces ${target.name} to make a STR save.`);
+    if (!save.success) {
+      pullTargetToward(monster, target);
+      if (/canopy snatch|dragged into the teeth|drop the hook/i.test(normalized)) applyStatusEffect(target, { id: "restrained", label: "Restrained", speedLocked: true, attackBonus: -2, expiresAtEndOfTurn: true });
+    }
+  }
+
+  if (/lightning whip/i.test(normalized)) {
+    const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s lightning whip forces ${target.name} to make a STR save.`);
+    if (!save.success) {
+      const dice = specialDamageDice(monster, 8);
+      const roll = rollDice(dice.count, dice.sides);
+      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "lightning", "Lightning Whip");
+      pullTargetToward(monster, target);
+    }
+  }
+
+  if (/constricting coil|stranglehold|crushing claws|forest judgment|hoist prisoner|heated coil|living chain|cinder chain judgment|mud grip|clay bind|root lock|engulfing slide|coral snare/i.test(normalized)) {
+    const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s crushing claws force ${target.name} to make a STR save.`);
+    if (!save.success) {
+      applyStatusEffect(target, { id: "restrained", label: "Restrained", speedLocked: true, attackBonus: -2, expiresAtEndOfTurn: true });
+    }
+  }
+
+  if (/crushing dominion/i.test(normalized)) {
+    const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s crushing dominion forces ${target.name} to make a STR save.`);
+    if (!save.success) {
+      applyProneCondition(target, "crushing-dominion");
+      pushTargetAway(monster, target);
+    }
+  }
+
+  if (/crippling|hamstring|web|snare|dragging grasp|drowning grip|gear nip|grinding teeth|sleep poison bolt|ice slick|cold bite|frozen undertow|glacial advance|polar night|current guard/i.test(normalized)) {
     const ability = /web|snare/i.test(normalized) ? "dex" : "str";
     const save = await rollSavingThrow(target, ability, dc, `${monster.name}'s restraint forces ${target.name} to make a ${ability.toUpperCase()} save.`);
     if (!save.success) {
-      if (/hamstring|crippling/i.test(normalized)) {
+      if (/hamstring|crippling|gear nip|grinding teeth|sleep poison bolt/i.test(normalized)) {
         applyStatusEffect(target, { id: "hamstrung", label: "Hamstrung", speedBonusFeet: -10, expiresAtEndOfTurn: true });
         addLog(`${target.name}'s speed is reduced by 10 ft until the end of their next turn.`, "important");
+        if (/sleep poison bolt/i.test(normalized)) target.hasReaction = false;
       } else {
         applyStatusEffect(target, { id: "snared", label: "Snared", speedLocked: true, expiresAtEndOfTurn: true });
         addLog(`${target.name}'s movement is stopped until the end of their next turn.`, "important");
@@ -4933,14 +5693,16 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
     }
   }
 
-  if (/charge|pounce|lunge|rush|swooping|stomp|slam/i.test(normalized) && (monster.lastMoveFeet ?? 0) >= monsterSpecialAbilityTuning.chargeMinFeet) {
+  if (/charge|pounce|lunge|rush|swooping|stomp|slam|burning dive|impaling advance|world-stamp|rift charge|siege charge|falling star dive|brittle dash|falling fronds|pouncing vines|briar slam|four-season slam|minecart shove|lava step|support-beam breaker|quake fist|stone pounce|avalanche hammer|pillar fall|crater slam|faultline strike|magma fault|crushing deep|pressure crush|whitewater rush|mudslide rush|thunderhead crash|tyrant downburst|shattering charge/i.test(normalized) && (monster.lastMoveFeet ?? 0) >= monsterSpecialAbilityTuning.chargeMinFeet) {
     const dice = specialDamageDice(monster, critical ? 8 : 6);
     const roll = rollDice(dice.count, dice.sides);
-    applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "bludgeoning", "charge");
+    const type = /burning dive|falling star dive|lava step|magma fault/i.test(normalized) ? "fire" : /impaling advance/i.test(normalized) ? "piercing" : /rift charge/i.test(normalized) ? "force" : /thunderhead|downburst/i.test(normalized) ? "thunder" : "bludgeoning";
+    applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), type, "charge");
     const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s charge forces ${target.name} to make a STR save.`);
     if (!save.success && pushTargetAway(monster, target)) {
       addLog(`${target.name} is shoved back by ${monster.name}.`, "important");
     }
+    if (/pouncing vines/i.test(normalized) && !save.success) applyProneCondition(target, "pouncing-vines");
   }
 }
 
@@ -4961,7 +5723,7 @@ function targetsInMonsterSpecialRange(monster, feet = monsterSpecialAbilityTunin
   return monsterTargetableHeroes().filter((hero) => hero.alive && distance(monster.position, hero.position) <= maxSquares && hasClearLineOfSight(monster.position, hero.position));
 }
 
-async function tryMonsterAreaSpecial(monster, namePattern, label, damageType, saveAbility, rangeFeet) {
+async function tryMonsterAreaSpecial(monster, namePattern, label, damageType, saveAbility, rangeFeet, options = {}) {
   if (!hasMonsterSpecial(monster, namePattern) || !monster.hasAction || !shouldUseMonsterSpecial("active")) return false;
   const targets = targetsInMonsterSpecialRange(monster, rangeFeet);
   if (!targets.length) return false;
@@ -4974,14 +5736,40 @@ async function tryMonsterAreaSpecial(monster, namePattern, label, damageType, sa
   const dc = monsterSpecialDc(monster);
   const dice = specialDamageDice(monster, namePattern.test("Fireball") ? 8 : 6);
   addLog(`${monster.name} uses ${label}.`, "important");
-  for (const target of targets.slice(0, 3)) {
+  for (const target of targets.slice(0, options.maxTargets ?? 3)) {
     const save = await rollSavingThrow(target, saveAbility, dc, `${monster.name}'s ${label} forces ${target.name} to make a ${saveAbility.toUpperCase()} save.`);
     const roll = rollDice(dice.count, dice.sides);
     const raw = Math.max(1, roll.total + dice.bonus);
     const damage = saveAbility === "dex" ? evasionAdjustedDamage(target, save, raw) : save.success ? Math.floor(raw / 2) : raw;
     if (save.success && damage > 0) addLog(`${target.name} takes half damage from ${label}.`);
     if (damage > 0) applySpecialDamage(monster, target, damage, damageType, label);
+    if (!save.success && options.onFailStatus) {
+      applyStatusEffect(target, typeof options.onFailStatus === "function" ? options.onFailStatus(target, monster) : { ...options.onFailStatus });
+    }
+    if (!save.success && options.pullTargets) pullTargetToward(monster, target);
+    if (!save.success && options.pushTargets) pushTargetAway(monster, target);
     if (!target.alive) handleHeroDeath();
+  }
+  return true;
+}
+
+async function tryMonsterStatusSpecial(monster, namePattern, label, saveAbility, rangeFeet, statusFactory, options = {}) {
+  if (!hasMonsterSpecial(monster, namePattern) || !monster.hasAction || !shouldUseMonsterSpecial("active")) return false;
+  const targets = targetsInMonsterSpecialRange(monster, rangeFeet);
+  if (!targets.length) return false;
+  if (await maybeUseSpellInterruptReaction(monster, label)) {
+    monster.hasAction = false;
+    addLog(`${monster.name}'s ${label} is interrupted before it takes hold.`, "important");
+    return true;
+  }
+  monster.hasAction = false;
+  const dc = monsterSpecialDc(monster);
+  addLog(`${monster.name} uses ${label}.`, "important");
+  for (const target of targets.slice(0, options.maxTargets ?? 1)) {
+    const save = await rollSavingThrow(target, saveAbility, dc, `${monster.name}'s ${label} forces ${target.name} to make a ${saveAbility.toUpperCase()} save.`);
+    if (save.success) continue;
+    applyStatusEffect(target, statusFactory(target, monster));
+    if (options.pullTargets) pullTargetToward(monster, target);
   }
   return true;
 }
@@ -5035,8 +5823,183 @@ async function maybeUseMonsterStartSpecial(monster) {
     applyStatusEffect(monster, { id: "blood-frenzy", label: "Blood Frenzy", attackBonus: 1, expiresAtEndOfTurn: true });
   }
 
+  if (hasMonsterSpecial(monster, /rapport spores|shriek alarm/i)) {
+    for (const ally of combatMonsters().filter((candidate) => candidate.id !== monster.id && candidate.tags?.includes("plant") && distance(candidate.position, monster.position) <= 3)) {
+      applyStatusEffect(ally, { id: "spore-rapport", label: "Spore Rapport", attackBonus: 1, expiresAtEndOfTurn: true });
+    }
+  }
+
+  if (hasMonsterSpecial(monster, /phalanx of flame/i)) {
+    const adjacentFiend = combatMonsters().some((ally) => ally.id !== monster.id && ally.tags?.includes("fiend") && distance(ally.position, monster.position) <= 1);
+    if (adjacentFiend) applyStatusEffect(monster, { id: "phalanx-of-flame", label: "Phalanx", acBonus: 1, attackBonus: 1, expiresAtEndOfTurn: true });
+  }
+
+  if (hasMonsterSpecial(monster, /bark orders|mine lord's edict|stoke the furnace|forgeheart pulse|royal furnace oath|heart of ore and flame/i)) {
+    const allyTags = monster.tags ?? [];
+    const bonusIsFire = hasMonsterSpecial(monster, /stoke the furnace|forgeheart pulse|heart of ore and flame/i);
+    for (const ally of combatMonsters().filter((candidate) => candidate.id !== monster.id && candidate.alive && distance(candidate.position, monster.position) <= 3)) {
+      const sharesTheme = (candidate.tags ?? []).some((tag) => allyTags.includes(tag) && ["embervein-deepworks", "embervein", "deepworks", "forge", "mine", "fire", "gear"].includes(tag));
+      if (!sharesTheme) continue;
+      applyStatusEffect(ally, { id: bonusIsFire ? "forge-stoked" : "ordered", label: bonusIsFire ? "Stoked" : "Ordered", attackBonus: 1, expiresAtEndOfTurn: true });
+    }
+  }
+
+  if (hasMonsterSpecial(monster, /rot stench|nauseating bulk|carrion perfume/i)) {
+    for (const target of monsterTargetableHeroes().filter((hero) => distance(hero.position, monster.position) <= 1)) {
+      const save = await rollSavingThrow(target, "con", monsterSpecialDc(monster), `${monster.name}'s stench forces ${target.name} to make a CON save.`);
+      if (!save.success) applyStatusEffect(target, { id: "nauseated", label: "Nauseated", attackBonus: -1, expiresAtEndOfTurn: true });
+    }
+  }
+
+  if (hasMonsterSpecial(monster, /furnace aura|hellfire wings|filth aura|crown of thorns|molten trail|bright seam|ignition flood|wake the deepworks|heart of ore and flame/i)) {
+    for (const target of monsterTargetableHeroes().filter((hero) => distance(hero.position, monster.position) <= 1)) {
+      const dice = specialDamageDice(monster, 6);
+      const roll = rollDice(dice.count, dice.sides);
+      const isFilth = hasMonsterSpecial(monster, /filth aura/i);
+      const isThorn = hasMonsterSpecial(monster, /crown of thorns/i);
+      const label = isFilth ? "Filth Aura" : isThorn ? "Crown of Thorns" : hasMonsterSpecial(monster, /wake the deepworks/i) ? "Wake the Deepworks" : hasMonsterSpecial(monster, /heart of ore and flame/i) ? "Heart of Ore and Flame" : hasMonsterSpecial(monster, /ignition flood/i) ? "Ignition Flood" : hasMonsterSpecial(monster, /bright seam/i) ? "Bright Seam" : hasMonsterSpecial(monster, /molten trail/i) ? "Molten Trail" : hasMonsterSpecial(monster, /hellfire wings/i) ? "Hellfire Wings" : "Furnace Aura";
+      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), isFilth ? "poison" : isThorn ? "piercing" : "fire", label);
+      if (!target.alive) handleHeroDeath();
+    }
+  }
+
+  if (hasMonsterSpecial(monster, /enlarge|hell-engine blueprint|gear assembly/i) && !monster.usedSpecials.EmberveinSelfBuff && shouldUseMonsterSpecial("defensive")) {
+    applyStatusEffect(monster, { id: "engine-primed", label: "Engine-Primed", acBonus: 1, attackBonus: 1, expiresAtEndOfTurn: true });
+    monster.usedSpecials.EmberveinSelfBuff = true;
+    addLog(`${monster.name}'s machinery surges for a moment.`, "important");
+    render();
+    return false;
+  }
+
+  if (hasMonsterSpecial(monster, /flare step|cinder dance|vanish into soot|cloudstep|slipstream|high roost|whirlpool step|splash step|melt away|crater step|fault step|mountain walks|storm eye|sky crown|storm reading|furnace shield|living cover|open sea body|endless body|cyclone guard|hurricane guard|glacial guard|current guard|guarding slab|iron stance/i) && !monster.usedSpecials.ElementalSelfBuff && shouldUseMonsterSpecial("defensive")) {
+    applyStatusEffect(monster, { id: "elemental-stance", label: "Elemental Stance", acBonus: 1, attackBonus: 1, expiresAtEndOfTurn: true });
+    monster.usedSpecials.ElementalSelfBuff = true;
+    addLog(`${monster.name}'s element gathers close around it.`, "important");
+    render();
+    return false;
+  }
+
+  if (hasMonsterSpecial(monster, /command the coals|pyre command|sultan's decree of flame|pearl command|current of kings|mantle command|open sky decree|skybreaker law|palace winds|cathedral winds|continental command|seismic dominion/i)) {
+    const allyTags = monster.tags ?? [];
+    for (const ally of combatMonsters().filter((candidate) => candidate.id !== monster.id && candidate.alive && distance(candidate.position, monster.position) <= 3)) {
+      const sharesElement = (candidate.tags ?? []).some((tag) => allyTags.includes(tag) && ["elemental", "fire", "air", "earth", "water", "storm", "stone", "ice"].includes(tag));
+      if (!sharesElement) continue;
+      applyStatusEffect(ally, { id: "elemental-command", label: "Commanded", attackBonus: 1, expiresAtEndOfTurn: true });
+    }
+  }
+
+  if (hasMonsterSpecial(monster, /high tempest aura|thin air aura|maelstrom aura|buried city aura/i)) {
+    const type = hasMonsterSpecial(monster, /maelstrom/i) ? "cold" : hasMonsterSpecial(monster, /buried city/i) ? "bludgeoning" : "thunder";
+    for (const target of monsterTargetableHeroes().filter((hero) => distance(hero.position, monster.position) <= 1)) {
+      const dice = specialDamageDice(monster, 6);
+      const roll = rollDice(dice.count, dice.sides);
+      applySpecialDamage(monster, target, Math.max(1, Math.floor((roll.total + dice.bonus) / 2)), type, "Elemental Aura");
+      if (!target.alive) handleHeroDeath();
+    }
+  }
+
   if (await tryMonsterAreaSpecial(monster, /fireball/i, "Fireball", "fire", "dex", monsterSpecialAbilityTuning.rangedSpecialFeet)) return true;
+  if (await tryMonsterAreaSpecial(monster, /ashen burst|ember mortar|volcanic pulse|eruption cycle|open the pyre|caldera gate|world-pyre ascension|magma breath|dead sky|suffocating rain|blinding cyclone|crater slam|faultline strike|lava wake|split the battlefield/i, "Elemental Flame Burst", "fire", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "scorched", label: "Scorched", acBonus: -1, expiresAtEndOfTurn: true },
+    pushTargets: /volcanic|eruption|crater|faultline/i.test(monsterSpecialNames(monster).join(" ")),
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /dust spin|thunderclap|crackling pulse|pressure rift|choir blast|tempest choir|split the heavens|starstorm fall|city-eater winds|neverending storm|cathedral winds|regent stormfall|tyrant downburst|queenly thunderbolt|baronial cyclone|breath of the plane|worldstorm body/i, "Elemental Storm Burst", /lightning|starstorm|crackling|queenly/i.test(monsterSpecialNames(monster).join(" ")) ? "lightning" : "thunder", "con", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "deafened", label: "Deafened", attackBonus: -1, expiresAtEndOfTurn: true },
+    pushTargets: true,
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /needle spray|royal tremor|collapse district|open sinkhole|sovereign faultline|fault throne|tectonic verdict|crown of cairns|avalanche hammer|pillar fall|quake fist|graveyard slam|seismic sentence/i, "Elemental Earth Burst", /needle|glass|shatter/i.test(monsterSpecialNames(monster).join(" ")) ? "slashing" : "bludgeoning", "str", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "shaken", label: "Shaken", attackBonus: -1, expiresAtEndOfTurn: true },
+    pushTargets: true,
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /boiling spray|tsunami front|crushing wave|endless deluge|drown the world|worldspring eruption|abyssal pressure|crown tide|leviathan roll|crush of oceans|hailglass volley|iceberg break|cloudburst devour|glacial advance/i, "Elemental Tide Burst", /boiling|steam|worldspring/i.test(monsterSpecialNames(monster).join(" ")) ? "fire" : /hailglass|iceberg|glacial/i.test(monsterSpecialNames(monster).join(" ")) ? "cold" : "bludgeoning", "str", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "waterlogged", label: "Waterlogged", speedBonusFeet: -10, expiresAtEndOfTurn: true },
+    pullTargets: /undertow|tide|current|leviathan|crush/i.test(monsterSpecialNames(monster).join(" ")),
+    pushTargets: /wave|tsunami|deluge|worldspring/i.test(monsterSpecialNames(monster).join(" ")),
+  })) return true;
+  if (await tryMonsterStatusSpecial(monster, /false horizon|gravityless zone|silence of no air|thin air aura|drying wind|fog cover|foam screen|mist choke|drowning mist|black pool|blackwater seep|coral growth|absolute stillness|topple curse|reverse weight|gemscale flash|resonant note/i, "Elemental Distortion", "wis", monsterSpecialAbilityTuning.rangedSpecialFeet, () => ({
+    id: `elemental-distortion-${monster.id}`,
+    label: "Distorted",
+    attackBonus: -1,
+    acBonus: -1,
+    expiresAtEndOfTurn: true,
+  }), { maxTargets: 2 })) return true;
+  if (await tryMonsterAreaSpecial(monster, /coal toss|soot breath|furnace vent|valve twist|throw keg|molten slag breath|lava breath|anvil breath/i, "Forge Burst", "fire", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "scorched", label: "Scorched", acBonus: -1, expiresAtEndOfTurn: true },
+    pushTargets: /throw keg|furnace vent|valve twist|anvil breath/i.test(monsterSpecialNames(monster).join(" ")),
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /cave-in groan|drop the hook|anvil drop|colossus hammerfall|support-beam breaker/i, "Crushing Machinery", "bludgeoning", "str", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "shaken", label: "Shaken", attackBonus: -1, expiresAtEndOfTurn: true },
+    pushTargets: true,
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /pressure release|overpressure burst|valve lock/i, "Pressure Burst", "thunder", "con", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "deafened", label: "Deafened", attackBonus: -1, expiresAtEndOfTurn: true },
+    pushTargets: true,
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /grinding floor|grinding teeth|dragged into the teeth/i, "Grinding Teeth", "slashing", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "hamstrung", label: "Hamstrung", speedBonusFeet: -10, expiresAtEndOfTurn: true },
+  })) return true;
+  if (await tryMonsterStatusSpecial(monster, /black smoke cloud/i, "Black Smoke Cloud", "con", monsterSpecialAbilityTuning.burstRangeFeet, () => ({
+    id: "smoke-blinded",
+    label: "Smoke-Blinded",
+    attackBonus: -2,
+    expiresAtEndOfTurn: true,
+  }), { maxTargets: 3 })) return true;
   if (await tryMonsterAreaSpecial(monster, /plague breath|bile spray|blight belch|rot burst|rot crown pulse/i, "Plague Breath", "poison", "con", monsterSpecialAbilityTuning.burstRangeFeet)) return true;
+  if (await tryMonsterAreaSpecial(monster, /doom scream|void bell toll/i, "Doom Scream", "thunder", "con", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "frightened", label: "Frightened", attackBonus: -2, expiresAtEndOfTurn: true },
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /mournful cry|hollow wail|banshee keening|white bell wail|grief pulse|origin wail|cathedral dirge|duke's war cry|crown of the ninefold pact|howl of hunger|panic shriek|abyssal roar|horror judgement|triple condemnation|chaos star|abyss unleashed|shriek alarm|panic spores|overmind spores/i, "Dread Wail", "psychic", "wis", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "frightened", label: "Frightened", attackBonus: -2, expiresAtEndOfTurn: true },
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /hurl debris|ethereal stomp|pit quake|world-stamp|world-cracker slam|dance of six deaths|whirling blades|rootquake|canopy collapse|first forest awakens/i, "Crushing Burst", /dance of six deaths|whirling blades/i.test(monsterSpecialNames(monster).join(" ")) ? "slashing" : "bludgeoning", "str", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "shaken", label: "Shaken", attackBonus: -1, expiresAtEndOfTurn: true },
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /soul lantern|grave breath|soul furnace|moonlit dominion|forbidden chorus|corrupt wish/i, "Soul Burst", "necrotic", "wis", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "drained", label: "Drained", speedBonusFeet: -10, expiresAtEndOfTurn: true },
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /profane radiance/i, "Profane Radiance", "radiant", "con", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "blinded", label: "Blinded", attackBonus: -2, expiresAtEndOfTurn: true },
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /hellhound breath|branding lash|guilty flame|brimstone shell|burning hand of command|confession by fire/i, "Infernal Burst", "fire", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "branded", label: "Branded", acBonus: -1, expiresAtEndOfTurn: true },
+    pushTargets: /burning hand/i.test(monsterSpecialNames(monster).join(" ")),
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /impaling advance/i, "Impaling Advance", "piercing", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
+    pushTargets: true,
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /abyssal bile|vomit plague/i, "Abyssal Bile", /vomit plague/i.test(monsterSpecialNames(monster).join(" ")) ? "acid" : "acid", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "scorched", label: "Scorched", acBonus: -1, expiresAtEndOfTurn: true },
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /dazzling spores/i, "Dazzling Spores", "radiant", "con", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "blinded", label: "Blinded", attackBonus: -2, expiresAtEndOfTurn: true },
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /carrion spores|spores of filth|venom bloom|titan sporefall|midnight spores/i, "Carrion Spores", "poison", "con", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFailStatus: { id: "poisoned", label: "Poisoned", attackBonus: -1, expiresAtEndOfTurn: true },
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /unstable fire/i, "Unstable Fire", "fire", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
+    pushTargets: true,
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /soul tempest|abyss storm/i, "Soul Tempest", "lightning", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
+    pushTargets: true,
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /flaming whipstorm|gate pulse|maw of the abyss|reality tear|rift sovereignty/i, "Abyssal Surge", /flaming whipstorm/i.test(monsterSpecialNames(monster).join(" ")) ? "fire" : /maw/i.test(monsterSpecialNames(monster).join(" ")) ? "piercing" : "force", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
+    pullTargets: /flaming whipstorm|gate pulse|maw of the abyss/i.test(monsterSpecialNames(monster).join(" ")),
+    pushTargets: /reality tear|rift sovereignty/i.test(monsterSpecialNames(monster).join(" ")),
+  })) return true;
+  if (await tryMonsterStatusSpecial(monster, /false lantern|lesser possession|noble possession|petty bargain|sulphur hex|sweetened damnation|infernal verdict|name in the ledger|praetor's challenge|chains of grace|false promise|prince's mark|musk charm|luring scent/i, "Infernal Compulsion", "wis", monsterSpecialAbilityTuning.rangedSpecialFeet, () => ({
+    id: `compelled-${monster.id}`,
+    label: "Compelled",
+    attackBonus: -2,
+    acBonus: -1,
+    expiresAtEndOfTurn: true,
+  }), { pullTargets: /luring scent/i.test(monsterSpecialNames(monster).join(" ")) })) return true;
+  if (await tryMonsterStatusSpecial(monster, /locking chain|sentence to chains|living chains|chains of the ninth gate|root snare|constricting coil|stranglehold|forest judgment|living jungle|command the brambles/i, "Binding Chains", "str", monsterSpecialAbilityTuning.burstRangeFeet, () => ({
+    id: "restrained",
+    label: "Restrained",
+    speedLocked: true,
+    attackBonus: -2,
+    expiresAtEndOfTurn: true,
+  }), { maxTargets: 3, pullTargets: true })) return true;
   if (await tryMonsterAreaSpecial(monster, /stampede|gravequake|stormhorn burst|root-rending roar|bossroar/i, "Roar", "bludgeoning", "str", monsterSpecialAbilityTuning.burstRangeFeet)) {
     for (const target of monsterTargetableHeroes()) {
       if (distance(monster.position, target.position) <= monsterSpecialAbilityTuning.burstRangeFeet / feetPerSquare) {
@@ -5062,12 +6025,14 @@ async function endTurn() {
     state.activeIndex = (state.activeIndex + 1) % state.initiative.length;
     if (state.activeIndex === 0) {
       state.round += 1;
+      advanceDungeonTime(combatRoundSeconds());
       addLog(`Round ${state.round} begins.`, "important");
     }
   } while (!activeFighter()?.alive);
   syncActiveHeroToTurn();
   resetTurnResources(activeFighter());
   addTurnStartLog(activeFighter());
+  if (await resolveTurnStartHazardsForActiveFighter()) return;
   if (isPartyHeroId(activeFighter()?.id) && activeFighter().hp <= 0) {
     await rollDeathSave(activeFighter());
     render();

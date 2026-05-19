@@ -1,11 +1,9 @@
-fly movement
-difficult terrain
-add shove and grapple attacks
-
 Sidekicks expert and spellcaster availability
 recruitable sidekicks
 
-feats
+add books and journals as items, configurable text and pics within it
+add doors and chests that require player input to open (code in numbers, in text, specific phrase word etc)
+
 Spell sound effects
 
 NPCs with (random) quests
@@ -16,9 +14,3 @@ add stealthing through rooms a possibelste
 
 Factions with quests (Monsterhunter, buying pelts etc, elementalists, Gravebinder etc)
 Arena fighting pit for glory
-
-
-check if multiple heros are saved correctly. if i save at home, i wanna spawn at home. if i save in a dungoen, i wanna start excatly in the same dungeon and where i left off and when i go home again have all the heros in the roster if they were any.
-check availabilty of premade hero token.
-
-

@@ -103,14 +103,32 @@ function render() {
 }
 
 els.rollInitiative.addEventListener("click", rollInitiative);
+els.initiativeList?.addEventListener("click", (event) => {
+  const item = event.target.closest("[data-initiative-fighter]");
+  const fighter = item ? state.fighters[item.dataset.initiativeFighter] : null;
+  if (!isPlayerControlledPartyFighter(fighter)) return;
+  if (setActiveHero(fighter.id)) render();
+});
 els.selectParty?.addEventListener("click", selectActivePartyForMovement);
 els.attack.addEventListener("click", () => {
   void performAttackWithPrompt();
 });
-els.actionButton.addEventListener("click", showActionMenu);
+els.actionButton.addEventListener("click", () => {
+  const fighter = state.mode === "combat" ? activeFighter() : activeHero();
+  if (activeGrabForCarrier(fighter)) {
+    releaseGrabForFighter(fighter);
+    return;
+  }
+  showActionMenu();
+});
 els.useItem.addEventListener("click", showUseItemMenu);
 els.abilities.addEventListener("click", showAbilitiesMenu);
 els.shortRest.addEventListener("click", takeShortRest);
+els.toggleDungeonTimer?.addEventListener("click", () => {
+  toggleDungeonClockPaused();
+  if (window.DepthboundPlaytest?.syncNow) window.DepthboundPlaytest.syncNow();
+  render();
+});
 els.returnHome.addEventListener("click", () => {
   if (state.mode === "combat") {
     fleeCombat();
@@ -126,6 +144,22 @@ els.heroCard.addEventListener("contextmenu", (event) => {
 els.newGame.addEventListener("click", () => {
   showMainMenu();
 });
+
+window.setInterval(() => {
+  if (!gameHasStarted || state?.mode === "home") return;
+  if (dungeonClockIsPaused()) {
+    renderDungeonClock();
+    renderHeroStatusCard(els.heroCard, activeHero());
+    return;
+  }
+  const advanced = syncDungeonClock();
+  const expired = advanced > 0 ? expireTimedDungeonEffects() : 0;
+  if (expired > 0) render();
+  else {
+    renderDungeonClock();
+    renderHeroStatusCard(els.heroCard, activeHero());
+  }
+}, 1000);
 const bugReportUrl = window.DungeonConfig?.bugReport?.formUrl ?? "";
 if (els.bugReport) {
   if (bugReportUrl) {
@@ -259,6 +293,12 @@ els.fighterInfo.addEventListener("click", (event) => {
   }
   if (button.dataset.action === "investigate-object") {
     investigateObject(button.dataset.object);
+  }
+  if (button.dataset.action === "farm-resource-node") {
+    farmResourceNode(button.dataset.object);
+  }
+  if (button.dataset.action === "use-object-interaction") {
+    useObjectInteraction(button.dataset.object);
   }
   if (button.dataset.action === "attack-object") {
     attackDestructibleObject(state.mode === "combat" ? activeFighter() : activeHero(), dungeonObjectForId(button.dataset.object));
@@ -404,12 +444,18 @@ els.closeUseItem.addEventListener("click", hideUseItemMenu);
 els.closeActionMenu.addEventListener("click", hideActionMenu);
 els.closeAbilities.addEventListener("click", hideAbilitiesMenu);
 els.closeHomeMenu.addEventListener("click", hideHomeMenu);
+els.closeVillage?.addEventListener("click", hideVillageMenu);
 els.closeStore.addEventListener("click", hideStoreMenu);
-els.goStore.addEventListener("click", showStoreMenu);
+els.backStoreVillage?.addEventListener("click", () => {
+  hideStoreMenu();
+  showVillageMenu();
+});
+els.goVillage?.addEventListener("click", showVillageMenu);
 els.buildHome?.addEventListener("click", showHomeBuilder);
+els.goAdventure?.addEventListener("click", () => setHomeMenuPanel("adventure"));
 els.goBarrowCrown?.addEventListener("click", () => void startCampaignDungeon("barrow-crown"));
 els.goThornwoodPact?.addEventListener("click", () => void startCampaignDungeon("thornwood-pact"));
-els.goNewDungeon.addEventListener("click", startNewDungeonWithHero);
+els.goNewDungeon?.addEventListener("click", startNewDungeonWithHero);
 els.levelUp.addEventListener("click", levelUpHero);
 els.replaceRangerCompanion?.addEventListener("click", () => void replaceDeadBeastMasterCompanion());
 els.storeMenu.addEventListener("click", (event) => {
@@ -419,6 +465,15 @@ els.storeMenu.addEventListener("click", (event) => {
   }
 
   const button = event.target.closest("button");
+  if (button?.dataset.action === "back-to-village") {
+    hideStoreMenu();
+    showVillageMenu();
+    return;
+  }
+  if (button?.dataset.action === "inspect-npc") {
+    showNpcInspection(button.dataset.npc);
+    return;
+  }
   if (button?.dataset.action === "buy-store-item") {
     buyStoreItem(button.dataset.item);
   }
@@ -450,6 +505,54 @@ els.gameDialog.addEventListener("click", (event) => {
 els.homeMenu.addEventListener("click", (event) => {
   if (event.target === els.homeMenu) {
     hideHomeMenu();
+    return;
+  }
+  const button = event.target.closest("button");
+  if (button?.dataset.homeMenu) {
+    setHomeMenuPanel(button.dataset.homeMenu);
+    return;
+  }
+  if (button?.dataset.randomDungeonTheme) {
+    void startRandomDungeonWithHero(button.dataset.randomDungeonTheme);
+    return;
+  }
+  if (button?.dataset.customDungeonId) {
+    void startCustomDungeonWithHero(button.dataset.customDungeonId);
+  }
+});
+els.villageMenu?.addEventListener("click", (event) => {
+  if (event.target === els.villageMenu) {
+    hideVillageMenu();
+    return;
+  }
+  const button = event.target.closest("button");
+  if (button?.dataset.action === "visit-village-npc") {
+    visitVillageNpc(button.dataset.npc);
+  }
+  if (button?.dataset.action === "inspect-npc") {
+    showNpcInspection(button.dataset.npc);
+  }
+  if (button?.dataset.action === "back-to-village-list") {
+    renderVillageMenu();
+  }
+  if (button?.dataset.action === "return-npc-visit") {
+    returnToNpcVisit(button.dataset.npc);
+  }
+  if (button?.dataset.action === "accept-npc-quest") {
+    acceptNpcQuest(button.dataset.npc, button.dataset.quest);
+  }
+  if (button?.dataset.action === "complete-npc-quest") {
+    completeNpcQuest(button.dataset.npc, button.dataset.quest);
+  }
+  if (button?.dataset.action === "start-npc-chat") {
+    startNpcChat(button.dataset.npc, button.dataset.chatState);
+  }
+  if (button?.dataset.action === "npc-chat-option") {
+    useNpcChatOption(button.dataset.npc, button.dataset.chatState, button.dataset.option);
+  }
+  if (button?.dataset.action === "close-village") {
+    hideVillageMenu();
+    showHomeMenu();
   }
 });
 els.useItemMenu.addEventListener("click", (event) => {
@@ -470,8 +573,16 @@ els.actionMenu.addEventListener("click", (event) => {
   }
 
   const button = event.target.closest("button");
+  if (button?.dataset.action === "grab-target") {
+    void useGrabAction(button.dataset.grabKind, button.dataset.grabId);
+    return;
+  }
+  if (button?.dataset.action === "release-grab") {
+    releaseGrabForFighter();
+    return;
+  }
   if (button?.dataset.action === "combat-action") {
-    useCombatAction(button.dataset.combatAction, button.dataset.target ?? null);
+    void useCombatAction(button.dataset.combatAction, button.dataset.target ?? null);
   }
 });
 els.abilitiesMenu.addEventListener("click", (event) => {
@@ -528,6 +639,13 @@ els.inventoryMenu.addEventListener("click", (event) => {
     adminMonsterCatalogOpen = !adminMonsterCatalogOpen;
     renderInventoryMenu();
   }
+  if (button.dataset.action === "toggle-admin-progress") {
+    adminProgressOpen = !adminProgressOpen;
+    renderInventoryMenu();
+  }
+  if (button.dataset.action === "set-admin-progress") {
+    setNpcAdminProgress(button.dataset.npc, button.dataset.progress);
+  }
   if (button.dataset.action === "admin-heal") {
     adminFullHeal();
   }
@@ -557,6 +675,13 @@ els.inventoryMenu.addEventListener("click", (event) => {
     if (!adminEnabled()) return;
     addAdminCoins(Number(button.dataset.cp));
   }
+  if (button.dataset.action === "inspect-party-resource") {
+    showPartyResourceInfo(button.dataset.item);
+  }
+  if (button.dataset.action === "toggle-quest-satchel") {
+    questSatchelOpen = !questSatchelOpen;
+    renderInventoryMenu();
+  }
   if (button.dataset.action === "add-admin-xp") {
     if (!adminEnabled()) return;
     addAdminXp(Number(button.dataset.xp));
@@ -581,6 +706,9 @@ els.inventoryMenu.addEventListener("click", (event) => {
   }
   if (button.dataset.action === "inspect-item") {
     showInventoryItemInfo(button.dataset.item);
+  }
+  if (button.dataset.action === "use-carried-consumable") {
+    useCarriedConsumable(button.dataset.item);
   }
   if (button.dataset.action === "give-item") {
     const select = button.closest(".equip-actions")?.querySelector("select[data-transfer-target]");

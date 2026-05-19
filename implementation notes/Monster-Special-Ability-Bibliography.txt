@@ -1,0 +1,182 @@
+Monster Special Ability Bibliography
+
+Scope:
+This file tracks the current monster specialAbility catalogue and the runtime mechanics that currently recognize those names. The source of truth is the monster pack files in src/scripts/content/monsters and the runtime hooks in src/scripts/app/combat-map.js.
+
+Runtime tuning:
+- Monster special tuning lives in src/scripts/app/combat-map.js under monsterSpecialAbilityTuning.
+- Active abilities use activeUseChance.
+- On-hit riders use onHitUseChance.
+- Defensive/passive-on-turn abilities use defensiveUseChance.
+- A specialAbility string is only mechanical when combat-map.js recognizes it by name or by regex family.
+
+Implemented Runtime Families
+
+- Movement identity:
+  Aquatic, BurrowAmbush, MarshAmbush, RockClimber, SewerSkulk.
+  These are mostly catalogue identity abilities. The monsters express the behavior through tags, speed, flying, placement, and theme context.
+
+- Start-of-turn self heal:
+  SelfHeal.
+  Once per fight, when at or below half HP, heals 1d6 + monster category HP.
+
+- Start-of-turn blood frenzy:
+  BloodFrenzy.
+  If at or below half HP, gains +1 attack for that turn.
+
+- Start-of-turn defensive brace:
+  Briarhide, ShellGuard, Stubborn Beast, Thornhide, Ironbark Guard, Grove Body, Ancient Bark, Adamantine Frame, Hard Light of the Forge, Gear Assembly, Burning Guard, Furnace Shield, Mirror Heat, Cyclone Guard, Hurricane Guard, Storm Shell, Current Guard, Glacial Guard, Stone Hide, Guarding Slab, Iron Stance, Mountain Heart, Tremor Shell, Diamond Refraction, Glass Refract, Black Glass Body, Living Cover, Idol Ward, Open Sea Body, Endless Body, Vortex Body, Worldstorm Body, Firestorm Body, Molten Body.
+  Defensive abilities reduce damage, cap damage, or grant a short AC/attack stance.
+
+- Elemental self stance:
+  Flare Step, Cinder Dance, Vanish into Soot, Cloudstep, Slipstream, High Roost, Whirlpool Step, Splash Step, Melt Away, Crater Step, Fault Step, Mountain Walks, Storm Eye, Sky Crown, Storm Reading, Furnace Shield, Living Cover, Open Sea Body, Endless Body, Cyclone Guard, Hurricane Guard, Glacial Guard, Current Guard, Guarding Slab, Iron Stance.
+  Once per fight, the monster may gain a brief +1 AC and +1 attack elemental stance.
+
+- Ally command aura:
+  Bark Orders, Mine Lord's Edict, Stoke the Furnace, Forgeheart Pulse, Royal Furnace Oath, Heart of Ore and Flame, Command the Coals, Pyre Command, Sultan's Decree of Flame, Pearl Command, Current of Kings, Mantle Command, Open Sky Decree, Skybreaker Law, Palace Winds, Cathedral Winds, Continental Command, Seismic Dominion.
+  Nearby allies that share the relevant theme or elemental tags gain a short attack bonus.
+
+- On-hit venom/poison:
+  Claw Fever, Deep Venom, Infernal Sting, Rotting Tendrils, Sickening Claws, Venom Bite, VenomBite, Venom Needle, Wyrmwood Sap.
+  Target makes a CON save. Failed saves take poison damage. Sickening/sap variants also apply a small attack penalty.
+
+- On-hit smoke, ash, choking, and airless pressure:
+  Ash Cough, Choking Grasp, Dead Sky, Drowning Mist, Drying Wind, Dust Bite, Dust Cough, Sandblind Ambush, Silence of No Air, Smoke, Smoke Veil, Suffocating Rain, Thin Air Aura, Mist Choke, Airless Bite.
+  Target makes a CON save. Failed saves suffer short attack and/or movement penalties.
+
+- On-hit fire and heat:
+  Burning Guard, Cinder Crown, Heated Spear, Ignite Ground, Kindle, Lava Wake, Magma Breath, Melt Armor, Scalding Puff, White-Hot Beam, Boiling Spray.
+  Target makes a DEX save. Failed saves take fire damage. Armor/beam variants may apply a short AC penalty.
+
+- On-hit cutting shards and glass:
+  Aurora Slash, Bleeding Edge, Glass Splinters, Glasswind Cut, Hailglass Volley, Needle Draft, Needle Spray, Prismatic Lance, Razor Pass, Salt Lash, Shard Pin.
+  Target makes a DEX save. Failed saves take slashing damage. Pinning shard variants slow movement.
+
+- On-hit lightning and thunder:
+  Chain Coil, Choir Blast, Crackling Pulse, Lesser Stormcall, Lightning Lash, Queenly Thunderbolt, Rod Draw, Static Bite, Stormlord Descent, Thunderclap.
+  Target makes a DEX or STR save. Failed saves take lightning or thunder damage and may lose reaction or be pulled.
+
+- On-hit life drain and soul drain:
+  Abyssal Drain, Astral Reap, Devour Soul, Greater Life Drain, Life Drain, Unending Appetite.
+  Target makes a CON save. Failed saves take necrotic damage, get a short drained movement penalty, and some variants heal the monster.
+
+- On-hit fear/curse/malice:
+  Condemning Mark, Dread Whisper, Mind-Pounce, Mindrot Sermon, Needling Malice, Ruin Hymn, Ruin Scratch, Mindrot Cloud, Corruptive Sporulation.
+  Target makes a WIS save. Failed saves suffer short attack/save penalties or lose reaction.
+
+- On-hit bloodied finisher:
+  Acid Maw, Bite and Tear, Blood in the Water, Blood Scent, Devouring Bloom, Engulfing Mass, Feeding Frenzy, Flesh Verdict, Salt the Wound, Thousand Maws.
+  If the target is at or below half HP, the monster deals extra damage. Some variants heal from the damage.
+
+- Pull, chain, and drag riders:
+  Baronial Undertow, Burial Pull, Canopy Snatch, Chain Coil, Dragged into the Teeth, Dragging Lash, Drop the Hook, Hook and Drag, Hookcap Pull, Hooking Chain, Leviathan Drag, Living Chains, Luring Scent, Pull Under, Spectral Chain, Tidal Pull.
+  Target makes a STR save. Failed saves may be pulled 5 ft and sometimes restrained.
+
+- Restraint and binding riders:
+  Cinder Chain Judgment, Clay Bind, Constricting Coil, Coral Snare, Crushing Claws, Engulfing Slide, Forest Judgment, Heated Coil, Hoist Prisoner, Living Chain, Mud Grip, Root Lock, Stranglehold.
+  Target makes a STR save. Failed saves are briefly restrained.
+
+- Hamstring, web, and cold slow:
+  Cold Bite, Crippling Bite, Dragging Grasp, Drowning Grip, Frozen Undertow, Gear Nip, Glacial Advance, Grinding Teeth, Hamstring Bite, Ice Slick, Polar Night, Sleep Poison Bolt, Web Snare, WebSnare.
+  Target makes a STR or DEX save. Failed saves reduce or stop movement briefly.
+
+- Charge, pounce, slam, rush, and quake hit:
+  Avalanche Hammer, Briar Slam, Burning Dive, Charge, Corpse Slam, Crater Slam, Crushing Deep, Crushing Stomp, Falling Fronds, Falling Star Dive, Faultline Strike, Four-Season Slam, Impaling Advance, Lava Step, Magma Fault, Mauling Rush, Minecart Shove, Mudslide Rush, Pillar Fall, Pounce, Pouncing Vines, Predator Lunge, Pressure Crush, Quake Fist, Rift Charge, Shattering Charge, Siege Charge, Stomp, Stone Pounce, Support-Beam Breaker, Swooping Strike, Thunder Charge, Thunderhead Crash, Tyrant Downburst, Whitewater Rush, World-Stamp.
+  If the monster moved far enough this turn, the hit adds extra damage and can shove or knock prone on a failed STR save.
+
+- Active fire/forge bursts:
+  Ashen Burst, Blinding Cyclone, Caldera Gate, Coal Toss, Dead Sky, Ember Mortar, Eruption Cycle, Fireball, Furnace Vent, Hellhound Breath, Lava Breath, Magma Breath, Molten Slag Breath, Open the Pyre, Split the Battlefield, Suffocating Rain, Volcanic Pulse, World-Pyre Ascension.
+  Area special. Targets save, take fire damage, and may be scorched or pushed.
+
+- Active storm/air bursts:
+  Baronial Cyclone, Breath of the Plane, Cathedral Winds, Choir Blast, City-Eater Winds, Crackling Pulse, Dust Spin, Neverending Storm, Pressure Rift, Queenly Thunderbolt, Regent Stormfall, Split the Heavens, Starstorm Fall, Tempest Choir, Thunderclap, Tyrant Downburst, Worldstorm Body.
+  Area special. Targets save, take thunder/lightning damage, and may be pushed or deafened.
+
+- Active earth bursts:
+  Avalanche Hammer, Collapse District, Crown of Cairns, Fault Throne, Graveyard Slam, Needle Spray, Open Sinkhole, Pillar Fall, Quake Fist, Royal Tremor, Seismic Sentence, Sovereign Faultline, Tectonic Verdict.
+  Area special. Targets save, take bludgeoning or slashing damage, and may be pushed or shaken.
+
+- Active tide/water bursts:
+  Abyssal Pressure, Boiling Spray, Cloudburst Devour, Crown Tide, Crush of Oceans, Crushing Wave, Drown the World, Endless Deluge, Glacial Advance, Hailglass Volley, Iceberg Break, Leviathan Roll, Tsunami Front, Worldspring Eruption.
+  Area special. Targets save, take bludgeoning/cold/fire damage, and may be pushed, pulled, or slowed.
+
+- Active plague/spore/poison bursts:
+  Abyssal Bile, Bile Spray, Blight Belch, Carrion Spores, Midnight Spores, Plague Breath, Rot Burst, Rot Crown Pulse, Spores of Filth, Titan Sporefall, Venom Bloom, Vomit Plague.
+  Area special. Targets save, take poison or acid damage, and may be poisoned/scorched.
+
+- Active dread/psychic/shout bursts:
+  Abyss Unleashed, Abyssal Roar, Banshee Keening, Cathedral Dirge, Chaos Star, Crown of the Ninefold Pact, Doom Scream, Duke's War Cry, Grief Pulse, Hollow Wail, Horror Judgement, Howl of Hunger, Mournful Cry, Origin Wail, Overmind Spores, Panic Shriek, Panic Spores, Shriek Alarm, Triple Condemnation, Void Bell Toll, White Bell Wail.
+  Area special. Targets save, take psychic/thunder damage, and may be frightened.
+
+- Active soul/necrotic bursts:
+  Corrupt Wish, Forbidden Chorus, Grave Breath, Moonlit Dominion, Soul Furnace, Soul Lantern.
+  Area special. Targets save, take necrotic damage, and may be drained.
+
+- Active force/abyssal/rift bursts:
+  Flaming Whipstorm, Gate Pulse, Maw of the Abyss, Reality Tear, Rift Sovereignty, Soul Tempest, Abyss Storm, Unstable Fire.
+  Area special. Targets save, take force/fire/lightning/piercing damage and may be pushed or pulled.
+
+- Active compulsion/debuff:
+  Chains of Grace, False Lantern, False Promise, Infernal Verdict, Lesser Possession, Luring Scent, Musk Charm, Name in the Ledger, Noble Possession, Petty Bargain, Praetor's Challenge, Prince's Mark, Sulphur Hex, Sweetened Damnation.
+  Status special. Target saves or suffers a short attack/AC debuff, sometimes with pull.
+
+- Active binding/chains:
+  Chains of the Ninth Gate, Command the Brambles, Constricting Coil, Forest Judgment, Living Chains, Living Jungle, Locking Chain, Root Snare, Sentence to Chains, Stranglehold.
+  Status special. Targets save or are briefly restrained and may be pulled.
+
+- Reactive body/riposte:
+  Abyssal Riposte, Barbed Hide, Black Glass Body, Blackwater Seep, Cinder Body, Cinder Crown, Crown of Thorns, Eidolic Reversal, Firestorm Body, Ghostly Riposte, Molten Body, Open Sea Body, Rooted Counter, Shard Burst, Shatter Spines, Storm Shell, Thorn Hide, Thorn Nest, Tremor Shell, Vortex Body, Worldstorm Body.
+  Melee attackers may take reactive damage. Some variants push the attacker.
+
+- Death defiance:
+  Black Rebirth, Endless Body, Endless Gale, Final Bargain, Fungal Rebirth, Infernal Wishflame, King's Return, Mountain Heart, Older Than Roads, Prince's Second Form, Primordial Regrowth, Unfinished Death, Absolute Stillness.
+  One-time survival at 1 HP, subject to damage-type exceptions for some older families.
+
+- Death burst:
+  Continental Melt, Death Throes, End-Breath Ash, Greater Death Throes, Iceberg Break, Industrial Catastrophe, Pebble Scatter, Split the Heavens, Worldspring Eruption.
+  When the monster dies, nearby heroes save or take area damage.
+
+- Terrain-like floor specials:
+  Storm Current Floor, Tidal Current Floor, Unstable Stone Floor.
+  These are furniture/terrain abilities, not monster specialAbility entries. They apply hazard/difficult terrain and may shove characters on failed saves.
+
+Catalogue Index By Monster Pack
+
+beast-biome-pack.js:
+Aquatic, BloodFrenzy, BossRoar, BurrowAmbush, Charge, FrostHide, MarshAmbush, Pounce, RockClimber, SewerSkulk, ShellGuard, Stampede, ThickHide, VenomBite, WebSnare.
+
+elemental-air-pack.js:
+Airless Bite, Aurora Slash, Baronial Cyclone, Breath of the Plane, Cathedral Winds, Chain Coil, Choir Blast, City-Eater Winds, Cloudstep, Crackling Pulse, Cyclone Guard, Drying Wind, Dust Spin, Endless Gale, False Horizon, Fog Cover, Glasswind Cut, Gravityless Zone, High Roost, High Tempest Aura, Hurricane Guard, Lesser Stormcall, Lightning Lash, Needle Draft, Neverending Storm, Open Sky Decree, Palace Winds, Pressure Rift, Queenly Thunderbolt, Razor Pass, Regent Stormfall, Rod Draw, Shrieking Gust, Silence of No Air, Sky Crown, Skybreaker Law, Slipstream, Split the Heavens, Starstorm Fall, Static Bite, Storm Eye, Storm Shell, Stormlord Descent, Tempest Choir, Thin Air Aura, Thunderclap, Thunderhead Crash, Tyrant Downburst, Vortex Body, Worldstorm Body.
+
+elemental-earth-pack.js:
+Adamantine Frame, Avalanche Hammer, Black Glass Body, Bleeding Edge, Burial Pull, Buried City Aura, Clay Bind, Collapse District, Continental Command, Continental Weight, Crater Step, Crown of Cairns, Diamond Refraction, Dust Cough, Engulfing Slide, Fault Step, Fault Throne, Gemscale Flash, Glass Refract, Graveyard Slam, Guarding Slab, Idol Ward, Iron Stance, Living Cover, Magma Fault, Mantle Command, Mountain Heart, Mountain Walks, Mud Grip, Mudslide Rush, Needle Spray, Older Than Roads, Open Sinkhole, Pebble Scatter, Pillar Fall, Prismatic Lance, Quake Fist, Resonant Note, Reverse Weight, Root Lock, Royal Tremor, Sandblind Ambush, Seismic Dominion, Seismic Sentence, Shatter Spines, Sovereign Faultline, Stone Hide, Stone Pounce, Tectonic Verdict, Topple Curse, Tremor Shell.
+
+elemental-fire-pack.js:
+Ash Cough, Ashen Burst, Black Rebirth, Blinding Cyclone, Burning Guard, Caldera Gate, Choking Grasp, Cinder Crown, Cinder Dance, Command the Coals, Crater Slam, Dead Sky, Ember Mortar, End-Breath Ash, Eruption Cycle, Faultline Strike, Firestorm Body, Flare Step, Furnace Shield, Glass Splinters, Heated Spear, Ignite Ground, Infernal Wishflame, Kindle, Lava Wake, Magma Breath, Melt Armor, Mirror Heat, Molten Body, Molten Pounce, Open the Pyre, Pyre Command, Shattering Charge, Smoke Veil, Split the Battlefield, Suffocating Rain, Sultan's Decree of Flame, Vanish into Soot, Volcanic Pulse, White-Hot Beam, World-Pyre Ascension.
+
+elemental-water-pack.js:
+Absolute Stillness, Abyssal Pressure, Baronial Undertow, Black Pool, Blackwater Seep, Blood in the Water, Boiling Spray, Cloudburst Devour, Cold Bite, Coral Growth, Coral Snare, Crown Tide, Crush of Oceans, Crushing Deep, Crushing Wave, Current Guard, Current of Kings, Drown the World, Drowning Mist, Endless Body, Endless Deluge, Foam Screen, Frozen Undertow, Glacial Advance, Glacial Guard, Hailglass Volley, Ice Slick, Iceberg Break, Leviathan Drag, Leviathan Roll, Maelstrom Aura, Melt Away, Mire Acid, Mist Choke, Open Sea Body, Pearl Command, Polar Night, Pressure Crush, Pull Under, Salt Lash, Salt the Wound, Scalding Puff, Shard Pin, Splash Step, Storm Reading, Tidal Pull, Tsunami Front, Whirlpool Step, Whitewater Rush, Worldspring Eruption.
+
+embervein-deepworks-monster-pack.js:
+Adamantine Frame, Anvil Breath, Anvil Drop, Bark Orders, Black Smoke Cloud, Bright Seam, Burst from Below, Cave-In Groan, Cinder Chain Judgment, Coal Toss, Colossus Hammerfall, Continental Melt, Crushing Shell, Dragged into the Teeth, Drop the Hook, Dust Bite, Enlarge, Forgeheart Pulse, Furnace Vent, Gear Assembly, Gear Nip, Grinding Floor, Grinding Teeth, Hard Light of the Forge, Heart of Ore and Flame, Heated Coil, Hell-Engine Blueprint, Hoist Prisoner, Hook and Drag, Ignition Flood, Industrial Catastrophe, Lava Breath, Lava Step, Living Chain, Mine Lord's Edict, Minecart Shove, Molten Slag Breath, Molten Trail, Overpressure Burst, Pressure Release, Royal Furnace Oath, Shard Burst, Sleep Poison Bolt, Soot Breath, Stoke the Furnace, Support-Beam Breaker, Throw Keg, Valve Lock, Valve Twist, Wake the Deepworks.
+
+fiend-demon-pack.js:
+Abyss Storm, Abyss Unleashed, Abyssal Bile, Abyssal Command Roar, Abyssal Riposte, Abyssal Roar, Bite and Tear, Carrion Spores, Chaos Star, Corrupt Wish, Crushing Claws, Crushing Dominion, Dance of Six Deaths, Death Throes, Demon Gate, Devour Soul, Falling Star Dive, False Promise, Feed the Mutation, Feeding Frenzy, Filth Aura, Flaming Whipstorm, Flesh Verdict, Gate Pulse, Greater Death Throes, Horror Judgement, Howl of Hunger, Jagged Spines, Lightning Whip, Maw of the Abyss, Mind-Pounce, Nauseating Bulk, Needling Malice, Panic Shriek, Parry Storm, Prince's Mark, Prince's Second Form, Reality Tear, Rift Blink, Rift Charge, Rift Sovereignty, Rot Stench, Ruin Hymn, Ruin Scratch, Ruinous Cleave, Shadow Slip, Siege Charge, Spawn of Ruin, Spores of Filth, Stunning Screech, Triple Condemnation, Unending Appetite, Unstable Fire, Venom Needle, Vomit Plague, Whirling Blades, World-Cracker Slam.
+
+fiend-devil-pack.js:
+Barbed Hide, Branding Lash, Brimstone Shell, Burning Dive, Burning Hand of Command, Chains of Grace, Chains of the Ninth Gate, Cinder Body, Clause of Pain, Command the Wretched, Confession by Fire, Crown of the Ninefold Pact, Duke's Edict, Duke's War Cry, Final Bargain, Final Signature, Furnace Aura, Guilty Flame, Harvest Contract, Hellbow Pin, Hellfire Wings, Hellhound Breath, Hellspines, Hook and Bleed, Hooking Chain, Impaling Advance, Infernal Countermarch, Infernal Dominion, Infernal Retinue, Infernal Sting, Infernal Verdict, Juridical Cruelty, Living Chains, Locking Chain, Name in the Ledger, Ninefold Curse, Pain Tax, Petty Bargain, Phalanx of Flame, Pit Lord's Command, Pit Quake, Praetor's Challenge, Profane Radiance, Punish Cowardice, Red Seal Edict, Sentence to Chains, Siege Slam, Soul Furnace, Stygian Brand, Sulphur Hex, Sweetened Damnation, Titanic Clause, Trampling Charge, World-Stamp.
+
+forest-beast-pack.js:
+Briarhide, Charge, Crippling Bite, Deep Venom, Hamstring Bite, Mauling Rush, Predator Lunge, Root-Rending Roar, SelfHeal, Stormhorn Burst, Stubborn Beast, Swooping Strike, Thornhide, Thunder Charge, Venom Bite, Venom Spit, Web Snare.
+
+ghost-undead-pack.js:
+Abyssal Drain, Astral Reap, Banshee Keening, Cathedral Dirge, Command the Dead, Condemning Mark, Courtly Decree, Dead Star Vision, Death Choir, Devour Memory, Doom Scream, Dread Whisper, Eidolic Reversal, Erase Name, Ethereal Stomp, Fading Retreat, False Lantern, Flicker Step, Forbidden Chorus, Ghostly Riposte, Grave Breath, Grave Lightning, Greater Life Drain, Grief Pulse, Hollow Wail, Hurl Debris, King's Return, Lesser Possession, Life Drain, Locked Passage, Maddening Secret, Mirror Double, Moonlit Dominion, Mournful Cry, Noble Possession, Origin Wail, Parrying Fade, Possess the Dungeon, Royal Wail, Shadow Vanish, Soul Eclipse, Soul Lantern, Soul Siphon, Soul Tempest, Spectral Chain, Spectral Charge, Unburied Retinue, Unfinished Death, Unholy Benediction, Void Bell Toll, White Bell Wail, White Veil.
+
+plant-creature-pack.js:
+Acid Maw, Ancient Bark, Ancient Photosynthesis, Blood Rain, Blood Scent, Briar Slam, Brittle Dash, Brood Spores, Canopy Collapse, Canopy Snatch, Carrion Perfume, Choking Colony, Colony Immortality, Colony Thought, Command the Brambles, Constricting Coil, Corpse Compost, Corruptive Sporulation, Crown of Thorns, Dazzling Spores, Devouring Bloom, Dragging Lash, Engulfing Mass, Falling Fronds, First Forest Awakens, Forest Judgment, Four-Season Slam, Fungal Rebirth, Grove Body, Guiding Glow, Hookcap Pull, Ironbark Guard, Lightning Feed, Living Jungle, Luring Scent, Many Maws, Midnight Spores, Mindrot Cloud, Mindrot Sermon, Musk Charm, Needle Spray, Overmind Spores, Pacifying Puff, Panic Spores, Pouncing Vines, Primordial Regrowth, Rapport Spores, Reaving Tangle, Regrowing Heads, Root Snare, Rooted Counter, Rootquake, Rotting Tendrils, Seasonal Wrath, Shared Pain Hymn, Shriek Alarm, Spore Communion, Stranglehold, Thorn Hide, Thorn Nest, Thousand Maws, Titan Sporefall, Venom Bloom, Worldroot Anchor, Wyrmwood Sap, Zombie Seed.
+
+skeletal-undead-pack.js:
+No specialAbility entries currently registered in this pack.
+
+zombie-undead-pack.js:
+Bile Spray, Blight Belch, Claw Fever, Corpse Slam, Crushing Stomp, Dragging Grasp, Drowning Grip, Fireball, Grave Spark, Gravequake, Lesser Fireball, Plague Breath, Rot Burst, Rot Crown Pulse, SelfHeal, Sickening Claws, Undead Fortitude.

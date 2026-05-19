@@ -4,7 +4,7 @@
   if (!["host", "guest"].includes(role)) return;
 
   const playtest = {
-    build: "playtest-sync-28",
+    build: "playtest-sync-37",
     role,
     id: "",
     sessionId: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
@@ -27,14 +27,24 @@
     transitionPulseTimer: 0,
     reactionRequests: {},
     reactionPrompt: null,
+    saveRequests: {},
+    savePrompt: null,
     localEditUntil: 0,
     suppressMapClickUntil: 0,
     remoteSpellTargeting: null,
     lastIntentStatus: "",
     tokenArtDataUrls: {},
     tokenArtPending: {},
+    tokenArtManifest: {},
+    tokenArtRequested: {},
+    tokenArtSent: {},
     snapshotSequence: 0,
     lastSnapshotPostAt: 0,
+    objectLocks: {},
+    localObjectLockId: "",
+    currentObjectInfoId: "",
+    currentObjectInfoSignature: "",
+    mirroredMenus: {},
   };
   window.DepthboundPlaytest = playtest;
 
@@ -72,11 +82,47 @@
     return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
 
+  const playtestTokenArtStoragePrefix = "depthbound.playtest.tokenArt.";
+  const playtestTokenArtMaxDataUrlLength = 180000;
+
   function tokenArtCacheKey(art) {
     if (!art) return "";
-    if (typeof art === "string") return art.startsWith("blob:") ? art : "";
+    if (typeof art === "string") return art.startsWith("data:image/") || art.startsWith("blob:") ? art : "";
     if (art.type === "custom-file") return art.path || art.id || "";
     return "";
+  }
+
+  function playtestTokenArtIdForFighter(fighter) {
+    const key = tokenArtCacheKey(fighter?.tokenArt ?? fighter?.tokenImage ?? fighter?.art ?? fighter?.portrait ?? fighter?.avatar);
+    if (!key) return "";
+    const basis = `${fighter?.id ?? ""}|${key}`;
+    let hash = 0;
+    for (let index = 0; index < basis.length; index += 1) hash = ((hash << 5) - hash + basis.charCodeAt(index)) | 0;
+    return `${fighter?.id ?? "hero"}-${Math.abs(hash).toString(36)}`;
+  }
+
+  function playtestTokenArtStorageKey(artId) {
+    return `${playtestTokenArtStoragePrefix}${artId}`;
+  }
+
+  function guestStoredTokenArt(artId) {
+    if (!artId) return "";
+    try {
+      return window.localStorage.getItem(playtestTokenArtStorageKey(artId)) ?? "";
+    } catch {
+      return "";
+    }
+  }
+
+  function storeGuestTokenArt(artId, dataUrl) {
+    if (!artId || !dataUrl || !dataUrl.startsWith("data:image/")) return false;
+    if (dataUrl.length > playtestTokenArtMaxDataUrlLength) return false;
+    try {
+      window.localStorage.setItem(playtestTokenArtStorageKey(artId), dataUrl);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function blobToDataUrl(blob) {
@@ -85,6 +131,35 @@
       reader.addEventListener("load", () => resolve(String(reader.result || "")));
       reader.addEventListener("error", () => reject(reader.error));
       reader.readAsDataURL(blob);
+    });
+  }
+
+  function imageBlobToSmallDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.addEventListener("load", () => {
+        try {
+          const size = 96;
+          const canvas = document.createElement("canvas");
+          canvas.width = size;
+          canvas.height = size;
+          const context = canvas.getContext("2d");
+          context.clearRect(0, 0, size, size);
+          const scale = Math.max(size / img.naturalWidth, size / img.naturalHeight);
+          const width = img.naturalWidth * scale;
+          const height = img.naturalHeight * scale;
+          context.drawImage(img, (size - width) / 2, (size - height) / 2, width, height);
+          URL.revokeObjectURL(img.src);
+          resolve(canvas.toDataURL("image/webp", 0.78));
+        } catch (error) {
+          reject(error);
+        }
+      });
+      img.addEventListener("error", () => {
+        URL.revokeObjectURL(img.src);
+        reject(new Error("Token art image could not be resized."));
+      });
+      img.src = URL.createObjectURL(blob);
     });
   }
 
@@ -104,7 +179,8 @@
       if (!url) return false;
       const response = await fetch(url);
       if (!response.ok) return false;
-      const dataUrl = await blobToDataUrl(await response.blob());
+      const blob = await response.blob();
+      const dataUrl = await imageBlobToSmallDataUrl(blob).catch(() => blobToDataUrl(blob));
       if (!dataUrl) return false;
       playtest.tokenArtDataUrls[key] = dataUrl;
       return true;
@@ -122,6 +198,73 @@
         if (cached) broadcastSnapshotSoon();
       });
     });
+  }
+
+  function hostTokenArtManifest() {
+    if (role !== "host") return {};
+    const manifest = {};
+    Object.values(state?.fighters ?? {}).forEach((fighter) => {
+      if (!isRosterHeroId(fighter?.id)) return;
+      const art = fighter.tokenArt ?? fighter.tokenImage ?? fighter.art ?? fighter.portrait ?? fighter.avatar;
+      const key = tokenArtCacheKey(art);
+      const artId = playtestTokenArtIdForFighter(fighter);
+      if (!key || !artId) return;
+      manifest[fighter.id] = { artId, key };
+      if (playtest.tokenArtDataUrls[key]) return;
+      void cacheTokenArtDataUrlForFighter(fighter).then((cached) => {
+        if (cached) broadcastTokenArtIfNeeded(fighter.id);
+      });
+    });
+    return manifest;
+  }
+
+  function applyGuestTokenArtReferences(snapshotState, manifest = playtest.tokenArtManifest) {
+    if (role !== "guest") return;
+    const missingArtIds = [];
+    Object.values(snapshotState?.fighters ?? {}).forEach((fighter) => {
+      const entry = manifest?.[fighter?.id];
+      const dataUrl = guestStoredTokenArt(entry?.artId);
+      if (dataUrl) fighter.tokenArt = dataUrl;
+      else if (entry?.artId) {
+        fighter.playtestTokenArtId = entry.artId;
+        if (!playtest.tokenArtRequested[entry.artId] || Date.now() - playtest.tokenArtRequested[entry.artId] > 5000) {
+          playtest.tokenArtRequested[entry.artId] = Date.now();
+          missingArtIds.push(entry.artId);
+        }
+      }
+    });
+    if (missingArtIds.length) send({ type: "tokenArtRequest", artIds: missingArtIds });
+  }
+
+  function broadcastTokenArtIfNeeded(heroId = "", requestedArtIds = null) {
+    if (role !== "host") return;
+    const peers = playtest.peers.filter((peer) => peer.role === "guest");
+    if (!peers.length) return;
+    const requested = requestedArtIds ? new Set(requestedArtIds) : null;
+    const fighters = heroId ? [state?.fighters?.[heroId]].filter(Boolean) : Object.values(state?.fighters ?? {});
+    for (const fighter of fighters) {
+      if (!isRosterHeroId(fighter?.id)) continue;
+      const art = fighter.tokenArt ?? fighter.tokenImage ?? fighter.art ?? fighter.portrait ?? fighter.avatar;
+      const key = tokenArtCacheKey(art);
+      const artId = playtestTokenArtIdForFighter(fighter);
+      const dataUrl = key ? playtest.tokenArtDataUrls[key] : "";
+      if (requested?.has(artId) && key && !dataUrl && !playtest.tokenArtPending[key]) {
+        void cacheTokenArtDataUrlForFighter(fighter).then((cached) => {
+          if (cached) broadcastTokenArtIfNeeded(fighter.id, [artId]);
+        });
+      }
+      if (!artId || !dataUrl || dataUrl.length > playtestTokenArtMaxDataUrlLength) continue;
+      if (requested && !requested.has(artId)) continue;
+      if (!requested && playtest.tokenArtSent[artId]) continue;
+      send({
+        type: "tokenArt",
+        fighterId: fighter.id,
+        artId,
+        dataUrl,
+        hostSessionId: playtest.hostSessionId || playtest.sessionId,
+      });
+      playtest.tokenArtSent[artId] = Date.now();
+    }
   }
 
   function stripPlaytestSnapshotTokenArt(snapshotState) {
@@ -145,6 +288,160 @@
     return stripHeroTokenArtFields(safeClone(hero));
   }
 
+  function objectLockId(object) {
+    if (!object) return "";
+    if (object.id) return String(object.id);
+    if (object.type === "homeChest") return "home-chest";
+    return "";
+  }
+
+  function lockablePlaytestObject(object) {
+    if (!objectLockId(object)) return false;
+    if (object.type === "homeChest" || object.type === "chest" || object.locked || object.trap) return true;
+    if (typeof objectHasLoot === "function" && objectHasLoot(object)) return true;
+    if (typeof objectComponent === "function" && (objectComponent(object, "resourceNode") || objectComponent(object, "uniqueInteraction") || objectComponent(object, "captiveCreature"))) return true;
+    const template = typeof objectTemplate === "function" ? objectTemplate(object.type) : null;
+    if (template?.inspectable) return true;
+    return Boolean(template && typeof homeObjectIsStorage === "function" && homeObjectIsStorage(object, template));
+  }
+
+  function objectForPlaytestLockId(objectId) {
+    if (!objectId) return null;
+    if (objectId === "home-chest") return homeChestObject?.() ?? null;
+    return dungeonObjectForId?.(objectId) ?? homeStorageObjectForId?.(objectId) ?? null;
+  }
+
+  function playtestLockOwnerName(lock) {
+    if (!lock) return "";
+    if (lock.ownerId === playtest.id) return role === "host" ? "host" : "you";
+    return lock.ownerName || (lock.ownerRole === "host" ? "host" : "guest");
+  }
+
+  function activeObjectLock(objectId) {
+    const lock = playtest.objectLocks?.[objectId];
+    if (!lock) return null;
+    if (lock.expiresAt && Date.now() > lock.expiresAt) {
+      delete playtest.objectLocks[objectId];
+      return null;
+    }
+    return lock;
+  }
+
+  function objectLockedByOther(objectId) {
+    const lock = activeObjectLock(objectId);
+    return lock && lock.ownerId !== playtest.id ? lock : null;
+  }
+
+  function setLocalObjectLock(objectId) {
+    if (!objectId) return;
+    if (playtest.localObjectLockId && playtest.localObjectLockId !== objectId) releaseLocalObjectLock();
+    playtest.localObjectLockId = objectId;
+    playtest.objectLocks[objectId] = {
+      objectId,
+      ownerId: playtest.id || `${role}-local`,
+      ownerName: role,
+      ownerRole: role,
+      expiresAt: Date.now() + 120000,
+    };
+    if (role === "guest") {
+      sendGuestObjectLock(objectId, true);
+    } else if (role === "host") {
+      broadcastSnapshotSoon();
+    }
+  }
+
+  function releaseLocalObjectLock() {
+    const objectId = playtest.localObjectLockId;
+    if (!objectId) return;
+    playtest.localObjectLockId = "";
+    const lock = playtest.objectLocks[objectId];
+    if (!lock || lock.ownerId === playtest.id || lock.ownerRole === role) delete playtest.objectLocks[objectId];
+    if (role === "guest") {
+      sendGuestObjectLock(objectId, false);
+    } else if (role === "host") {
+      broadcastSnapshotSoon();
+    }
+  }
+
+  function sendGuestObjectLock(objectId, locked) {
+    if (role !== "guest" || !objectId) return false;
+    return send({
+      type: "intent",
+      payload: {
+        kind: "objectLock",
+        heroId: guestIntentHero()?.id ?? "",
+        objectId,
+        locked: Boolean(locked),
+      },
+    });
+  }
+
+  function renderObjectLockedMessage(object, lock) {
+    const template = object?.type === "homeChest" ? { name: "Home Chest" } : objectTemplate?.(object?.type);
+    els.fighterInfoName.textContent = template?.name ?? "Object";
+    els.fighterInfoBody.innerHTML = `
+      <p class="empty-note">Waiting for ${escapeHtml(playtestLockOwnerName(lock))} to finish with this object.</p>
+      <p class="empty-note">This panel will unlock when their object menu closes.</p>
+    `;
+    els.fighterInfo.classList.remove("hidden");
+  }
+
+  function enableGuestObjectActionButtons() {
+    if (role !== "guest") return;
+    els.fighterInfo
+      ?.querySelectorAll(
+        "[data-action='take-object-item'], [data-action='pick-lock'], [data-action='disarm-trap'], [data-action='investigate-object'], [data-action='farm-resource-node'], [data-action='use-object-interaction'], [data-action='free-captive'], [data-action='attack-object'], [data-action='home-store-item'], [data-action='home-store-all-items'], [data-action='home-take-all-items'], [data-action='home-deposit-all-coins'], [data-action='home-withdraw-all-coins']",
+      )
+      .forEach((button) => {
+        const action = button.dataset.action;
+        const alreadySpent =
+          (action === "pick-lock" && /lock attempt spent/i.test(button.textContent ?? "")) ||
+          (action === "disarm-trap" && /attempt spent/i.test(button.textContent ?? ""));
+        if (alreadySpent) return;
+        button.disabled = false;
+        button.removeAttribute("aria-disabled");
+        button.title = "";
+      });
+  }
+
+  function objectInfoSignature(objectId, object) {
+    if (!objectId || !object) return "";
+    const lock = activeObjectLock(objectId);
+    return JSON.stringify({
+      objectId,
+      locked: Boolean(object.locked),
+      disarmed: Boolean(object.disarmed),
+      armed: object.armed,
+      trap: object.trap
+        ? {
+            detected: Boolean(object.trap.detected),
+            disarmed: Boolean(object.trap.disarmed),
+            armed: object.trap.armed,
+            spent: Boolean(object.trap.spent),
+          }
+        : null,
+      items: (object.items ?? []).map((item) => `${item.id}:${item.quantity ?? item.ammo?.quantity ?? 1}`),
+      lastResult: object.lastResult ?? "",
+      lockAttemptsByHero: object.lockAttemptsByHero ?? {},
+      disarmAttemptsByHero: object.disarmAttemptsByHero ?? object.trap?.disarmAttemptsByHero ?? {},
+      lockOwner: lock ? `${lock.ownerId}:${lock.ownerRole}` : "",
+    });
+  }
+
+  function refreshCurrentObjectInfoPanel(force = false) {
+    const objectId = playtest.currentObjectInfoId;
+    if (!objectId || els.fighterInfo?.classList.contains("hidden")) return;
+    const object = objectForPlaytestLockId(objectId);
+    const signature = objectInfoSignature(objectId, object);
+    if (!force && signature && signature === playtest.currentObjectInfoSignature) {
+      enableGuestObjectActionButtons();
+      return;
+    }
+    if (object) showDungeonObjectInfo(object);
+    playtest.currentObjectInfoSignature = signature;
+    enableGuestObjectActionButtons();
+  }
+
   function assignedHeroIds() {
     if (role === "host") return [];
     return playtest.assignments[playtest.id] ?? [];
@@ -163,6 +460,23 @@
     return state?.fighters?.[playtest.selectedHeroId] ?? null;
   }
   playtest.selectedHero = selectedGuestHero;
+
+  function guestIntentHero() {
+    const selected = selectedGuestHero();
+    if (selected) return selected;
+    const ids = assignedHeroIds();
+    const active = typeof activeHero === "function" ? activeHero() : null;
+    if (active?.id && (ids.includes(active.id) || isPlayerControlledPartyFighter(active))) {
+      playtest.selectedHeroId = active.id;
+      return active;
+    }
+    const fighter = typeof activeFighter === "function" ? activeFighter() : null;
+    if (fighter?.id && (ids.includes(fighter.id) || isPlayerControlledPartyFighter(fighter))) {
+      playtest.selectedHeroId = fighter.id;
+      return fighter;
+    }
+    return null;
+  }
 
   function guestCanControlHero(heroId) {
     return role === "guest" && assignedHeroIds().includes(heroId) && Boolean(state?.fighters?.[heroId]);
@@ -219,7 +533,72 @@
     document.body.classList.toggle("menu-active", !gameHasStarted);
     els.mainMenu?.classList.toggle("hidden", Boolean(gameHasStarted));
     if (gameHasStarted) {
-      [els.homeMenu, els.storeMenu].forEach((element) => element?.classList.add("hidden"));
+      [els.homeMenu, els.storeMenu, els.villageMenu, els.gameDialog].forEach((element) => {
+        if (!element?.classList.contains("playtest-host-mirrored")) element?.classList.add("hidden");
+      });
+    }
+  }
+
+  function refreshGuestOpenPlayerMenus() {
+    if (role !== "guest") return;
+    if (els.inventoryMenu && !els.inventoryMenu.classList.contains("hidden") && typeof renderInventoryMenu === "function") {
+      renderInventoryMenu();
+    }
+    if (els.useItemMenu && !els.useItemMenu.classList.contains("hidden") && typeof renderUseItemMenu === "function") {
+      renderUseItemMenu();
+    }
+  }
+
+  const mirroredMenuTargets = [
+    ["home", "homeMenu"],
+    ["village", "villageMenu"],
+    ["store", "storeMenu"],
+    ["dialog", "gameDialog"],
+  ];
+
+  function readonlyMirrorElement(element) {
+    if (!element) return;
+    element.classList.add("playtest-host-mirrored");
+    element.querySelectorAll("button, input, select, textarea").forEach((control) => {
+      control.disabled = true;
+      control.setAttribute("aria-disabled", "true");
+    });
+    element.querySelectorAll("a").forEach((link) => {
+      link.setAttribute("tabindex", "-1");
+      link.setAttribute("aria-disabled", "true");
+    });
+  }
+
+  function captureHostMenuMirror() {
+    if (role !== "host") return {};
+    const mirrors = {};
+    for (const [key, elementName] of mirroredMenuTargets) {
+      const element = els[elementName];
+      if (!element || element.classList.contains("hidden")) continue;
+      mirrors[key] = {
+        className: element.className,
+        html: element.innerHTML,
+      };
+    }
+    return mirrors;
+  }
+
+  function applyGuestMenuMirror(mirrors = {}) {
+    if (role !== "guest") return;
+    playtest.mirroredMenus = mirrors ?? {};
+    for (const [key, elementName] of mirroredMenuTargets) {
+      const element = els[elementName];
+      if (!element) continue;
+      const mirror = playtest.mirroredMenus[key];
+      if (mirror?.html) {
+        element.className = mirror.className || element.className;
+        element.innerHTML = mirror.html;
+        element.classList.remove("hidden");
+        readonlyMirrorElement(element);
+      } else if (element.classList.contains("playtest-host-mirrored")) {
+        element.classList.add("hidden");
+        element.classList.remove("playtest-host-mirrored");
+      }
     }
   }
 
@@ -333,7 +712,21 @@
     const hero = selectedGuestHero();
     const enemies = visibleEnemyOptions();
     const reaction = playtest.reactionPrompt?.prompt ?? null;
+    const savePrompt = playtest.savePrompt?.prompt ?? null;
     bodyEl.innerHTML = `
+      ${
+        savePrompt
+          ? `
+            <div class="playtest-reaction">
+              <strong>${escapeHtml(savePrompt.title ?? "Saving Throw")}</strong>
+              <p>${escapeHtml(savePrompt.message ?? "")}</p>
+              <div class="playtest-actions">
+                <button type="button" data-playtest-save-roll>${escapeHtml(savePrompt.rollLabel ?? "Roll Save")}</button>
+              </div>
+            </div>
+          `
+          : ""
+      }
       ${
         reaction
           ? `
@@ -376,6 +769,7 @@
   function snapshotPayload() {
     if (!state) return null;
     const snapshotState = safeClone(state);
+    const tokenArtManifest = hostTokenArtManifest();
     stripPlaytestSnapshotTokenArt(snapshotState);
     return {
       type: "snapshot",
@@ -384,6 +778,9 @@
       gameHasStarted: Boolean(gameHasStarted),
       roomZoom,
       summary: stateSummary(),
+      objectLocks: safeClone(playtest.objectLocks),
+      menuMirror: captureHostMenuMirror(),
+      tokenArtManifest,
       hostSessionId: playtest.hostSessionId || playtest.sessionId,
     };
   }
@@ -417,6 +814,7 @@
           renderPlaytestPanel();
         });
     }
+    broadcastTokenArtIfNeeded();
     renderPlaytestPanel();
   }
 
@@ -467,7 +865,111 @@
         return result;
       };
     }
+    if (typeof showDungeonObjectInfo === "function") {
+      const realShowDungeonObjectInfo = showDungeonObjectInfo;
+      showDungeonObjectInfo = function playtestShowDungeonObjectInfoHook(object) {
+        const id = objectLockId(object);
+        playtest.currentObjectInfoId = id;
+        if (lockablePlaytestObject(object)) {
+          const lock = objectLockedByOther(id);
+          if (lock) {
+            renderObjectLockedMessage(object, lock);
+            return;
+          }
+          setLocalObjectLock(id);
+        } else if (playtest.localObjectLockId) {
+          releaseLocalObjectLock();
+        }
+        const result = realShowDungeonObjectInfo.apply(this, arguments);
+        playtest.currentObjectInfoSignature = objectInfoSignature(id, object);
+        enableGuestObjectActionButtons();
+        return result;
+      };
+    }
+    if (typeof hideFighterInfo === "function") {
+      const realHideFighterInfo = hideFighterInfo;
+      hideFighterInfo = function playtestHideFighterInfoHook() {
+        releaseLocalObjectLock();
+        playtest.currentObjectInfoId = "";
+        playtest.currentObjectInfoSignature = "";
+        return realHideFighterInfo.apply(this, arguments);
+      };
+    }
+    if (typeof showTemporaryEffectsInfo === "function") {
+      const realShowTemporaryEffectsInfo = showTemporaryEffectsInfo;
+      showTemporaryEffectsInfo = function playtestShowTemporaryEffectsInfoHook() {
+        releaseLocalObjectLock();
+        playtest.currentObjectInfoId = "";
+        playtest.currentObjectInfoSignature = "";
+        return realShowTemporaryEffectsInfo.apply(this, arguments);
+      };
+    }
     if (role === "host") installHostTransitionHooks();
+    if (role === "host") installHostMenuMirrorHooks();
+    if (role === "host") installHostSaveHooks();
+    if (role === "host") installHostMenuReleaseGuards();
+  }
+
+  function hookHostMenuFunction(name) {
+    if (typeof window[name] !== "function") return;
+    const original = window[name];
+    window[name] = function playtestHostMenuMirrorHook() {
+      const result = original.apply(this, arguments);
+      window.setTimeout(() => broadcastSnapshotNow(), 0);
+      if (result?.finally) result.finally(() => broadcastSnapshotNow());
+      return result;
+    };
+  }
+
+  function installHostMenuMirrorHooks() {
+    [
+      "showHomeMenu",
+      "hideHomeMenu",
+      "showVillageMenu",
+      "hideVillageMenu",
+      "renderVillageMenu",
+      "visitVillageNpc",
+      "startNpcChat",
+      "useNpcChatOption",
+      "showStoreMenu",
+      "hideStoreMenu",
+      "showDungeonStoryDialog",
+      "showGameDialog",
+      "showChoiceDialog",
+    ].forEach(hookHostMenuFunction);
+  }
+
+  function installHostMenuReleaseGuards() {
+    document.addEventListener(
+      "click",
+      (event) => {
+        const targetElement = event.target?.closest ? event.target : event.target?.parentElement;
+        const closesMenu =
+          targetElement?.closest("#close-fighter-info, #close-home-menu, #close-village, #close-store, #game-dialog [data-action='close'], #game-dialog button") ||
+          targetElement === els.fighterInfo ||
+          targetElement === els.homeMenu ||
+          targetElement === els.villageMenu ||
+          targetElement === els.storeMenu ||
+          targetElement === els.gameDialog;
+        if (!closesMenu) return;
+        window.setTimeout(() => {
+          releaseLocalObjectLock();
+          broadcastSnapshotNow();
+        }, 0);
+      },
+      true,
+    );
+  }
+
+  function installHostSaveHooks() {
+    if (typeof showSavingThrowMenu !== "function") return;
+    const realShowSavingThrowMenu = showSavingThrowMenu;
+    showSavingThrowMenu = function playtestShowSavingThrowMenuHook(options) {
+      const target = options?.target;
+      const controller = guestControllerForHero(target?.id);
+      if (!controller) return realShowSavingThrowMenu.apply(this, arguments);
+      return requestGuestSavingThrow(controller.id, options);
+    };
   }
 
   function hookHostAsyncFunction(name) {
@@ -566,6 +1068,25 @@
       return;
     }
 
+    if (payload.kind === "objectLock") {
+      const objectId = String(payload.objectId ?? "");
+      if (!objectId) return;
+      if (payload.locked) {
+        playtest.objectLocks[objectId] = {
+          objectId,
+          ownerId: message.peerId,
+          ownerName: message.peerName ?? "guest",
+          ownerRole: "guest",
+          expiresAt: Date.now() + 120000,
+        };
+      } else if (playtest.objectLocks[objectId]?.ownerId === message.peerId) {
+        delete playtest.objectLocks[objectId];
+      }
+      refreshCurrentObjectInfoPanel(true);
+      broadcastSnapshotNow();
+      return;
+    }
+
     const hero = state?.fighters?.[heroId];
 
     const sendRawSpellTargetResult = (resolved) => {
@@ -658,20 +1179,27 @@
         .map((step) => ({ x: Math.floor(Number(step?.x)), y: Math.floor(Number(step?.y)) }))
         .filter((step) => Number.isFinite(step.x) && Number.isFinite(step.y) && window.DungeonGrid.isInsideGrid(step, currentGridSize()));
 
-    const remotePathIsValid = (path) => {
-      if (!path.length) return false;
-      const pathCost = path.reduce((total, step) => total + movementCostAtPosition(step), 0);
-      if (!heroCanAct(hero) || (state.mode === "combat" && hero.movementLeft <= 0)) return false;
-      if (pathCost > movementLimitFor(hero)) return false;
-      if (!canEndMovementOnTile(hero, path.at(-1))) return false;
+    const normalizeRemotePathStart = (path) => {
+      const currentKey = positionKey(hero.position);
+      const currentIndex = path.findIndex((step) => positionKey(step) === currentKey);
+      if (currentIndex >= 0) return path.slice(currentIndex + 1);
+      return path;
+    };
+
+    const remotePathValidity = (path) => {
+      if (!path.length) return { ok: false, reason: "empty path" };
+      const pathCost = path.reduce((total, step) => total + movementCostAtPosition(step, hero), 0);
+      if (!heroCanAct(hero) || (state.mode === "combat" && hero.movementLeft <= 0)) return { ok: false, reason: "hero cannot move" };
+      if (pathCost > movementLimitFor(hero)) return { ok: false, reason: "path is out of movement" };
+      if (!canEndMovementOnTile(hero, path.at(-1))) return { ok: false, reason: "destination is blocked" };
       let previous = hero.position;
       const traversed = [];
       for (const step of path) {
-        if (!isValidPathStep(hero, previous, step, traversed)) return false;
+        if (!isValidPathStep(hero, previous, step, traversed)) return { ok: false, reason: `invalid step from ${positionKey(previous)} to ${positionKey(step)}` };
         traversed.push(step);
         previous = step;
       }
-      return true;
+      return { ok: true, reason: "" };
     };
 
     const moveRemoteHeroAlongPath = async (path) => {
@@ -693,7 +1221,7 @@
           void triggerCustomDungeonStory("enterRoom", { roomId: nextRoom.id, room: nextRoom, fighter: hero });
         }
         movedSteps += 1;
-        movedCost += movementCostAtPosition(step);
+        movedCost += movementCostAtPosition(step, hero);
         collectLootAtPosition(hero, step);
         triggerTrapAtPosition(hero, step);
         if (state.mode !== "combat" && isPlayerControlledPartyFighter(hero)) moveAutonomousAlliesWithLeaderStep(hero);
@@ -718,10 +1246,11 @@
     if (payload.kind === "move") {
       const destination = payload.destination;
       if (!destination || !window.DungeonGrid.isInsideGrid(destination, currentGridSize())) return;
-      const path = sanitizeRemotePath(payload.path);
+      const path = normalizeRemotePathStart(sanitizeRemotePath(payload.path));
       const destinationKey = positionKey({ x: Math.floor(destination.x), y: Math.floor(destination.y) });
-      if (!path.length || positionKey(path.at(-1)) !== destinationKey || !remotePathIsValid(path)) {
-        rejectRemoteAction("movement path is no longer valid");
+      const validity = remotePathValidity(path);
+      if (!path.length || positionKey(path.at(-1)) !== destinationKey || !validity.ok) {
+        rejectRemoteAction(`movement path is no longer valid${validity.reason ? ` (${validity.reason})` : ""}`);
         return;
       }
       await moveRemoteHeroAlongPath(path);
@@ -731,7 +1260,10 @@
 
     if (payload.kind === "attack") {
       if (state.mode !== "combat" || activeFighter()?.id !== heroId) return;
-      const legalTargets = [...attackTargets(), ...destructibleObjectTargets(hero)];
+      const monsterTargets = visibleMonsters().filter((monster) =>
+        attackWeaponChoicesForFighter(hero).some((choice) => isInAttackRangeWithProfile(hero, monster, damageProfile(hero, { weapon: choice.options?.weapon }))),
+      );
+      const legalTargets = [...monsterTargets, ...destructibleObjectTargets(hero)];
       const requestedTargetId = String(payload.targetId ?? "");
       const target = requestedTargetId
         ? legalTargets.find((entry) => entry.id === requestedTargetId)
@@ -741,9 +1273,11 @@
         return;
       }
       if (!target) return;
-      selectedAttackTargetId = target.id;
-      if (objectIsDestructible(target)) await attackDestructibleObject(hero, target);
-      else await makeAttack(hero, target);
+      await withRemoteHeroFocus(async () => {
+        selectedAttackTargetId = target.id;
+        if (objectIsDestructible(target)) await attackDestructibleObject(hero, target);
+        else await makeAttack(hero, target);
+      });
       broadcastSnapshotNow();
       return;
     }
@@ -773,6 +1307,18 @@
       const beforeLogLength = state.log?.length ?? 0;
       await withRemoteHeroFocus(() => useBeltItem(payload.itemId, payload.targetId ?? null));
       if ((state.log?.length ?? 0) === beforeLogLength) rejectRemoteAction("item could not be used");
+      broadcastSnapshotNow();
+      return;
+    }
+
+    if (payload.kind === "useCarriedConsumable") {
+      if (state.mode === "combat") {
+        rejectRemoteAction("carried consumables must be equipped during combat");
+        return;
+      }
+      const beforeLogLength = state.log?.length ?? 0;
+      await withRemoteHeroFocus(() => useCarriedConsumable(payload.itemId));
+      if ((state.log?.length ?? 0) === beforeLogLength) rejectRemoteAction("carried consumable could not be used");
       broadcastSnapshotNow();
       return;
     }
@@ -830,6 +1376,55 @@
       const resolved = await resolveRemoteSpellTarget({ x: Math.floor(position.x), y: Math.floor(position.y) });
       if (!resolved) addLog(`${message.peerName ?? "Guest"} chose a spell target before ${hero.name}'s spell was ready on the host. Try the target click again.`, "important");
       sendSpellTargetResult(resolved);
+      broadcastSnapshotNow();
+      return;
+    }
+
+    if (payload.kind === "objectAction") {
+      const action = String(payload.action ?? "");
+      const objectId = String(payload.objectId ?? (action.startsWith("home-") ? "home-chest" : ""));
+      const itemId = String(payload.itemId ?? "");
+      const supported = [
+        "take-object-item",
+        "pick-lock",
+        "disarm-trap",
+        "investigate-object",
+        "farm-resource-node",
+        "use-object-interaction",
+        "free-captive",
+        "attack-object",
+        "home-store-item",
+        "home-store-all-items",
+        "home-take-all-items",
+        "home-deposit-all-coins",
+        "home-withdraw-all-coins",
+      ].includes(action);
+      if (!supported || !objectId) return;
+      if (action === "attack-object" && !canUseTurnAction) {
+        rejectRemoteAction("it is not their turn");
+        return;
+      }
+      await withRemoteHeroFocus(async () => {
+        if (action === "take-object-item") takeObjectItem(objectId, itemId);
+        if (action === "pick-lock") pickObjectLock(objectId);
+        if (action === "disarm-trap") disarmTrap(objectId);
+        if (action === "investigate-object") investigateObject(objectId);
+        if (action === "farm-resource-node") farmResourceNode(objectId);
+        if (action === "use-object-interaction") useObjectInteraction(objectId);
+        if (action === "free-captive") freeCaptiveCreature(objectId);
+        if (action === "attack-object") await attackDestructibleObject(state.mode === "combat" ? activeFighter() : activeHero(), dungeonObjectForId(objectId));
+        if (action === "home-store-item") storeHomeChestItem(itemId, objectId);
+        if (action === "home-store-all-items") storeAllHomeChestItems(objectId);
+        if (action === "home-take-all-items") takeAllHomeChestItems(objectId);
+        if (action === "home-deposit-all-coins") {
+          moveMoneyBetweenHeroAndChest("deposit", moneyToCp(activeHero().inventory.money));
+          showHomeChestInfo();
+        }
+        if (action === "home-withdraw-all-coins") {
+          moveMoneyBetweenHeroAndChest("withdraw", moneyToCp(state.chestMoney ?? {}));
+          showHomeChestInfo();
+        }
+      });
       broadcastSnapshotNow();
       return;
     }
@@ -904,8 +1499,12 @@
   }
 
   function sendGuestIntent(kind, extra = {}) {
-    const hero = selectedGuestHero();
-    if (!hero) return false;
+    const hero = guestIntentHero();
+    if (!hero) {
+      playtest.lastIntentStatus = `could not send ${kind}: no controlled hero selected`;
+      renderPlaytestPanel();
+      return false;
+    }
     const sent = send({
       type: "intent",
       payload: {
@@ -918,6 +1517,13 @@
     playtest.lastIntentStatus = sent ? `sent ${kind} for ${hero.name}` : `could not send ${kind}: socket not connected`;
     renderPlaytestPanel();
     return sent;
+  }
+
+  function guestSelectedTargetId() {
+    if (playtest.selectedTargetId) return playtest.selectedTargetId;
+    const selected = typeof selectedAttackTarget === "function" ? selectedAttackTarget() : null;
+    if (selected?.id && !isPartyHeroId(selected.id)) return selected.id;
+    return "";
   }
 
   function sendGuestHeroUpdate(reason = "hero") {
@@ -965,6 +1571,37 @@
     });
   };
 
+  function requestGuestSavingThrow(peerId, options) {
+    if (role !== "host" || !peerId) return Promise.resolve(null);
+    const target = options?.target;
+    if (!target) return Promise.resolve(null);
+    const requestId = `save-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const ability = String(options.ability ?? "");
+    const prompt = {
+      title: "Saving Throw",
+      message: options.message ?? `${target.name} must make a ${ability.toUpperCase()} saving throw.`,
+      rollLabel: ability ? `Roll ${ability.toUpperCase()} Save` : "Roll Save",
+      targetName: target.name,
+      ability,
+      dc: options.dc,
+    };
+    const sent = send({ type: "savePrompt", targetPeerId: peerId, requestId, prompt, hostSessionId: playtest.hostSessionId || playtest.sessionId });
+    if (!sent) return Promise.resolve(savingThrow(target, options.ability, options.dc));
+    return new Promise((resolve) => {
+      playtest.saveRequests[requestId] = () => {
+        const save = savingThrow(target, options.ability, options.dc);
+        resolve(save);
+      };
+      window.setTimeout(() => {
+        const roll = playtest.saveRequests[requestId];
+        if (!roll) return;
+        delete playtest.saveRequests[requestId];
+        addLog(`${target.name}'s guest save prompt timed out; rolling on the host.`, "important");
+        roll();
+      }, 30000);
+    });
+  }
+
   function tileFromPointerEvent(event) {
     const targetElement = event.target?.closest ? event.target : event.target?.parentElement;
     const tile = targetElement?.closest(".tile");
@@ -984,8 +1621,10 @@
   }
 
   function requestGuestMoveTo(position, path = []) {
-    if (!selectedGuestHero() || !position) return;
+    const hero = selectedGuestHero();
+    if (!hero || !position) return;
     sendGuestIntent("move", {
+      start: { x: Math.floor(hero.position.x), y: Math.floor(hero.position.y) },
       destination: { x: Math.floor(position.x), y: Math.floor(position.y) },
       path: cleanMovementPath(path),
     });
@@ -1102,14 +1741,15 @@
         if (normalAction) {
           event.preventDefault();
           event.stopImmediatePropagation();
-          sendGuestIntent(normalAction.id === "attack" ? "attack" : "endTurn");
+          if (normalAction.id === "attack") sendGuestIntent("attack", { targetId: guestSelectedTargetId() });
+          else sendGuestIntent("endTurn");
           return;
         }
         const combatAction = targetElement?.closest("[data-action='combat-action']");
         if (combatAction) {
           event.preventDefault();
           event.stopImmediatePropagation();
-          sendGuestIntent(combatAction.dataset.combatAction, { targetId: combatAction.dataset.target ?? playtest.selectedTargetId });
+          sendGuestIntent(combatAction.dataset.combatAction, { targetId: combatAction.dataset.target ?? guestSelectedTargetId() });
           hideActionMenu();
           return;
         }
@@ -1125,7 +1765,7 @@
         if (useAbility) {
           event.preventDefault();
           event.stopImmediatePropagation();
-          sendGuestIntent("useAbility", { abilityId: useAbility.dataset.ability });
+          sendGuestIntent("useAbility", { abilityId: useAbility.dataset.ability, targetId: guestSelectedTargetId() });
           hideAbilitiesMenu();
           return;
         }
@@ -1207,7 +1847,15 @@
         const inventoryAction = targetElement?.closest("#inventory-menu [data-action], #inventory-menu #close-inventory");
         if (inventoryAction) {
           const action = inventoryAction.dataset.action ?? "";
-          if (["equip", "unequip", "inspect-item"].includes(action) || inventoryAction.id === "close-inventory") {
+          if (action === "use-carried-consumable") {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const hero = selectedGuestHero();
+            if (hero) setActiveHero(hero.id);
+            sendGuestIntent("useCarriedConsumable", { itemId: inventoryAction.dataset.item });
+            return;
+          }
+          if (["equip", "unequip", "inspect-item", "use-carried-consumable"].includes(action) || inventoryAction.id === "close-inventory") {
             const hero = selectedGuestHero();
             if (hero) setActiveHero(hero.id);
             if (["equip", "unequip"].includes(action)) markGuestHeroChanged("inventory");
@@ -1223,7 +1871,36 @@
           if (!hero) return;
           event.preventDefault();
           event.stopImmediatePropagation();
+          releaseLocalObjectLock();
+          playtest.currentObjectInfoId = "";
+          playtest.currentObjectInfoSignature = "";
           showTemporaryEffectsInfo(hero);
+          return;
+        }
+        if (targetElement?.closest(".dungeon-object, .chest-token")) {
+          const hero = selectedGuestHero();
+          if (hero) setActiveHero(hero.id);
+        }
+        const objectAction = targetElement?.closest(
+          "#fighter-info [data-action='take-object-item'], #fighter-info [data-action='pick-lock'], #fighter-info [data-action='disarm-trap'], #fighter-info [data-action='investigate-object'], #fighter-info [data-action='farm-resource-node'], #fighter-info [data-action='use-object-interaction'], #fighter-info [data-action='free-captive'], #fighter-info [data-action='attack-object'], #fighter-info [data-action='home-store-item'], #fighter-info [data-action='home-store-all-items'], #fighter-info [data-action='home-take-all-items'], #fighter-info [data-action='home-deposit-all-coins'], #fighter-info [data-action='home-withdraw-all-coins']",
+        );
+        if (objectAction) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          const hero = selectedGuestHero();
+          if (hero) setActiveHero(hero.id);
+          playtest.lastIntentStatus = `sent ${objectAction.dataset.action ?? "object action"}`;
+          const sent = sendGuestIntent("objectAction", {
+            action: objectAction.dataset.action,
+            objectId: objectAction.dataset.object ?? playtest.currentObjectInfoId ?? (String(objectAction.dataset.action ?? "").startsWith("home-") ? "home-chest" : ""),
+            itemId: objectAction.dataset.item ?? "",
+          });
+          if (!sent) playtest.lastIntentStatus = `could not send ${objectAction.dataset.action ?? "object action"}`;
+          renderPlaytestPanel();
+          return;
+        }
+        if (targetElement?.closest("#close-fighter-info") || targetElement === els.fighterInfo) {
+          releaseLocalObjectLock();
           return;
         }
         if (
@@ -1232,6 +1909,11 @@
           ) &&
           !targetElement.closest("#playtest-overlay")
         ) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
+        if (targetElement?.closest(".playtest-host-mirrored")) {
           event.preventDefault();
           event.stopImmediatePropagation();
           return;
@@ -1266,6 +1948,10 @@
       "pointerdown",
       (event) => {
         const targetElement = event.target?.closest ? event.target : event.target?.parentElement;
+        const targetToken = targetElement?.closest("[data-combatant]");
+        if (targetToken && !targetToken.classList.contains("hero")) {
+          playtest.selectedTargetId = targetToken.dataset.combatant ?? playtest.selectedTargetId;
+        }
         if (guestSpellTargetingActive()) {
           if (playtest.remoteSpellTargeting) {
             event.preventDefault();
@@ -1384,7 +2070,7 @@
     }
     const intent = event.target.closest("[data-playtest-intent]")?.dataset.playtestIntent;
     if (!intent) return;
-    if (intent === "attack") sendGuestIntent("attack");
+    if (intent === "attack") sendGuestIntent("attack", { targetId: guestSelectedTargetId() });
     else sendGuestIntent(intent);
   });
 
@@ -1394,6 +2080,14 @@
     const value = button.dataset.playtestReaction === "accept";
     send({ type: "reactionResponse", requestId: playtest.reactionPrompt.requestId, value });
     playtest.reactionPrompt = null;
+    renderPlaytestPanel();
+  });
+
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-playtest-save-roll]");
+    if (!button || role !== "guest" || !playtest.savePrompt) return;
+    send({ type: "saveResponse", requestId: playtest.savePrompt.requestId });
+    playtest.savePrompt = null;
     renderPlaytestPanel();
   });
 
@@ -1434,11 +2128,18 @@
         render();
         renderPlaytestPanel();
       }
+      if (message.type === "host-replaced") {
+        releaseLocalObjectLock();
+      }
       if (message.type === "snapshot" && role === "guest") {
         if (Date.now() < playtest.localEditUntil) return;
         playtest.applyingSnapshot = true;
         const previousRoomKey = playtest.mirroredRoomKey;
+        playtest.tokenArtManifest = message.tokenArtManifest ?? playtest.tokenArtManifest ?? {};
         state = message.state;
+        applyGuestTokenArtReferences(state, playtest.tokenArtManifest);
+        playtest.objectLocks = message.objectLocks ?? {};
+        playtest.mirroredMenus = message.menuMirror ?? {};
         playtest.lastSnapshotSummary = message.summary ?? stateSummary(message.state);
         gameHasStarted = Boolean(message.gameHasStarted);
         playtest.gameStarted = gameHasStarted;
@@ -1449,11 +2150,29 @@
         syncGuestChrome();
         playtest.lastSnapshotAt = Date.now();
         render();
+        refreshGuestOpenPlayerMenus();
+        applyGuestMenuMirror(playtest.mirroredMenus);
         if (previousRoomKey !== playtest.mirroredRoomKey) focusGuestCameraOnPartyStart();
+        refreshCurrentObjectInfoPanel();
         playtest.applyingSnapshot = false;
+      }
+      if (message.type === "tokenArt" && role === "guest") {
+        const stored = storeGuestTokenArt(message.artId, message.dataUrl);
+        if (stored) delete playtest.tokenArtRequested[message.artId];
+        if (message.dataUrl && state?.fighters?.[message.fighterId]) {
+          state.fighters[message.fighterId].tokenArt = message.dataUrl;
+          render();
+        }
+      }
+      if (message.type === "tokenArtRequest" && role === "host") {
+        broadcastTokenArtIfNeeded("", message.artIds ?? []);
       }
       if (message.type === "reactionPrompt" && role === "guest" && message.targetPeerId === playtest.id) {
         playtest.reactionPrompt = { requestId: message.requestId, prompt: message.prompt ?? {} };
+        renderPlaytestPanel();
+      }
+      if (message.type === "savePrompt" && role === "guest" && message.targetPeerId === playtest.id) {
+        playtest.savePrompt = { requestId: message.requestId, prompt: message.prompt ?? {} };
         renderPlaytestPanel();
       }
       if (message.type === "spellTargetResult" && role === "guest" && message.targetPeerId === playtest.id) {
@@ -1464,6 +2183,12 @@
         if (!resolve) return;
         delete playtest.reactionRequests[message.requestId];
         resolve(Boolean(message.value));
+      }
+      if (message.type === "saveResponse" && role === "host") {
+        const roll = playtest.saveRequests[message.requestId];
+        if (!roll) return;
+        delete playtest.saveRequests[message.requestId];
+        roll();
       }
       if (message.type === "intent" && role === "host") {
         void handleHostIntent(message);

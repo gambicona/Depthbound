@@ -68,6 +68,26 @@ window.DungeonContent.register("themes", "oldGuardroom", {
     ["crypt"],
     ["ruin"],
   ],
+  resourceNodeTagGroups: [
+    ["resource-node", "dungeon"],
+    ["resource-node", "ruin"],
+    ["resource-node", "stone"],
+  ],
+  terrainFloorIds: ["water-floor", "acid-floor", "healing-pool-floor"],
+  terrainFloorWeights: {
+    "water-floor": 8,
+    "acid-floor": 0.45,
+    "healing-pool-floor": 0.55,
+  },
+  terrainFloors: {
+    pools: { min: 1, max: 3, chance: 1 },
+    tilesPerPool: { min: 3, max: 5 },
+    tileOverrides: {
+      "healing-pool-floor": { min: 2, max: 3 },
+    },
+    hallwayChance: 0.05,
+    doorChance: 0.035,
+  },
   furnitureSpawnChances: {
     table: 0.5,
     bigRock: 0.18,
@@ -96,6 +116,6 @@ window.DungeonContent.register("themes", "oldGuardroom", {
     corridorChance: 0.035,
     chestChance: 0.3,
   },
-  lootTableIds: ["basicDungeon"],
+  lootTableIds: ["basicDungeon", "magicUndeadItems"],
 });
 })();

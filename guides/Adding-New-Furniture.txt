@@ -1,0 +1,221 @@
+How to add new furniture or dungeon objects
+
+Current source files to compare against:
+- Template: src/scripts/content/furniture/furniture-template.js
+- Main dungeon pack: src/scripts/content/furniture/dungeon-furniture-pack.js
+- Farmable resource nodes: src/scripts/content/furniture/resource-nodes.js
+- Home pack: src/scripts/content/furniture/home-decor-pack.js
+- Theme filters: src/scripts/content/themes/
+- Runtime object logic: src/scripts/app/game-state.js and src/scripts/app/combat-map.js
+
+1. Add the furniture template
+
+Most dungeon furniture belongs in:
+src/scripts/content/furniture/dungeon-furniture-pack.js
+
+That file uses a helper named feature(id, name, tags, options). Prefer that helper when adding normal dungeon objects because it automatically fills the common fields and adds the base "furniture" tag.
+
+Example:
+
+feature("my-statue", "Stone Statue", ["old-guardroom", "dungeon", "ruin"], {
+  kind: "feature",
+  blocksMovement: true,
+  blocksLineOfSight: true,
+  inspectable: true,
+  symbol: "S",
+  spawnChance: 0.08,
+  placement: "random-room-cell",
+  weight: 900,
+  description: "A cracked stone statue. Loose stone and old dust collect around its base.",
+  components: [
+    C.destructible(18, 14),
+    C.hiddenLoot({ dc: 13, chance: 0.25, reward: "smallGold" }),
+  ],
+});
+
+If you make a separate file, use DungeonContent.register("furniture", id, template) directly and load it in index.html before app.js.
+
+2. Important fields
+
+name: Display name.
+kind: Usually "feature", "obstacle", "trap", or another descriptive kind. Chests are features with container components now.
+tags: Used by themes and runtime logic. Keep "furniture" on normal objects. Add biome/theme tags such as "old-guardroom", "forest", "crypt", "ruin", "forge", "swamp".
+width/height: Occupied grid squares. Defaults to 1.
+blocksMovement: If true, heroes and monsters path around it unless special movement applies.
+blocksLineOfSight: If true, ranged/spell line of sight is blocked.
+inspectable: If true, it can be inspected.
+interactable: Usually true when inspectable or when it has active components.
+symbol: Fallback map symbol.
+spawnChance: Default chance when the theme does not override it.
+placement: Placement rule.
+weight: Used by push/drag/lift. 666 means intentionally not grabbable.
+description: Inspection panel text.
+components: The current behavior system.
+
+3. Placement values
+
+Current placement logic understands these patterns:
+
+random-room-cell: Default room placement.
+room-center: Attempts centered placement in a room.
+wall-adjacent: Good for chests, racks, cabinets, and wall features.
+paired-dungeon-cells: Used for portal pairs.
+
+If a new object needs a new shape, pairing rule, room rule, or terrain rule, update the object creation/placement code in game-state.js around createDungeonObjects, createFeatureObject, and related helpers.
+
+Useful helpers:
+objectTemplate(type)
+objectComponents(objectOrType)
+objectComponent(objectOrType, type)
+objectCells(object)
+objectAt(position)
+objectsAtPosition(position)
+objectBlocksMovement(object)
+objectBlocksLineOfSight(object)
+randomOpenCell(cells, blockedKeys)
+wallAdjacentRoomCells(room)
+
+4. Components are the current mechanics
+
+dungeon-furniture-pack.js defines shorthand helpers in C. Use these instead of adding one-off interaction code when possible.
+
+Runtime-active components:
+
+C.hiddenLoot({ dc, chance, reward, item, items })
+Adds inspectable hidden loot. reward can be "smallGold"; item/items can name exact item ids.
+
+C.loot({ count, item, items, reward })
+Adds a defined loot container. With no item/items, it defaults to reward: "chestLoot". count controls random chest item count.
+
+C.lock({ dc, chance })
+Object may start locked. Used by containers/reliquaries.
+
+C.trap({ source, chance, spotDc, damage, mode })
+Adds a trap. source: "container" uses chest-trap logic. mode: "floor" makes floor traps.
+
+C.ambush({ chance, trigger })
+Can trigger an ambush on inspection.
+
+C.hazardEnter({ damage }) and C.hazardMove({ damage })
+Hazard terrain damage.
+
+C.healingPool({ dice, targets, oncePerFighter })
+Healing terrain/feature.
+
+C.difficult
+Makes terrain cost extra movement.
+
+C.destructible(hp, ac)
+Object can be attacked and destroyed.
+
+C.pushable
+Marks an object as pushable. Weight still matters.
+
+C.harvest(itemId, { dc, chance, quantity })
+Harvestable resource. Uses the same investigation reward flow as hidden loot.
+
+resourceNode component
+Use this for active, once-per-party dungeon farming. Resource nodes live in src/scripts/content/furniture/resource-nodes.js and are placed by their own capped generation pass, so they do not spawn once per room like normal furniture.
+
+Required/important fields:
+- kind: "resource-node"
+- tags: include "resource-node" plus normal theme tags such as forest, wilds, dungeon, ruin, cave, mine, rock.
+- placement: usually "wall-adjacent".
+- components: [{ type: "resourceNode", ability, skill, dc, timeSeconds, rewards }]
+
+Reward format:
+
+components: [
+  {
+    type: "resourceNode",
+    ability: "con",
+    skill: "athletics",
+    dc: 12,
+    timeSeconds: 20 * 60,
+    rewards: [{ itemId: "stone-chip", baseQuantity: 1, maxQuantity: 5, quantityStep: 5 }],
+  },
+]
+
+On success, the party gets baseQuantity, +1 per quantityStep points above the DC, capped by maxQuantity. A natural 20 adds +1 before the cap. The node is spent after one party attempt, even on failure.
+
+Theme selection:
+- Prefer resourceNodeTagGroups on themes when resource nodes need stricter filtering than normal furniture.
+- Use resourceNodeIds for an exact node list.
+- If neither is set, resource nodes fall back to normal furnitureTagGroups.
+
+C.captive({ monsterId, monsterIds, dc, skill, ability })
+Captive creature object. The object can be opened/freed, with failure releasing the creature hostile.
+
+Metadata/display components:
+
+C.cover("half") and C.concealment("partial")
+Adds component labels for inspection/admin display. Add combat logic before relying on these for mechanical cover.
+
+C.light(radius)
+Adds a light-source label/inspect marker. Add lighting/render logic before relying on it to illuminate rooms.
+
+C.spawn({ monsterId, monsterIds })
+Adds a spawn-point label/inspect marker. Add runtime spawn logic before relying on it to create monsters.
+
+C.toggle(options)
+Adds a toggle label/inspect marker. Add custom UI/runtime logic before relying on it for interactions.
+
+5. Add art
+
+Put a PNG in:
+assets/furniture/
+
+The renderer expects icon files to follow the furniture id naming convention when possible, for example:
+my-statue -> assets/furniture/my-statue.png
+
+If art is missing, the object can still render with symbol/styling, but it should be added before considering the content complete.
+
+6. Make it eligible for a theme
+
+Themes use furnitureTagGroups:
+
+furnitureTagGroups: [
+  ["old-guardroom"],
+  ["dungeon"],
+  ["crypt"],
+]
+
+A furniture object can spawn when it matches at least one full tag group. trapTagGroups separately choose floor traps.
+
+You can also use explicit furnitureIds, but tag groups are easier to maintain.
+
+7. Tune spawn chance
+
+Each template can define spawnChance. A theme can override per object:
+
+furnitureSpawnChances: {
+  "my-statue": 0.08,
+}
+
+Theme overrides win over template spawnChance.
+
+8. Chests, containers, and loot
+
+Normal chest-like objects should use definedLootContainer plus optional lock/trap:
+
+components: [
+  C.loot({ count: 2 }),
+  C.lock({ dc: 12, chance: 0.5 }),
+  C.trap({ source: "container", chance: 0.3 }),
+]
+
+C.loot with no explicit item/items rolls randomChestLoot. Chest loot currently draws healing potions, ammunition, buyable weapons, and can add treasure/magic by party-level chances.
+
+For exact contents:
+
+components: [
+  C.loot({ items: ["mace", "spear"] }),
+]
+
+9. Testing checklist
+
+- Confirm the id is unique and uses the same spelling in art, themes, and dungeon JSON.
+- Confirm the tag group in the theme can match the object.
+- Confirm large objects have legal width/height and do not block doors.
+- Confirm blocking and line-of-sight behavior in a generated dungeon.
+- Inspect it in game to verify description, hidden loot, traps, locks, hazards, harvests, and captive behavior.

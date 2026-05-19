@@ -1,11 +1,12 @@
 function movementWalkableFor(fighter) {
-  return isRosterHeroId(fighter.id) && (state.mode === "exploration" || state.mode === "home") ? visibleWalkable() : currentWalkable();
+  return isRosterHeroId(fighter.id) && (state.mode === "exploration" || state.mode === "home") ? visibleWalkable(fighter) : currentWalkable(fighter);
 }
 
-function detectedArmedTrapKeys() {
+function detectedArmedTrapKeys(fighter = null) {
   const keys = new Set();
   for (const object of state.dungeonObjects ?? []) {
     if (!objectIsTrap(object) || !object.detected || object.spent || object.disarmed || object.armed === false) continue;
+    if (fighterIsFlying(fighter) && objectHasTag(object, "floor")) continue;
     objectCells(object).forEach((cell) => keys.add(positionKey(cell)));
   }
   return keys;
@@ -15,10 +16,11 @@ function isDetectedArmedTrapPosition(position) {
   return detectedArmedTrapKeys().has(positionKey(position));
 }
 
-function hazardousTerrainKeys() {
+function hazardousTerrainKeys(fighter = null) {
   const keys = new Set();
   for (const object of state.dungeonObjects ?? []) {
     if (!objectIsHazardousTerrain(object)) continue;
+    if (fighterIsFlying(fighter) && objectHasTag(object, "floor")) continue;
     objectCells(object).forEach((cell) => keys.add(positionKey(cell)));
   }
   return keys;
@@ -28,10 +30,26 @@ function trapAwareWalkableFor(fighter, destination = null) {
   const walkable = new Set(movementWalkableFor(fighter));
   const destinationKey = destination ? positionKey(destination) : "";
   const currentKey = positionKey(fighter.position);
-  detectedArmedTrapKeys().forEach((tileKey) => {
+  detectedArmedTrapKeys(fighter).forEach((tileKey) => {
     if (tileKey !== currentKey && tileKey !== destinationKey) walkable.delete(tileKey);
   });
   return walkable;
+}
+
+function aiAllySafeWalkableFor(fighter, destination = null) {
+  const walkable = trapAwareWalkableFor(fighter, destination);
+  const currentKey = positionKey(fighter.position);
+  detectedArmedTrapKeys(fighter).forEach((tileKey) => {
+    if (tileKey !== currentKey) walkable.delete(tileKey);
+  });
+  hazardousTerrainKeys(fighter).forEach((tileKey) => {
+    if (tileKey !== currentKey) walkable.delete(tileKey);
+  });
+  return walkable;
+}
+
+function isAiAllySafeStep(fighter, position, destination = null) {
+  return aiAllySafeWalkableFor(fighter, destination).has(positionKey(position));
 }
 
 function movementLimitFor(fighter) {
@@ -48,15 +66,21 @@ function occupyingFighterAt(position, ignoredFighter = null) {
   ) ?? null;
 }
 
+function carriedFighterOccupiesPosition(fighter, position) {
+  const carried = grabbedFighterForCarrier(fighter);
+  return Boolean(carried?.position && carried.position.x === position.x && carried.position.y === position.y);
+}
+
 function canMoveThroughOccupiedTile(fighter, position) {
   const occupant = occupyingFighterAt(position, fighter);
+  if (occupant && grabbedFighterForCarrier(fighter)?.id === occupant.id) return true;
   if (occupant && state.mode === "home" && isRosterHeroId(fighter.id) && isRosterHeroId(occupant.id)) return true;
   if (occupant && isPartyHeroId(fighter.id) && isPartyHeroId(occupant.id)) return true;
   return Boolean(fighter.canMoveThroughMonsters && occupant && hostileTo(fighter, occupant));
 }
 
 function canEndMovementOnTile(fighter, position) {
-  return !window.DungeonGrid.isOccupied(position, state.fighters, fighter);
+  return !window.DungeonGrid.isOccupied(position, state.fighters, fighter) || carriedFighterOccupiesPosition(fighter, position);
 }
 
 function isValidPathStep(fighter, from, to, path = []) {
@@ -104,13 +128,14 @@ function sleep(ms) {
 
 async function moveFighterAlongPath(fighter, path, silent = false) {
   if (!heroCanAct(fighter) || (state.mode === "combat" && fighter.movementLeft <= 0)) return false;
-  const pathCost = (path ?? []).reduce((total, step) => total + movementCostAtPosition(step), 0);
+  const pathCost = (path ?? []).reduce((total, step) => total + movementCostAtPosition(step, fighter), 0);
   if (!path || path.length === 0 || pathCost > movementLimitFor(fighter)) return false;
   if (!canEndMovementOnTile(fighter, path.at(-1))) return false;
 
   let previous = fighter.position;
   for (const step of path) {
     if (!isValidPathStep(fighter, previous, step, path.slice(0, path.indexOf(step)))) return false;
+    if (!canMoveGrabbedEntityWithCarrier(fighter, previous, step)) return false;
     previous = step;
   }
 
@@ -121,32 +146,44 @@ async function moveFighterAlongPath(fighter, path, silent = false) {
 
   let movedSteps = 0;
   let movedCost = 0;
+  let stoppedByOpportunityDamage = false;
   for (const step of path) {
     const opportunityAttackers = Object.values(state.fighters).filter((candidate) => canOpportunityAttack(candidate, fighter, fighter.position, step));
     for (const attacker of opportunityAttackers) {
       if (!(await shouldTakeOpportunityAttack(attacker, fighter))) continue;
       await opportunityAttack(attacker, fighter);
-      if (!fighter.alive) break;
+      if (!fighter.alive || fighter.hp <= 0) {
+        stoppedByOpportunityDamage = true;
+        break;
+      }
+      if (state.mode === "combat" && fighter.movementLeft <= 0) break;
     }
-    if (!fighter.alive) break;
+    if (!fighter.alive || fighter.hp <= 0 || (state.mode === "combat" && fighter.movementLeft <= 0)) break;
+    if (!canMoveGrabbedEntityWithCarrier(fighter, fighter.position, step)) {
+      addLog(`${fighter.name} cannot drag ${grabbedEntityMovementLabel(fighter)} any farther.`, "important");
+      break;
+    }
 
+    const previousPosition = { ...fighter.position };
     const previousRoomId = roomForPosition(fighter.position)?.id ?? "";
     fighter.position = { ...step };
+    moveGrabbedEntityWithCarrier(fighter, previousPosition, step);
     const nextRoom = roomForPosition(fighter.position);
     if (isPlayerControlledPartyFighter(fighter) && nextRoom && nextRoom.id !== previousRoomId) {
       void triggerCustomDungeonStory("enterRoom", { roomId: nextRoom.id, room: nextRoom, fighter });
     }
     movedSteps += 1;
-    movedCost += movementCostAtPosition(step);
+    movedCost += movementCostAtPosition(step, fighter);
     collectLootAtPosition(fighter, step);
     triggerTrapAtPosition(fighter, step);
+    triggerGrabbedEntityTileEffects(fighter, previousPosition);
     if (state.mode !== "combat" && isPlayerControlledPartyFighter(fighter)) moveAutonomousAlliesWithLeaderStep(fighter);
     const usedPortal = triggerPortalAtPosition(fighter, fighter.position);
     const openedDoor = autoOpenAdjacentExplorationDoor(fighter);
     render();
     const stepDelay = movedSteps > longMoveFastAfterSteps ? Math.max(25, Math.round(tokenSlideMs * longMoveFastMultiplier)) : tokenSlideMs;
     await sleep(stepDelay);
-    if (!fighter.alive) break;
+    if (!fighter.alive || fighter.hp <= 0) break;
     if (usedPortal) {
       movementInProgress = false;
       dragPath = null;
@@ -158,18 +195,20 @@ async function moveFighterAlongPath(fighter, path, silent = false) {
   }
 
   if (state.mode === "combat") {
-    fighter.movementLeft -= movedCost;
+    fighter.movementLeft = Math.max(0, fighter.movementLeft - movedCost);
   }
   fighter.lastMoveFeet = movedSteps * feetPerSquare;
 
   if (!silent) {
     const suffix = state.mode === "combat" ? ` ${fighter.movementLeft * feetPerSquare} ft remains.` : "";
-    addLog(`${fighter.name} moves ${movedSteps * feetPerSquare} ft.${suffix}`);
+    const dragText = fighterIsDraggingEntity(fighter) ? " while dragging" : "";
+    addLog(`${fighter.name} moves ${movedSteps * feetPerSquare} ft${dragText}.${suffix}`);
+    if (stoppedByOpportunityDamage) addLog(`${fighter.name}'s movement stops where the opportunity attack landed.`, "important");
   }
 
   movementInProgress = false;
   if (state.mode !== "combat" && isPlayerControlledPartyFighter(fighter)) await moveAutonomousAlliesNearLeader(fighter);
-  if (isPlayerControlledPartyFighter(fighter) && checkDungeonCompletion(fighter)) return true;
+  if (fighter.hp > 0 && isPlayerControlledPartyFighter(fighter) && checkDungeonCompletion(fighter)) return true;
   render();
   return true;
 }
@@ -177,6 +216,69 @@ async function moveFighterAlongPath(fighter, path, silent = false) {
 async function moveFighter(fighter, destination, silent = false) {
   const path = findMovementPath(fighter, destination);
   return moveFighterAlongPath(fighter, path, silent);
+}
+
+function moveGrabbedEntityWithCarrier(carrier, previousCarrierPosition, carrierStep) {
+  const grabbedFighter = grabbedFighterForCarrier(carrier);
+  if (grabbedFighter) {
+    grabbedFighter.position = { ...previousCarrierPosition };
+    return;
+  }
+
+  const grabbedObject = grabbedObjectForCarrier(carrier);
+  if (!grabbedObject) return;
+  const dx = carrierStep.x - previousCarrierPosition.x;
+  const dy = carrierStep.y - previousCarrierPosition.y;
+  grabbedObject.position = {
+    x: grabbedObject.position.x + dx,
+    y: grabbedObject.position.y + dy,
+  };
+}
+
+function canMoveGrabbedEntityWithCarrier(carrier, previousCarrierPosition, carrierStep) {
+  const grabbedFighter = grabbedFighterForCarrier(carrier);
+  if (grabbedFighter) {
+    return Boolean(
+      window.DungeonGrid.isInsideGrid(previousCarrierPosition, currentGridSize()) &&
+        movementWalkableFor(grabbedFighter).has(positionKey(previousCarrierPosition)) &&
+        (!window.DungeonGrid.isOccupied(previousCarrierPosition, state.fighters, grabbedFighter) ||
+          positionKey(carrier.position) === positionKey(previousCarrierPosition)),
+    );
+  }
+
+  const grabbedObject = grabbedObjectForCarrier(carrier);
+  if (!grabbedObject) return true;
+  const dx = carrierStep.x - previousCarrierPosition.x;
+  const dy = carrierStep.y - previousCarrierPosition.y;
+  const movedObject = {
+    ...grabbedObject,
+    position: { x: grabbedObject.position.x + dx, y: grabbedObject.position.y + dy },
+  };
+  const walkable = movementWalkableFor(carrier);
+  return objectCells(movedObject).every((cell) =>
+    window.DungeonGrid.isInsideGrid(cell, currentGridSize()) &&
+      walkable.has(positionKey(cell)) &&
+      !Object.values(state.fighters).some((fighter) =>
+        fighter.alive &&
+          fighter.id !== carrier.id &&
+          fighter.position.x === cell.x &&
+          fighter.position.y === cell.y,
+      ),
+  );
+}
+
+function triggerGrabbedEntityTileEffects(carrier, previousCarrierPosition) {
+  const grabbedFighter = grabbedFighterForCarrier(carrier);
+  if (!grabbedFighter?.alive) return;
+  collectLootAtPosition(grabbedFighter, previousCarrierPosition);
+  triggerTrapAtPosition(grabbedFighter, previousCarrierPosition);
+}
+
+function grabbedEntityMovementLabel(carrier) {
+  const grabbedFighter = grabbedFighterForCarrier(carrier);
+  if (grabbedFighter) return grabbedFighter.name;
+  const grabbedObject = grabbedObjectForCarrier(carrier);
+  return objectTemplate(grabbedObject?.type)?.name ?? "that";
 }
 
 function autonomousPartyAllies() {
@@ -206,7 +308,7 @@ function followLeaderForAlly(ally, preferredLeader = activeHero()) {
 
 function followTargetPositionForAlly(ally, leader) {
   const followDistance = followDistanceForAlly(ally);
-  const walkable = new Set(state.mode === "home" || state.mode === "exploration" ? visibleWalkable() : currentWalkable());
+  const walkable = aiAllySafeWalkableFor(ally);
   const occupied = new Set(
     Object.values(state.fighters)
       .filter((fighter) => fighter.alive && fighter.id !== ally.id)
@@ -229,6 +331,7 @@ function moveAutonomousAlliesWithLeaderStep(preferredLeader = activeHero()) {
     if (!destination) continue;
     const step = adjacentCells(ally.position)
       .filter((position) => isValidPathStep(ally, ally.position, position, []))
+      .filter((position) => isAiAllySafeStep(ally, position, destination))
       .sort((a, b) => distance(a, destination) - distance(b, destination) || distance(a, leader.position) - distance(b, leader.position))[0];
     if (!step || !isValidPathStep(ally, ally.position, step, [])) continue;
     ally.position = { ...step };
@@ -246,7 +349,7 @@ async function moveAutonomousAlliesNearLeader(preferredLeader = activeHero()) {
     if (distance(ally.position, leader.position) <= followDistanceForAlly(ally)) continue;
     const destination = followTargetPositionForAlly(ally, leader);
     if (!destination) continue;
-    const path = findMovementPath(ally, destination);
+    const path = findMovementPathWithWalkable(ally, destination, aiAllySafeWalkableFor(ally, destination));
     if (path?.length) await moveFighterAlongPath(ally, path.slice(0, Math.floor(ally.speedFeet / feetPerSquare)), true);
   }
 }
@@ -263,8 +366,8 @@ function occupiedByUnselectedHeroOrObstacle(position, movingHeroIds) {
 
 function groupMoveDestinations(destination, heroes, anchorHero = heroes[0]) {
   const movingHeroIds = new Set(heroes.map((hero) => hero.id));
-  const walkable = new Set(state.mode === "home" || state.mode === "exploration" ? visibleWalkable() : movementWalkableFor(heroes[0]));
-  hazardousTerrainKeys().forEach((tileKey) => walkable.delete(tileKey));
+  const walkable = new Set(state.mode === "home" || state.mode === "exploration" ? visibleWalkable(anchorHero) : movementWalkableFor(anchorHero));
+  hazardousTerrainKeys(anchorHero).forEach((tileKey) => walkable.delete(tileKey));
   const unselectedBlockedKeys = new Set(
     Object.values(state.fighters)
       .filter((fighter) => fighter.alive && !movingHeroIds.has(fighter.id))
@@ -277,30 +380,45 @@ function groupMoveDestinations(destination, heroes, anchorHero = heroes[0]) {
       .filter((hero) => hero.id !== anchorHero?.id)
       .sort((a, b) => distance(a.position, destination) - distance(b.position, destination)),
   ].filter(Boolean);
+  const destinationRoom = roomForPosition(destination);
+  const candidateAreaPenalty = (position) => {
+    const room = roomForPosition(position);
+    if (destinationRoom) return room?.id === destinationRoom.id ? 0 : 30;
+    return room ? 18 : 0;
+  };
   const candidates = Array.from(walkable)
     .map(positionFromKey)
     .filter((position) => !unselectedBlockedKeys.has(positionKey(position)))
-    .sort((a, b) => distance(a, destination) - distance(b, destination))
-    .slice(0, Math.max(48, heroes.length * 18));
+    .sort((a, b) => candidateAreaPenalty(a) - candidateAreaPenalty(b) || distance(a, destination) - distance(b, destination))
+    .slice(0, Math.max(160, heroes.length * 40));
 
   const plans = [];
   for (const hero of sortedHeroes) {
+    const heroWalkable = new Set(state.mode === "home" || state.mode === "exploration" ? visibleWalkable(hero) : movementWalkableFor(hero));
+    hazardousTerrainKeys(hero).forEach((tileKey) => heroWalkable.delete(tileKey));
     const heroCandidates =
       plans.length === 0
         ? [destination, ...candidates]
         : candidates;
-    const target = heroCandidates.find((position) => {
-      const key = positionKey(position);
-      if (assigned.has(key)) return false;
-      if (!walkable.has(key)) return false;
-      if (unselectedBlockedKeys.has(key)) return false;
-      const path = findMovementPathWithWalkable(hero, position, walkable);
-      if (!path?.length && positionKey(hero.position) !== key) return false;
-      plans.push({ hero, destination: position, path: path ?? [] });
-      assigned.add(key);
-      return true;
-    });
-    if (!target) return [];
+    const options = heroCandidates
+      .map((position) => {
+        const key = positionKey(position);
+        if (assigned.has(key)) return null;
+        if (!heroWalkable.has(key)) return null;
+        if (unselectedBlockedKeys.has(key)) return null;
+        const path = findMovementPathWithWalkable(hero, position, heroWalkable);
+        if (!path?.length && positionKey(hero.position) !== key) return null;
+        const pathLength = path?.length ?? 0;
+        const finalDistance = distance(position, destination);
+        const score = candidateAreaPenalty(position) + finalDistance * 4 + pathLength;
+        return { hero, destination: position, path: path ?? [], key, score, pathLength, finalDistance };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.score - b.score || a.pathLength - b.pathLength || a.finalDistance - b.finalDistance);
+    const selected = options[0];
+    if (!selected) return [];
+    plans.push({ hero, destination: selected.destination, path: selected.path });
+    assigned.add(selected.key);
   }
 
   return plans;
@@ -326,7 +444,10 @@ async function moveFightersAlongPathsTogether(plans) {
       const step = plan.path[stepIndex];
       if (!step || !plan.hero.alive) continue;
       const stepKey = positionKey(step);
-      if (blockedTrapKeys.has(stepKey) || blockedHazardKeys.has(stepKey)) {
+      if (
+        (blockedTrapKeys.has(stepKey) && detectedArmedTrapKeys(plan.hero).has(stepKey)) ||
+        (blockedHazardKeys.has(stepKey) && hazardousTerrainKeys(plan.hero).has(stepKey))
+      ) {
         plan.stoppedBeforeTrap = true;
         stoppedBeforeTrap.add(plan.hero.id);
         continue;
@@ -568,21 +689,28 @@ function visibleTrapKeysForMonster(monster) {
   const keys = new Set();
   for (const object of state.dungeonObjects ?? []) {
     if (!objectIsTrap(object) || !object.detected || object.spent || object.disarmed || object.armed === false) continue;
+    if (fighterIsFlying(monster) && objectHasTag(object, "floor")) continue;
     objectCells(object).forEach((cell) => keys.add(positionKey(cell)));
   }
   return keys;
 }
 
-function monsterMovementWalkable(monster, baseWalkable = currentWalkable()) {
-  const walkable = new Set(baseWalkable);
+function monsterMovementWalkable(monster, baseWalkable = null) {
+  const base = baseWalkable ?? currentWalkable(monster);
+  const walkable = new Set(base);
   visibleTrapKeysForMonster(monster).forEach((tileKey) => {
     if (tileKey !== positionKey(monster.position)) walkable.delete(tileKey);
   });
   return walkable;
 }
 
-function consumeMonsterPathfindingJob(monster) {
+function consumeMonsterPathfindingJob(monster, force = false) {
   if (!monster || !monster.alive) return false;
+  if (force) {
+    perfStats.pathfindingJobs += 1;
+    perfStats.pathfindingJobsLastFrame += 1;
+    return true;
+  }
   if (pathfindingJobsThisTurn >= monsterPathfindingBudgetPerTurn) return false;
   pathfindingJobsThisTurn += 1;
   perfStats.pathfindingJobs += 1;
@@ -591,9 +719,9 @@ function consumeMonsterPathfindingJob(monster) {
 }
 
 function monsterReachableTiles(monster, options) {
-  if (!consumeMonsterPathfindingJob(monster)) return new Map();
+  if (!consumeMonsterPathfindingJob(monster, options?.forcePathfinding)) return new Map();
   return reachableTiles(monster, state.fighters, {
-    moveCost: (_from, to) => movementCostAtPosition(to),
+    moveCost: (_from, to) => movementCostAtPosition(to, monster),
     ...options,
   });
 }
@@ -615,8 +743,8 @@ function canAttackFromPosition(attacker, target, position) {
   return attackGridDistance(position, target.position) <= range && hasClearLineOfSight(position, target.position);
 }
 
-function pathForMonster(monster, destination, walkable = monsterMovementWalkable(monster)) {
-  if (!consumeMonsterPathfindingJob(monster)) return null;
+function pathForMonster(monster, destination, walkable = monsterMovementWalkable(monster), options = {}) {
+  if (!consumeMonsterPathfindingJob(monster, options.forcePathfinding)) return null;
   return findPath(monster.position, destination, monster, state.fighters, {
     gridSize: currentGridSize(),
     walkable,
@@ -625,9 +753,9 @@ function pathForMonster(monster, destination, walkable = monsterMovementWalkable
   });
 }
 
-function attackPlanAgainst(monster, target, avoidOpportunity = false, baseWalkable = currentWalkable()) {
+function attackPlanAgainst(monster, target, avoidOpportunity = false, baseWalkable = null) {
   const monsterRoom = monster.behavior === "rangedKiter" ? roomForPosition(monster.position) : null;
-  const movementBase = monsterRoom ? roomWalkableSet(monsterRoom) : baseWalkable;
+  const movementBase = monsterRoom ? roomWalkableSet(monsterRoom, monster) : baseWalkable;
   const walkable = monsterMovementWalkable(monster, movementBase);
   const reachable = Array.from(
     monsterReachableTiles(monster, {
@@ -697,14 +825,20 @@ function chooseMonsterAttackPlan(monster) {
   return planFor(healer, true) ?? preferredPlan(true, { preferHealer: true, preferWeak: true }) ?? preferredPlan(false, { preferHealer: true });
 }
 
-function bestPathToward(mover, target, avoidOpportunity = false) {
+function bestPathToward(mover, target, avoidOpportunity = false, options = {}) {
   const walkable = monsterMovementWalkable(mover);
+  if (isAutonomousAlly(mover)) {
+    hazardousTerrainKeys(mover).forEach((tileKey) => {
+      if (tileKey !== positionKey(mover.position)) walkable.delete(tileKey);
+    });
+  }
   const reachable = Array.from(
     monsterReachableTiles(mover, {
       gridSize: currentGridSize(),
       walkable,
       canTraverse: (from, to, path) => canTraverseMovementEdge(mover, from, to, path),
       stateKey: (position, path) => movementStateKey(mover, position, path),
+      forcePathfinding: options.forcePathfinding,
     }).entries(),
   ).map(([key, cost]) => {
     const [x, y] = key.split(",").map(Number);
@@ -719,7 +853,7 @@ function bestPathToward(mover, target, avoidOpportunity = false) {
   });
 
   for (const entry of reachable) {
-    const path = pathForMonster(mover, entry.position, walkable);
+    const path = pathForMonster(mover, entry.position, walkable, { forcePathfinding: options.forcePathfinding });
     if (path && (!avoidOpportunity || !pathProvokesOpportunity(mover, path))) return path;
   }
   return null;
@@ -732,7 +866,7 @@ function normalRangeSquares(fighter) {
 
 function roomWalkableSet(room, fighter = null) {
   const walkable = new Set((room?.cells ?? []).map(positionKey));
-  blockingObjectKeys().forEach((tileKey) => walkable.delete(tileKey));
+  blockingObjectKeys(fighter).forEach((tileKey) => walkable.delete(tileKey));
   return fighter ? monsterMovementWalkable(fighter, walkable) : walkable;
 }
 
@@ -835,7 +969,7 @@ function bestSwarmPath(mover, target) {
 }
 
 function healingItemsForAi(fighter) {
-  return (fighter?.inventory?.items ?? []).filter((item) => item.use?.kind === "healing" && itemHasCharges(item));
+  return (fighter?.inventory?.items ?? []).filter((item) => ["healing", "fullHealing"].includes(item.use?.kind) && itemHasCharges(item));
 }
 
 function dyingClassHeroes() {
@@ -864,8 +998,8 @@ async function maybeUseAiHealingPotion(ally) {
 
   ally.hasAction = false;
   if (!spendItemCharge(item)) return false;
-  const healingRoll = rollDice(item.use.dice.count, item.use.dice.sides);
-  const healing = healingRoll.total + (item.use.bonus ?? 0);
+  const healingRoll = item.use?.kind === "fullHealing" ? { rolls: [], total: Math.max(0, (target.maxHp ?? 0) - (target.hp ?? 0)) } : rollDice(item.use.dice.count, item.use.dice.sides);
+  const healing = item.use?.kind === "fullHealing" ? healingRoll.total : healingRoll.total + (item.use.bonus ?? 0);
   const healed = applyHealingToHero(target, healing);
   playSoundEffect("potionDrink");
   if (item.use?.consume !== false && !item.use?.charges) {
@@ -875,7 +1009,12 @@ async function maybeUseAiHealingPotion(ally) {
     }
   }
   const targetText = target.id === ally.id ? "" : ` on ${target.name}`;
-  addLog(`${ally.name} uses ${item.name}${targetText} and heals ${healed} HP (${healingRoll.rolls.join(" + ")} + ${item.use.bonus ?? 0}).`, "heal");
+  addLog(
+    item.use?.kind === "fullHealing"
+      ? `${ally.name} uses ${item.name}${targetText} and heals ${healed} HP to full.`
+      : `${ally.name} uses ${item.name}${targetText} and heals ${healed} HP (${healingRoll.rolls.join(" + ")} + ${item.use.bonus ?? 0}).`,
+    "heal",
+  );
   refreshDerivedStats(ally);
   refreshDerivedStats(target);
   return true;
@@ -883,6 +1022,7 @@ async function maybeUseAiHealingPotion(ally) {
 
 async function runMonsterAi(monster) {
   if (!monster.alive || partyDefeatedOrDying()) return;
+  const behavior = monster.behavior ?? "melee";
   const monsterTurnFinished = () => {
     window.setTimeout(() => {
       if (activeFighter()?.id === monster.id && !partyDefeatedOrDying()) endTurn();
@@ -895,6 +1035,10 @@ async function runMonsterAi(monster) {
     monsterTurnFinished();
     return;
   }
+  if (fighterStatusEffect(monster, "grappled") && await attemptGrappleEscape(monster)) {
+    monsterTurnFinished();
+    return;
+  }
   if (await maybeUseAiHealingPotion(monster)) {
     monsterTurnFinished();
     return;
@@ -904,13 +1048,13 @@ async function runMonsterAi(monster) {
     return;
   }
 
-  if (monster.behavior === "swarm") {
+  if (behavior === "swarm") {
     const swarmTarget = swarmTargetFor(monster);
     if (!swarmTarget) {
       endTurn();
       return;
     }
-    const path = bestSwarmPath(monster, swarmTarget);
+    const path = bestSwarmPath(monster, swarmTarget) ?? bestPathToward(monster, swarmTarget, false, { forcePathfinding: true });
     if (path) {
       await moveFighterAlongPath(monster, path, true);
       addLog(`${monster.name} swarms around ${swarmTarget.name}.`);
@@ -930,7 +1074,7 @@ async function runMonsterAi(monster) {
     return;
   }
 
-  if (monster.behavior === "rangedKiter") {
+  if (behavior === "rangedKiter") {
     const plan = chooseMonsterAttackPlan(monster);
     const target = plan?.target ?? closestTargetTo(monster);
     if (!target) {
@@ -940,7 +1084,10 @@ async function runMonsterAi(monster) {
     const avoidsOpportunity = abilityScore(monster, "int") >= 11;
     const path = plan?.path?.length
       ? plan.path
-      : bestRoomKitePath(monster, target, avoidsOpportunity) ?? (avoidsOpportunity ? bestRoomKitePath(monster, target, false) : null);
+      : bestRoomKitePath(monster, target, avoidsOpportunity) ??
+        (avoidsOpportunity ? bestRoomKitePath(monster, target, false) : null) ??
+        bestPathToward(monster, target, avoidsOpportunity, { forcePathfinding: true }) ??
+        (avoidsOpportunity ? bestPathToward(monster, target, false, { forcePathfinding: true }) : null);
     if (path) {
       await moveFighterAlongPath(monster, path, true);
       addLog(`${monster.name} repositions inside the room.`);
@@ -960,7 +1107,7 @@ async function runMonsterAi(monster) {
     return;
   }
 
-  if (monster.behavior === "melee") {
+  if (behavior === "melee") {
     const plan = chooseMonsterAttackPlan(monster);
     const target = plan?.target ?? closestTargetTo(monster);
     if (!target) {
@@ -971,7 +1118,8 @@ async function runMonsterAi(monster) {
     if (!hasMeleeAccess(monster, target)) {
       const path = plan?.path?.length
         ? plan.path
-        : bestPathToward(monster, target, avoidsOpportunity) ?? (avoidsOpportunity ? bestPathToward(monster, target, false) : null);
+        : bestPathToward(monster, target, avoidsOpportunity, { forcePathfinding: true }) ??
+          (avoidsOpportunity ? bestPathToward(monster, target, false, { forcePathfinding: true }) : null);
       if (path) {
         const before = { ...monster.position };
         await moveFighterAlongPath(monster, path, true);
@@ -1093,7 +1241,8 @@ function extendDragPath(position) {
     return;
   }
 
-  if (dragPath.length >= movementLimitFor(hero)) return;
+  const currentCost = dragPath.reduce((total, step) => total + movementCostAtPosition(step, hero), 0);
+  if (currentCost >= movementLimitFor(hero)) return;
 
   const from = dragPath[dragPath.length - 1] ?? hero.position;
   if (!isValidPathStep(hero, from, position, dragPath)) {

@@ -138,6 +138,26 @@
         background: #25315f;
       }
 
+      .creator-cell.object-water-floor {
+        background: linear-gradient(135deg, rgba(75, 161, 204, 0.62), rgba(24, 74, 116, 0.78)), #1f2425;
+        color: #d8f6ff;
+      }
+
+      .creator-cell.object-lava-floor {
+        background: linear-gradient(135deg, rgba(255, 174, 31, 0.68), rgba(159, 35, 16, 0.82)), #28130e;
+        color: #fff0bc;
+      }
+
+      .creator-cell.object-acid-floor {
+        background: linear-gradient(135deg, rgba(189, 255, 58, 0.72), rgba(26, 132, 49, 0.84)), #102714;
+        color: #f0ffd0;
+      }
+
+      .creator-cell.object-healing-pool-floor {
+        background: linear-gradient(135deg, rgba(255, 190, 213, 0.7), rgba(176, 57, 118, 0.82)), #2b1420;
+        color: #fff4f8;
+      }
+
       .creator-cell.selected-room {
         outline: 2px solid var(--accent);
         outline-offset: -2px;
@@ -197,6 +217,12 @@
       .creator-row {
         display: grid;
         gap: 8px;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .creator-filter-grid {
+        display: grid;
+        gap: 6px;
         grid-template-columns: 1fr 1fr;
       }
 
@@ -509,12 +535,48 @@
         <section class="creator-section">
           <h2>Furniture Catalogue</h2>
           <input id="furniture-search" type="search" placeholder="Search furniture" />
+          <div class="creator-filter-grid">
+            <label>
+              Kind
+              <select id="furniture-kind-filter"></select>
+            </label>
+            <label>
+              Tag
+              <select id="furniture-tag-filter"></select>
+            </label>
+            <label>
+              Sort
+              <select id="furniture-sort">
+                <option value="name">Name</option>
+                <option value="kind">Kind</option>
+                <option value="id">ID</option>
+              </select>
+            </label>
+          </div>
           <div id="furniture-catalogue" class="catalogue"></div>
         </section>
 
         <section class="creator-section">
           <h2>Monster Catalogue</h2>
           <input id="monster-search" type="search" placeholder="Search monsters" />
+          <div class="creator-filter-grid">
+            <label>
+              Category
+              <select id="monster-category-filter"></select>
+            </label>
+            <label>
+              Tag
+              <select id="monster-tag-filter"></select>
+            </label>
+            <label>
+              Sort
+              <select id="monster-sort">
+                <option value="name">Name</option>
+                <option value="category">Category</option>
+                <option value="id">ID</option>
+              </select>
+            </label>
+          </div>
           <label>
             <input id="monster-is-boss" type="checkbox" />
             Place as boss
@@ -525,6 +587,26 @@
         <section class="creator-section">
           <h2>Selected</h2>
           <div id="selected-card" class="selected-card small-note">Nothing selected.</div>
+          <input id="item-search" type="search" placeholder="Search items" />
+          <div class="creator-filter-grid">
+            <label>
+              Type
+              <select id="item-type-filter"></select>
+            </label>
+            <label>
+              Tag
+              <select id="item-tag-filter"></select>
+            </label>
+            <label>
+              Sort
+              <select id="item-sort">
+                <option value="name">Name</option>
+                <option value="value">Value</option>
+                <option value="type">Type</option>
+                <option value="id">ID</option>
+              </select>
+            </label>
+          </div>
           <label>
             Add loot item
             <select id="loot-item"></select>
@@ -575,8 +657,13 @@
     <script src="src/scripts/content/registry.js" defer></script>
     <script src="src/scripts/content/items/equipment.js" defer></script>
     <script src="src/scripts/content/items/treasure.js" defer></script>
+    <script src="src/scripts/content/items/materials.js" defer></script>
     <script src="src/scripts/content/items/magic_items.js" defer></script>
     <script src="src/scripts/content/items/magic_accessories.js" defer></script>
+    <script src="src/scripts/content/items/magic-forest-pack.js" defer></script>
+    <script src="src/scripts/content/items/magic-undead-pack.js" defer></script>
+    <script src="src/scripts/content/items/magic-hell-pack.js" defer></script>
+    <script src="src/scripts/content/items/magic-underdark-drow-pack.js" defer></script>
     <script src="src/scripts/content/spells/core-spells.js" defer></script>
     <script src="src/scripts/content/classes/barbarian.js" defer></script>
     <script src="src/scripts/content/classes/fighter.js" defer></script>
@@ -592,14 +679,36 @@
     <script src="src/scripts/content/classes/warlock.js" defer></script>
     <script src="src/scripts/content/monsters/skeletal-undead-pack.js" defer></script>
     <script src="src/scripts/content/monsters/zombie-undead-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/ghost-undead-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/fiend-devil-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/fiend-demon-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/plant-creature-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/embervein-deepworks-monster-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/elemental-fire-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/elemental-air-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/elemental-earth-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/elemental-water-pack.js" defer></script>
     <script src="src/scripts/content/monsters/forest-beast-pack.js" defer></script>
     <script src="src/scripts/content/monsters/beast-biome-pack.js" defer></script>
     <script src="src/scripts/content/furniture/dungeon-furniture-pack.js" defer></script>
+    <script src="src/scripts/content/furniture/resource-nodes.js" defer></script>
+    <script src="src/scripts/content/furniture/desert-ruins-pack.js" defer></script>
+    <script src="src/scripts/content/furniture/depths-of-hells-pack.js" defer></script>
+    <script src="src/scripts/content/furniture/underdark-depths-pack.js" defer></script>
+    <script src="src/scripts/content/furniture/home-decor-pack.js" defer></script>
     <script src="src/scripts/content/traps/chest-traps.js" defer></script>
     <script src="src/scripts/content/dungeons/generated-old-guardroom.js" defer></script>
     <script src="src/scripts/content/loot/basic-dungeon.js" defer></script>
     <script src="src/scripts/content/themes/old-guardroom.js" defer></script>
     <script src="src/scripts/content/themes/forest-of-the-beasts.js" defer></script>
+    <script src="src/scripts/content/themes/desert-ruins.js" defer></script>
+    <script src="src/scripts/content/themes/depths-of-hells.js" defer></script>
+    <script src="src/scripts/content/themes/underdark-depths.js" defer></script>
+    <script src="src/scripts/content/themes/embervein-deepworks.js" defer></script>
+    <script src="src/scripts/content/themes/crucible-of-flame.js" defer></script>
+    <script src="src/scripts/content/themes/crucible-of-storms.js" defer></script>
+    <script src="src/scripts/content/themes/crucible-of-stone.js" defer></script>
+    <script src="src/scripts/content/themes/crucible-of-tides.js" defer></script>
     <script src="src/scripts/dice.js" defer></script>
     <script src="src/scripts/grid.js" defer></script>
     <script src="src/scripts/dungeon.js" defer></script>

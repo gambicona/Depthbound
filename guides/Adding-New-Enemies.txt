@@ -1,0 +1,170 @@
+How to add a new enemy and make it spawn
+
+Current source files to compare against:
+- Template: src/scripts/content/monsters/monster-template.js
+- Existing packs: src/scripts/content/monsters/skeletal-undead-pack.js, zombie-undead-pack.js, forest-beast-pack.js, beast-biome-pack.js
+- Spawn/theme logic: src/scripts/app/game-state.js
+- Combat specials and drops: src/scripts/app/combat-map.js
+
+1. Create or update a monster content file
+
+Add the monster to an existing pack in:
+src/scripts/content/monsters/
+
+For a new themed pack, create a new JS file in the same folder and load it in index.html after registry.js/content item files and before app.js. Existing monster packs are loaded around the other content packs, before furniture, loot, themes, and app.js.
+
+2. Register the monster
+
+Use DungeonContent.register("monsters", id, template):
+
+(() => {
+window.DungeonContent.register("monsters", "myMonsterId", {
+  name: "My Monster",
+  role: "Short gameplay role shown in the UI",
+  tags: ["undead", "skeletal", "old-guardroom"],
+  maxHp: 18,
+  category: 1,
+  xp: 75,
+  ac: 13,
+  baseAc: 13,
+  attackBonus: 4,
+  damage: {
+    count: 1,
+    sides: 6,
+    bonus: 2,
+    type: "piercing",
+    attackType: "weapon",
+    label: "1d6 + 2 piercing",
+    range: { kind: "melee", feet: 5 },
+  },
+  damageResistances: [],
+  damageVulnerabilities: ["bludgeoning"],
+  damageImmunities: ["poison"],
+  conditionImmunities: ["poisoned"],
+  specialAbility: ["Pounce"],
+  initiativeBonus: 2,
+  speedFeet: 30,
+  behavior: "melee",
+  token: "M",
+  tokenArt: "assets/tokens/my-monster.jpg",
+});
+})();
+
+3. Important monster fields
+
+name: Display name.
+role: Short UI/admin description.
+tags: Theme matching, boss detection, material drops, and search/filter labels. Include biome/theme tags such as "old-guardroom", "forest", "desert", "swamp", plus broad tags such as "undead", "skeletal", "beast", "construct", "boss", "ranged", "caster".
+maxHp: Starting and maximum HP.
+category: Power band. Hero levels 1-2 use category 1, levels 3-4 use category 2, and so on.
+xp: XP awarded on defeat.
+ac/baseAc: Armor class. baseAc is useful when equipment or effects may adjust AC.
+attackBonus: Base to-hit value. Monster attacks also account for ability changes when applicable.
+damage: Main attack dice. For ranged attackers, add range data.
+initiativeBonus: Initiative modifier.
+speedFeet: Movement speed.
+behavior: AI behavior key.
+token: One-letter fallback token.
+tokenArt: Token image path.
+equipment/inventory: Optional gear actually carried by the monster.
+extraLoot: Optional guaranteed/chance drops.
+
+4. Damage and defenses
+
+The current damage object supports:
+
+damage: {
+  count: 1,
+  sides: 8,
+  bonus: 2,
+  type: "piercing",
+  attackType: "weapon",
+  label: "1d8 + 2 piercing",
+  range: { kind: "ranged", normal: 80, long: 320, feet: 80 },
+}
+
+Use damageResistances, damageVulnerabilities, damageImmunities, and conditionImmunities for defenses. These are read by the shared damage/status systems.
+
+5. Behaviors currently used
+
+melee: Moves toward a chosen target and attacks in melee.
+rangedKiter: Uses ranged attacks and tries to keep useful spacing.
+swarm: Spawns multiple copies together. The live spawn count scales with party size and category gap.
+
+Flying monsters can set flying: true.
+
+6. Special abilities
+
+Monster specials are currently string names in specialAbility. Combat code reads them by matching text patterns, so use established names when possible.
+
+Common active/passive names:
+- Charge, Pounce, Lunge, Rush, Slam, Stomp: on-hit charge/push logic after moving at least 20 ft.
+- VenomBite, Poison, Sickening, Claw Fever, Deep Venom: CON save poison rider on hit.
+- WebSnare, Snare, Crippling, Hamstring, Dragging Grasp, Drowning Grip: movement-control rider on hit.
+- ShellGuard, Thornhide, Briarhide, Stubborn Beast: defensive AC brace.
+- BloodFrenzy: attack boost while below half HP.
+- Fireball: ranged area fire special.
+- Plague Breath, Bile Spray, Blight Belch, Rot Burst, Rot Crown Pulse: poison burst/breath special.
+- Stampede, Gravequake, Stormhorn Burst, Root-Rending Roar, BossRoar: roar/burst special and shaken rider.
+- SelfHeal: once per fight heal when below half HP.
+- Undead Fortitude: defensive survival check when reduced to 0 HP.
+
+The save DC is calculated in combat-map.js as 10 + monster category by default, with playtest tuning overrides under monsters.specialAbilities.
+
+7. Make it eligible for a theme
+
+Themes use tag groups:
+
+monsterTagGroups: [
+  ["undead", "skeletal", "old-guardroom"],
+]
+
+A monster can spawn when it matches at least one full tag group. If tag groups match nothing, the theme can fall back to explicit monsterIds.
+
+Bosses use bossMonsterTagGroups:
+
+bossMonsterTagGroups: [
+  ["undead", "skeletal", "old-guardroom", "boss"],
+]
+
+8. Category, scaling, and boss timing
+
+categoryForHeroLevel(level) is ceil(level / 2).
+
+Category 1: hero levels 1-2
+Category 2: hero levels 3-4
+Category 3: hero levels 5-6
+Category 4: hero levels 7-8
+And so on.
+
+Normal room spawns only choose monsters at or below the party category. Lower-category monsters can still appear later and get light HP scaling. Bosses are considered when the active hero needs a dungeon boss, currently even-numbered levels.
+
+9. Loot and material drops
+
+Most monsters should rely on shared loot:
+- Normal monsters: low chance for potion/equipment/treasure/magic, plus small coins.
+- Bosses: much higher chance for treasure and magic, plus better coins.
+
+Material drops are added automatically by tags in combat-map.js:
+- undead/skeletal/skeleton: bone dust, rib bones, skull fragments, grave wax.
+- beast: hide, claw, fang, blood, raw meat.
+- construct: iron scrap, arcane gear, crystal shard.
+
+For special drops, add extraLoot:
+
+extraLoot: [
+  { kind: "item", itemId: "gem-amethyst", quantity: 1, chance: 0.25 },
+  { kind: "item", itemId: "bolts-20", quantityDice: { count: 1, sides: 8 } },
+  { kind: "randomEquipment" },
+]
+
+Use extraLoot sparingly. It bypasses the normal rarity feel.
+
+10. Testing checklist
+
+- Confirm the JS file is loaded in index.html.
+- Confirm the monster id is unique.
+- Confirm tokenArt points to an existing file in assets/tokens/.
+- Confirm its tags match a theme monsterTagGroups or bossMonsterTagGroups entry.
+- Run a dungeon at the right hero level/category.
+- In Admin mode, check monster names, HP, AC, tags, and drops during a playtest.
