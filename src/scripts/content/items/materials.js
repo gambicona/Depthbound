@@ -334,6 +334,66 @@ component("monster-blood", "Monster Blood", {
   description: "A small vial of preserved monster blood for alchemy, poisons, and stranger recipes.",
 });
 
+component("venom-gland", "Venom Gland", {
+  category: "monster part",
+  kind: "monster part",
+  material: "venom",
+  form: "gland",
+  rarity: "uncommon",
+  cost: sp(4),
+  craftingValueCp: 40,
+  tags: ["alchemy", "monster-part", "monster", "venom", "poison", "beast", "reagent"],
+  professions: ["alchemist", "poisoner", "healer"],
+  biomes: ["forest", "swamp", "desert", "underdark", "water"],
+  short: "A carefully sealed venom sac.",
+  description: "A small gland full of dangerous venom. Useful for poisons, antidotes, and risky alchemy.",
+});
+
+component("horn-and-antler", "Horn and Antler", {
+  category: "monster part",
+  kind: "monster part",
+  material: "bone",
+  form: "horn",
+  rarity: "uncommon",
+  cost: sp(3),
+  craftingValueCp: 30,
+  tags: ["monster-part", "monster", "beast", "horn", "antler", "bone", "trophy", "crafting"],
+  professions: ["weaponsmith", "carver", "jeweler", "alchemist"],
+  biomes: ["forest", "mountain", "grassland", "arctic"],
+  short: "A sturdy horn or antler piece.",
+  description: "Dense horn or antler from a dangerous beast. It can be carved, powdered, or mounted as a trophy.",
+});
+
+component("scale-and-shell", "Scale and Shell", {
+  category: "monster part",
+  kind: "monster part",
+  material: "shell",
+  form: "plate",
+  rarity: "uncommon",
+  cost: sp(4),
+  craftingValueCp: 40,
+  tags: ["monster-part", "monster", "beast", "scale", "shell", "carapace", "armor", "crafting"],
+  professions: ["armorsmith", "leatherworker", "enchanter"],
+  biomes: ["swamp", "water", "desert", "underdark"],
+  short: "A hard scale or shell plate.",
+  description: "A durable plate of scale, shell, or carapace from a heavily protected creature.",
+});
+
+component("giant-feather", "Giant Feather", {
+  category: "monster part",
+  kind: "monster part",
+  material: "feather",
+  form: "plume",
+  rarity: "uncommon",
+  cost: sp(2),
+  craftingValueCp: 20,
+  tags: ["monster-part", "monster", "beast", "bird", "feather", "flying", "crafting"],
+  professions: ["fletcher", "tailor", "enchanter"],
+  biomes: ["forest", "mountain", "grassland", "arctic", "urban"],
+  short: "A broad feather from a large beast.",
+  description: "A strong, oversized feather suitable for fletching, charms, and light ornamentation.",
+});
+
 component("devil-blood", "Devil Blood", {
   category: "alchemy reagent",
   kind: "monster part",
@@ -446,6 +506,20 @@ component("mutated-flesh", "Mutated Flesh", {
   description: "A sample of flesh that still tries to become something else. Dangerous, but valuable to the right crafter.",
 });
 
+component("grave-flesh", "Grave Flesh", {
+  category: "monster part",
+  kind: "monster part",
+  material: "flesh",
+  form: "scrap",
+  cost: cp(6),
+  craftingValueCp: 6,
+  tags: ["alchemy", "monster-part", "monster", "undead", "zombie", "flesh", "rot", "disease", "grave"],
+  professions: ["alchemist", "relic-scholar", "poisoner"],
+  themes: ["old-guardroom", "desert-ruins"],
+  short: "A preserved scrap of undead flesh.",
+  description: "Rotten but strangely persistent tissue from a corpse-creature. Useful in grim alchemy and disease study.",
+});
+
 component("raw-meat", "Raw Meat", {
   category: "food ingredient",
   kind: "food ingredient",
@@ -456,6 +530,20 @@ component("raw-meat", "Raw Meat", {
   professions: ["cook"],
   short: "A usable cut of raw meat.",
   description: "Not pretty, but a cook can make it useful.",
+});
+
+component("fish-meat", "Fish Meat", {
+  category: "food ingredient",
+  kind: "food ingredient",
+  material: "meat",
+  form: "fillet",
+  cost: cp(5),
+  craftingValueCp: 5,
+  tags: ["food", "ingredient", "meat", "fish", "water", "beast", "cooking"],
+  professions: ["cook", "alchemist"],
+  biomes: ["water", "swamp", "coast"],
+  short: "A clean cut of fish or aquatic beast meat.",
+  description: "Fresh meat from a water-dwelling creature. Good for stews, drying, or bait.",
 });
 
 component("lean-game-meat", "Lean Game Meat", {

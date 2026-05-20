@@ -2566,6 +2566,7 @@ function addMonsterMaterialDrops(monster) {
     add("cracked-rib-bone", { chance: 0.08 });
     add("skull-fragment", { chance: 0.035 });
     add("grave-wax", { chance: ids.has("old-guardroom") ? 0.04 : 0.02 });
+    if (ids.has("zombie") || hasFoodCue("corpse", "cadaver", "flesh", "rot", "plague")) add("grave-flesh", { chance: ids.has("boss") ? 0.2 : 0.12 });
   }
   if (ids.has("ghost") || ids.has("specter") || ids.has("wraith") || ids.has("banshee") || ids.has("spirit")) {
     add("ectoplasm", { chance: 0.24 });
@@ -2579,6 +2580,11 @@ function addMonsterMaterialDrops(monster) {
     add("monster-blood", { chance: 0.1 });
     add("raw-meat", { chance: 0.18 });
     add("lean-game-meat", { chance: hasFoodCue("wolf", "stag", "hare", "predator") ? 0.14 : 0.06 });
+    if (hasFoodCue("venom", "poison", "viper", "serpent", "scorpion", "spider", "basilisk", "stingray")) add("venom-gland", { chance: ids.has("boss") ? 0.2 : 0.12 });
+    if (hasFoodCue("horn", "antler", "stag", "elk", "ram", "rhino", "aurochs", "bison", "yak", "bull", "mammoth")) add("horn-and-antler", { chance: ids.has("boss") ? 0.18 : 0.1 });
+    if (hasFoodCue("shell", "scale", "carapace", "crab", "turtle", "tortoise", "scorpion", "croc", "alligator", "ankylosaur")) add("scale-and-shell", { chance: ids.has("boss") ? 0.18 : 0.1 });
+    if (hasFoodCue("bird", "raptor", "roc", "owl", "eagle", "vulture", "crane", "harrier")) add("giant-feather", { chance: ids.has("boss") ? 0.2 : 0.14 });
+    if (hasFoodCue("water", "fish", "shark", "eel", "orca", "whale", "manta", "hippo", "seal", "croc", "alligator")) add("fish-meat", { chance: ids.has("boss") ? 0.18 : 0.1 });
     if (hasFoodCue("boar")) add("boar-haunch", { chance: ids.has("boss") ? 0.22 : 0.16 });
     if (hasFoodCue("bear")) add("bear-fat", { chance: ids.has("boss") ? 0.2 : 0.14 });
     if (hasFoodCue("bird", "raptor")) add("game-bird-breast", { chance: 0.15 });
@@ -4048,7 +4054,7 @@ function maybeUseMonsterDamageReduction(defender, attacker, incomingDamage, mele
     addLog(`${defender.name}'s Grove Body disperses part of the blow.`, "important");
     return reduced;
   }
-  if (hasMonsterSpecial(defender, /adamantine frame|hard light of the forge|gear assembly/i) && !defender.usedSpecials[roundKey]) {
+  if (hasMonsterSpecial(defender, /adamantine frame|hard light of the forge|gear assembly|thickhide|frosthide/i) && !defender.usedSpecials[roundKey]) {
     defender.usedSpecials[roundKey] = true;
     const reduction = Math.max(3, 2 + monsterCategory(defender));
     addLog(`${defender.name}'s hardened frame reduces the hit by ${reduction}.`, "important");
@@ -4118,7 +4124,7 @@ async function applyMonsterReactiveSpecials(defender, attacker, incomingDamage, 
 
 function maybeUseMonsterDeathDefiance(monster, damagePackets = []) {
   if (isPartyHeroId(monster?.id)) return false;
-  if (!hasMonsterSpecial(monster, /king's return|unfinished death|final bargain|prince's second form|fungal rebirth|primordial regrowth|black rebirth|infernal wishflame|endless gale|mountain heart|older than roads|endless body|absolute stillness/i)) return false;
+  if (!hasMonsterSpecial(monster, /king's return|unfinished death|final bargain|prince's second form|fungal rebirth|primordial regrowth|black rebirth|infernal wishflame|endless gale|mountain heart|older than roads|endless body|absolute stillness|hollow choir rebuild|mass grave rebuild/i)) return false;
   monster.usedSpecials = monster.usedSpecials ?? {};
   if (monster.usedSpecials.DeathDefiance) return false;
   const radiantDamage = damagePackets.some((packet) => packet.type === "radiant" && packet.damage > 0);
@@ -5551,7 +5557,7 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
     }
   }
 
-  if (/dread whisper|condemning mark/i.test(normalized)) {
+  if (/dread whisper|condemning mark|bone debt|marrow verdict/i.test(normalized)) {
     const save = await rollSavingThrow(target, "wis", dc, `${monster.name}'s dread presence forces ${target.name} to make a WIS save.`);
     if (!save.success) {
       applyStatusEffect(target, { id: `dread-${monster.id}`, label: /condemning mark/i.test(normalized) ? "Condemned" : "Shaken", attackBonus: -1, expiresAtEndOfTurn: true });
@@ -5585,7 +5591,7 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
     }
   }
 
-  if (/glass splinters|glasswind cut|razor pass|needle draft|needle spray|bleeding edge|shard pin|hailglass volley|aurora slash|prismatic lance|salt lash/i.test(normalized)) {
+  if (/glass splinters|glasswind cut|razor pass|needle draft|needle spray|bleeding edge|shard pin|shatter spines|hailglass volley|aurora slash|prismatic lance|salt lash/i.test(normalized)) {
     const save = await rollSavingThrow(target, "dex", dc, `${monster.name}'s cutting element forces ${target.name} to make a DEX save.`);
     if (!save.success) {
       const dice = specialDamageDice(monster, critical ? 8 : 6);
@@ -5619,7 +5625,7 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
     }
   }
 
-  if (/hellspines|stygian brand|hellbow pin/i.test(normalized)) {
+  if (/hellspines|stygian brand|hellbow pin|bone cage/i.test(normalized)) {
     const ability = /hellbow pin/i.test(normalized) ? "str" : "dex";
     const save = await rollSavingThrow(target, ability, dc, `${monster.name}'s pinning strike forces ${target.name} to make a ${ability.toUpperCase()} save.`);
     if (!save.success) {
@@ -5661,7 +5667,7 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
     const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s chain forces ${target.name} to make a STR save.`);
     if (!save.success) {
       pullTargetToward(monster, target);
-      if (/canopy snatch|dragged into the teeth|drop the hook/i.test(normalized)) applyStatusEffect(target, { id: "restrained", label: "Restrained", speedLocked: true, attackBonus: -2, expiresAtEndOfTurn: true });
+      if (/canopy snatch|dragged into the teeth|drop the hook|bone cage/i.test(normalized)) applyStatusEffect(target, { id: "restrained", label: "Restrained", speedLocked: true, attackBonus: -2, expiresAtEndOfTurn: true });
     }
   }
 
@@ -5675,7 +5681,7 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
     }
   }
 
-  if (/constricting coil|stranglehold|crushing claws|forest judgment|hoist prisoner|heated coil|living chain|cinder chain judgment|mud grip|clay bind|root lock|engulfing slide|coral snare/i.test(normalized)) {
+  if (/constricting coil|stranglehold|crushing claws|forest judgment|hoist prisoner|heated coil|living chain|cinder chain judgment|mud grip|clay bind|root lock|engulfing slide|coral snare|bone cage/i.test(normalized)) {
     const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s crushing claws force ${target.name} to make a STR save.`);
     if (!save.success) {
       applyStatusEffect(target, { id: "restrained", label: "Restrained", speedLocked: true, attackBonus: -2, expiresAtEndOfTurn: true });
@@ -5823,7 +5829,7 @@ async function maybeUseMonsterStartSpecial(monster) {
     return false;
   }
 
-  if (hasMonsterSpecial(monster, /shellguard|thornhide|briarhide|stubborn beast/i) && !monster.usedSpecials.ShellGuard && shouldUseMonsterSpecial("defensive")) {
+  if (hasMonsterSpecial(monster, /shellguard|thornhide|briarhide|thickhide|frosthide|stubborn beast/i) && !monster.usedSpecials.ShellGuard && shouldUseMonsterSpecial("defensive")) {
     applyStatusEffect(monster, { id: "guarded", label: "Guarded", acBonus: monsterSpecialAbilityTuning.shellGuardAcBonus, expiresAtEndOfTurn: true });
     monster.usedSpecials.ShellGuard = true;
     addLog(`${monster.name} braces defensively (+${monsterSpecialAbilityTuning.shellGuardAcBonus} AC this turn).`, "important");
@@ -5846,13 +5852,32 @@ async function maybeUseMonsterStartSpecial(monster) {
     if (adjacentFiend) applyStatusEffect(monster, { id: "phalanx-of-flame", label: "Phalanx", acBonus: 1, attackBonus: 1, expiresAtEndOfTurn: true });
   }
 
-  if (hasMonsterSpecial(monster, /bark orders|mine lord's edict|stoke the furnace|forgeheart pulse|royal furnace oath|heart of ore and flame/i)) {
+  if (hasMonsterSpecial(monster, /bark orders|mine lord's edict|stoke the furnace|forgeheart pulse|royal furnace oath|heart of ore and flame|command the dead|carrion crown command|imperial corpse decree|unburied retinue|lockstep/i)) {
     const allyTags = monster.tags ?? [];
     const bonusIsFire = hasMonsterSpecial(monster, /stoke the furnace|forgeheart pulse|heart of ore and flame/i);
+    const bonusIsUndead = hasMonsterSpecial(monster, /command the dead|carrion crown command|imperial corpse decree|unburied retinue|lockstep/i);
     for (const ally of combatMonsters().filter((candidate) => candidate.id !== monster.id && candidate.alive && distance(candidate.position, monster.position) <= 3)) {
       const sharesTheme = (candidate.tags ?? []).some((tag) => allyTags.includes(tag) && ["embervein-deepworks", "embervein", "deepworks", "forge", "mine", "fire", "gear"].includes(tag));
-      if (!sharesTheme) continue;
-      applyStatusEffect(ally, { id: bonusIsFire ? "forge-stoked" : "ordered", label: bonusIsFire ? "Stoked" : "Ordered", attackBonus: 1, expiresAtEndOfTurn: true });
+      const sharesUndead = bonusIsUndead && (candidate.tags ?? []).some((tag) => ["undead", "skeletal", "zombie"].includes(tag));
+      if (!sharesTheme && !sharesUndead) continue;
+      applyStatusEffect(ally, { id: bonusIsFire ? "forge-stoked" : bonusIsUndead ? "death-commanded" : "ordered", label: bonusIsFire ? "Stoked" : bonusIsUndead ? "Commanded" : "Ordered", attackBonus: 1, expiresAtEndOfTurn: true });
+    }
+  }
+
+  if (hasMonsterSpecial(monster, /mass grave mortar|corpse cart spill/i) && !monster.usedSpecials.GraveMortar && shouldUseMonsterSpecial("active")) {
+    const targets = targetsInMonsterSpecialRange(monster, monsterSpecialAbilityTuning.rangedSpecialFeet).slice(0, 2);
+    if (targets.length) {
+      monster.usedSpecials.GraveMortar = true;
+      for (const target of targets) {
+        const save = await rollSavingThrow(target, "dex", monsterSpecialDc(monster), `${monster.name}'s corpse barrage forces ${target.name} to make a DEX save.`);
+        const dice = specialDamageDice(monster, 8);
+        const roll = rollDice(dice.count, dice.sides);
+        applySpecialDamage(monster, target, Math.max(1, Math.floor((roll.total + dice.bonus) / (save.success ? 2 : 1))), /mortar/i.test(monsterSpecialNames(monster).join(" ")) ? "bludgeoning" : "poison", "Corpse Barrage");
+        if (!save.success) applyStatusEffect(target, { id: "nauseated", label: "Nauseated", attackBonus: -1, expiresAtEndOfTurn: true });
+      }
+      monster.hasAction = false;
+      render();
+      return true;
     }
   }
 
@@ -5883,7 +5908,7 @@ async function maybeUseMonsterStartSpecial(monster) {
     return false;
   }
 
-  if (hasMonsterSpecial(monster, /flare step|cinder dance|vanish into soot|cloudstep|slipstream|high roost|whirlpool step|splash step|melt away|crater step|fault step|mountain walks|storm eye|sky crown|storm reading|furnace shield|living cover|open sea body|endless body|cyclone guard|hurricane guard|glacial guard|current guard|guarding slab|iron stance/i) && !monster.usedSpecials.ElementalSelfBuff && shouldUseMonsterSpecial("defensive")) {
+  if (hasMonsterSpecial(monster, /flare step|cinder dance|vanish into soot|cloudstep|slipstream|high roost|whirlpool step|splash step|melt away|crater step|fault step|mountain walks|storm eye|sky crown|storm reading|furnace shield|living cover|open sea body|endless body|cyclone guard|hurricane guard|glacial guard|current guard|guarding slab|iron stance|fading retreat/i) && !monster.usedSpecials.ElementalSelfBuff && shouldUseMonsterSpecial("defensive")) {
     applyStatusEffect(monster, { id: "elemental-stance", label: "Elemental Stance", acBonus: 1, attackBonus: 1, expiresAtEndOfTurn: true });
     monster.usedSpecials.ElementalSelfBuff = true;
     addLog(`${monster.name}'s element gathers close around it.`, "important");
@@ -5923,7 +5948,7 @@ async function maybeUseMonsterStartSpecial(monster) {
     onFailStatus: { id: "shaken", label: "Shaken", attackBonus: -1, expiresAtEndOfTurn: true },
     pushTargets: true,
   })) return true;
-  if (await tryMonsterAreaSpecial(monster, /boiling spray|tsunami front|crushing wave|endless deluge|drown the world|worldspring eruption|abyssal pressure|crown tide|leviathan roll|crush of oceans|hailglass volley|iceberg break|cloudburst devour|glacial advance/i, "Elemental Tide Burst", /boiling|steam|worldspring/i.test(monsterSpecialNames(monster).join(" ")) ? "fire" : /hailglass|iceberg|glacial/i.test(monsterSpecialNames(monster).join(" ")) ? "cold" : "bludgeoning", "str", monsterSpecialAbilityTuning.burstRangeFeet, {
+  if (await tryMonsterAreaSpecial(monster, /boiling spray|tsunami front|crushing wave|endless deluge|drown the world|worldspring eruption|abyssal pressure|crown tide|leviathan roll|crush of oceans|corpse tide|hailglass volley|iceberg break|cloudburst devour|glacial advance/i, "Elemental Tide Burst", /boiling|steam|worldspring/i.test(monsterSpecialNames(monster).join(" ")) ? "fire" : /hailglass|iceberg|glacial/i.test(monsterSpecialNames(monster).join(" ")) ? "cold" : "bludgeoning", "str", monsterSpecialAbilityTuning.burstRangeFeet, {
     onFailStatus: { id: "waterlogged", label: "Waterlogged", speedBonusFeet: -10, expiresAtEndOfTurn: true },
     pullTargets: /undertow|tide|current|leviathan|crush/i.test(monsterSpecialNames(monster).join(" ")),
     pushTargets: /wave|tsunami|deluge|worldspring/i.test(monsterSpecialNames(monster).join(" ")),
@@ -5960,10 +5985,10 @@ async function maybeUseMonsterStartSpecial(monster) {
   if (await tryMonsterAreaSpecial(monster, /doom scream|void bell toll/i, "Doom Scream", "thunder", "con", monsterSpecialAbilityTuning.burstRangeFeet, {
     onFailStatus: { id: "frightened", label: "Frightened", attackBonus: -2, expiresAtEndOfTurn: true },
   })) return true;
-  if (await tryMonsterAreaSpecial(monster, /mournful cry|hollow wail|banshee keening|white bell wail|grief pulse|origin wail|cathedral dirge|duke's war cry|crown of the ninefold pact|howl of hunger|panic shriek|abyssal roar|horror judgement|triple condemnation|chaos star|abyss unleashed|shriek alarm|panic spores|overmind spores/i, "Dread Wail", "psychic", "wis", monsterSpecialAbilityTuning.burstRangeFeet, {
+  if (await tryMonsterAreaSpecial(monster, /mournful cry|hollow wail|banshee keening|white bell wail|royal wail|grief pulse|origin wail|cathedral dirge|duke's war cry|crown of the ninefold pact|howl of hunger|panic shriek|abyssal roar|horror judgement|triple condemnation|chaos star|abyss unleashed|shriek alarm|panic spores|overmind spores/i, "Dread Wail", "psychic", "wis", monsterSpecialAbilityTuning.burstRangeFeet, {
     onFailStatus: { id: "frightened", label: "Frightened", attackBonus: -2, expiresAtEndOfTurn: true },
   })) return true;
-  if (await tryMonsterAreaSpecial(monster, /hurl debris|ethereal stomp|pit quake|world-stamp|world-cracker slam|dance of six deaths|whirling blades|rootquake|canopy collapse|first forest awakens/i, "Crushing Burst", /dance of six deaths|whirling blades/i.test(monsterSpecialNames(monster).join(" ")) ? "slashing" : "bludgeoning", "str", monsterSpecialAbilityTuning.burstRangeFeet, {
+  if (await tryMonsterAreaSpecial(monster, /hurl debris|ethereal stomp|pit quake|world-stamp|world-cracker slam|dance of six deaths|whirling blades|rootquake|canopy collapse|first forest awakens|corpse slam/i, "Crushing Burst", /dance of six deaths|whirling blades/i.test(monsterSpecialNames(monster).join(" ")) ? "slashing" : "bludgeoning", "str", monsterSpecialAbilityTuning.burstRangeFeet, {
     onFailStatus: { id: "shaken", label: "Shaken", attackBonus: -1, expiresAtEndOfTurn: true },
   })) return true;
   if (await tryMonsterAreaSpecial(monster, /soul lantern|grave breath|soul furnace|moonlit dominion|forbidden chorus|corrupt wish/i, "Soul Burst", "necrotic", "wis", monsterSpecialAbilityTuning.burstRangeFeet, {
@@ -5985,7 +6010,7 @@ async function maybeUseMonsterStartSpecial(monster) {
   if (await tryMonsterAreaSpecial(monster, /dazzling spores/i, "Dazzling Spores", "radiant", "con", monsterSpecialAbilityTuning.burstRangeFeet, {
     onFailStatus: { id: "blinded", label: "Blinded", attackBonus: -2, expiresAtEndOfTurn: true },
   })) return true;
-  if (await tryMonsterAreaSpecial(monster, /carrion spores|spores of filth|venom bloom|titan sporefall|midnight spores/i, "Carrion Spores", "poison", "con", monsterSpecialAbilityTuning.burstRangeFeet, {
+  if (await tryMonsterAreaSpecial(monster, /carrion spores|spores of filth|venom bloom|titan sporefall|midnight spores|plague king's mass/i, "Carrion Spores", "poison", "con", monsterSpecialAbilityTuning.burstRangeFeet, {
     onFailStatus: { id: "poisoned", label: "Poisoned", attackBonus: -1, expiresAtEndOfTurn: true },
   })) return true;
   if (await tryMonsterAreaSpecial(monster, /unstable fire/i, "Unstable Fire", "fire", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {

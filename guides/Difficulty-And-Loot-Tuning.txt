@@ -80,6 +80,31 @@ Monster scaling
 
 applyMonsterCategoryScaling handles scaling lower-category monsters upward. Tune HP and attack scaling there if low-category monsters feel too weak or too strong in higher dungeons.
 
+5e CR comparison note
+
+Reference point: category N is roughly treated as D&D 5e CR 2N for broad comparison only.
+
+Current normal monster averages compared to the official-style Monster Statistics by Challenge Rating table:
+
+cat 1 ~= CR 2: 13% target HP, -0.1 AC, +0.9 attack, 30% target damage
+cat 2 ~= CR 4: 21% target HP, +0.3 AC, +0.2 attack, 25% target damage
+cat 3 ~= CR 6: 29% target HP, +0.2 AC, +0.4 attack, 24% target damage
+cat 4 ~= CR 8: 39% target HP, +0.7 AC, +0.4 attack, 26% target damage
+cat 5 ~= CR 10: 47% target HP, +0.4 AC, +1.5 attack, 28% target damage
+cat 6 ~= CR 12: 55% target HP, +1.1 AC, +1.6 attack, 30% target damage
+cat 7 ~= CR 14: 64% target HP, +1.5 AC, +2.7 attack, 30% target damage
+cat 8 ~= CR 16: 74% target HP, +2.4 AC, +2.7 attack, 33% target damage
+cat 9 ~= CR 18: 82% target HP, +2.6 AC, +2.5 attack, 33% target damage
+cat 10 ~= CR 20: 90% target HP, +3.8 AC, +4.0 attack, 32% target damage
+
+Interpretation:
+Normal monsters are intentionally much softer and less lethal than official CR-equivalent 5e monsters. They have low HP at early and mid categories and only approach official HP at cat 9-10. Their damage is consistently low, around one quarter to one third of official CR expectations. They do, however, have slightly high AC and high attack bonuses, especially in late categories, so they can feel accurate and hard to hit without dealing official-level burst damage.
+
+Bosses are closer on HP and exceed official HP expectations at high categories, but boss damage is still below official CR expectations. This supports the current design of many weaker enemies plus occasional durable bosses, rather than one monster equaling a full tabletop CR-equivalent encounter.
+
+Current conclusion:
+This is acceptable for now. Do not automatically raise all monster damage to official CR values unless the whole encounter economy, party size, rest frequency, boss design, and loot pacing are rebalanced together.
+
 Loot from normal monsters
 
 createLootForMonster controls normal and boss drop chances.
