@@ -539,6 +539,7 @@ const els = {
   turnLabel: document.querySelector("#turn-label"),
   dungeonTimerLabel: document.querySelector("#dungeon-timer-label"),
   toggleDungeonTimer: document.querySelector("#toggle-dungeon-timer"),
+  questLogButton: document.querySelector("#quest-log-button"),
   initiativeList: document.querySelector("#initiative-list"),
   rollInitiative: document.querySelector("#roll-initiative"),
   selectParty: document.querySelector("#select-party"),

@@ -251,19 +251,39 @@
         border-radius: 6px;
         color: var(--text);
         display: block;
+        line-height: 1.16;
+        min-width: 0;
+        min-height: 44px;
         padding: 7px 8px;
         text-align: left;
+        width: 100%;
+      }
+
+      .catalogue b,
+      .catalogue .small-note {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .catalogue .furniture-catalogue-button {
+        align-items: center;
         display: grid;
         gap: 8px;
         grid-template-columns: 32px minmax(0, 1fr);
       }
 
+      .furniture-catalogue-copy {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+
       .catalogue .monster-catalogue-button {
         display: grid;
-        gap: 3px;
+        gap: 2px;
       }
 
       .monster-catalogue-title {
@@ -274,6 +294,7 @@
       }
 
       .monster-catalogue-title b {
+        display: block;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -307,6 +328,8 @@
         font-weight: 900;
         height: 32px;
         justify-content: center;
+        min-height: 32px;
+        min-width: 32px;
         overflow: hidden;
         width: 32px;
       }

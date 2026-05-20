@@ -2614,7 +2614,6 @@ async function startDungeonChoiceWithHero(choice) {
   }
   roomIsBuilt = false;
   hideHomeMenu();
-  addLog(`${partyMembers.map((hero) => hero.name).join(", ")} leave home for ${state.dungeonSizeName ? `${state.dungeonSizeName} ` : ""}${state.customDungeon?.name ?? getContentDefinition("themes", state.themeId)?.name ?? "a new dungeon"}.`, "important");
   render();
   window.DepthboundPlaytest?.syncNow?.();
   centerViewOnHero();
@@ -2707,7 +2706,6 @@ async function startCampaignDungeon(campaignId) {
   }
   roomIsBuilt = false;
   hideHomeMenu();
-  addLog(`${partyMembers.map((hero) => hero.name).join(", ")} leave home for ${template.name}.`, "important");
   render();
   window.DepthboundPlaytest?.syncNow?.();
   centerViewOnHero();

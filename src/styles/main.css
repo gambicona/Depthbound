@@ -1782,6 +1782,14 @@ h1 {
   padding: 5px 10px;
 }
 
+.quest-log-button {
+  font-size: 0.78rem;
+  justify-content: center;
+  margin-top: 8px;
+  min-height: 34px;
+  width: 100%;
+}
+
 .initiative-list {
   display: grid;
   gap: 8px;
@@ -4275,6 +4283,81 @@ h1 {
   font-size: 0.78rem;
   min-height: 34px;
   padding: 6px 10px;
+}
+
+.store-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.errand-material-picker {
+  display: grid;
+  gap: 8px;
+}
+
+.errand-material-picker label {
+  align-items: center;
+  background: rgba(13, 10, 11, 0.2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 82px;
+  padding: 8px 10px;
+}
+
+.errand-material-picker label span,
+.errand-material-picker label small {
+  display: block;
+}
+
+.errand-material-picker label small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+.errand-material-picker input {
+  width: 100%;
+}
+
+.quest-log-list {
+  display: grid;
+  gap: 10px;
+  max-height: min(58vh, 560px);
+  overflow: auto;
+}
+
+.quest-log-entry {
+  background: rgba(13, 10, 11, 0.24);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.quest-log-entry.ready {
+  border-color: rgba(126, 191, 137, 0.72);
+}
+
+.quest-log-entry b,
+.quest-log-entry span {
+  display: block;
+}
+
+.quest-log-entry span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+.quest-log-entry p {
+  margin: 0;
 }
 
 .object-result {

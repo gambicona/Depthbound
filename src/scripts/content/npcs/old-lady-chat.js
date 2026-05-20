@@ -66,11 +66,11 @@
         greeting: "So. The door has fewer dead men around it. Good. Doors should know their place.",
         options: [
           option("knew-them", "You knew them, didn't you?", "You talk like you knew those guards.", [
-            "Not them. Their kind.",
+            "The Guards? Not them. Their kind.",
             "Same boots. Same orders. Same habit of dying where someone important told them to stand.",
           ]),
           option("village-reaction", "What did the village say?", "How did the village react?", [
-            "The baker crossed himself. The innkeeper charged more for ale. Marra Vell tried to sell me 'anti-ghost candles.'",
+            "The baker crossed himself. The innkeeper charged more for ale. Sophie tried to sell me 'anti-ghost candles.'",
             "I told her I already own a broom.",
           ]),
           option("whats-next", "What's next?", "What do you think is deeper inside?", [

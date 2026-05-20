@@ -3372,6 +3372,7 @@ function showPlanningTableInfo() {
       ${comfortMarkup || `<p class="empty-note">No class heroes in the roster.</p>`}
     </section>
     <div class="object-actions">
+      <button type="button" data-action="show-quest-log">Quest Log [J]</button>
       <button type="button" data-action="create-roster-hero">Create New Hero</button>
     </div>
   `;
@@ -4319,8 +4320,15 @@ function investigateObject(objectId) {
 }
 
 function hideFighterInfo() {
+  const wasHomeBuilderOpen = isHomeBuilderOpen();
   els.fighterInfo.classList.remove("home-builder-dock");
   els.fighterInfo.classList.add("hidden");
+  if (wasHomeBuilderOpen) {
+    homeBuildTool = null;
+    homeMoveSelection = null;
+    homePaintPointerId = null;
+    render();
+  }
 }
 
 function moneyText(money) {
@@ -6458,6 +6466,10 @@ function completeNpcQuest(npcId, questId) {
   npcBehavior(npcId)?.completeQuest?.(questId);
 }
 
+function cancelNpcQuest(npcId, questId) {
+  return npcBehavior(npcId)?.cancelQuest?.(questId) ?? false;
+}
+
 function npcAdminProgressEntries() {
   return Object.values(window.DungeonNpcBehaviors ?? {})
     .flatMap((behavior) => behavior.adminProgressEntries?.() ?? [])
@@ -6539,6 +6551,351 @@ function storeNpcDefinition() {
   };
 }
 
+function smithMaterialCommissionForNpc(npcId) {
+  if (!smithMaterialCommissionRequests[npcId]) return null;
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  const commissions = smithMaterialCommissionState(state.questFlags);
+  commissions[npcId] ??= randomSmithMaterialCommission(npcId);
+  return commissions[npcId];
+}
+
+function smithMaterialCommissionRewardCp(commission) {
+  return Math.max(0, Math.floor(Number(commission?.quantity) || 0) * Math.floor(Number(commission?.rewardGpPerResource ?? smithMaterialCommissionRewardGpPerResource) || 0) * 100);
+}
+
+function smithMaterialCommissionRequirement(commission) {
+  return commission?.requirement ?? (commission?.itemId ? { itemId: commission.itemId } : {});
+}
+
+function smithMaterialCommissionLabel(commission) {
+  if (commission?.label) return commission.label;
+  const item = getItemTemplate(commission?.itemId);
+  if (item?.name) return item.name;
+  const requirement = smithMaterialCommissionRequirement(commission);
+  if (requirement.category) return `any ${requirement.category}`;
+  if (requirement.tagsAny?.length) return `any ${requirement.tagsAny.join(" or ")}`;
+  if (requirement.tagsAll?.length) return `materials tagged ${requirement.tagsAll.join(", ")}`;
+  return "matching materials";
+}
+
+function smithMaterialCommissionRequestText(npc, commission) {
+  const quantity = Math.max(1, Math.floor(Number(commission?.quantity) || 1));
+  const template = commission?.requestText ?? `${npc?.name ?? "The merchant"} needs {quantity} ${smithMaterialCommissionLabel(commission)}.`;
+  return template
+    .replaceAll("{npc}", npc?.name ?? "The merchant")
+    .replaceAll("{quantity}", String(quantity))
+    .replaceAll("{materials}", smithMaterialCommissionLabel(commission));
+}
+
+function titleCaseText(value) {
+  return String(value ?? "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => `${word.slice(0, 1).toUpperCase()}${word.slice(1)}`)
+    .join(" ");
+}
+
+function smithMaterialCommissionMarkup(npc) {
+  const commission = smithMaterialCommissionForNpc(npc?.id);
+  if (!commission) return "";
+  const requirement = smithMaterialCommissionRequirement(commission);
+  const itemName = smithMaterialCommissionLabel(commission);
+  const quantity = Math.max(1, Math.floor(Number(commission.quantity) || 1));
+  const have = partyResourceCountForRequirement(requirement);
+  const rewardCp = smithMaterialCommissionRewardCp(commission);
+  const ready = have >= quantity;
+  const accepted = commission.status === "accepted";
+  const completed = commission.status === "completed";
+  const prompt = accepted
+    ? `${smithMaterialCommissionRequestText(npc, commission)}`
+    : completed
+      ? `${npc.name} has paid for this order. Check back after the next outing.`
+      : smithMaterialCommissionRequestText(npc, commission);
+  return `
+    <section class="store-section">
+      <h3>Material Commission</h3>
+      <div class="store-row">
+        <div>
+          <b>${escapeHtml(quantity)} ${escapeHtml(titleCaseText(itemName))}</b>
+          <span>${escapeHtml(prompt)} Satchel: ${escapeHtml(have)}/${escapeHtml(quantity)} - Reward: ${escapeHtml(priceText(rewardCp))}</span>
+        </div>
+        ${
+          completed
+            ? `<button type="button" disabled>Paid</button>`
+            : accepted
+              ? `<button type="button" data-action="complete-smith-commission" data-npc="${escapeAttribute(npc.id)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Materials"}</button>`
+            : `<div class="store-row-actions">
+                  <button type="button" data-action="accept-smith-commission" data-npc="${escapeAttribute(npc.id)}">Accept</button>
+                  <button type="button" data-action="complete-smith-commission" data-npc="${escapeAttribute(npc.id)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Materials"}</button>
+                </div>`
+        }
+      </div>
+    </section>
+  `;
+}
+
+function acceptSmithMaterialCommission(npcId) {
+  const npc = window.DungeonContent.get("npcs", npcId);
+  const commission = smithMaterialCommissionForNpc(npcId);
+  if (!npc || !commission || commission.status === "completed") return;
+  commission.status = "accepted";
+  commission.acceptedAt = Date.now();
+  addLog(smithMaterialCommissionRequestText(npc, commission), "important");
+  renderStoreMenu();
+}
+
+function cancelSmithMaterialCommission(npcId) {
+  const npc = window.DungeonContent.get("npcs", npcId);
+  const commission = smithMaterialCommissionForNpc(npcId);
+  if (!npc || !commission || commission.status !== "accepted") return false;
+  commission.status = "available";
+  commission.cancelledAt = Date.now();
+  delete commission.acceptedAt;
+  addLog(`${npc.name}'s material commission is no longer accepted.`, "important");
+  if (!els.storeMenu.classList.contains("hidden") && activeStoreNpcId === npcId) renderStoreMenu();
+  return true;
+}
+
+function completeSmithMaterialCommission(npcId) {
+  showSmithMaterialCommissionHandIn(npcId);
+}
+
+function selectedSmithCommissionContributions() {
+  return Array.from(els.gameDialogField.querySelectorAll("[data-errand-material-input]"))
+    .map((input) => ({
+      itemId: input.dataset.item,
+      quantity: Math.max(0, Math.floor(Number(input.value) || 0)),
+      max: Math.max(0, Math.floor(Number(input.max) || 0)),
+    }))
+    .filter((entry) => entry.itemId && entry.quantity > 0);
+}
+
+function validateSmithCommissionContributions(commission, contributions) {
+  const requirement = smithMaterialCommissionRequirement(commission);
+  const target = Math.max(1, Math.floor(Number(commission.quantity) || 1));
+  const total = contributions.reduce((sum, entry) => sum + entry.quantity, 0);
+  if (total !== target) return `Choose exactly ${target} total material${target === 1 ? "" : "s"}.`;
+  for (const entry of contributions) {
+    if (entry.quantity > entry.max) return "One of the selected quantities is higher than the satchel stack.";
+    const item = getItemTemplate(entry.itemId);
+    if (!item || !itemMatchesRequirement(item, requirement)) return "One of the selected materials no longer matches this errand.";
+    if (partyResourceCount(entry.itemId) < entry.quantity) return "One of the selected satchel stacks has changed.";
+  }
+  return "";
+}
+
+function applySmithMaterialCommissionHandIn(npcId, commission, contributions) {
+  const npc = window.DungeonContent.get("npcs", npcId);
+  if (!npc || !commission || commission.status === "completed") return;
+  const error = validateSmithCommissionContributions(commission, contributions);
+  if (error) return;
+  for (const entry of contributions) consumePartyResource(entry.itemId, entry.quantity);
+  const rewardCp = smithMaterialCommissionRewardCp(commission);
+  addMoney(activeHero().inventory.money, rewardCp);
+  commission.status = "completed";
+  commission.completedAt = Date.now();
+  const materialText = contributions
+    .map((entry) => `${entry.quantity} ${getItemTemplate(entry.itemId)?.name ?? entry.itemId}`)
+    .join(", ");
+  addLog(`${npc.name} takes ${materialText} and pays ${priceText(rewardCp)}.`, "important");
+  render();
+  renderStoreMenu();
+}
+
+function showSmithMaterialCommissionHandIn(npcId) {
+  const npc = window.DungeonContent.get("npcs", npcId);
+  const commission = smithMaterialCommissionForNpc(npcId);
+  if (!npc || !commission || commission.status === "completed") return;
+  const requirement = smithMaterialCommissionRequirement(commission);
+  const quantity = Math.max(1, Math.floor(Number(commission.quantity) || 1));
+  const stacks = partyResourceStacksForRequirement(requirement);
+  if (stacks.reduce((sum, stack) => sum + stack.quantity, 0) < quantity) return;
+  els.gameDialogTitle.textContent = `Hand In Materials`;
+  els.gameDialogMessage.innerHTML = `<p>${escapeHtml(smithMaterialCommissionRequestText(npc, commission))} Choose exactly what to hand over.</p>`;
+  els.gameDialogField.classList.remove("hidden");
+  els.gameDialogField.innerHTML = `
+    <div class="errand-material-picker">
+      ${stacks
+        .map(
+          (stack) => `
+            <label>
+              <span>${escapeHtml(stack.item?.name ?? stack.itemId)} <small>have ${escapeHtml(stack.quantity)}</small></span>
+              <input type="number" inputmode="numeric" min="0" max="${escapeAttribute(stack.quantity)}" step="1" value="0" data-errand-material-input data-item="${escapeAttribute(stack.itemId)}" />
+            </label>
+          `,
+        )
+        .join("")}
+      <p class="ability-assignment-error" aria-live="polite">Selected: 0/${escapeHtml(quantity)}</p>
+    </div>
+  `;
+  els.gameDialogActions.innerHTML = `
+    <button type="button" data-dialog-action="confirm">Hand In</button>
+    <button type="button" class="ghost-button" data-dialog-action="cancel">Cancel</button>
+  `;
+  const update = () => {
+    const total = selectedSmithCommissionContributions().reduce((sum, entry) => sum + entry.quantity, 0);
+    const error = els.gameDialogField.querySelector(".ability-assignment-error");
+    if (error) error.textContent = `Selected: ${total}/${quantity}`;
+  };
+  const cleanup = () => {
+    els.gameDialogActions.removeEventListener("click", handleClick);
+    els.gameDialogField.removeEventListener("input", handleInput);
+    els.gameDialog.classList.add("hidden");
+    els.gameDialogField.innerHTML = "";
+    els.gameDialogField.classList.add("hidden");
+    activeDialogCancel = null;
+  };
+  const handleInput = (event) => {
+    const input = event.target.closest("[data-errand-material-input]");
+    if (!input) return;
+    const max = Math.max(0, Math.floor(Number(input.max) || 0));
+    input.value = String(Math.max(0, Math.min(max, Math.floor(Number(input.value) || 0))));
+    update();
+  };
+  const handleClick = (event) => {
+    const button = event.target.closest("[data-dialog-action]");
+    if (!button) return;
+    if (button.dataset.dialogAction === "cancel") {
+      cleanup();
+      return;
+    }
+    const contributions = selectedSmithCommissionContributions();
+    const validation = validateSmithCommissionContributions(commission, contributions);
+    if (validation) {
+      const error = els.gameDialogField.querySelector(".ability-assignment-error");
+      if (error) error.textContent = validation;
+      return;
+    }
+    cleanup();
+    applySmithMaterialCommissionHandIn(npcId, commission, contributions);
+  };
+  els.gameDialogActions.addEventListener("click", handleClick);
+  els.gameDialogField.addEventListener("input", handleInput);
+  activeDialogCancel = cleanup;
+  els.gameDialog.classList.remove("hidden");
+  els.gameDialogField.querySelector("input")?.focus();
+}
+
+function materialCommissionQuestLogEntries() {
+  const commissions = smithMaterialCommissionState(state?.questFlags ?? {});
+  return Object.entries(commissions)
+    .filter(([, commission]) => commission?.status === "accepted")
+    .map(([npcId, commission]) => {
+      const npc = window.DungeonContent.get("npcs", npcId) ?? { id: npcId, name: npcId, title: "Merchant" };
+      const requirement = smithMaterialCommissionRequirement(commission);
+      const target = Math.max(1, Math.floor(Number(commission.quantity) || 1));
+      return {
+        id: `commission-${npcId}`,
+        giver: npc.name ?? npc.title ?? npcId,
+        title: `${target} ${titleCaseText(smithMaterialCommissionLabel(commission))}`,
+        description: smithMaterialCommissionRequestText(npc, commission),
+        ready: partyResourceCountForRequirement(requirement) >= target,
+        cancelable: true,
+        cancelType: "commission",
+        npcId,
+        questId: `commission-${npcId}`,
+        objectives: [
+          {
+            label: smithMaterialCommissionLabel(commission),
+            progress: Math.min(target, partyResourceCountForRequirement(requirement)),
+            target,
+          },
+        ],
+      };
+    });
+}
+
+function acceptedQuestLogEntries() {
+  return [
+    ...Object.values(window.DungeonNpcBehaviors ?? {}).flatMap((behavior) => behavior.questLogEntries?.() ?? []),
+    ...materialCommissionQuestLogEntries(),
+  ].filter(Boolean);
+}
+
+function cancelQuestLogEntry(entry) {
+  if (!entry?.cancelable) return false;
+  if (entry.cancelType === "npc") return cancelNpcQuest(entry.npcId, entry.questId);
+  if (entry.cancelType === "commission") return cancelSmithMaterialCommission(entry.npcId);
+  return false;
+}
+
+function questLogEntryMarkup(entry) {
+  return `
+    <article class="quest-log-entry${entry.ready ? " ready" : ""}">
+      <div>
+        <b>${escapeHtml(entry.title ?? "Quest")}</b>
+        <span>${escapeHtml(entry.giver ?? "Quest")}${entry.ready ? " - Ready" : ""}</span>
+      </div>
+      ${entry.description ? `<p>${escapeHtml(entry.description)}</p>` : ""}
+      ${(entry.objectives ?? [])
+        .map((objective) => {
+          const target = Math.max(1, objective.target ?? 1);
+          const progress = Math.min(target, Math.max(0, objective.progress ?? 0));
+          return `<div class="quest-progress">${escapeHtml(objective.label ?? "Objective")}: ${escapeHtml(progress)}/${escapeHtml(target)}</div>`;
+        })
+        .join("")}
+      ${
+        entry.cancelable
+          ? `<button type="button" class="ghost-button" data-dialog-action="cancel-quest" data-quest-id="${escapeAttribute(entry.id)}">Cancel Quest</button>`
+          : ""
+      }
+    </article>
+  `;
+}
+
+function renderQuestLogButton() {
+  if (!els.questLogButton) return;
+  els.questLogButton.disabled = !gameHasStarted;
+  els.questLogButton.textContent = "Quest Log [J]";
+}
+
+function showQuestLog() {
+  if (!gameHasStarted) return;
+  const entries = acceptedQuestLogEntries();
+  els.gameDialogTitle.textContent = "Quest Log";
+  els.gameDialogMessage.innerHTML = entries.length
+    ? `<section class="quest-log-list">${entries.map(questLogEntryMarkup).join("")}</section>`
+    : `<p class="empty-note">No accepted quests.</p>`;
+  els.gameDialogField.classList.add("hidden");
+  els.gameDialogField.innerHTML = "";
+  els.gameDialogActions.innerHTML = `<button type="button" data-dialog-action="close-quest-log">Close</button>`;
+  const cleanup = () => {
+    els.gameDialogActions.removeEventListener("click", handleClick);
+    els.gameDialogMessage.removeEventListener("click", handleMessageClick);
+    els.gameDialog.classList.add("hidden");
+    activeDialogCancel = null;
+  };
+  const handleClick = (event) => {
+    if (event.target.closest("[data-dialog-action='close-quest-log']")) cleanup();
+  };
+  const handleMessageClick = (event) => {
+    const button = event.target.closest("[data-dialog-action='cancel-quest']");
+    if (!button) return;
+    const entry = acceptedQuestLogEntries().find((candidate) => candidate.id === button.dataset.questId);
+    if (!cancelQuestLogEntry(entry)) return;
+    cleanup();
+    render();
+    showQuestLog();
+  };
+  els.gameDialogActions.addEventListener("click", handleClick);
+  els.gameDialogMessage.addEventListener("click", handleMessageClick);
+  activeDialogCancel = cleanup;
+  els.gameDialog.classList.remove("hidden");
+  els.gameDialogActions.querySelector("[data-dialog-action='close-quest-log']")?.focus();
+}
+
+function questLogIsOpen() {
+  return !els.gameDialog.classList.contains("hidden") && els.gameDialogTitle.textContent === "Quest Log";
+}
+
+function toggleQuestLog() {
+  if (questLogIsOpen() && activeDialogCancel) {
+    activeDialogCancel();
+    return;
+  }
+  showQuestLog();
+}
+
 function storeStockItems(npc = storeNpcDefinition()) {
   const query = storeSearch.trim().toLowerCase();
   const shopType = npc?.shop?.type ?? "general";
@@ -6574,6 +6931,7 @@ function renderStoreMenu() {
       </div>
     </section>
     <div class="store-wallet">${escapeHtml(moneyText(hero.inventory.money))}</div>
+    ${smithMaterialCommissionMarkup(npc)}
     <label class="store-search" for="store-search">
       <span>Search</span>
       <input id="store-search" type="search" placeholder="Search store" value="${escapeAttribute(storeSearch)}" />
@@ -10059,6 +10417,7 @@ function renderControls() {
   if (els.roomTitle) els.roomTitle.textContent = state.mode === "home" ? "Home" : state.room.name;
   els.showDungeonIntro?.classList.toggle("hidden", !state.customDungeon?.intro?.text && !(state.customDungeon?.intro?.images ?? []).length);
   renderDungeonClock();
+  renderQuestLogButton();
   els.roundLabel.textContent = state.mode === "combat" ? `Round ${state.round}` : "Out of turn order";
 
   if (state.completed) {

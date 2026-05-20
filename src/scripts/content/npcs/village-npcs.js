@@ -41,14 +41,14 @@ const armorLines = [
 ];
 
 npc("general-merchant", {
-  name: "Marra Vell",
+  name: "Sophie",
   title: "General Merchant",
   portrait: "assets/npcs/general-merchant.png",
   token: { fallbackLabel: "GM" },
   village: { unlocked: true, order: 10 },
   dialogue: { entryLines: generalLines },
   inspection:
-    "Marra is a practical, sharp-eyed trader who follows trouble because trouble always needs rope, oil, lanterns, rations, and \"things people forgot until they were already bleeding.\" She has set up a small wagon-stall near Sister Maelis's cemetery chapel.",
+    "Sophie is a practical, sharp-eyed trader who follows trouble because trouble always needs rope, oil, lanterns, rations, and \"things people forgot until they were already bleeding.\" She has set up a small wagon-stall near Sister Maelis's cemetery chapel.",
   shop: { type: "general", sellRate: 0.4, acceptsSoldTypes: ["any"] },
   description: "Everyday supplies, ammunition, and basic recovery goods.",
 });

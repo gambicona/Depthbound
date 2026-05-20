@@ -26,6 +26,10 @@ function randomDungeonSizeEncounterTarget(sizeId = "large", roomCount = 20) {
   return Math.min(roomCount, min + Math.floor(Math.random() * (max - min + 1)));
 }
 
+function dungeonArrivalLogText(dungeonName = "the dungeon", entranceRoomName = "the entrance") {
+  return `The party leaves home and arrives in the ${entranceRoomName} of the ${dungeonName}.`;
+}
+
 function createInitialState(heroNameOverride = "", heroForDifficulty = null, heroOptions = {}, themeId = defaultContent.theme, dungeonSizeId = "large") {
   dungeonClockRuntimePaused = false;
   const dungeonDefinition = getContentDefinition("dungeons", defaultContent.dungeon);
@@ -118,7 +122,7 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
     },
     log: [
       {
-        text: `Generated a ${dungeonSize?.name ?? "Large"} ${dungeon.roomCount}-room ${theme?.name ?? dungeonDefinition?.name ?? "Generated Dungeon"} with about ${encounterTarget} monster encounters${terrainSummary ? ` and terrain pools: ${terrainSummary}` : ""}. ${hero.name} starts at the entrance of ${firstRoom.name}.`,
+        text: dungeonArrivalLogText(theme?.name ?? dungeonDefinition?.name ?? "Generated Dungeon", firstRoom.name),
         type: "important",
       },
     ],
@@ -194,6 +198,71 @@ function consumePartyResource(itemId, quantity = 1) {
   return true;
 }
 
+const smithMaterialCommissionRewardGpPerResource = 10;
+const smithMaterialCommissionRequests = {
+  "general-merchant": [
+    { label: "Healing Herbs", requestText: "{npc} needs {quantity} Healing Herbs for potion stock.", requirement: { type: "component", tagsAll: ["herb", "healing"] }, quantityRange: [4, 8] },
+    { label: "Food Ingredients", requestText: "{npc} needs {quantity} Food Ingredients for trail rations.", requirement: { type: "component", category: "food ingredient" }, quantityRange: [6, 12] },
+    { itemId: "cloth-scrap", label: "Cloth Scraps", requestText: "{npc} needs {quantity} Cloth Scraps for bandages and supply bundles.", quantityRange: [8, 14] },
+    { itemId: "wood-bundle", label: "Wood Bundles", requestText: "{npc} needs {quantity} Wood Bundles for arrow shafts and crate repairs.", quantityRange: [4, 8] },
+    { label: "Cooking Herbs", requestText: "{npc} needs {quantity} Cooking Herbs for travel meals.", requirement: { type: "component", tagsAll: ["herb", "food"] }, quantityRange: [4, 8] },
+  ],
+  weaponsmith: [
+    { itemId: "coal-chunk", label: "packs of coal", requestText: "{npc} needs {quantity} packs of coal for his forge.", quantityRange: [4, 7] },
+    { itemId: "iron-scrap", label: "pieces of iron scrap", requestText: "{npc} needs {quantity} pieces of iron scrap for blade fittings.", quantityRange: [8, 14] },
+    { label: "pieces of metal", requestText: "{npc} needs {quantity} pieces of any metal for a rush order.", requirement: { type: "component", category: "metal" }, quantityRange: [8, 14] },
+    { label: "packs of fuel", requestText: "{npc} needs {quantity} packs of fuel for his forge.", requirement: { type: "component", tagsAny: ["fuel", "coal", "forge"] }, quantityRange: [4, 8] },
+    { itemId: "embervein-ore", label: "nuggets of Embervein Ore", requestText: "{npc} needs {quantity} nuggets of Embervein Ore for heat-holding steel.", quantityRange: [3, 6] },
+    { itemId: "infernal-iron-shard", label: "Infernal Iron Shards", requestText: "{npc} needs {quantity} Infernal Iron Shards for warded weapon work.", quantityRange: [2, 4] },
+    { itemId: "arcane-gear", label: "Arcane Gears", requestText: "{npc} needs {quantity} Arcane Gears for a delicate weapon mechanism.", quantityRange: [1, 3] },
+  ],
+  armorsmith: [
+    { itemId: "iron-scrap", label: "pieces of iron scrap", requestText: "{npc} needs {quantity} pieces of iron scrap for rivets and patches.", quantityRange: [8, 14] },
+    { label: "pieces of metal", requestText: "{npc} needs {quantity} pieces of any metal for repairs.", requirement: { type: "component", category: "metal" }, quantityRange: [8, 14] },
+    { label: "pieces of leather or hide", requestText: "{npc} needs {quantity} pieces of leather or hide for straps and padding.", requirement: { type: "component", tagsAny: ["leather", "hide"] }, quantityRange: [6, 10] },
+    { itemId: "leather-scrap", label: "Leather Scraps", requestText: "{npc} needs {quantity} Leather Scraps for harness repairs.", quantityRange: [6, 10] },
+    { itemId: "beast-hide", label: "Beast Hides", requestText: "{npc} needs {quantity} Beast Hides for reinforced armor lining.", quantityRange: [3, 6] },
+    { itemId: "cloth-scrap", label: "Cloth Scraps", requestText: "{npc} needs {quantity} Cloth Scraps for gambeson padding.", quantityRange: [10, 16] },
+    { itemId: "spider-silk", label: "bundles of Spider Silk", requestText: "{npc} needs {quantity} bundles of Spider Silk for light reinforcement.", quantityRange: [3, 6] },
+  ],
+};
+
+function smithMaterialCommissionState(questFlags = state?.questFlags) {
+  if (!questFlags) return {};
+  questFlags.smithMaterialCommissions ??= {};
+  return questFlags.smithMaterialCommissions;
+}
+
+function randomSmithMaterialCommission(npcId) {
+  const requests = smithMaterialCommissionRequests[npcId] ?? [];
+  const request = requests[Math.floor(Math.random() * requests.length)] ?? requests[0] ?? { itemId: "iron-scrap", quantity: 10 };
+  const requirement = request.requirement ?? (request.itemId ? { itemId: request.itemId } : {});
+  const [minQuantity, maxQuantity] = request.quantityRange ?? [request.quantity, request.quantity];
+  const min = Math.max(1, Math.floor(Number(minQuantity) || 1));
+  const max = Math.max(min, Math.floor(Number(maxQuantity) || min));
+
+  return {
+    status: "available",
+    itemId: request.itemId,
+    label: request.label,
+    requestText: request.requestText,
+    requirement: cloneData(requirement),
+    quantity: min + Math.floor(Math.random() * (max - min + 1)),
+    quantityRange: request.quantityRange ? [min, max] : undefined,
+    rewardGpPerResource: smithMaterialCommissionRewardGpPerResource,
+    offeredAt: Date.now(),
+  };
+}
+
+function resetSmithMaterialCommissionsOnHomeArrival(questFlags = state?.questFlags) {
+  const commissions = smithMaterialCommissionState(questFlags);
+  for (const npcId of Object.keys(smithMaterialCommissionRequests)) {
+    if (commissions[npcId]?.status === "accepted") continue;
+    commissions[npcId] = randomSmithMaterialCommission(npcId);
+  }
+  return commissions;
+}
+
 function itemBaseId(item) {
   return item?.baseItemId ?? item?.itemId ?? item?.id ?? null;
 }
@@ -256,6 +325,17 @@ function materialStacksForRequirement(requirement = {}) {
     if (itemMatchesRequirement(item, requirement)) stacks.push({ source: "chest", itemId: item.id, item, quantity: item.quantity ?? 1 });
   }
   return stacks.sort((a, b) => itemValueCopper(a.item) - itemValueCopper(b.item) || String(a.item?.name ?? "").localeCompare(String(b.item?.name ?? "")));
+}
+
+function partyResourceStacksForRequirement(requirement = {}) {
+  return Object.entries(normalizePartyResources(state?.partyResources ?? {}))
+    .map(([itemId, quantity]) => ({ itemId, item: getItemTemplate(itemId), quantity }))
+    .filter((stack) => stack.item && itemMatchesRequirement(stack.item, requirement))
+    .sort((a, b) => String(a.item?.name ?? a.itemId).localeCompare(String(b.item?.name ?? b.itemId)));
+}
+
+function partyResourceCountForRequirement(requirement = {}) {
+  return partyResourceStacksForRequirement(requirement).reduce((sum, stack) => sum + Math.max(0, Math.floor(Number(stack.quantity) || 0)), 0);
 }
 
 function materialCountForRequirement(requirement = {}) {
@@ -527,7 +607,7 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
     },
     log: [
       {
-        text: `${partyMembers.map((hero) => hero.name).join(", ")} enter ${template.name}.`,
+        text: dungeonArrivalLogText(template.name, entranceRoom.name),
         type: "important",
       },
     ],
@@ -1307,6 +1387,8 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
     fighters[normalizedPartyData?.activeHeroId] && !fighters[normalizedPartyData.activeHeroId].dead && !isAutonomousAlly(fighters[normalizedPartyData.activeHeroId])
       ? normalizedPartyData.activeHeroId
       : heroIds.find((id) => fighters[id] && !fighters[id].dead && !isAutonomousAlly(fighters[id])) ?? livingRosterIds.find((id) => fighters[id] && !isAutonomousAlly(fighters[id])) ?? "hero";
+  const questFlags = cloneData(normalizedPartyData?.questFlags ?? state?.questFlags ?? {});
+  resetSmithMaterialCommissionsOnHomeArrival(questFlags);
 
   return {
     combatStarted: false,
@@ -1351,7 +1433,7 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
     home,
     monsterCompendium: normalizeMonsterCompendium(partyData ? normalizedPartyData?.monsterCompendium : state?.monsterCompendium),
     campaignProgress: cloneData(normalizedPartyData?.campaignProgress ?? {}),
-    questFlags: cloneData(normalizedPartyData?.questFlags ?? state?.questFlags ?? {}),
+    questFlags,
     partyResources: normalizePartyResources(partyResources),
     lootPiles: [],
     dungeonObjects: home.objects,

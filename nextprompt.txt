@@ -6,11 +6,13 @@ add doors and chests that require player input to open (code in numbers, in text
 
 Spell sound effects
 
-NPCs with (random) quests
-
-ressource points to get ressources (stone pit, con check, get stone, farmable, as configurable file, spawnable in dungeons at walls)
 packs to find (Medizin Pack Proviant Pack, etc) that can either be sold to merchants or even factions for points or be opened to gain whatever is inside
 add stealthing through rooms a possibelste
 
 Factions with quests (Monsterhunter, buying pelts etc, elementalists, Gravebinder etc)
 Arena fighting pit for glory
+
+
+monsters cat 4-10:
+undead skeletal and zombie
+beasts all

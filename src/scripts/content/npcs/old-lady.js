@@ -1258,6 +1258,29 @@ window.DungeonNpcBehaviors.oldLady = (() => {
         active: stage.id === activeId,
       }));
     },
+    questLogEntries() {
+      return quests()
+        .filter((quest) => questStatus(quest) === "accepted")
+        .map((quest) => ({
+          id: quest.id,
+          giver: npc().name ?? "Old Lady Mara",
+          title: quest.title ?? "Errand",
+          description: quest.dialogue?.reminder ?? quest.dialogue?.offer ?? "",
+          ready: questReady(quest),
+          cancelable: true,
+          cancelType: "npc",
+          npcId,
+          questId: quest.id,
+          objectives: (quest.objectives ?? []).map((objective) => {
+            const target = Math.max(1, objective.count ?? 1);
+            return {
+              label: objective.displayName ?? objective.id ?? "Objective",
+              progress: Math.min(target, objectiveProgress(objective)),
+              target,
+            };
+          }),
+        }));
+    },
     setAdminProgress(progressId) {
       const stage = adminQuestProgressStages.find((entry) => entry.id === progressId);
       if (!stage) return;
@@ -1276,6 +1299,15 @@ window.DungeonNpcBehaviors.oldLady = (() => {
       state.questFlags.oldLadyAvailable = true;
       addLog(`Old Lady Mara gives the party a quest: ${quest.title}.`, "important");
       renderHut();
+    },
+    cancelQuest(questId) {
+      const quest = quests().find((entry) => entry.id === questId);
+      if (!quest || questStatus(quest) !== "accepted") return false;
+      questState()[quest.id] = { status: "available", cancelledAt: Date.now() };
+      if (quest.id === "old-lady-quest-green-vines") delete state.questFlags.oldLadyGreenVinesAccepted;
+      state.questFlags.oldLadyAvailable = true;
+      addLog(`The party cancels Old Lady Mara's quest: ${quest.title}.`, "important");
+      return true;
     },
     completeQuest(questId) {
       const quest = quests().find((entry) => entry.id === questId);

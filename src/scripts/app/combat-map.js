@@ -2553,6 +2553,11 @@ function addMonsterMaterialDrops(monster) {
   if (!monster || monster.materialDropsAdded) return;
   monster.materialDropsAdded = true;
   const ids = new Set([monster.baseMonsterId, monster.templateId, monster.id, ...(monster.tags ?? [])].filter(Boolean));
+  const idText = Array.from(ids).map((id) => String(id).toLowerCase());
+  const hasFoodCue = (...cues) => cues.some((cue) => {
+    const normalized = String(cue).toLowerCase();
+    return ids.has(normalized) || idText.some((id) => id.includes(normalized));
+  });
   const add = (itemId, options = {}) => {
     monster.extraLoot = [...(monster.extraLoot ?? []), { kind: "item", itemId, ...options }];
   };
@@ -2573,6 +2578,11 @@ function addMonsterMaterialDrops(monster) {
     add("beast-fang", { chance: 0.12 });
     add("monster-blood", { chance: 0.1 });
     add("raw-meat", { chance: 0.18 });
+    add("lean-game-meat", { chance: hasFoodCue("wolf", "stag", "hare", "predator") ? 0.14 : 0.06 });
+    if (hasFoodCue("boar")) add("boar-haunch", { chance: ids.has("boss") ? 0.22 : 0.16 });
+    if (hasFoodCue("bear")) add("bear-fat", { chance: ids.has("boss") ? 0.2 : 0.14 });
+    if (hasFoodCue("bird", "raptor")) add("game-bird-breast", { chance: 0.15 });
+    if (hasFoodCue("spider")) add("spider-eggs", { chance: hasFoodCue("giant") || ids.has("boss") ? 0.14 : 0.08 });
   }
   if (ids.has("plant")) {
     add("living-wood", { chance: ids.has("treant") || ids.has("tree") || ids.has("wood") || ids.has("guardian") ? 0.22 : 0.1 });
@@ -2580,6 +2590,8 @@ function addMonsterMaterialDrops(monster) {
     add("verdant-sap", { chance: ids.has("forest") || ids.has("jungle") || ids.has("flower") ? 0.16 : 0.08 });
     add("glowspore-dust", { chance: ids.has("fungus") || ids.has("spore") || ids.has("myconid") || ids.has("mold") ? 0.22 : 0.045 });
     add("medicinal-herb", { chance: 0.08 });
+    add("edible-fungus", { chance: hasFoodCue("fungus", "mushroom", "myconid", "mold") ? 0.18 : 0.025 });
+    add("sweet-nectar-pod", { chance: hasFoodCue("flower", "jungle", "vine", "bloom") ? 0.14 : 0.035 });
   }
   if (ids.has("construct")) {
     add("iron-scrap", { chance: 0.28, quantityDice: { count: 1, sides: 2 } });

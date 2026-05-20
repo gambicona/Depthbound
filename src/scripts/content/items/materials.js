@@ -458,6 +458,100 @@ component("raw-meat", "Raw Meat", {
   description: "Not pretty, but a cook can make it useful.",
 });
 
+component("lean-game-meat", "Lean Game Meat", {
+  category: "food ingredient",
+  kind: "food ingredient",
+  material: "meat",
+  form: "cut",
+  cost: cp(7),
+  craftingValueCp: 7,
+  tags: ["food", "beast", "monster-part", "meat", "game", "lean", "cook", "trade-good"],
+  professions: ["cook"],
+  short: "A clean cut of lean wild meat.",
+  description: "A trim cut from a swift forest creature. It cooks quickly and takes herbs well.",
+});
+
+component("boar-haunch", "Boar Haunch", {
+  category: "food ingredient",
+  kind: "food ingredient",
+  material: "meat",
+  form: "haunch",
+  cost: cp(9),
+  craftingValueCp: 9,
+  tags: ["food", "beast", "monster-part", "meat", "boar", "fatty", "cook", "trade-good"],
+  professions: ["cook"],
+  short: "A heavy haunch of rich boar meat.",
+  description: "Dense, flavorful meat from a tusked beast. Best roasted long or chopped into stew.",
+});
+
+component("bear-fat", "Bear Fat", {
+  category: "food ingredient",
+  kind: "food ingredient",
+  material: "fat",
+  form: "rendering",
+  cost: cp(8),
+  craftingValueCp: 8,
+  tags: ["food", "beast", "monster-part", "fat", "bear", "cook", "preserve", "trade-good"],
+  professions: ["cook", "alchemist"],
+  short: "A wrapped lump of useful cooking fat.",
+  description: "Rich beast fat that can be rendered for frying, preserving, or fortifying trail meals.",
+});
+
+component("game-bird-breast", "Game Bird Breast", {
+  category: "food ingredient",
+  kind: "food ingredient",
+  material: "meat",
+  form: "breast",
+  cost: cp(8),
+  craftingValueCp: 8,
+  tags: ["food", "beast", "monster-part", "meat", "bird", "flying", "cook", "trade-good"],
+  professions: ["cook"],
+  short: "A pale cut of game bird meat.",
+  description: "Light meat from a large bird or raptor, good for quick skewers and restorative broths.",
+});
+
+component("spider-eggs", "Spider Eggs", {
+  category: "food ingredient",
+  kind: "food ingredient",
+  material: "egg",
+  form: "cluster",
+  cost: cp(6),
+  craftingValueCp: 6,
+  tags: ["food", "beast", "monster-part", "egg", "spider", "cave", "underdark", "cook", "poison"],
+  professions: ["cook", "alchemist", "poisoner"],
+  biomes: ["underdark", "cave", "forest"],
+  short: "A small wrapped cluster of spider eggs.",
+  description: "Pale eggs from a giant spider. Risky raw, but useful to cooks with steady hands.",
+});
+
+component("edible-fungus", "Edible Fungus", {
+  category: "food ingredient",
+  kind: "food ingredient",
+  material: "fungus",
+  form: "cap",
+  cost: cp(5),
+  craftingValueCp: 5,
+  tags: ["food", "plant", "fungus", "mushroom", "cave", "underdark", "forage", "cook", "trade-good"],
+  professions: ["cook", "herbalist"],
+  biomes: ["underdark", "cave", "forest", "swamp"],
+  short: "A safe, earthy mushroom cap.",
+  description: "A plain but nourishing fungus, prized mostly because it will not glow, scream, or poison the stew.",
+});
+
+component("sweet-nectar-pod", "Sweet Nectar Pod", {
+  category: "food ingredient",
+  kind: "food ingredient",
+  material: "plant",
+  form: "pod",
+  cost: cp(6),
+  craftingValueCp: 6,
+  tags: ["food", "plant", "nectar", "flower", "sweet", "forest", "jungle", "forage", "cook", "healing"],
+  professions: ["cook", "herbalist", "healer"],
+  biomes: ["forest", "jungle", "wilds"],
+  short: "A sticky pod of floral nectar.",
+  description: "A sweet, fragrant pod from a dangerous plant. It can soften bitter herbs or glaze trail rations.",
+});
+
 component("iron-scrap", "Iron Scrap", {
   category: "metal",
   kind: "building material",

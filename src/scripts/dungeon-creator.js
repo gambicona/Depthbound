@@ -575,8 +575,8 @@ function furnitureCatalogueButton(entry, selectedId) {
         ${iconPath ? `<img class="hidden" data-creator-furniture-image src="${escapeAttribute(iconPath)}" alt="" draggable="false" />` : ""}
         <span>${escapeHtml(fallbackSymbol)}</span>
       </span>
-      <span>
-        <b>${escapeHtml(entry.name)}</b><br>
+      <span class="furniture-catalogue-copy">
+        <b>${escapeHtml(entry.name)}</b>
         <span class="small-note">${escapeHtml([entry.floor ? "floor" : entry.kind, ...(entry.tags ?? []).slice(0, 3)].filter(Boolean).join(" - "))}</span>
       </span>
     </button>

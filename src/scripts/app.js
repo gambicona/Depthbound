@@ -129,6 +129,7 @@ els.toggleDungeonTimer?.addEventListener("click", () => {
   if (window.DepthboundPlaytest?.syncNow) window.DepthboundPlaytest.syncNow();
   render();
 });
+els.questLogButton?.addEventListener("click", toggleQuestLog);
 els.returnHome.addEventListener("click", () => {
   if (state.mode === "combat") {
     fleeCombat();
@@ -377,6 +378,9 @@ els.fighterInfo.addEventListener("click", (event) => {
   if (button.dataset.action === "create-roster-hero") {
     createRosterHero();
   }
+  if (button.dataset.action === "show-quest-log") {
+    showQuestLog();
+  }
   if (button.dataset.action === "add-party-hero") {
     addHeroToParty(button.dataset.hero);
   }
@@ -479,6 +483,12 @@ els.storeMenu.addEventListener("click", (event) => {
   }
   if (button?.dataset.action === "sell-store-item") {
     sellStoreItem(button.dataset.item);
+  }
+  if (button?.dataset.action === "accept-smith-commission") {
+    acceptSmithMaterialCommission(button.dataset.npc);
+  }
+  if (button?.dataset.action === "complete-smith-commission") {
+    completeSmithMaterialCommission(button.dataset.npc);
   }
 });
 els.storeMenu.addEventListener("input", (event) => {
@@ -802,6 +812,19 @@ window.addEventListener("keydown", (event) => {
       }
       return;
     }
+  }
+  if (key === "j" && gameHasStarted && !activeDialogCancel) {
+    const target = event.target;
+    if (!target?.matches?.("input, textarea, select") && !target?.isContentEditable && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      event.preventDefault();
+      toggleQuestLog();
+      return;
+    }
+  }
+  if (key === "j" && gameHasStarted && questLogIsOpen()) {
+    event.preventDefault();
+    toggleQuestLog();
+    return;
   }
   if (activeDialogCancel || overlayOpen || event.ctrlKey || event.altKey || event.metaKey) return;
   const target = event.target;
