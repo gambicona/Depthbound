@@ -66,6 +66,18 @@ resourceNode("ore-vein", "Ore Vein", ["ore", "metal", "rock", "cave", "mine", "f
   description: "Dark iron flecks run through the stone. Mining it takes force, leverage, and patience.",
 });
 
+resourceNode("coal-seam", "Coal Seam", ["coal", "fuel", "rock", "cave", "mine", "forge", "industrial", "embervein"], {
+  itemId: "coal-chunk",
+  ability: "str",
+  skill: "athletics",
+  dc: 12,
+  minutes: 25,
+  baseQuantity: 1,
+  maxQuantity: 5,
+  symbol: "C",
+  description: "A black coal seam cuts through the wall. Careful strikes break away usable fuel without collapsing the edge.",
+});
+
 resourceNode("gem-seam", "Gem Seam", ["gem", "crystal", "rock", "cave", "mine", "underdark", "arcane"], {
   itemId: "crystal-shard",
   ability: "int",

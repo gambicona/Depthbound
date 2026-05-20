@@ -1,6 +1,7 @@
 (() => {
 window.DungeonContent.register("themes", "underdarkDepths", {
   name: "Underdark Depths",
+  description: "Underground beasts, fungi, earth-water-air elementals, ore, gems, glowcaps, caves, and dangerous pools.",
   music: {
     exploration: "assets/sounds/music/underdarkDepths-exploration.mp3",
     combat: "assets/sounds/music/underdarkDepths-combat.mp3",

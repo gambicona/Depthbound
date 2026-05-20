@@ -1561,6 +1561,60 @@ function corridorPassageIdsAtPosition(position) {
     .map((passage) => passage.id);
 }
 
+function corridorPassageIndexesAtPosition(position) {
+  const tileKey = positionKey(position);
+  return (state.dungeon?.corridorPassages ?? [])
+    .map((passage, index) => passage.cells?.some((cell) => positionKey(cell) === tileKey) ? index : -1)
+    .filter((index) => index >= 0);
+}
+
+function corridorNeighborCells(position) {
+  const corridorKeys = corridorTiles();
+  return adjacentCells(position).filter((cell) => corridorKeys.has(positionKey(cell)));
+}
+
+function isCorridorGeometryJunction(position) {
+  return corridorNeighborCells(position).length >= 3;
+}
+
+function revealCrossedCorridorPassages(openedCorridorKeys, seedCells = []) {
+  const passages = state.dungeon?.corridorPassages ?? [];
+  if (!passages.length || !seedCells.length) return;
+
+  const queue = [...seedCells];
+  const checkedJunctionKeys = new Set();
+  const revealedPassageIndexes = new Set();
+  const maxChecks = Math.max(1, (state.dungeon?.corridors ?? []).length);
+  let checks = 0;
+
+  while (queue.length > 0 && checks < maxChecks) {
+    checks += 1;
+    const current = queue.shift();
+    const currentKey = positionKey(current);
+    if (checkedJunctionKeys.has(currentKey)) continue;
+
+    const passageIndexes = corridorPassageIndexesAtPosition(current);
+    const geometryJunction = isCorridorGeometryJunction(current);
+    if (passageIndexes.length <= 1 && !geometryJunction) continue;
+
+    checkedJunctionKeys.add(currentKey);
+    const revealFromCells = geometryJunction ? [current, ...corridorNeighborCells(current)] : [current];
+    const indexesToReveal = new Set(revealFromCells.flatMap(corridorPassageIndexesAtPosition));
+    for (const passageIndex of indexesToReveal) {
+      if (revealedPassageIndexes.has(passageIndex)) continue;
+      revealedPassageIndexes.add(passageIndex);
+
+      const passage = passages[passageIndex];
+      for (const cell of passage?.cells ?? []) {
+        const cellKey = positionKey(cell);
+        const wasHidden = !openedCorridorKeys.has(cellKey);
+        openedCorridorKeys.add(cellKey);
+        if (wasHidden && (corridorPassageIndexesAtPosition(cell).length > 1 || isCorridorGeometryJunction(cell))) queue.push(cell);
+      }
+    }
+  }
+}
+
 function previousPositionForPath(fighter, path) {
   if (!path || path.length <= 1) return fighter.position;
   return path[path.length - 2];
@@ -2553,14 +2607,51 @@ function addMonsterMaterialDrops(monster) {
   if (!monster || monster.materialDropsAdded) return;
   monster.materialDropsAdded = true;
   const ids = new Set([monster.baseMonsterId, monster.templateId, monster.id, ...(monster.tags ?? [])].filter(Boolean));
-  const idText = Array.from(ids).map((id) => String(id).toLowerCase());
+  const textFields = [
+    ...Array.from(ids),
+    monster.name,
+    monster.role,
+    monster.description,
+    monster.equipment?.armor,
+    monster.equipment?.offHand,
+    ...(monster.specials ?? []),
+  ].filter(Boolean);
+  const idText = textFields.map((id) => String(id).toLowerCase());
   const hasFoodCue = (...cues) => cues.some((cue) => {
     const normalized = String(cue).toLowerCase();
     return ids.has(normalized) || idText.some((id) => id.includes(normalized));
   });
+  const hasWornMetalArmorCue = () => {
+    if (ids.has("beast") || ids.has("plant") || ids.has("elemental")) return false;
+    const armor = String(monster.equipment?.armor ?? "").toLowerCase();
+    const offHand = String(monster.equipment?.offHand ?? "").toLowerCase();
+    if (/(chain|mail|scale|plate|splint|breastplate|shield)/i.test(`${armor} ${offHand}`)) return true;
+    return hasFoodCue(
+      "armored",
+      "armour",
+      "armor",
+      "plate",
+      "mail",
+      "chain",
+      "shieldbearer",
+      "tower-shield",
+      "tower shield",
+      "shield",
+      "knight",
+      "sentinel",
+      "soldier",
+      "halberdier",
+      "pikeman",
+      "arbalester",
+      "crossbowman",
+    );
+  };
   const add = (itemId, options = {}) => {
     monster.extraLoot = [...(monster.extraLoot ?? []), { kind: "item", itemId, ...options }];
   };
+  if (hasWornMetalArmorCue()) {
+    add("iron-scrap", { chance: ids.has("boss") ? 0.08 : 0.045 });
+  }
   if (ids.has("undead") || ids.has("skeletal") || ids.has("skeleton")) {
     add("bone-dust", { chance: 0.18 });
     add("cracked-rib-bone", { chance: 0.08 });
@@ -2623,6 +2714,9 @@ function addMonsterMaterialDrops(monster) {
   }
   if (ids.has("elemental")) {
     add("elemental-mote", { chance: 0.24 });
+    if (hasFoodCue("coal", "soot", "cinder", "ember", "ash", "smoke", "fire", "lava", "magma", "furnace", "slag", "earth", "stone", "ore")) {
+      add("coal-chunk", { chance: ids.has("boss") ? 0.1 : 0.055 });
+    }
     if (ids.has("fire") || ids.has("ash") || ids.has("smoke") || ids.has("lava") || ids.has("magma") || ids.has("heat")) {
       add("flame-essence", { chance: ids.has("boss") ? 0.18 : 0.1 });
     }
@@ -3254,7 +3348,10 @@ function openDoor(door) {
     if (!targetRoom || !targetDoor) {
       if (!doorRoom) continue;
       openedDoorKeys.add(positionKey(entry));
-      if (entry.corridor) openedCorridorKeys.add(positionKey(entry.corridor));
+      if (entry.corridor) {
+        openedCorridorKeys.add(positionKey(entry.corridor));
+        revealCrossedCorridorPassages(openedCorridorKeys, [entry.corridor]);
+      }
       if (!discovered.has(doorRoom.id)) {
         discovered.add(doorRoom.id);
         revealedRooms.push(doorRoom);
@@ -3267,7 +3364,9 @@ function openDoor(door) {
     const roomToReveal = openingFromDiscoveredRoom ? null : doorRoom;
 
     openedDoorKeys.add(positionKey(entry));
-    corridorPathBetweenDoors(entry, targetDoor).forEach((cell) => openedCorridorKeys.add(positionKey(cell)));
+    const corridorPath = corridorPathBetweenDoors(entry, targetDoor);
+    corridorPath.forEach((cell) => openedCorridorKeys.add(positionKey(cell)));
+    revealCrossedCorridorPassages(openedCorridorKeys, corridorPath);
     openedAnyPassage = true;
 
     if (roomToReveal && !discovered.has(roomToReveal.id)) {
@@ -3995,6 +4094,10 @@ function monsterSpecialNames(monster) {
   return (monster?.specialAbility ?? []).map((name) => String(name));
 }
 
+function monsterSpecialNameMatching(monster, pattern) {
+  return monsterSpecialNames(monster).find((name) => pattern.test(name)) ?? null;
+}
+
 function hasMonsterSpecial(monster, pattern) {
   return monsterSpecialNames(monster).some((name) => pattern.test(name));
 }
@@ -4205,14 +4308,70 @@ function auraSaveBonus(target) {
   return paladin ? Math.max(1, abilityMod(paladin, "cha")) : 0;
 }
 
-function showSavingThrowMenu({ target, ability, dc, message }) {
+function savingThrowExplanation(message = "", ability = "") {
+  const text = String(message);
+  const label =
+    text.match(/'s ([^.]+?) forces/i)?.[1] ??
+    text.match(/'s ([^.]+?) tries/i)?.[1] ??
+    text.match(/'s ([^.]+?) tests/i)?.[1] ??
+    text.match(/'s ([^.]+?) wraps/i)?.[1] ??
+    text.match(/'s ([^.]+?) bursts/i)?.[1] ??
+    text.match(/'s ([^.]+?) batters/i)?.[1] ??
+    "special ability";
+  const lower = `${label} ${text}`.toLowerCase();
+  const abilityText = String(ability).toUpperCase();
+  if (/forge|furnace|coal|cinder|ember|fire|flame|burn|magma|lava|scald|boiling/.test(lower)) {
+    return {
+      flavor: `${label} erupts in a wave of heat, sparks, and choking forge grit. ${abilityText} measures whether the target can duck behind cover, turn aside, or move through the blast before the worst of it lands.`,
+      failure: "Failure means the heat catches fully, usually causing fire damage or a short-lived burning penalty.",
+      success: "Success means the target avoids the center of the blast, often taking reduced damage or avoiding the rider effect.",
+    };
+  }
+  if (/poison|venom|sick|stench|bile|rot|plague|nausea/.test(lower)) {
+    return {
+      flavor: `${label} carries venom, rot, or fouled air. ${abilityText} measures whether the target's body fights it off before it spreads.`,
+      failure: "Failure means poison, sickness, damage, or a weakening condition takes hold.",
+      success: "Success means the target resists the worst of the toxin or disease.",
+    };
+  }
+  if (/dread|fear|whisper|malice|mind|hymn|chorus|verdict|debt|soul|life drain|drain|psychic/.test(lower)) {
+    return {
+      flavor: `${label} attacks nerve, courage, or soul rather than armor. ${abilityText} measures whether the target keeps their mind and spirit steady.`,
+      failure: "Failure means fear, necrotic harm, psychic pressure, or a weakening condition breaks through.",
+      success: "Success means the target keeps control and shrugs off the worst of it.",
+    };
+  }
+  if (/chain|pull|drag|snare|web|grip|coil|cage|restrain|hamstring|pin|shard|needle|glass|cutting|whip/.test(lower)) {
+    return {
+      flavor: `${label} tries to catch, cut, pin, or drag the target out of position. ${abilityText} measures whether they twist free before it locks in.`,
+      failure: "Failure means movement is reduced, stopped, forced, or punished, sometimes with extra damage.",
+      success: "Success means the target keeps their footing and avoids the controlling rider.",
+    };
+  }
+  if (/storm|lightning|thunder|static|current|tide|water|ice|frost|mist|pressure|wind|air|chok|dust|smoke/.test(lower)) {
+    return {
+      flavor: `${label} turns the battlefield itself into the attack. ${abilityText} measures whether the target can breathe, brace, or move with the sudden elemental force.`,
+      failure: "Failure means elemental damage, lost reactions, slowed movement, or another short-lived condition.",
+      success: "Success means the target rides out the surge or only catches a glancing effect.",
+    };
+  }
+  return {
+    flavor: `${label} is a special monster ability. ${abilityText} measures whether the target can resist the effect before it takes hold.`,
+    failure: "Failure means the ability's harmful rider applies.",
+    success: "Success means the target avoids or reduces the rider effect.",
+  };
+}
+
+function showSavingThrowMenu({ target, ability, dc, message, explanation = null }) {
   return new Promise((resolve) => {
     const abilityText = ability.toUpperCase();
+    const details = explanation ?? savingThrowExplanation(message, ability);
     let resultSave = null;
     els.gameDialogTitle.textContent = "Saving Throw";
     els.gameDialogMessage.innerHTML = `
       ${dialogActorMarkup(target)}
       <p>${escapeHtml(message)}</p>
+      <p>${escapeHtml(details.flavor)}</p>
       <p>${escapeHtml(target.name)} must roll a ${abilityText} save against DC ${dc}.</p>
     `;
     els.gameDialogField.classList.add("hidden");
@@ -4238,6 +4397,7 @@ function showSavingThrowMenu({ target, ability, dc, message }) {
       els.gameDialogMessage.innerHTML = `
         ${dialogActorMarkup(target)}
         <p>${escapeHtml(message)}</p>
+        <p>${escapeHtml(resultSave.success ? details.success : details.failure)}</p>
         <p><b>Result:</b> ${resultSave.roll} ${escapeHtml(abilityLabel(resultSave.bonus))} = ${resultSave.total} vs DC ${dc}.</p>
         <p>${resultSave.success ? "Success." : "Failure."}</p>
       `;
@@ -4253,7 +4413,7 @@ function showSavingThrowMenu({ target, ability, dc, message }) {
   });
 }
 
-async function rollSavingThrow(target, ability, dc, message) {
+async function rollSavingThrow(target, ability, dc, message, explanation = null) {
   if (!isPartyHeroId(target?.id)) {
     const save = savingThrow(target, ability, dc);
     if (save.indomitable) addLog(`${target.name} uses Indomitable and rerolls ${save.indomitable.roll}.`, "important");
@@ -4262,7 +4422,7 @@ async function rollSavingThrow(target, ability, dc, message) {
     return save;
   }
   addLog(message, "important");
-  const save = await showSavingThrowMenu({ target, ability, dc, message });
+  const save = await showSavingThrowMenu({ target, ability, dc, message, explanation });
   if (!save.success) {
     const inspiration = bardicInspirationDie(target);
     if (inspiration && save.total + inspiration.sides >= dc) {
@@ -5565,7 +5725,7 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
     }
   }
 
-  if (/dust bite|dust cough|coal toss|black smoke cloud|smoke|smoke veil|sandblind ambush/i.test(normalized)) {
+  if (/dust bite|dust cough|smoke|smoke veil|sandblind ambush/i.test(normalized)) {
     const save = await rollSavingThrow(target, "con", dc, `${monster.name}'s choking dust forces ${target.name} to make a CON save.`);
     if (!save.success) {
       applyStatusEffect(target, { id: "smoke-choked", label: "Smoke-Choked", attackBonus: -1, expiresAtEndOfTurn: true });
@@ -5663,7 +5823,7 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
     }
   }
 
-  if (/spectral chain|hooking chain|chain coil|living chains|dragging lash|hookcap pull|canopy snatch|luring scent|hook and drag|dragged into the teeth|drop the hook|tidal pull|pull under|baronial undertow|leviathan drag|burial pull/i.test(normalized)) {
+  if (/spectral chain|hooking chain|chain coil|living chains|dragging lash|hookcap pull|canopy snatch|luring scent|hook and drag|dragged into the teeth|tidal pull|pull under|baronial undertow|leviathan drag|burial pull/i.test(normalized)) {
     const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s chain forces ${target.name} to make a STR save.`);
     if (!save.success) {
       pullTargetToward(monster, target);
@@ -5741,29 +5901,81 @@ function targetsInMonsterSpecialRange(monster, feet = monsterSpecialAbilityTunin
   return monsterTargetableHeroes().filter((hero) => hero.alive && distance(monster.position, hero.position) <= maxSquares && hasClearLineOfSight(monster.position, hero.position));
 }
 
+function monsterSpecialSaveExplanation(label, damageType, saveAbility, options = {}) {
+  const abilityText = String(saveAbility).toUpperCase();
+  const lower = String(label).toLowerCase();
+  const rider = options.onFailStatus?.label ? ` and may leave the target ${String(options.onFailStatus.label).toLowerCase()}` : "";
+  if (/dust spin/.test(lower)) {
+    return {
+      flavor: `${label} whips grit, bone-dry air, and cutting debris around the target. ${abilityText} measures whether they duck through the spinning dust before it slices into them.`,
+      failure: "Failure means slashing damage lands and the dust drags at their movement, slowing them briefly.",
+      success: "Success means they slip through the edge of the vortex and avoid the movement penalty.",
+    };
+  }
+  if (/thunderclap|choir blast|tempest choir|tyrant downburst|baronial cyclone|city-eater winds|neverending storm|worldstorm|stormfall|split the heavens|breath of the plane/.test(lower)) {
+    return {
+      flavor: `${label} hammers the area with violent air pressure and sound. ${abilityText} measures whether the target can brace, keep balance, and stay oriented.`,
+      failure: `Failure means ${damageType} damage hits hard${rider}, and the blast may shove them out of position.`,
+      success: "Success means they ride out the shockwave and take only a glancing effect.",
+    };
+  }
+  if (/crackling|lightning|starstorm|queenly thunderbolt/.test(lower)) {
+    return {
+      flavor: `${label} lashes the area with arcing stormlight. ${abilityText} measures whether the target grounds themselves before the current jumps through them.`,
+      failure: `Failure means ${damageType} damage courses through them${rider}.`,
+      success: "Success means the worst of the charge snaps past instead of through them.",
+    };
+  }
+  if (/falling machinery|drop the hook|anvil drop|colossus hammerfall|cave-in groan/.test(lower)) {
+    return {
+      flavor: `${label} brings heavy mineworks, hooks, stone, or forge-weight crashing down. ${abilityText} measures whether the target dives clear before the impact lands.`,
+      failure: "Failure means bludgeoning damage lands hard and the target is knocked prone.",
+      success: "Success means the target avoids the center of the falling weight.",
+    };
+  }
+  if (/pressure release/.test(lower)) {
+    return {
+      flavor: `${label} vents a scalding blast from the machinery. ${abilityText} measures whether the target can get out of the line before heat and pressure slam into them.`,
+      failure: "Failure means fire damage hits directly and the blast may push the target back.",
+      success: "Success means the target turns aside from the worst of the venting pressure.",
+    };
+  }
+  if (/web snare/.test(lower)) {
+    return {
+      flavor: `${label} launches sticky strands around the target's feet and limbs. ${abilityText} measures whether they slip clear before the web tightens.`,
+      failure: "Failure means the target is snared and cannot move briefly.",
+      success: "Success means the web misses or tears loose before it can hold.",
+    };
+  }
+  return savingThrowExplanation(`${label} forces the target to make a ${abilityText} save.`, saveAbility);
+}
+
 async function tryMonsterAreaSpecial(monster, namePattern, label, damageType, saveAbility, rangeFeet, options = {}) {
   if (!hasMonsterSpecial(monster, namePattern) || !monster.hasAction || !shouldUseMonsterSpecial("active")) return false;
   const targets = targetsInMonsterSpecialRange(monster, rangeFeet);
   if (!targets.length) return false;
-  if (await maybeUseSpellInterruptReaction(monster, label)) {
+  const publicLabel = options.publicLabel ?? monsterSpecialNameMatching(monster, namePattern) ?? label;
+  const explanation = options.explanation ?? monsterSpecialSaveExplanation(publicLabel, damageType, saveAbility, options);
+  if (await maybeUseSpellInterruptReaction(monster, publicLabel)) {
     monster.hasAction = false;
-    addLog(`${monster.name}'s ${label} is interrupted before it takes hold.`, "important");
+    addLog(`${monster.name}'s ${publicLabel} is interrupted before it takes hold.`, "important");
     return true;
   }
   monster.hasAction = false;
   const dc = monsterSpecialDc(monster);
   const dice = specialDamageDice(monster, namePattern.test("Fireball") ? 8 : 6);
-  addLog(`${monster.name} uses ${label}.`, "important");
+  addLog(`${monster.name} uses ${publicLabel}.`, "important");
   for (const target of targets.slice(0, options.maxTargets ?? 3)) {
-    const save = await rollSavingThrow(target, saveAbility, dc, `${monster.name}'s ${label} forces ${target.name} to make a ${saveAbility.toUpperCase()} save.`);
+    const save = await rollSavingThrow(target, saveAbility, dc, `${monster.name}'s ${publicLabel} forces ${target.name} to make a ${saveAbility.toUpperCase()} save.`, explanation);
     const roll = rollDice(dice.count, dice.sides);
     const raw = Math.max(1, roll.total + dice.bonus);
     const damage = saveAbility === "dex" ? evasionAdjustedDamage(target, save, raw) : save.success ? Math.floor(raw / 2) : raw;
-    if (save.success && damage > 0) addLog(`${target.name} takes half damage from ${label}.`);
-    if (damage > 0) applySpecialDamage(monster, target, damage, damageType, label);
+    if (save.success && damage > 0) addLog(`${target.name} takes half damage from ${publicLabel}.`);
+    if (damage > 0) applySpecialDamage(monster, target, damage, damageType, publicLabel);
     if (!save.success && options.onFailStatus) {
       applyStatusEffect(target, typeof options.onFailStatus === "function" ? options.onFailStatus(target, monster) : { ...options.onFailStatus });
     }
+    if (!save.success && options.onFail) options.onFail(target, monster, save);
     if (!save.success && options.pullTargets) pullTargetToward(monster, target);
     if (!save.success && options.pushTargets) pushTargetAway(monster, target);
     if (!target.alive) handleHeroDeath();
@@ -5775,16 +5987,18 @@ async function tryMonsterStatusSpecial(monster, namePattern, label, saveAbility,
   if (!hasMonsterSpecial(monster, namePattern) || !monster.hasAction || !shouldUseMonsterSpecial("active")) return false;
   const targets = targetsInMonsterSpecialRange(monster, rangeFeet);
   if (!targets.length) return false;
-  if (await maybeUseSpellInterruptReaction(monster, label)) {
+  const publicLabel = options.publicLabel ?? monsterSpecialNameMatching(monster, namePattern) ?? label;
+  const explanation = options.explanation ?? monsterSpecialSaveExplanation(publicLabel, "status", saveAbility, options);
+  if (await maybeUseSpellInterruptReaction(monster, publicLabel)) {
     monster.hasAction = false;
-    addLog(`${monster.name}'s ${label} is interrupted before it takes hold.`, "important");
+    addLog(`${monster.name}'s ${publicLabel} is interrupted before it takes hold.`, "important");
     return true;
   }
   monster.hasAction = false;
   const dc = monsterSpecialDc(monster);
-  addLog(`${monster.name} uses ${label}.`, "important");
+  addLog(`${monster.name} uses ${publicLabel}.`, "important");
   for (const target of targets.slice(0, options.maxTargets ?? 1)) {
-    const save = await rollSavingThrow(target, saveAbility, dc, `${monster.name}'s ${label} forces ${target.name} to make a ${saveAbility.toUpperCase()} save.`);
+    const save = await rollSavingThrow(target, saveAbility, dc, `${monster.name}'s ${publicLabel} forces ${target.name} to make a ${saveAbility.toUpperCase()} save.`, explanation);
     if (save.success) continue;
     applyStatusEffect(target, statusFactory(target, monster));
     if (options.pullTargets) pullTargetToward(monster, target);
@@ -5940,7 +6154,11 @@ async function maybeUseMonsterStartSpecial(monster) {
     onFailStatus: { id: "scorched", label: "Scorched", acBonus: -1, expiresAtEndOfTurn: true },
     pushTargets: /volcanic|eruption|crater|faultline/i.test(monsterSpecialNames(monster).join(" ")),
   })) return true;
-  if (await tryMonsterAreaSpecial(monster, /dust spin|thunderclap|crackling pulse|pressure rift|choir blast|tempest choir|split the heavens|starstorm fall|city-eater winds|neverending storm|cathedral winds|regent stormfall|tyrant downburst|queenly thunderbolt|baronial cyclone|breath of the plane|worldstorm body/i, "Elemental Storm Burst", /lightning|starstorm|crackling|queenly/i.test(monsterSpecialNames(monster).join(" ")) ? "lightning" : "thunder", "con", monsterSpecialAbilityTuning.burstRangeFeet, {
+  if (await tryMonsterAreaSpecial(monster, /dust spin/i, "Dust Spin", "slashing", "dex", feetPerSquare, {
+    onFailStatus: { id: "dust-slowed", label: "Slowed", speedBonusFeet: -5, expiresAtEndOfTurn: true },
+    maxTargets: 8,
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /thunderclap|crackling pulse|pressure rift|choir blast|tempest choir|split the heavens|starstorm fall|city-eater winds|neverending storm|cathedral winds|regent stormfall|tyrant downburst|queenly thunderbolt|baronial cyclone|breath of the plane|worldstorm body/i, "Elemental Storm Burst", /lightning|starstorm|crackling|queenly/i.test(monsterSpecialNames(monster).join(" ")) ? "lightning" : "thunder", "con", monsterSpecialAbilityTuning.burstRangeFeet, {
     onFailStatus: { id: "deafened", label: "Deafened", attackBonus: -1, expiresAtEndOfTurn: true },
     pushTargets: true,
   })) return true;
@@ -5960,19 +6178,37 @@ async function maybeUseMonsterStartSpecial(monster) {
     acBonus: -1,
     expiresAtEndOfTurn: true,
   }), { maxTargets: 2 })) return true;
-  if (await tryMonsterAreaSpecial(monster, /coal toss|soot breath|furnace vent|valve twist|throw keg|molten slag breath|lava breath|anvil breath/i, "Forge Burst", "fire", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
+  if (await tryMonsterStatusSpecial(monster, /coal toss/i, "Coal Toss", "dex", 10, () => ({
+    id: "coal-blinded",
+    label: "Blinded",
+    attackBonus: -2,
+    expiresAtEndOfTurn: true,
+  }), {
+    explanation: {
+      flavor: "Coal Toss bursts into sharp black dust and hot grit around the target's face. DEX measures whether they turn away before the powder blinds them.",
+      failure: "Failure means the target is briefly blinded by coal dust.",
+      success: "Success means they avoid the worst of the dust cloud.",
+    },
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /soot breath|furnace vent|valve twist|throw keg|molten slag breath|lava breath|anvil breath/i, "Forge Burst", "fire", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
     onFailStatus: { id: "scorched", label: "Scorched", acBonus: -1, expiresAtEndOfTurn: true },
     pushTargets: /throw keg|furnace vent|valve twist|anvil breath/i.test(monsterSpecialNames(monster).join(" ")),
   })) return true;
-  if (await tryMonsterAreaSpecial(monster, /cave-in groan|drop the hook|anvil drop|colossus hammerfall|support-beam breaker/i, "Crushing Machinery", "bludgeoning", "str", monsterSpecialAbilityTuning.burstRangeFeet, {
+  if (await tryMonsterAreaSpecial(monster, /drop the hook|anvil drop|colossus hammerfall|cave-in groan/i, "Falling Machinery", "bludgeoning", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
+    onFail: (target) => applyProneCondition(target, "falling-machinery"),
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /support-beam breaker/i, "Crushing Machinery", "bludgeoning", "str", monsterSpecialAbilityTuning.burstRangeFeet, {
     onFailStatus: { id: "shaken", label: "Shaken", attackBonus: -1, expiresAtEndOfTurn: true },
     pushTargets: true,
   })) return true;
-  if (await tryMonsterAreaSpecial(monster, /pressure release|overpressure burst|valve lock/i, "Pressure Burst", "thunder", "con", monsterSpecialAbilityTuning.burstRangeFeet, {
+  if (await tryMonsterAreaSpecial(monster, /pressure release/i, "Pressure Release", "fire", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
+    pushTargets: true,
+  })) return true;
+  if (await tryMonsterAreaSpecial(monster, /overpressure burst/i, "Pressure Burst", "thunder", "con", monsterSpecialAbilityTuning.burstRangeFeet, {
     onFailStatus: { id: "deafened", label: "Deafened", attackBonus: -1, expiresAtEndOfTurn: true },
     pushTargets: true,
   })) return true;
-  if (await tryMonsterAreaSpecial(monster, /grinding floor|grinding teeth|dragged into the teeth/i, "Grinding Teeth", "slashing", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
+  if (await tryMonsterAreaSpecial(monster, /grinding floor/i, "Grinding Floor", "slashing", "dex", monsterSpecialAbilityTuning.burstRangeFeet, {
     onFailStatus: { id: "hamstrung", label: "Hamstrung", speedBonusFeet: -10, expiresAtEndOfTurn: true },
   })) return true;
   if (await tryMonsterStatusSpecial(monster, /black smoke cloud/i, "Black Smoke Cloud", "con", monsterSpecialAbilityTuning.burstRangeFeet, () => ({
@@ -6045,7 +6281,14 @@ async function maybeUseMonsterStartSpecial(monster) {
     }
     return true;
   }
-  if (await tryMonsterAreaSpecial(monster, /web snare|websnare|venom spit|grave spark/i, "Special Shot", /venom/i.test(monsterSpecialNames(monster).join(" ")) ? "poison" : "necrotic", "dex", monsterSpecialAbilityTuning.rangedSpecialFeet)) return true;
+  if (await tryMonsterStatusSpecial(monster, /web snare|websnare/i, "Web Snare", "dex", monsterSpecialAbilityTuning.rangedSpecialFeet, () => ({
+    id: "web-snared",
+    label: "Snared",
+    speedLocked: true,
+    expiresAtEndOfTurn: true,
+  }))) return true;
+  if (await tryMonsterAreaSpecial(monster, /venom spit/i, "Venom Spit", "poison", "con", monsterSpecialAbilityTuning.rangedSpecialFeet)) return true;
+  if (await tryMonsterAreaSpecial(monster, /grave spark/i, "Grave Spark", "necrotic", "dex", monsterSpecialAbilityTuning.rangedSpecialFeet)) return true;
 
   return false;
 }

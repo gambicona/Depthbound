@@ -91,6 +91,14 @@ melee: Moves toward a chosen target and attacks in melee.
 rangedKiter: Uses ranged attacks and tries to keep useful spacing.
 swarm: Spawns multiple copies together. The live spawn count scales with party size and category gap.
 
+The combat AI also infers richer tactical behaviors from role text, tags, and special ability names. You do not need to set these directly in most monster templates:
+- charger: Charge, pounce, rush, stampede, trampler, or ravager monsters prefer longer approaches and Dash when they cannot reach melee this turn.
+- skirmisher: Hunter, duelist, stalker, flying, fast, or skirmisher monsters prefer wounded targets and avoid opportunity attacks when smart enough.
+- guardian: Guardian, soldier, myrmidon, armored, shield, or sentinel monsters prefer nearest pressure and hold the front.
+- brute: Brute, colossus, titan, huge, heavy, crusher, or executioner monsters are direct, less cautious attackers.
+- artillery: Ranged/caster monsters with shot, volley, spear, blast, fireball, bolt, breath, spit, or mortar cues prefer firing angles and valuable targets.
+- controller: Monsters with bind, snare, chain, grapple, charm, hex, command, mist, fog, aura, screen, cover, or lock cues prefer control angles and vulnerable/high-value targets.
+
 Flying monsters can set flying: true.
 
 6. Special abilities

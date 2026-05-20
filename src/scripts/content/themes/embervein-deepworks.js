@@ -1,6 +1,7 @@
 (() => {
 window.DungeonContent.register("themes", "emberveinDeepworks", {
   name: "The Embervein Deepworks",
+  description: "A forge-mine dungeon for farming stone, iron, and coal, with fire/earth elementals, steam, devils, and industrial hazards.",
   music: {
     exploration: "assets/sounds/music/emberveinDeepworks-exploration.mp3",
     combat: "assets/sounds/music/emberveinDeepworks-combat.mp3",
@@ -62,6 +63,19 @@ window.DungeonContent.register("themes", "emberveinDeepworks", {
     ["elemental", "smoke"],
     ["elemental", "magma"],
     ["elemental", "earth"],
+    ["elemental", "water", "steam"],
+    ["elemental", "air", "dust"],
+    ["elemental", "air", "sirocco"],
+    ["elemental", "air", "pressure"],
+    ["fiend", "devil", "fire"],
+    ["fiend", "devil", "chain"],
+    ["fiend", "devil", "furnace"],
+    ["fiend", "devil", "soldier"],
+    ["fiend", "devil", "barbed"],
+    ["fiend", "devil", "pit"],
+    ["fiend", "devil", "artillery"],
+    ["fiend", "demon", "fire"],
+    ["fiend", "demon", "siege"],
   ],
   bossMonsterTagGroups: [
     ["embervein-deepworks", "boss"],
@@ -70,6 +84,11 @@ window.DungeonContent.register("themes", "emberveinDeepworks", {
     ["elemental", "smoke", "boss"],
     ["elemental", "magma", "boss"],
     ["elemental", "earth", "boss"],
+    ["elemental", "air", "pressure", "boss"],
+    ["fiend", "devil", "chain", "boss"],
+    ["fiend", "devil", "fire", "boss"],
+    ["fiend", "devil", "pit", "boss"],
+    ["fiend", "demon", "siege", "boss"],
   ],
   furnitureTagGroups: [
     ["forge", "mine", "industrial"],
@@ -79,12 +98,14 @@ window.DungeonContent.register("themes", "emberveinDeepworks", {
     ["chest"],
   ],
   resourceNodeTagGroups: [
+    ["resource-node", "coal"],
     ["resource-node", "ore"],
     ["resource-node", "stone"],
     ["resource-node", "gem"],
     ["resource-node", "cave"],
     ["resource-node", "brimstone"],
   ],
+  resourceNodeIds: ["stone-outcrop", "ore-vein", "coal-seam"],
   terrainFloorIds: ["lava-floor", "water-floor", "acid-floor", "healing-pool-floor"],
   terrainFloorWeights: {
     "lava-floor": 3.25,
@@ -143,9 +164,16 @@ window.DungeonContent.register("themes", "emberveinDeepworks", {
     chestChance: 0.34,
   },
   resourceNodes: {
-    min: 2,
-    max: 5,
+    min: 5,
+    max: 10,
     chance: 1,
+  },
+  resourceNodesBySize: {
+    small: { min: 4, max: 8, chance: 1 },
+    medium: { min: 5, max: 10, chance: 1 },
+    large: { min: 10, max: 15, chance: 1 },
+    massive: { min: 15, max: 20, chance: 1 },
+    insane: { min: 20, max: 25, chance: 1 },
   },
   lootTableIds: ["basicDungeon", "magicHellItems", "magicUnderdarkDrowItems"],
 });

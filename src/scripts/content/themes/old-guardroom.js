@@ -1,6 +1,7 @@
 (() => {
 window.DungeonContent.register("themes", "oldGuardroom", {
   name: "Old Guardroom",
+  description: "Undead soldiers, skeleton bosses, old barracks clutter, stone nodes, and classic dungeon loot.",
   music: {
     exploration: "assets/sounds/music/oldGuardroom-exploration.mp3",
     combat: "assets/sounds/music/oldGuardroom-combat.mp3",

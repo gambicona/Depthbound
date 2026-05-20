@@ -1,6 +1,7 @@
 (() => {
 window.DungeonContent.register("themes", "crucibleOfStorms", {
   name: "The Crucible of Storms",
+  description: "Air, storm, lightning, and thunder elementals, storm currents, floating crystals, stone, and gem nodes.",
   music: {
     exploration: "assets/sounds/music/crucibleOfStorms-exploration.mp3",
     combat: "assets/sounds/music/crucibleOfStorms-combat.mp3",

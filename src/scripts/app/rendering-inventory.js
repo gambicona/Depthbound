@@ -6307,7 +6307,16 @@ function renderHomeAdventurePanels() {
       .filter((theme) => !theme.hidden)
       .sort((a, b) => a.name.localeCompare(b.name));
     els.homeRandomDungeonActions.innerHTML = `
-      ${themes.map((theme) => `<button type="button" data-random-dungeon-theme="${escapeAttribute(theme.id)}">${escapeHtml(theme.name)}</button>`).join("")}
+      ${themes
+        .map(
+          (theme) => `
+            <button type="button" class="random-dungeon-theme-button" data-random-dungeon-theme="${escapeAttribute(theme.id)}">
+              <span>${escapeHtml(theme.name)}</span>
+              ${theme.description ? `<small>${escapeHtml(theme.description)}</small>` : ""}
+            </button>
+          `,
+        )
+        .join("")}
       <hr />
       <button type="button" data-home-menu="adventure">Back</button>
     `;
@@ -6805,8 +6814,45 @@ function materialCommissionQuestLogEntries() {
     });
 }
 
+function campaignQuestLogEntries() {
+  const campaigns = window.DungeonCampaigns?.list?.() ?? [];
+  return campaigns
+    .filter((campaign) => !campaign.hidden && campaign.count > 0)
+    .map((campaign) => {
+      const completed = Math.max(0, Math.min(campaign.count, Math.floor(Number(state?.campaignProgress?.[campaign.id]) || 0)));
+      const quest = campaign.quest ?? {};
+      const started = completed > 0;
+      const finished = completed >= campaign.count;
+      const title = finished
+        ? quest.completedTitle ?? `${campaign.name} Complete`
+        : started
+          ? quest.progressTitle ?? campaign.name
+          : quest.initialTitle ?? campaign.name;
+      const description = finished
+        ? quest.completedDescription ?? `${campaign.name} is complete.`
+        : started
+          ? quest.progressDescription ?? campaign.description
+          : quest.initialDescription ?? campaign.description;
+      return {
+        id: `campaign-${campaign.id}`,
+        giver: quest.giver ?? campaign.name,
+        title,
+        description,
+        ready: finished,
+        objectives: [
+          {
+            label: started || finished ? campaign.name : `Begin ${campaign.name}`,
+            progress: started || finished ? completed : 0,
+            target: started || finished ? campaign.count : 1,
+          },
+        ],
+      };
+    });
+}
+
 function acceptedQuestLogEntries() {
   return [
+    ...campaignQuestLogEntries(),
     ...Object.values(window.DungeonNpcBehaviors ?? {}).flatMap((behavior) => behavior.questLogEntries?.() ?? []),
     ...materialCommissionQuestLogEntries(),
   ].filter(Boolean);

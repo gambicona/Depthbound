@@ -1,6 +1,7 @@
 (() => {
 window.DungeonContent.register("themes", "crucibleOfFlame", {
   name: "The Crucible of Flame",
+  description: "Fire, ash, smoke, and magma elementals, heavy lava terrain, brimstone, ore, gems, and scorching forge rooms.",
   music: {
     exploration: "assets/sounds/music/crucibleOfFlame-exploration.mp3",
     combat: "assets/sounds/music/crucibleOfFlame-combat.mp3",

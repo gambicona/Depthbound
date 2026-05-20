@@ -1,6 +1,7 @@
 (() => {
 window.DungeonContent.register("themes", "depthsOfHells", {
   name: "Depths of Hells",
+  description: "Devils, demons, fire elementals, lava, brimstone, infernal iron, harsh traps, and hellish magic loot.",
   music: {
     exploration: "assets/sounds/music/depthsOfHells-exploration.mp3",
     combat: "assets/sounds/music/depthsOfHells-combat.mp3",

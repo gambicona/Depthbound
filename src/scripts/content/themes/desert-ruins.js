@@ -1,6 +1,7 @@
 (() => {
 window.DungeonContent.register("themes", "desertRuins", {
   name: "Desert Ruins",
+  description: "Desert beasts, zombies, ghosts, fire and earth elementals, stone, gems, acid pools, and buried ruin treasure.",
   music: {
     exploration: "assets/sounds/music/desertRuins-exploration.mp3",
     combat: "assets/sounds/music/desertRuins-combat.mp3",

@@ -3,6 +3,15 @@ const campaigns = [
   {
   id: "barrow-crown",
   name: "The Barrow Crown",
+  quest: {
+    giver: "Sister Maelis",
+    initialTitle: "Help Sister Maelis",
+    initialDescription: "Help Sister Maelis in putting the dead to rest in the Barrow Crown.",
+    progressTitle: "Find the Barrow Crown",
+    progressDescription: "Follow the trail through the Barrow Crown dungeons and recover the relic that keeps the old dead sleeping.",
+    completedTitle: "The Barrow Crown Recovered",
+    completedDescription: "The Barrow Crown campaign is complete. The placeholder ending text can be expanded when the finale is fully written.",
+  },
   description: `For centuries, the hills north of the old road were left untouched.
 Shepherds avoided them.
 Kings refused to build upon them.
@@ -29,6 +38,15 @@ If the Barrow Crown is not found, the first king will rise — and every oath on
   {
     id: "thornwood-pact",
     name: "The Thornwood Pact",
+    quest: {
+      giver: "Old Lady Mara",
+      initialTitle: "Help Old Lady Mara",
+      initialDescription: "Help Old Lady Mara investigate the first signs of the Thornwood Pact. Placeholder story text until the full opening is written.",
+      progressTitle: "Uncover the Thornwood Pact",
+      progressDescription: "Push deeper into the Thornwood Pact campaign and learn what the forest has promised, and to whom. Placeholder story text until these dungeons are finalized.",
+      completedTitle: "The Thornwood Pact Broken",
+      completedDescription: "The Thornwood Pact campaign is complete. Placeholder ending text until the final pact resolution is written.",
+    },
     description: "Placeholder campaign description for The Thornwood Pact. Edit this later.",
     count: 8,
     folder: "campaigns/the-thornwood-pact",

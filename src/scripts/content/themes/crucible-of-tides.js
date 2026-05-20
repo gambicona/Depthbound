@@ -1,6 +1,7 @@
 (() => {
 window.DungeonContent.register("themes", "crucibleOfTides", {
   name: "The Crucible of Tides",
+  description: "Water, ice, steam, mist, brine, and coral elementals, tidal currents, stone, gems, fungi, and wet hazards.",
   music: {
     exploration: "assets/sounds/music/crucibleOfTides-exploration.mp3",
     combat: "assets/sounds/music/crucibleOfTides-combat.mp3",

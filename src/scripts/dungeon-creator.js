@@ -335,6 +335,13 @@ function makeCorridorPassage(id, cells, options = {}) {
   return { id: `corridor-${id}`, cells: cells.map((cell) => ({ ...cell })), edges, ...options };
 }
 
+function nextCorridorPassageId() {
+  const usedIds = new Set(state.corridorPassages.map((passage) => passage.id));
+  let index = state.corridorPassages.length;
+  while (usedIds.has(`corridor-${index}`)) index += 1;
+  return index;
+}
+
 function uniqueCells(cells) {
   return Array.from(new Map(cells.map((cell) => [key(cell), cell])).values());
 }
@@ -1097,7 +1104,7 @@ function connectRooms(a, b) {
   if (!aConnection || !bConnection) return;
   const baseCells = carvePath(aConnection.outside, bConnection.outside);
   const cells = widenPath(baseCells);
-  const passage = makeCorridorPassage(state.corridorPassages.length, cells, { roomIds: [a.id, b.id] });
+  const passage = makeCorridorPassage(nextCorridorPassageId(), cells, { roomIds: [a.id, b.id] });
   state.corridors = uniqueCells([...state.corridors, ...cells]);
   state.corridorPassages.push(passage);
   a.doors.push({ ...aConnection.door, corridor: { ...aConnection.outside }, to: b.id });
@@ -1117,7 +1124,7 @@ function addManualHallway(start, end, cells) {
   const basePath = uniqueCells(cells);
   const path = uniqueCells(widenPath(basePath));
   state.corridors = uniqueCells([...state.corridors, ...path]);
-  state.corridorPassages.push(makeCorridorPassage(state.corridorPassages.length, path, { roomIds: [start.room?.id, end.room?.id].filter(Boolean) }));
+  state.corridorPassages.push(makeCorridorPassage(nextCorridorPassageId(), path, { roomIds: [start.room?.id, end.room?.id].filter(Boolean) }));
   if (start.room) start.room.doors.push({ ...start.position, corridor: { ...basePath[0] }, ...(end.room ? { to: end.room.id } : {}) });
   if (end.room) end.room.doors.push({ ...end.position, corridor: { ...basePath.at(-1) }, ...(start.room ? { to: start.room.id } : {}) });
   if (start.room && end.room) {

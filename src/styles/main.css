@@ -3571,8 +3571,22 @@ h1 {
   width: 100%;
 }
 
+.home-actions button.random-dungeon-theme-button {
+  align-items: flex-start;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  text-align: left;
+}
+
 .home-actions small {
   color: var(--gold);
+}
+
+.home-actions .random-dungeon-theme-button small {
+  color: var(--muted);
+  line-height: 1.35;
+  white-space: normal;
 }
 
 .home-builder-tools,

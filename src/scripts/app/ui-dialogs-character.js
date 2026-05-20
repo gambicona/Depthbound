@@ -2517,7 +2517,7 @@ async function chooseDungeonChoice() {
   const themes = availableDungeonThemes();
   const customDungeons = availableCustomDungeons();
   const choices = [
-    ...themes.map((theme) => ({ value: `theme:${theme.id}`, label: theme.name })),
+    ...themes.map((theme) => ({ value: `theme:${theme.id}`, label: theme.name, description: theme.description })),
     ...customDungeons.map((dungeon) => ({ value: `custom:${dungeon.id}`, label: `Custom: ${dungeon.name}` })),
   ];
   if (choices.length <= 1) return choices[0]?.value ?? `theme:${defaultContent.theme}`;
@@ -2534,7 +2534,7 @@ async function chooseRandomDungeonChoice() {
   const themeId = await showChoiceDialog({
     title: "Random Dungeons",
     message: "Choose a dungeon theme.",
-    choices: themes.map((theme) => ({ value: theme.id, label: theme.name })),
+    choices: themes.map((theme) => ({ value: theme.id, label: theme.name, description: theme.description })),
   });
   return themeId;
 }

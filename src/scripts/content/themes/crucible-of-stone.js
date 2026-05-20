@@ -1,6 +1,7 @@
 (() => {
 window.DungeonContent.register("themes", "crucibleOfStone", {
   name: "The Crucible of Stone",
+  description: "Earth, stone, mud, crystal, and sand elementals, unstable ground, stone, ore, gems, and cave machinery.",
   music: {
     exploration: "assets/sounds/music/crucibleOfStone-exploration.mp3",
     combat: "assets/sounds/music/crucibleOfStone-combat.mp3",

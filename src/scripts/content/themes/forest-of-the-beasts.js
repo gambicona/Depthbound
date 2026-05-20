@@ -1,6 +1,7 @@
 (() => {
 window.DungeonContent.register("themes", "forestOfTheBeasts", {
   name: "Forest of the Beasts",
+  description: "Forest beasts, hostile plants, water and air elementals, vines, herbs, timber, and natural hazards.",
   music: {
     exploration: "assets/sounds/music/forestOfTheBeasts-exploration.mp3",
     combat: "assets/sounds/music/forestOfTheBeasts-combat.mp3",

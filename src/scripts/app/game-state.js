@@ -507,6 +507,7 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
   }
   const theme = getContentDefinition("themes", template.themeId) ?? getContentDefinition("themes", defaultContent.theme);
   const dungeon = ensureCorridorPassages(template.dungeon);
+  const entranceRoom = dungeon.rooms.find((room) => room.id === dungeon.entranceRoomId) ?? dungeon.rooms[0];
   const leader = partyMembers[0] ?? previousState?.fighters?.hero;
   const partyDifficulty = {
     ...(leader ?? {}),
@@ -2864,11 +2865,12 @@ function weightedMonsterIdsForHero(hero, themeId = currentThemeId()) {
       const category = monsterCategory(entry.template);
       return {
         id: entry.id,
+        template: entry.template,
         weight: category === targetCategory ? 3 : 1,
       };
     });
 
-  return entries.length ? entries : allowedMonsterIds.map((id) => ({ id, weight: 1 }));
+  return entries.length ? entries : allowedMonsterIds.map((id) => ({ id, template: getMonsterTemplate(id), weight: 1 }));
 }
 
 function pickWeightedMonsterId(entries, usedCounts = {}, fallbackId = defaultContent.monster) {
@@ -2884,6 +2886,77 @@ function pickWeightedMonsterId(entries, usedCounts = {}, fallbackId = defaultCon
     if (roll <= 0) return entry.id;
   }
   return adjustedEntries.at(-1)?.id ?? fallbackId;
+}
+
+function monsterMeaningfulTags(monster = {}) {
+  const ignored = new Set(["boss", "swarm", "minion", "ranged", "melee", "caster", "brute", "skirmisher", "controller", "tank", "artillery"]);
+  return new Set((monster.tags ?? []).filter((tag) => tag && !ignored.has(tag)));
+}
+
+function monsterCombatRole(monster = {}) {
+  const text = `${monster.behavior ?? ""} ${monster.role ?? ""} ${(monster.tags ?? []).join(" ")}`.toLowerCase();
+  if (/ranged|kiter|archer|marksman|crossbow|artillery|caster|warlock|hex|oracle|invoker|mage|spell|sentry|thrower/.test(text)) return "ranged";
+  if (/controller|jailer|gaoler|lock|pull|snare|chain|command/.test(text)) return "control";
+  if (/tank|shield|sentinel|guard|armored|armoured|plate|brute|charger|mauler|crusher|behemoth/.test(text)) return "frontline";
+  return "melee";
+}
+
+function monsterRolesComplement(a = "melee", b = "melee") {
+  if (a === b) return false;
+  if ((a === "ranged" && b === "melee") || (a === "melee" && b === "ranged")) return true;
+  if ((a === "ranged" && b === "frontline") || (a === "frontline" && b === "ranged")) return true;
+  if (a === "control" || b === "control") return true;
+  return false;
+}
+
+function pickCompanionMonsterTemplate(anchorTemplate, roomTemplates, monsterEntries, usedCounts, localCounts, fallbackTemplate) {
+  const anchorTags = monsterMeaningfulTags(anchorTemplate);
+  const roomRoles = new Set(roomTemplates.map(monsterCombatRole));
+  const anchorRole = monsterCombatRole(anchorTemplate);
+  const matchingTagCandidates = monsterEntries
+    .map((entry) => entry.template ?? getMonsterTemplate(entry.id))
+    .filter((template) => template && template.behavior !== "swarm")
+    .filter((template) => Array.from(monsterMeaningfulTags(template)).some((tag) => anchorTags.has(tag)));
+  const offThemeAllowed = matchingTagCandidates.length < 2 || Math.random() < 0.08;
+  const weightedCandidates = monsterEntries
+    .map((entry) => ({ ...entry, template: entry.template ?? getMonsterTemplate(entry.id) }))
+    .filter((entry) => entry.template && entry.template.behavior !== "swarm")
+    .map((entry) => {
+      const template = entry.template;
+      const tags = monsterMeaningfulTags(template);
+      const sharedTagCount = Array.from(tags).filter((tag) => anchorTags.has(tag)).length;
+      const role = monsterCombatRole(template);
+      const alreadyInRoom = localCounts[entry.id] ?? 0;
+      let weight = entry.weight ?? 1;
+      weight *= 1 + Math.min(3, sharedTagCount) * 1.2;
+      if (sharedTagCount === 0) weight *= offThemeAllowed ? 0.04 : 0;
+      if (monsterRolesComplement(anchorRole, role) || Array.from(roomRoles).some((existingRole) => monsterRolesComplement(existingRole, role))) weight *= 1.75;
+      if (roomRoles.has(role)) weight *= 0.65;
+      if (entry.id === anchorTemplate.id && monsterEntries.length > 1) weight *= 0.22;
+      weight /= Math.max(1, (usedCounts[entry.id] ?? 0) + alreadyInRoom + 1);
+      return { template, weight: weight > 0 ? Math.max(0.01, weight) : 0 };
+    })
+    .filter((entry) => entry.weight > 0);
+  const total = weightedCandidates.reduce((sum, entry) => sum + entry.weight, 0);
+  if (total <= 0) return fallbackTemplate;
+  let roll = Math.random() * total;
+  for (const entry of weightedCandidates) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.template;
+  }
+  return weightedCandidates.at(-1)?.template ?? fallbackTemplate;
+}
+
+function roomMonsterComposition(anchorTemplate, spawnCount, monsterEntries, usedCounts) {
+  if (anchorTemplate.behavior === "swarm" || spawnCount <= 1) return Array.from({ length: spawnCount }, () => anchorTemplate);
+  const templates = [anchorTemplate];
+  const localCounts = { [anchorTemplate.id]: 1 };
+  while (templates.length < spawnCount) {
+    const companion = pickCompanionMonsterTemplate(anchorTemplate, templates, monsterEntries, usedCounts, localCounts, anchorTemplate);
+    templates.push(companion);
+    localCounts[companion.id] = (localCounts[companion.id] ?? 0) + 1;
+  }
+  return templates;
 }
 
 function bossMonsterIdForHero(hero, themeId = currentThemeId()) {
@@ -3278,7 +3351,8 @@ function objectTypeIsResourceNode(type) {
 
 function resourceNodeSpawnSettings(theme = null, dungeonSizeId = "large") {
   const sizeSettings = dungeonSizeDefinition(dungeonSizeId)?.resourceNodes;
-  const settings = sizeSettings ?? theme?.resourceNodes ?? theme?.resourceNodeSpawns ?? {};
+  const themeSizeSettings = theme?.resourceNodesBySize?.[dungeonSizeId] ?? theme?.resourceNodeSpawnsBySize?.[dungeonSizeId];
+  const settings = themeSizeSettings ?? sizeSettings ?? theme?.resourceNodes ?? theme?.resourceNodeSpawns ?? {};
   if (settings === false) return { min: 0, max: 0, chance: 0 };
   const min = Math.max(0, Math.floor(Number(settings.min ?? 1) || 0));
   const max = Math.max(min, Math.floor(Number(settings.max ?? 2) || 0));
@@ -4982,13 +5056,18 @@ function createDungeonMonsters(dungeon, heroPosition, hero, exitRoomId = "", dun
     const spawnCount = roomMonsterSpawnCount(monsterTemplate, hero);
     const spawnCells = clusteredSpawnCells(room, spawnCount, heroPosition, objectBlockedKeys, dungeon.gridSize, floorKeys);
     if (spawnCells.length === 0) continue;
-    usedMonsterCounts[monsterId] = (usedMonsterCounts[monsterId] ?? 0) + 1;
     const actualCount = Math.min(spawnCount, spawnCells.length);
-    for (let swarmIndex = 0; swarmIndex < actualCount; swarmIndex += 1) {
-      const position = spawnCells[swarmIndex];
+    const roomTemplates = roomMonsterComposition(monsterTemplate, actualCount, monsterEntries, usedMonsterCounts);
+    const roomTemplateCounts = {};
+    for (let spawnIndex = 0; spawnIndex < roomTemplates.length; spawnIndex += 1) {
+      const position = spawnCells[spawnIndex];
+      const template = roomTemplates[spawnIndex] ?? monsterTemplate;
       if (!position) continue;
-      const suffix = spawnCount > 1 ? ` ${swarmIndex + 1}` : index === 0 ? "" : ` ${index + 1}`;
-      const monster = createMonsterForRoom(monsterTemplate, room, position, `monster-${room.id}${spawnCount > 1 ? `-${swarmIndex + 1}` : ""}`, `${monsterTemplate.name}${suffix}`, hero);
+      roomTemplateCounts[template.id] = (roomTemplateCounts[template.id] ?? 0) + 1;
+      usedMonsterCounts[template.id] = (usedMonsterCounts[template.id] ?? 0) + 1;
+      const duplicateInRoom = roomTemplates.filter((entry) => entry.id === template.id).length > 1;
+      const suffix = duplicateInRoom ? ` ${roomTemplateCounts[template.id]}` : "";
+      const monster = createMonsterForRoom(template, room, position, `monster-${room.id}-${spawnIndex + 1}`, `${template.name}${suffix}`, hero);
       monsters[monster.id] = monster;
       objectBlockedKeys.add(positionKey(position));
     }
