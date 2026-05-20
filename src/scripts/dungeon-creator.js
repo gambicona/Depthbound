@@ -37,10 +37,21 @@ function itemOptionLabel(item) {
   return `${item.name} (${itemValueText(item)})`;
 }
 
+function parseListInput(value) {
+  return Array.from(
+    new Set(
+      String(value ?? "")
+        .split(/[,;\n]/)
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
 function normalizeCreatorCustomItem(item, index = 0) {
   if (!item || typeof item !== "object") return null;
   const id = String(item.id || item.baseItemId || `custom-item-${index + 1}`);
-  const description = String(item.customDescription ?? item.description ?? item.magic?.description ?? item.treasure?.description ?? "").trim();
+  const description = String(item.customDescription ?? item.handout?.text ?? item.description ?? item.magic?.description ?? item.treasure?.description ?? "").trim();
   const normalized = clone({
     ...item,
     id,
@@ -51,6 +62,19 @@ function normalizeCreatorCustomItem(item, index = 0) {
   });
   if (normalized.magic) normalized.magic.description = description;
   if (normalized.treasure) normalized.treasure.description = description;
+  if (normalized.type === "handout" || normalized.handout) {
+    const categories = parseListInput([...(normalized.handout?.categories ?? []), ...(normalized.journalCategories ?? [])].join(", "));
+    normalized.type = "handout";
+    normalized.tomeInventory = "party";
+    normalized.journalCategories = categories;
+    normalized.handout = {
+      ...(normalized.handout ?? {}),
+      title: normalized.name ?? id,
+      text: description,
+      format: normalized.handout?.format ?? "markdown-lite",
+      categories,
+    };
+  }
   return normalized;
 }
 
@@ -177,6 +201,7 @@ const els = {
   customItemName: document.querySelector("#custom-item-name"),
   customItemDescription: document.querySelector("#custom-item-description"),
   customItemType: document.querySelector("#custom-item-type"),
+  customItemTags: document.querySelector("#custom-item-tags"),
   customItemWeight: document.querySelector("#custom-item-weight"),
   customItemValue: document.querySelector("#custom-item-value"),
   createCustomItem: document.querySelector("#create-custom-item"),
@@ -227,6 +252,62 @@ function objectAt(position) {
 
 function objectsAt(position) {
   return state.objects.filter((object) => objectCellsForCreator(object).some((cell) => cell.x === position.x && cell.y === position.y));
+}
+
+function doorId(room, door) {
+  return room && door ? `door:${room.id}:${key(door)}` : "";
+}
+
+function doorEntityById(id) {
+  if (!String(id ?? "").startsWith("door:")) return null;
+  for (const room of state.rooms) {
+    const door = (room.doors ?? []).find((entry) => doorId(room, entry) === id);
+    if (door) return { __door: true, id, room, door };
+  }
+  return null;
+}
+
+function doorAt(position) {
+  const positionKey = key(position);
+  for (const room of state.rooms) {
+    const door = (room.doors ?? []).find((entry) => key(entry) === positionKey);
+    if (door) return { __door: true, id: doorId(room, door), room, door };
+  }
+  return null;
+}
+
+function normalizeCreatorSpecialLock(lock = null) {
+  if (!lock || typeof lock !== "object") return null;
+  const answer = String(lock.answer ?? lock.key ?? lock.passphrase ?? "").trim();
+  if (!answer) return null;
+  return {
+    label: String(lock.label ?? "Special Lock").trim() || "Special Lock",
+    prompt: String(lock.prompt ?? "Enter the key phrase.").trim() || "Enter the key phrase.",
+    answer,
+    caseSensitive: Boolean(lock.caseSensitive),
+  };
+}
+
+function specialLockDraft(lock = null) {
+  return {
+    label: String(lock?.label ?? "Special Lock").trim() || "Special Lock",
+    prompt: String(lock?.prompt ?? "Enter the key phrase.").trim() || "Enter the key phrase.",
+    answer: String(lock?.answer ?? "").trim(),
+    caseSensitive: Boolean(lock?.caseSensitive),
+  };
+}
+
+function objectCanUseSpecialLock(object) {
+  const def = window.DungeonContent.get("furniture", object?.type);
+  const tags = def?.tags ?? [];
+  const components = def?.components ?? [];
+  return Boolean(
+    object?.items?.length ||
+    def?.kind === "container" ||
+    tags.includes("container") ||
+    tags.includes("loot") ||
+    components.some((component) => ["lock", "loot", "definedLootContainer"].includes(component?.type)),
+  );
 }
 
 function objectTypeIsTerrainFloor(type) {
@@ -350,9 +431,25 @@ function rebuildWalkable() {
   return uniqueCells([...state.rooms.flatMap((room) => room.cells), ...state.corridors]);
 }
 
+function doorForExport(door) {
+  const specialLock = normalizeCreatorSpecialLock(door.specialLock);
+  const exported = { ...door };
+  if (specialLock) exported.specialLock = specialLock;
+  else delete exported.specialLock;
+  return exported;
+}
+
+function roomForExport(room) {
+  return {
+    ...clone(room),
+    doors: (room.doors ?? []).map(doorForExport),
+  };
+}
+
 function buildDungeon() {
   const walkable = rebuildWalkable();
-  const doors = state.rooms.flatMap((room) => (room.doors ?? []).map((door) => ({ ...door, roomId: room.id })));
+  const rooms = state.rooms.map(roomForExport);
+  const doors = rooms.flatMap((room) => (room.doors ?? []).map((door) => ({ ...door, roomId: room.id })));
   const fallbackEntranceRoom = state.rooms[0];
   const startRoom = state.start ? state.rooms.find((room) => room.id === state.start.roomId && cellInRoom(room, state.start.position)) : null;
   const entranceRoom = startRoom ?? fallbackEntranceRoom;
@@ -364,7 +461,7 @@ function buildDungeon() {
     id: state.id,
     gridSize: state.gridSize,
     roomCount: state.rooms.length,
-    rooms: clone(state.rooms),
+    rooms,
     corridors: clone(state.corridors),
     corridorPassages: clone(state.corridorPassages),
     doors,
@@ -413,7 +510,8 @@ function templateFromState(options = {}) {
       ...(object.height ? { height: object.height } : {}),
       ...(object.pairId ? { pairId: object.pairId } : {}),
       ...(typeof object.locked === "boolean" ? { locked: object.locked } : {}),
-      ...(object.lockDc ? { lockDc: object.lockDc } : {}),
+      ...(normalizeCreatorSpecialLock(object.specialLock) ? { specialLock: normalizeCreatorSpecialLock(object.specialLock), locked: true } : {}),
+      ...(!normalizeCreatorSpecialLock(object.specialLock) && object.lockDc ? { lockDc: object.lockDc } : {}),
       items: [...(object.items ?? [])],
     })),
     monsters: state.monsters.map((monster) => ({
@@ -753,6 +851,7 @@ function renderGrid() {
       const room = roomMap.get(cellKey);
       const monster = monsterAt(position);
       const object = objectAt(position);
+      const door = room ? (room.doors ?? []).find((entry) => key(entry) === cellKey) : null;
       const terrainObject = objectsAt(position).find(objectIsTerrainFloor);
       const classes = [
         "creator-cell",
@@ -766,16 +865,18 @@ function renderGrid() {
         object ? `object-${String(object.type).replace(/[^a-z0-9_-]/gi, "-")}` : "",
         hallwayPreviewKeys.has(cellKey) ? "selected-room" : "",
         room?.id === state.connectFromRoomId || room?.id === state.selectedId ? "selected-room" : "",
+        door && state.selectedId === doorId(room, door) ? "selected-room" : "",
         y === 0 && x % 5 === 0 ? "axis-x" : "",
         x === 0 && y % 5 === 0 ? "axis-y" : "",
       ].filter(Boolean).join(" ");
       const template = object ? window.DungeonContent.get("furniture", object.type) : null;
-      const label = monster ? "M" : object ? (template?.symbol ?? (object.type === "portal" ? "P" : "F")) : startKey === cellKey ? "S" : exitKey === cellKey ? "E" : "";
+      const label = monster ? "M" : object ? (template?.symbol ?? (object.type === "portal" ? "P" : "F")) : startKey === cellKey ? "S" : exitKey === cellKey ? "E" : door ? "D" : "";
       const iconPath = object ? furnitureIconPath(template, object.type) : "";
       const content = object && !monster
         ? `${iconPath ? `<img class="creator-cell-object-icon hidden" data-creator-furniture-image src="${escapeAttribute(iconPath)}" alt="" draggable="false" />` : ""}<span>${escapeHtml(label)}</span>`
         : escapeHtml(label);
-      cells.push(`<button type="button" class="${classes}" data-x="${x}" data-y="${y}" data-axis-x="${x}" data-axis-y="${y}" title="${escapeAttribute(object ? template?.name ?? object.type : room?.name ?? "")}">${content}</button>`);
+      const title = object ? template?.name ?? object.type : door ? `Door in ${room?.name ?? room?.id ?? "room"}` : room?.name ?? "";
+      cells.push(`<button type="button" class="${classes}" data-x="${x}" data-y="${y}" data-axis-x="${x}" data-axis-y="${y}" ${door ? `data-door-id="${escapeAttribute(doorId(room, door))}"` : ""} title="${escapeAttribute(title)}">${content}</button>`);
     }
   }
   els.grid.innerHTML = cells.join("");
@@ -783,7 +884,8 @@ function renderGrid() {
 }
 
 function selectedEntity() {
-  return state.objects.find((object) => object.id === state.selectedId) ??
+  return doorEntityById(state.selectedId) ??
+    state.objects.find((object) => object.id === state.selectedId) ??
     state.monsters.find((monster) => monster.id === state.selectedId) ??
     state.rooms.find((room) => room.id === state.selectedId) ??
     null;
@@ -843,6 +945,46 @@ function renderStoryTriggerList() {
       </div>
     `).join("")
     : `<p class="small-note">No story triggers yet.</p>`;
+}
+
+function readSelectedLockField(field) {
+  return els.selectedCard.querySelector(`[${field}]`);
+}
+
+function updateObjectSpecialLockFromCard(object, changedField) {
+  const enabledInput = readSelectedLockField("data-object-field='specialLockEnabled'");
+  const enabled = Boolean(enabledInput?.checked);
+  if (!enabled) {
+    delete object.specialLock;
+    if (changedField === "specialLockEnabled") renderSelected();
+    return;
+  }
+  object.specialLock = {
+    label: readSelectedLockField("data-object-field='specialLockLabel'")?.value.trim() || "Special Lock",
+    prompt: readSelectedLockField("data-object-field='specialLockPrompt'")?.value.trim() || "Enter the key phrase.",
+    answer: readSelectedLockField("data-object-field='specialLockAnswer'")?.value.trim() ?? "",
+    caseSensitive: Boolean(readSelectedLockField("data-object-field='specialLockCaseSensitive'")?.checked),
+  };
+  object.locked = true;
+  delete object.lockDc;
+  if (changedField === "specialLockEnabled") renderSelected();
+}
+
+function updateDoorSpecialLockFromCard(entity, changedField) {
+  const enabledInput = readSelectedLockField("data-door-lock-field='enabled'");
+  const enabled = Boolean(enabledInput?.checked);
+  if (!enabled) {
+    delete entity.door.specialLock;
+    if (changedField === "enabled") renderSelected();
+    return;
+  }
+  entity.door.specialLock = {
+    label: readSelectedLockField("data-door-lock-field='label'")?.value.trim() || "Special Lock",
+    prompt: readSelectedLockField("data-door-lock-field='prompt'")?.value.trim() || "Enter the key phrase.",
+    answer: readSelectedLockField("data-door-lock-field='answer'")?.value.trim() ?? "",
+    caseSensitive: Boolean(readSelectedLockField("data-door-lock-field='caseSensitive'")?.checked),
+  };
+  if (changedField === "enabled") renderSelected();
 }
 
 function clearStoryTriggerForm() {
@@ -915,6 +1057,18 @@ function renderSelected() {
     els.selectedCard.innerHTML = "Nothing selected.";
     return;
   }
+  if (selected.__door) {
+    const lock = specialLockDraft(selected.door.specialLock);
+    const enabled = Boolean(selected.door.specialLock);
+    els.selectedCard.innerHTML = `<b>Door</b><br>Door in ${escapeHtml(selected.room.name ?? selected.room.id)} at ${selected.door.x}, ${selected.door.y}
+      <label><input data-door-lock-field="enabled" type="checkbox" ${enabled ? "checked" : ""} /> Special phrase lock</label>
+      <label>Lock name <input data-door-lock-field="label" value="${escapeAttribute(lock.label)}" ${enabled ? "" : "disabled"} /></label>
+      <label>Prompt <input data-door-lock-field="prompt" value="${escapeAttribute(lock.prompt)}" ${enabled ? "" : "disabled"} /></label>
+      <label>Correct key <input data-door-lock-field="answer" value="${escapeAttribute(lock.answer)}" ${enabled ? "" : "disabled"} /></label>
+      <label><input data-door-lock-field="caseSensitive" type="checkbox" ${lock.caseSensitive ? "checked" : ""} ${enabled ? "" : "disabled"} /> Case-sensitive answer</label>
+      <small>When a player opens this door, they must enter the exact configured key before it opens.</small>`;
+    return;
+  }
   if (selected.monsterId) {
     const template = window.DungeonContent.get("monsters", selected.monsterId);
     els.selectedCard.innerHTML = `<b>${selected.name}</b><br>${selected.isBoss ? "Boss " : ""}Monster at ${selected.position.x}, ${selected.position.y}<br>
@@ -934,11 +1088,23 @@ function renderSelected() {
   if (selected.type) {
     const def = window.DungeonContent.get("furniture", selected.type);
     const lock = (def?.components ?? []).find((component) => component?.type === "lock");
+    const specialLock = specialLockDraft(selected.specialLock);
+    const specialLockEnabled = Boolean(selected.specialLock);
+    const canUseSpecialLock = objectCanUseSpecialLock(selected);
     els.selectedCard.innerHTML = `<b>${def?.name ?? selected.type}</b><br>${def?.kind === "trap" ? "Trap" : "Furniture"} at ${selected.position.x}, ${selected.position.y}<br>Loot: ${(selected.items ?? []).map(itemName).join(", ") || "none"}
       ${
-        lock
+        lock && !specialLockEnabled
           ? `<label><input data-object-field="locked" type="checkbox" ${selected.locked ? "checked" : ""} /> Locked in this dungeon</label>
              <label>Lock DC <input data-object-field="lockDc" type="number" value="${selected.lockDc ?? lock.dc ?? 12}" /></label>`
+          : ""
+      }
+      ${
+        canUseSpecialLock
+          ? `<label><input data-object-field="specialLockEnabled" type="checkbox" ${specialLockEnabled ? "checked" : ""} /> Special phrase lock</label>
+             <label>Lock name <input data-object-field="specialLockLabel" value="${escapeAttribute(specialLock.label)}" ${specialLockEnabled ? "" : "disabled"} /></label>
+             <label>Prompt <input data-object-field="specialLockPrompt" value="${escapeAttribute(specialLock.prompt)}" ${specialLockEnabled ? "" : "disabled"} /></label>
+             <label>Correct key <input data-object-field="specialLockAnswer" value="${escapeAttribute(specialLock.answer)}" ${specialLockEnabled ? "" : "disabled"} /></label>
+             <label><input data-object-field="specialLockCaseSensitive" type="checkbox" ${specialLock.caseSensitive ? "checked" : ""} ${specialLockEnabled ? "" : "disabled"} /> Case-sensitive answer</label>`
           : ""
       }
       <div class="room-move-controls">
@@ -1227,6 +1393,7 @@ function previewDraggedRoom(room, dx, dy, origin = { x: room.x, y: room.y }) {
 
 function beginRoomDrag(position) {
   if (state.tool !== "select") return;
+  if (doorAt(position)) return;
   const room = roomAt(position);
   if (!room || monsterAt(position) || objectAt(position)) return;
   state.selectedId = room.id;
@@ -1310,7 +1477,7 @@ function createCustomItem() {
   const template = window.DungeonContent.get("items", els.customItemTemplate.value);
   if (!template) return;
   const id = `custom-item-${state.customItems.length + 1}`;
-  const description = els.customItemDescription.value.trim() || template.description || template.magic?.description || template.treasure?.description || "";
+  const description = els.customItemDescription.value.trim() || template.handout?.text || template.description || template.magic?.description || template.treasure?.description || "";
   const valueGp = Math.max(0, Number(els.customItemValue.value) || 0);
   const customItem = {
     ...clone(template),
@@ -1327,6 +1494,22 @@ function createCustomItem() {
   customItem.cost.text = itemValueText(customItem);
   if (customItem.magic) customItem.magic = { ...customItem.magic, description };
   if (customItem.treasure) customItem.treasure = { ...customItem.treasure, description };
+  if (customItem.type === "handout" || template.type === "handout" || template.handout) {
+    const categories = parseListInput(els.customItemTags?.value || (template.handout?.categories ?? []).join(", "));
+    customItem.type = "handout";
+    customItem.category = "journal";
+    customItem.tomeInventory = "party";
+    customItem.journalCategories = categories;
+    customItem.tags = Array.from(new Set([...(customItem.tags ?? []), "handout", "journal", "ancient-tome", ...categories]));
+    customItem.handout = {
+      ...(template.handout ?? {}),
+      ...(customItem.handout ?? {}),
+      title: customItem.name,
+      text: description,
+      format: customItem.handout?.format ?? template.handout?.format ?? "markdown-lite",
+      categories,
+    };
+  }
   state.customItems.push(customItem);
   renderCatalogueFilters();
   renderItemSelects();
@@ -1462,7 +1645,7 @@ function handleGridClick(position) {
   } else if (state.tool === "erase") {
     eraseAt(position);
   } else {
-    state.selectedId = monsterAt(position)?.id ?? objectAt(position)?.id ?? room?.id ?? "";
+    state.selectedId = monsterAt(position)?.id ?? objectAt(position)?.id ?? doorAt(position)?.id ?? room?.id ?? "";
   }
   renderAll();
 }
@@ -1701,6 +1884,11 @@ function init() {
   els.grid.addEventListener("click", (event) => {
     const cell = event.target.closest("[data-x]");
     if (!cell) return;
+    if (state.tool === "select" && cell.dataset.doorId) {
+      state.selectedId = cell.dataset.doorId;
+      renderAll();
+      return;
+    }
     handleGridClick({ x: Number(cell.dataset.x), y: Number(cell.dataset.y) });
   });
   els.grid.addEventListener("pointerdown", (event) => {
@@ -1784,9 +1972,11 @@ function init() {
   els.customItemTemplate.addEventListener("change", () => {
     const template = window.DungeonContent.get("items", els.customItemTemplate.value);
     if (!template) return;
-    els.customItemName.value = `${template.name} Variant`;
-    els.customItemDescription.value = template.description ?? template.magic?.description ?? template.treasure?.description ?? "";
+    const isHandout = template.type === "handout" || template.handout;
+    els.customItemName.value = isHandout ? template.handout?.title ?? template.name : `${template.name} Variant`;
+    els.customItemDescription.value = template.handout?.text ?? template.description ?? template.magic?.description ?? template.treasure?.description ?? "";
     els.customItemType.value = template.type ?? "";
+    if (els.customItemTags) els.customItemTags.value = isHandout ? (template.handout?.categories ?? ["Promiscuous"]).join(", ") : "";
     els.customItemWeight.value = String(template.weightLb ?? 0);
     els.customItemValue.value = String(itemValueCp(template) / 100);
   });
@@ -1799,6 +1989,13 @@ function init() {
   });
   els.selectedCard.addEventListener("input", (event) => {
     const selected = selectedEntity();
+    const doorInput = event.target.closest("[data-door-lock-field]");
+    if (doorInput && selected?.__door) {
+      updateDoorSpecialLockFromCard(selected, doorInput.dataset.doorLockField);
+      renderExport();
+      return;
+    }
+
     const roomInput = event.target.closest("[data-room-field]");
     if (roomInput && selected?.cells) {
       if (roomInput.dataset.roomField === "name") {
@@ -1812,8 +2009,10 @@ function init() {
 
     const objectInput = event.target.closest("[data-object-field]");
     if (objectInput && selected?.type) {
-      if (objectInput.dataset.objectField === "locked") selected.locked = objectInput.checked;
-      if (objectInput.dataset.objectField === "lockDc") selected.lockDc = Math.max(1, Number(objectInput.value) || 12);
+      const field = objectInput.dataset.objectField;
+      if (field === "locked") selected.locked = objectInput.checked;
+      if (field === "lockDc") selected.lockDc = Math.max(1, Number(objectInput.value) || 12);
+      if (field.startsWith("specialLock")) updateObjectSpecialLockFromCard(selected, field);
       renderExport();
       return;
     }

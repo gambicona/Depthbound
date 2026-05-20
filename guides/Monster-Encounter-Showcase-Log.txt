@@ -1,0 +1,347 @@
+Monster Encounter Showcase Log
+
+Purpose
+
+This is a lookup sheet for interesting monster groups that show off AI behavior,
+monster roles, and dungeon-theme identity. These are not strict balance packs;
+tune monster counts, categories, and room size to the party level.
+
+Use this when you want an encounter to feel like a small tactical scene instead
+of a pile of enemies.
+
+
+Old Guardroom
+
+1. Hollow Choir Command Post
+   Monsters: Bone-Priest of the Hollow Choir (C6), Adamant-Bone Sentinel (C7), Tomb-Star Arbalest (C9)
+   Type: Boss/support plus normal monsters
+   What is cool:
+   The Sentinel gives the party a clear front line problem, the Arbalest punishes
+   exposed heroes, and the Bone-Priest has meaningful choices between pressure,
+   support, and punishment. This is a good showcase for the special-action scorer:
+   heal/support if the line is damaged, attack/control if the party is clustered
+   or vulnerable.
+
+2. Rusted Guard Formation
+   Monsters: Marrow Standard Bearer (C7), Black-Bone Halberdier (C6), Ossuary Spellblade (C6)
+   Type: Non-boss tactical squad
+   What is cool:
+   This feels like trained undead soldiers rather than random skeletons. The
+   Halberdiers create reach and movement pressure, the Spellblade can threaten
+   softer targets, and the Standard Bearer makes the group read as coordinated.
+   Good for testing whether players respect monster zones of control.
+
+3. Corpse-Tide Breakthrough
+   Monsters: Corpse-Tide Colossus (C8), Grave Ghoul (C1), Shambling Corpse (C1) or Bloated Rotter (C1)
+   Type: Big brute plus bodies
+   What is cool:
+   The Colossus is the obvious danger, but the weaker undead clog lanes and make
+   target selection matter. This is useful when you want a slower encounter where
+   the drama comes from the party trying to stop the large undead before the room
+   collapses into a scrum.
+
+4. Haunted Barracks
+   Monsters: Warden of the Old Watch (C2), Ruin Arbalester (C3), Rusted Shieldbearer (C1)
+   Type: Theme-forward old-guardroom patrol
+   What is cool:
+   The Shieldbearers make a stubborn front, the Arbalesters fire from behind, and
+   the Warden gives the encounter a named tactical center. It is readable for the
+   player: break the shield wall, dive the archers, or burn down the leader.
+
+
+Forest Of The Beasts
+
+1. Grove Bodyguard Cell
+   Monsters: Ironbark Guardian (C5), Sparkwing Mephitling (C1), Myconid Sporeguard (C3)
+   Type: Guardian plus ranged ally plus healer
+   What is cool:
+   This is one of the cleanest behavior showcases. The Guardian holds the line,
+   the Sparkwing tries to shoot from a safer distance, and the Sporeguard can heal
+   wounded allies. The party gets a real priority puzzle: kill the healer, chase
+   the kiter, or break the wall.
+
+2. Pack And Charge
+   Monsters: Forest Wolf (C1) or Moonfang Dire Wolf (C5), Bramble Boar (C1) or Elder Briarboar (C4)
+   Type: Non-boss beast encounter
+   What is cool:
+   Wolves are good for swarm/focus behavior, while the boar gives the encounter
+   a charger that wants to hit from distance. It creates a fast, physical fight
+   where spacing and protecting wounded heroes matter.
+
+3. Fungal Nursery
+   Monsters: Fungal Broodmother (C3), Myconid Sporeguard (C3), Violet Fungus Cluster (C1) or Shrieker Sporecap (C2)
+   Type: Support/control ecology encounter
+   What is cool:
+   The Broodmother is the pressure piece, the Sporeguard is the sustain piece,
+   and the smaller fungi make the room feel occupied and hazardous. This is a
+   good encounter for showing that "plant/fungus" does not just mean slow melee.
+
+4. First Forest Court
+   Monsters: Root of the First Forest (C10), Ironbark Guardian (C5), Needlewind Skirmisher (C2)
+   Type: Boss plus protector plus mobile attacker
+   What is cool:
+   The boss feels like the ancient heart of the room, the Guardian buys it time,
+   and the Skirmisher punishes wounded or isolated characters. This is a good
+   late-forest encounter because the monsters create different problems at once.
+
+
+Underdark Depths
+
+1. Shrieking Mycelium Den
+   Monsters: Hookcap Mycelial Horror (C4), Myconid Sporeguard (C3), Shrieker Sporecap (C2)
+   Type: Non-boss fungus encounter
+   What is cool:
+   The Shrieker provides alarm/control flavor, the Sporeguard can heal or support,
+   and the Horror becomes the actual thing the party must stop. The encounter
+   reads like a living cave defense system.
+
+2. Webbed Beetle Ambush
+   Monsters: Pale Cave Spider (C1), Nightglass Spider (C3), Razor-Mandible Beetle (C2)
+   Type: Non-boss predator mix
+   What is cool:
+   Spiders give skirmish and ambush pressure, while the beetle supplies blunt
+   melee threat. This is a good compact encounter when you want the underdark to
+   feel predatory without using a boss.
+
+3. Deep Mycelial Throne
+   Monsters: Deep Mycelial Overmind (C10), Fungal Broodmother (C3), Spore Titan of the Deep (C7)
+   Type: Boss/control fungus court
+   What is cool:
+   This is a heavy support/control fight. The player should feel that the fungi
+   are sharing a mind: healing, pressure, and control all compete for the monsters'
+   best action. Good for testing high-level special choice.
+
+4. Pressure Cave Collapse
+   Monsters: Stone-Crown Warden (C4), Mudslide Ravager (C4), Pressure Rift Horror (C4)
+   Type: Elemental cave encounter
+   What is cool:
+   Stone holds the line, mud disrupts positioning, and pressure magic makes the
+   room feel unstable. This is a strong underdark alternative to beasts or fungi.
+
+
+Desert Ruins
+
+1. Sun-Baked Ambush
+   Monsters: Glass-Fang Viper (C2), Dust Hyena (C1), Sand Scorpion (C1)
+   Type: Non-boss desert predator pack
+   What is cool:
+   Hyenas create pack pressure, the Viper threatens a priority target, and the
+   Scorpion gives a tougher control/brute angle. It is quick, readable, and nasty.
+
+2. Haunted Reliquary
+   Monsters: Whispering Shade (C1), Candleflame Wisp (C1), Grave-Lantern Specter (C1)
+   Type: Non-boss ghost encounter
+   What is cool:
+   This feels like the ruin's memory fighting the party. The ghosts are fragile
+   enough to handle, but their magic and target choices make the encounter feel
+   less like a normal melee brawl.
+
+3. Glasswind Killing Ground
+   Monsters: Glasswind Assassin (C5), Sirocco Reaver (C3), Sandstorm Burrower (C5)
+   Type: Mobile elemental/desert encounter
+   What is cool:
+   This is a movement showcase. The enemies reposition, pressure angles, and make
+   the battlefield feel windy and unstable. Excellent for testing opportunity
+   attacks, kiting, and target chasing.
+
+4. Dune Guardian Procession
+   Monsters: Duneplate Tortoise (C5) or Ancient Glassback Tortoise (C3), Bonecrack Scorpion (C3), Sirocco Wyvern (C7)
+   Type: Boss-like beast mix without a true boss
+   What is cool:
+   The tortoise anchors the encounter, the scorpion punishes careless melee, and
+   the wyvern creates a mobile threat. It feels like desert wildlife guarding an
+   ancient road or sealed ruin.
+
+
+Embervein Deepworks
+
+1. Foundry Firing Line
+   Monsters: Emberstorm Artillery (C5), Cinder Lemure (C1) or Kindled Ash Brute (C1), Chain-Snag Devil (C2)
+   Type: Ranged artillery plus screen plus controller
+   What is cool:
+   This is a very clean AI showcase. The screen tries to keep the party occupied,
+   the Artillery seeks useful shots, and the Chain-Snag Devil adds control. The
+   player sees the problem immediately: get past the front or suffer ranged fire.
+
+2. Furnace Maintenance Crew
+   Monsters: Furnace-Core Myrmidon (C3), Obsidian Smelter (C4), Sootflame Taskmaster (C2)
+   Type: Non-boss industrial fire team
+   What is cool:
+   These monsters feel like the dungeon machinery has become hostile. The Myrmidon
+   and Smelter bring heavy fire/forge pressure, while the Taskmaster gives the
+   encounter a command-unit flavor.
+
+3. Bad Air In The Mine
+   Monsters: Pressure Rift Horror (C4), Dust Devil (C1), Smoke Mephit Sneak (C2)
+   Type: Control and movement encounter
+   What is cool:
+   Not every Embervein fight needs to be pure fire. This one is about bad air,
+   pressure shifts, and sneaky movement. It is useful for rooms with vents, shafts,
+   or unstable tunnels.
+
+4. Heart Of The Deepworks
+   Monsters: The Embervein, Awakened (C10), Hell-Crown Praetor (C9), Furnace Tyrant (C7) or Furnace-Core Myrmidon (C3)
+   Type: Boss plus commander plus brute
+   What is cool:
+   The Awakened is the dungeon heart, the Praetor adds infernal command/support,
+   and the brute prevents the party from casually rushing the boss. This should
+   feel like the whole industrial hell-engine waking up.
+
+
+Depths Of Hells
+
+1. Chain Court
+   Monsters: Hell-Crown Praetor (C9), Infernal Gaoler (C2), Chain-Snag Devil (C2)
+   Type: Devil commander plus control squad
+   What is cool:
+   This is organized cruelty. Chains control movement, the Gaoler punishes trapped
+   targets, and the Praetor can support or punish depending on the turn. This is
+   a good encounter for showing devils as disciplined tactical enemies.
+
+2. Contract Office From Hell
+   Monsters: Soul-Ledger Scribe (C5), Contract Whelp (C1), Spined Hellion (C2)
+   Type: Non-boss infernal bureaucracy encounter
+   What is cool:
+   The Scribe feels like the brain of the encounter, the Whelps create nuisance
+   pressure, and the ranged devil punishes characters who ignore the backline.
+   Funny premise, real tactical teeth.
+
+3. Demon Breach
+   Monsters: Blood-Smoke Howler (C2), Blink-Rift Predator (C5), Claw Imp of Ruin (C1)
+   Type: Chaotic demon pack
+   What is cool:
+   This should contrast strongly with devil fights. It is fast, violent, and messy:
+   the Predator threatens weak positions, the Howler adds pressure, and the Imps
+   make the party spend actions cleaning up chaos.
+
+4. Hellchain Tribunal
+   Monsters: Hellchain Exarch (C7), Chain Magistrate (C4), Furnace Tyrant (C7)
+   Type: Boss devil chain encounter
+   What is cool:
+   This is a late-theme chain-control fight. The party has to decide whether to
+   kill the controller, survive the brute, or spend resources breaking the enemy
+   formation. It should feel oppressive but understandable.
+
+
+Crucible Of Flame
+
+1. Ember Battery
+   Monsters: Emberstorm Artillery (C5), Cinder Lemure (C1), Smoke Mephit Sneak (C2)
+   Type: Non-boss artillery screen
+   What is cool:
+   The Lemures screen, the Artillery blasts, and the Sneak pressures heroes who
+   try to solve the fight by standing still. A very good "basic fire tactics"
+   encounter.
+
+2. Smoke And Magma
+   Monsters: Magma Myrmidon (C5), Smoke-Veil Assassin (C5), Ash Paraelemental Strangler (C3)
+   Type: Mixed control and damage
+   What is cool:
+   Smoke makes targeting and pursuit awkward, magma creates heavy pressure, and
+   the Strangler adds control. This fight should make the player care about both
+   position and priority targets.
+
+3. Caldera Gate
+   Monsters: Warden of the Caldera Gate (C8), Lava-Tide Colossus (C6), Ember Wisp (C1) as adds
+   Type: Boss plus huge brute
+   What is cool:
+   One monster is the ritual/terrain threat, the other is the physical disaster.
+   Wisps let the room feel alive without stealing the spotlight.
+
+
+Crucible Of Stone
+
+1. Living Wall
+   Monsters: Stone-Crown Warden (C4), Graniteback Bear (C3 or high-tier C6) or Basalt Mauler (C3), Crystal-Carapace Scarab (C3)
+   Type: Defensive stone encounter
+   What is cool:
+   This is a durable formation. The Warden can show off regrowth/healing-style
+   support when appropriate, while the other monsters make a stubborn front line.
+
+2. Mudslide Ambush
+   Monsters: Mudslide Ravager (C4), Sandstorm Burrower (C5), Boulder Boar (C2)
+   Type: Mobile earth encounter
+   What is cool:
+   Earth does not have to mean slow. The Burrower and Boar create movement spikes,
+   while the Myrmidon disrupts the party's preferred formation.
+
+3. Idol Chamber
+   Monsters: Graven Idol Guardian (C2) or Stone-Crown Warden (C4), Pebbleling (C1) or Dust Mephitling (C1), Stoneback Beetle (C1)
+   Type: Boss-like temple defense
+   What is cool:
+   This is a good stone-crucible centerpiece: a hard central guardian with smaller
+   creatures that make action economy matter. The party must decide whether to
+   clear bodies or commit damage to the idol/warden.
+
+
+Crucible Of Storms
+
+1. Needle Draft Squadron
+   Monsters: Needlewind Skirmisher (C2), Sparkwing Mephitling (C1), Thunderclap Sprite (C2)
+   Type: Non-boss mobile air team
+   What is cool:
+   This is perfect for testing skirmisher and kiter behavior. The Skirmisher wants
+   wounded targets, the Sparkwing wants distance, and the Sprite adds burst/control
+   flavor. Opportunity attacks and reactions matter here.
+
+2. Pressure Front
+   Monsters: Pressure Rift Horror (C4), Dust Devil (C1), Sirocco Reaver (C3)
+   Type: Movement/control storm encounter
+   What is cool:
+   The room should feel hard to stand in. The monsters pull, slip, pressure, and
+   chase in different ways, forcing the party to adapt rather than form a static
+   line.
+
+3. Storm Throne
+   Monsters: Sky-Crown Stormlord (C5), Storm-Shell Core (C2), Needlewind Skirmisher (C2)
+   Type: Boss plus defensive core plus mobile attackers
+   What is cool:
+   The Stormlord is spectacle, the Core gives support/defense texture, and the
+   Skirmishers keep the fight from becoming a stationary boss race.
+
+
+Crucible Of Tides
+
+1. Mending Current Cell
+   Monsters: Whitewater Matron (C3), Tide Mauler (C3) or Tidepool Tyrant (C2), Reefjaw Shark (C2)
+   Type: Healer plus bruiser plus predator
+   What is cool:
+   This is a clear healer showcase. The Matron gives the party a support target,
+   the bruiser holds attention, and the shark-style predator punishes wounded or
+   exposed heroes.
+
+2. Steam And Mist Oracle
+   Monsters: Steamstorm Oracle (C6), Fogbank Harrier (C2), River Myrmidon (C3) or Steam Mephitling (C1)
+   Type: Caster/control water encounter
+   What is cool:
+   The Oracle gives magical pressure, the Harrier repositions, and the brute makes
+   chasing the backline costly. Good for a room with vents, pools, or mist cover.
+
+3. Blackwater Wall
+   Monsters: Blackwater Colossus (C6), Glacierback Guardian (C5), Shock Eel (C2) or Storm Eel (C3)
+   Type: Heavy water boss-style fight
+   What is cool:
+   The Colossus is the big offensive problem, the Guardian is the anchor, and the
+   eel creates a dangerous side threat. Simple, readable, and dramatic.
+
+4. Maelstrom Court
+   Monsters: Maelstrom Baron (C7), Whitewater Matron (C3), Dripling (C1) or Steam Mephitling (C1)
+   Type: Boss plus healer plus adds
+   What is cool:
+   The Baron creates the main threat, the Matron makes target priority matter, and
+   the lesser elementals make the battlefield crowded enough for the action scorer
+   to choose between healing, offense, and fallback attacks.
+
+
+General Encounter Design Notes
+
+- Guardian plus ranged ally is one of the clearest player-readable setups.
+- Healer plus brute works best when the healer is reachable but not free.
+- Skirmishers and kiters need enough room to move, or they become normal melee.
+- Artillery needs either distance, a screen, or both.
+- Swarm monsters are most interesting when they can choose the same wounded target.
+- Controllers are strongest when the room has lanes, doors, or hazards to exploit.
+- Bosses feel smarter when paired with one monster that protects them and one that
+  pressures the party's backline.
+- Non-boss encounters are usually better with two clear roles than with five mixed
+  roles. Let the player understand the problem quickly.

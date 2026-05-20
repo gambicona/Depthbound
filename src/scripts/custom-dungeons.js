@@ -35,10 +35,15 @@ function normalizeStoryTriggers(triggers = []) {
   return Array.isArray(triggers) ? triggers.map(normalizeStoryTrigger).filter(Boolean) : [];
 }
 
+function normalizeStringList(values = []) {
+  const source = Array.isArray(values) ? values : String(values ?? "").split(/[,;\n]/);
+  return Array.from(new Set(source.map((entry) => String(entry).trim()).filter(Boolean)));
+}
+
 function normalizeCustomItem(item, index) {
   if (!item || typeof item !== "object") return null;
   const id = String(item.id || item.baseItemId || `custom-item-${index + 1}`);
-  const description = String(item.customDescription ?? item.description ?? item.magic?.description ?? item.treasure?.description ?? "").trim();
+  const description = String(item.customDescription ?? item.handout?.text ?? item.description ?? item.magic?.description ?? item.treasure?.description ?? "").trim();
   const normalized = clone({
     ...item,
     id,
@@ -49,6 +54,19 @@ function normalizeCustomItem(item, index) {
   });
   if (normalized.magic) normalized.magic.description = description;
   if (normalized.treasure) normalized.treasure.description = description;
+  if (normalized.type === "handout" || normalized.handout) {
+    const categories = normalizeStringList([...(normalized.handout?.categories ?? []), ...(normalized.journalCategories ?? [])]);
+    normalized.type = "handout";
+    normalized.tomeInventory = "party";
+    normalized.journalCategories = categories;
+    normalized.handout = {
+      ...(normalized.handout ?? {}),
+      title: normalized.name ?? id,
+      text: description,
+      format: normalized.handout?.format ?? "markdown-lite",
+      categories,
+    };
+  }
   return normalized;
 }
 

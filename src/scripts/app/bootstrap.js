@@ -7,6 +7,9 @@ const { slotCount, getSlots, save, load, remove, saveQuickstart, loadQuickstart 
 let state = null;
 let roomIsBuilt = false;
 let monsterTurnTimer = null;
+let mainMenuBackgroundTimer = null;
+let mainMenuBackgroundIndex = -1;
+let mainMenuBackgroundLayerIndex = 0;
 let gameHasStarted = false;
 let activeSaveSlot = 1;
 let showDungeonLayout = false;
@@ -84,7 +87,16 @@ const heroTokenPreviewSize = 74;
 const preheroTokenManifestPath = "assets/tokens/preheros/manifest.json";
 const mainMenuBackgrounds = [
   "assets/backgrounds/Corrupted Forest.png",
+  "assets/backgrounds/Depths of Hell.png",
+  "assets/backgrounds/Elemental Earth.png",
+  "assets/backgrounds/Elemental Fire 1.png",
+  "assets/backgrounds/Elemental Fire 2.png",
+  "assets/backgrounds/Elemental Water.png",
+  "assets/backgrounds/Elemental Wind.png",
+  "assets/backgrounds/Embervein deepworks.png",
   "assets/backgrounds/Ruined armory of the undead.png",
+  "assets/backgrounds/Sandy Desert.png",
+  "assets/backgrounds/Underdark.png",
 ];
 const buttonThemes = new Set(["verdigris", "ember", "steel", "royal"]);
 const longMoveFastAfterSteps = 5;
@@ -481,6 +493,7 @@ const classPredefinedAbilityScores = {
 
 const els = {
   mainMenu: document.querySelector("#main-menu"),
+  mainMenuBackgroundLayers: [...document.querySelectorAll(".main-menu-bg-layer")],
   menuActions: document.querySelector(".menu-actions"),
   mainMenuBack: document.querySelector("#main-menu-back"),
   startAdventure: document.querySelector("#start-adventure"),
@@ -526,6 +539,7 @@ const els = {
   buildHome: document.querySelector("#build-home"),
   goBarrowCrown: document.querySelector("#go-barrow-crown"),
   goThornwoodPact: document.querySelector("#go-thornwood-pact"),
+  goEmberveinFirstClaim: document.querySelector("#go-embervein-first-claim"),
   goNewDungeon: document.querySelector("#go-new-dungeon"),
   levelPanel: document.querySelector(".level-panel"),
   levelUp: document.querySelector("#level-up"),

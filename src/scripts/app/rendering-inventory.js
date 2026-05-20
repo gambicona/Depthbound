@@ -1870,9 +1870,11 @@ function showDungeonObjectInfo(object) {
   const isHomeStorage = isHomeChest || isHomePlacedContainer;
   const homeBed = state.mode === "home" && object.homePlaced ? objectComponent(object.type, "homeBed") : null;
   const objectLocked = !isHomeChest && object.locked === true;
+  const specialLock = normalizeSpecialLock(object.specialLock);
   const canLootObject = (objectHasLoot(object) || isHomeChest || isHomePlacedContainer) && objectAdjacent && canActInCombat && !objectLocked;
   const heroTriedLock = Boolean(object.lockAttemptsByHero?.[hero.id]);
-  const canPickLock = objectLocked && objectAdjacent && canActInCombat && !heroTriedLock;
+  const canPickLock = objectLocked && !specialLock && objectAdjacent && canActInCombat && !heroTriedLock;
+  const canAnswerSpecialLock = objectLocked && specialLock && objectAdjacent && canActInCombat;
   const disarmTarget = object.trap ?? object;
   const heroTriedDisarm = Boolean(disarmTarget.disarmAttemptsByHero?.[hero.id]);
   const canDisarm =
@@ -1975,10 +1977,13 @@ function showDungeonObjectInfo(object) {
     }
     ${
       objectLocked
-        ? `<p class="empty-note">Locked. Contents hidden until the lock is picked.</p>
-           <button type="button" data-action="pick-lock" data-object="${escapeAttribute(object.id)}" ${canPickLock ? "" : "disabled"}>${
-             heroTriedLock ? "Lock Attempt Spent" : `Pick Lock (DC ${object.lockDc ?? 12})`
-           }</button>`
+        ? specialLock
+          ? `<p class="empty-note">Locked by ${escapeHtml(specialLock.label)}. Contents hidden until the key is given.</p>
+             <button type="button" data-action="answer-special-lock" data-object="${escapeAttribute(object.id)}" ${canAnswerSpecialLock ? "" : "disabled"}>Enter Key</button>`
+          : `<p class="empty-note">Locked. Contents hidden until the lock is picked.</p>
+             <button type="button" data-action="pick-lock" data-object="${escapeAttribute(object.id)}" ${canPickLock ? "" : "disabled"}>${
+               heroTriedLock ? "Lock Attempt Spent" : `Pick Lock (DC ${object.lockDc ?? 12})`
+             }</button>`
         : ""
     }
     ${
@@ -2108,8 +2113,8 @@ function showDungeonObjectInfo(object) {
         ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.spotDc ?? 12}</b><span>Spot DC</span></div>` : ""}
         ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.detected ? "Spotted" : "Hidden"}</b><span>Detection</span></div>` : ""}
         ${object.trap?.detected ? `<div class="stat-pill"><b>${object.trap.spotDc ?? 12}</b><span>Trap DC</span></div>` : ""}
-        ${object.lockDc ? `<div class="stat-pill"><b>${object.locked ? "Locked" : "Open"}</b><span>Lock</span></div>` : ""}
-        ${object.lockDc ? `<div class="stat-pill"><b>${object.lockDc}</b><span>Lock DC</span></div>` : ""}
+        ${object.lockDc || specialLock ? `<div class="stat-pill"><b>${object.locked ? "Locked" : "Open"}</b><span>Lock</span></div>` : ""}
+        ${specialLock ? `<div class="stat-pill"><b>${escapeHtml(specialLock.label)}</b><span>Key Lock</span></div>` : object.lockDc ? `<div class="stat-pill"><b>${object.lockDc}</b><span>Lock DC</span></div>` : ""}
         ${destructible ? `<div class="stat-pill"><b>${objectArmorClass(object)}</b><span>AC</span></div>` : ""}
         ${destructible ? `<div class="stat-pill"><b>${object.hp}/${object.maxHp}</b><span>HP</span></div>` : ""}
       </div>
@@ -3636,6 +3641,7 @@ function takeObjectItem(objectId, itemId) {
   object.items = (object.items ?? []).filter((entry) => entry.id !== itemId);
   addItemToInventory(hero, item, "object-stack");
   addLog(`${hero.name} takes ${item.name} from ${objectTemplate(object.type)?.name ?? "the feature"}.`, "important");
+  logTomeStorageForItem(item);
   render();
   showDungeonObjectInfo(object);
 }
@@ -3643,7 +3649,7 @@ function takeObjectItem(objectId, itemId) {
 function pickObjectLock(objectId) {
   const object = dungeonObjectForId(objectId);
   const hero = activeHero();
-  if (!object || !object.locked) return;
+  if (!object || !object.locked || normalizeSpecialLock(object.specialLock)) return;
   if (
     (state.mode === "combat" && activeFighter()?.id !== hero.id) ||
     !objectCells(object).some((cell) => Math.max(Math.abs(hero.position.x - cell.x), Math.abs(hero.position.y - cell.y)) === 1)
@@ -3676,6 +3682,41 @@ function pickObjectLock(objectId) {
     object.lastResult += " The lock holds.";
     addLog("The lock holds.");
     recordD20OutcomeForFighter(hero, false);
+  }
+  render();
+  showDungeonObjectInfo(object);
+}
+
+async function answerObjectSpecialLock(objectId) {
+  const object = dungeonObjectForId(objectId);
+  const hero = activeHero();
+  const specialLock = normalizeSpecialLock(object?.specialLock);
+  if (!object || !object.locked || !specialLock) return;
+  if (
+    (state.mode === "combat" && activeFighter()?.id !== hero.id) ||
+    !objectCells(object).some((cell) => Math.max(Math.abs(hero.position.x - cell.x), Math.abs(hero.position.y - cell.y)) === 1)
+  ) {
+    addLog(`${hero.name} needs to be next to ${objectTemplate(object.type)?.name ?? "it"} to use the lock${state.mode === "combat" ? " on their turn" : ""}.`);
+    renderLog();
+    return;
+  }
+  if (!activeStealthCheckInMonsterRoom(hero, `tries ${objectTemplate(object.type)?.name ?? "a keyed lock"}`)) return;
+  const answer = await showGameDialog({
+    title: specialLock.label,
+    message: specialLock.prompt,
+    input: { label: "Key", value: "", maxLength: 120 },
+    confirmText: "Unlock",
+    cancelText: "Cancel",
+  });
+  if (answer === null) return;
+  if (specialLockAnswerMatches(specialLock, answer)) {
+    object.locked = false;
+    object.specialLock = { ...specialLock, unlocked: true };
+    object.lastResult = `${specialLock.label} accepts the key.`;
+    addLog(`${hero.name} unlocks ${objectTemplate(object.type)?.name ?? "the lock"}.`, "important");
+  } else {
+    object.lastResult = `${specialLock.label} rejects the key.`;
+    addLog(`${specialLock.label} rejects the key.`);
   }
   render();
   showDungeonObjectInfo(object);
@@ -3905,6 +3946,7 @@ function grantFeatureInspectionReward(hero, object, component) {
     items.forEach((item) => addItemToInventory(hero, item, "found-stack"));
     object.lastResult += ` Found ${items.map((item) => item.name).join(", ")}.`;
     addLog(`${hero.name} finds ${items.map((item) => item.name).join(", ")}.`, "important");
+    logTomeStorageForItems(items);
     return true;
   }
   return false;
@@ -4145,7 +4187,7 @@ function resolveObjectInteractionSuccess(hero, object, component, total, rollRes
     const name = grantObjectInteractionItem(hero, itemId, "forge");
     if (name) messages.push(`Drew heat into ${name}.`);
     if (greatSuccess) {
-      applyStatusEffect(hero, { id: "forge-heated-weapon", label: "Forge Heat", weaponRider: true, damageBonus: rollDie(6), damageType: "fire", durationRounds: 10 });
+      applyStatusEffect(hero, { id: "forge-heated-weapon", label: "Forge Heat", weaponRider: true, damageBonus: rollDie(6), damageType: "fire", expiresAtHome: true });
       messages.push(`${hero.name}'s next weapon hits carry forge fire.`);
     }
   } else if (effect === "anvilTune") {
@@ -4497,6 +4539,7 @@ function itemDetails(item) {
     return `${item.category ?? "Consumable"}; ${item.use?.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
   }
   if (item.type === "accessory") return `${magicText.replace(/^; /, "") || item.loot?.rarity || "magic"}${chargeText}${cost}${weight}${starterText}`;
+  if (item.type === "handout") return `Ancient Tome handout${cost}`;
   if (item.type === "treasure") return `${item.treasure?.kind ?? item.category ?? "treasure"}; value ${item.cost?.text ?? priceText(item.treasure?.valueCp ?? 0)}${weight}${starterText}`;
   return item.type ?? "Item";
 }
@@ -4504,6 +4547,7 @@ function itemDetails(item) {
 function itemDisplayDescription(item) {
   if (!item) return "";
   const isCustomDungeonItem = item.customDungeonItem || /^custom-item-\d+/.test(String(item.baseItemId ?? item.itemId ?? item.id ?? ""));
+  if (item.type === "handout" || item.handout) return item.handout?.text ?? item.customDescription ?? item.description ?? "";
   if (isCustomDungeonItem) return item.customDescription || item.description || item.magic?.description || item.treasure?.description || "";
   return item.magic?.description || item.treasure?.description || item.description || "";
 }
@@ -4993,6 +5037,7 @@ function addAdminItemToInventory(templateId) {
 
   addItemToInventory(hero, item, "admin-stack");
   addLog(`Added ${item.name} to inventory.`, "important");
+  logTomeStorageForItem(item);
   render();
   renderInventoryMenu();
 }
@@ -5399,6 +5444,57 @@ function showPartyResourceInfo(itemId) {
   });
 }
 
+function handoutInlineMarkup(text) {
+  return escapeHtml(text)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+}
+
+function handoutTextMarkup(text = "") {
+  const lines = String(text ?? "").replace(/\r\n/g, "\n").split("\n");
+  const blocks = [];
+  let paragraph = [];
+  let list = [];
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    blocks.push(`<p>${handoutInlineMarkup(paragraph.join(" "))}</p>`);
+    paragraph = [];
+  };
+  const flushList = () => {
+    if (!list.length) return;
+    blocks.push(`<ul>${list.map((item) => `<li>${handoutInlineMarkup(item)}</li>`).join("")}</ul>`);
+    list = [];
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+    const heading = /^(#{1,3})\s+(.+)$/.exec(trimmed);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      const level = Math.min(4, heading[1].length + 2);
+      blocks.push(`<h${level}>${handoutInlineMarkup(heading[2])}</h${level}>`);
+      continue;
+    }
+    const bullet = /^[-*]\s+(.+)$/.exec(trimmed);
+    if (bullet) {
+      flushParagraph();
+      list.push(bullet[1]);
+      continue;
+    }
+    flushList();
+    paragraph.push(trimmed);
+  }
+  flushParagraph();
+  flushList();
+  return blocks.join("") || `<p class="empty-note">This page is blank.</p>`;
+}
+
 function unequippedInventoryItems(fighter) {
   const equippedIds = new Set(Object.values(fighter.equipment).filter(Boolean));
   return fighter.inventory.items.filter((item) => !equippedIds.has(item.id));
@@ -5551,22 +5647,33 @@ function ensureItemCharges(item) {
   return item;
 }
 
+function itemChargeRefreshKey(item) {
+  if (!item?.use?.charges?.refresh) return null;
+  return `${state.customDungeonId ?? state.dungeon?.id ?? state.themeId ?? "dungeon"}:${state.campaignIndex ?? "standalone"}`;
+}
+
 function itemHasCharges(item) {
   ensureItemCharges(item);
+  if (item?.use?.charges?.refresh === "newDungeon" && item.use.charges.lastUsedKey === itemChargeRefreshKey(item)) return false;
   return !item?.use?.charges || (item.use.charges.remaining ?? 0) > 0;
 }
 
 function spendItemCharge(item) {
   ensureItemCharges(item);
   if (!item?.use?.charges) return true;
+  if (item.use.charges.refresh === "newDungeon" && item.use.charges.lastUsedKey === itemChargeRefreshKey(item)) return false;
   if ((item.use.charges.remaining ?? 0) <= 0) return false;
   item.use.charges.remaining -= 1;
+  if (item.use.charges.refresh === "newDungeon") item.use.charges.lastUsedKey = itemChargeRefreshKey(item);
   return true;
 }
 
 function refreshItemChargesForFighter(fighter, refresh) {
   for (const item of fighter?.inventory?.items ?? []) {
-    if (item.use?.charges?.refresh === refresh) item.use.charges.remaining = item.use.charges.max ?? 1;
+    if (item.use?.charges?.refresh === refresh) {
+      item.use.charges.remaining = item.use.charges.max ?? 1;
+      delete item.use.charges.lastUsedKey;
+    }
   }
 }
 
@@ -6343,8 +6450,10 @@ function renderHomeAdventurePanels() {
   Object.entries(panels).forEach(([key, panel]) => panel?.classList.toggle("hidden", key !== homeMenuPanel));
   const barrowCompleted = state.campaignProgress?.["barrow-crown"] ?? 0;
   const thornwoodCompleted = state.campaignProgress?.["thornwood-pact"] ?? 0;
+  const emberveinCompleted = state.campaignProgress?.["embervein-first-claim"] ?? 0;
   els.goBarrowCrown?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${barrowCompleted}/7`));
   els.goThornwoodPact?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${thornwoodCompleted}/8`));
+  els.goEmberveinFirstClaim?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${emberveinCompleted}/1`));
 
   if (els.homeRandomDungeonActions) {
     const themes = window.DungeonContent
@@ -6688,6 +6797,81 @@ function smithMaterialCommissionMarkup(npc) {
   `;
 }
 
+const borrenClaimHammerItemId = "magic-embervein-claim-hammer";
+const borrenClaimHammerQuestKey = "borrenClaimHammer";
+
+function borrenClaimHammerRequirement() {
+  return { itemId: borrenClaimHammerItemId };
+}
+
+function borrenClaimHammerState() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[borrenClaimHammerQuestKey] ??= { status: "available" };
+  return state.questFlags[borrenClaimHammerQuestKey];
+}
+
+function borrenClaimHammerCount() {
+  return materialCountForRequirement(borrenClaimHammerRequirement());
+}
+
+function borrenClaimHammerMarkup(npc) {
+  if (npc?.id !== "armorsmith") return "";
+  const quest = borrenClaimHammerState();
+  const have = borrenClaimHammerCount();
+  const accepted = quest.status === "accepted";
+  const completed = quest.status === "completed";
+  if (!completed && !accepted && have <= 0) return "";
+  return `
+    <section class="store-section">
+      <h3>Relic Claim</h3>
+      <div class="store-row">
+        <div>
+          <b>Embervein Claim Hammer</b>
+          <span>${
+            completed
+              ? "Borren has the hammer and is already studying its maker's marks."
+              : accepted
+                ? "Borren wants the Ashmantle hammer before anyone else melts its memory out of it."
+                : "Borren notices the Ashmantle mark beneath the soot and asks to see the hammer."
+          } Satchel and packs: ${escapeHtml(have)}/1 - Reward: 100 gp, 3 Embervein Ore, smith chain started.</span>
+        </div>
+        ${
+          completed
+            ? `<button type="button" disabled>Returned</button>`
+            : accepted
+              ? `<button type="button" data-action="complete-borren-claim-hammer" ${have >= 1 ? "" : "disabled"}>${have >= 1 ? "Give Hammer" : "Need Hammer"}</button>`
+              : `<button type="button" data-action="accept-borren-claim-hammer">Ask Borren</button>`
+        }
+      </div>
+    </section>
+  `;
+}
+
+function acceptBorrenClaimHammerQuest() {
+  const quest = borrenClaimHammerState();
+  if (quest.status === "completed") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog("Borren Ashmantle recognizes the Embervein Claim Hammer and asks the party to return it to his forge.", "important");
+  renderStoreMenu();
+}
+
+function completeBorrenClaimHammerQuest() {
+  const quest = borrenClaimHammerState();
+  if (quest.status === "completed" || borrenClaimHammerCount() < 1) return;
+  if (!consumeMaterialsForRequirement(borrenClaimHammerRequirement(), 1)) return;
+  const hero = activeHero();
+  addMoney(hero.inventory.money, 10000);
+  addPartyResourceItem(getItemTemplate("embervein-ore"), 3);
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  state.questFlags["flag.borren.claimHammerReturned"] = true;
+  state.questFlags["flag.borren.smithChainStarted"] = true;
+  addLog("Borren accepts the First Claim Hammer. The Ashmantle smithing chain has begun.", "important");
+  renderStoreMenu();
+  renderInventoryMenu();
+}
+
 function acceptSmithMaterialCommission(npcId) {
   const npc = window.DungeonContent.get("npcs", npcId);
   const commission = smithMaterialCommissionForNpc(npcId);
@@ -6859,6 +7043,30 @@ function materialCommissionQuestLogEntries() {
     });
 }
 
+function borrenClaimHammerQuestLogEntries() {
+  const quest = state?.questFlags?.[borrenClaimHammerQuestKey];
+  if (quest?.status !== "accepted") return [];
+  const have = borrenClaimHammerCount();
+  return [
+    {
+      id: "borren-claim-hammer",
+      giver: "Borren Ashmantle",
+      title: "The First Claim Hammer",
+      description: "Borren recognized the Ashmantle maker's mark on the Embervein Claim Hammer. Bring it back to his forge so he can begin tracing the claim.",
+      ready: have >= 1,
+      cancelable: true,
+      cancelType: "borren-claim-hammer",
+      objectives: [
+        {
+          label: "Embervein Claim Hammer",
+          progress: Math.min(1, have),
+          target: 1,
+        },
+      ],
+    },
+  ];
+}
+
 function campaignQuestLogEntries() {
   const campaigns = window.DungeonCampaigns?.list?.() ?? [];
   return campaigns
@@ -6900,13 +7108,75 @@ function acceptedQuestLogEntries() {
     ...campaignQuestLogEntries(),
     ...Object.values(window.DungeonNpcBehaviors ?? {}).flatMap((behavior) => behavior.questLogEntries?.() ?? []),
     ...materialCommissionQuestLogEntries(),
+    ...borrenClaimHammerQuestLogEntries(),
   ].filter(Boolean);
+}
+
+function ancientTomeEntries() {
+  return normalizePartyTomes(state?.partyTomes ?? []).sort((a, b) => (a.collectedAt ?? 0) - (b.collectedAt ?? 0) || a.title.localeCompare(b.title));
+}
+
+function ancientTomeCategoryGroups(entries = ancientTomeEntries()) {
+  const groups = new Map();
+  for (const entry of entries) {
+    const categories = entry.categories?.length ? entry.categories : ["Uncategorized"];
+    for (const category of categories) {
+      if (!groups.has(category)) groups.set(category, []);
+      groups.get(category).push(entry);
+    }
+  }
+  return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+}
+
+function ancientTomeEntryMarkup(entry) {
+  return `
+    <details class="quest-log-entry ancient-tome-entry">
+      <summary>
+        <b>${escapeHtml(entry.title)}</b>
+        <span>${escapeHtml((entry.categories?.length ? entry.categories : ["Uncategorized"]).join(", "))}</span>
+      </summary>
+      <div class="ancient-tome-text">${handoutTextMarkup(entry.text)}</div>
+    </details>
+  `;
+}
+
+function ancientTomeMarkup() {
+  const entries = ancientTomeEntries();
+  const groups = ancientTomeCategoryGroups(entries);
+  return `
+    <section class="quest-log-list ancient-tome-list">
+      <h3>Ancient Tome</h3>
+      ${
+        entries.length
+          ? groups
+              .map(
+                ([category, categoryEntries]) => `
+                  <details class="ancient-tome-category" open>
+                    <summary>${escapeHtml(category)} <span>${categoryEntries.length}</span></summary>
+                    <div>${categoryEntries.map(ancientTomeEntryMarkup).join("")}</div>
+                  </details>
+                `,
+              )
+              .join("")
+          : `<p class="empty-note">No collected handouts.</p>`
+      }
+    </section>
+  `;
 }
 
 function cancelQuestLogEntry(entry) {
   if (!entry?.cancelable) return false;
   if (entry.cancelType === "npc") return cancelNpcQuest(entry.npcId, entry.questId);
   if (entry.cancelType === "commission") return cancelSmithMaterialCommission(entry.npcId);
+  if (entry.cancelType === "borren-claim-hammer") {
+    const quest = borrenClaimHammerState();
+    if (quest.status !== "accepted") return false;
+    quest.status = "available";
+    quest.cancelledAt = Date.now();
+    delete quest.acceptedAt;
+    addLog("Borren's claim hammer request is no longer accepted.", "important");
+    return true;
+  }
   return false;
 }
 
@@ -6944,9 +7214,14 @@ function showQuestLog() {
   if (!gameHasStarted) return;
   const entries = acceptedQuestLogEntries();
   els.gameDialogTitle.textContent = "Quest Log";
-  els.gameDialogMessage.innerHTML = entries.length
-    ? `<section class="quest-log-list">${entries.map(questLogEntryMarkup).join("")}</section>`
-    : `<p class="empty-note">No accepted quests.</p>`;
+  els.gameDialogMessage.innerHTML = `
+    ${
+      entries.length
+        ? `<section class="quest-log-list">${entries.map(questLogEntryMarkup).join("")}</section>`
+        : `<p class="empty-note">No accepted quests.</p>`
+    }
+    ${ancientTomeMarkup()}
+  `;
   els.gameDialogField.classList.add("hidden");
   els.gameDialogField.innerHTML = "";
   els.gameDialogActions.innerHTML = `<button type="button" data-dialog-action="close-quest-log">Close</button>`;
@@ -7022,6 +7297,7 @@ function renderStoreMenu() {
       </div>
     </section>
     <div class="store-wallet">${escapeHtml(moneyText(hero.inventory.money))}</div>
+    ${borrenClaimHammerMarkup(npc)}
     ${smithMaterialCommissionMarkup(npc)}
     <label class="store-search" for="store-search">
       <span>Search</span>

@@ -289,6 +289,9 @@ els.fighterInfo.addEventListener("click", (event) => {
   if (button.dataset.action === "pick-lock") {
     pickObjectLock(button.dataset.object);
   }
+  if (button.dataset.action === "answer-special-lock") {
+    void answerObjectSpecialLock(button.dataset.object);
+  }
   if (button.dataset.action === "disarm-trap") {
     disarmTrap(button.dataset.object);
   }
@@ -459,6 +462,7 @@ els.buildHome?.addEventListener("click", showHomeBuilder);
 els.goAdventure?.addEventListener("click", () => setHomeMenuPanel("adventure"));
 els.goBarrowCrown?.addEventListener("click", () => void startCampaignDungeon("barrow-crown"));
 els.goThornwoodPact?.addEventListener("click", () => void startCampaignDungeon("thornwood-pact"));
+els.goEmberveinFirstClaim?.addEventListener("click", () => void startCampaignDungeon("embervein-first-claim"));
 els.goNewDungeon?.addEventListener("click", startNewDungeonWithHero);
 els.levelUp.addEventListener("click", levelUpHero);
 els.replaceRangerCompanion?.addEventListener("click", () => void replaceDeadBeastMasterCompanion());
@@ -489,6 +493,12 @@ els.storeMenu.addEventListener("click", (event) => {
   }
   if (button?.dataset.action === "complete-smith-commission") {
     completeSmithMaterialCommission(button.dataset.npc);
+  }
+  if (button?.dataset.action === "accept-borren-claim-hammer") {
+    acceptBorrenClaimHammerQuest();
+  }
+  if (button?.dataset.action === "complete-borren-claim-hammer") {
+    completeBorrenClaimHammerQuest();
   }
 });
 els.storeMenu.addEventListener("input", (event) => {

@@ -1020,7 +1020,7 @@
       "click",
       (event) => {
         const trigger = event.target?.closest?.(
-          "#go-new-dungeon, #go-barrow-crown, #go-thornwood-pact, #return-home, [data-campaign-dungeon], #start-adventure, [data-action='load-slot']",
+          "#go-new-dungeon, #go-barrow-crown, #go-thornwood-pact, #go-embervein-first-claim, #return-home, [data-campaign-dungeon], #start-adventure, [data-action='load-slot']",
         );
         if (trigger) pulseHostSnapshots();
       },

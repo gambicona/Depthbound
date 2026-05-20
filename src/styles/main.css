@@ -437,12 +437,7 @@ h1 {
 
 .main-menu {
   align-items: center;
-  background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(5, 4, 5, 0.42) 38%, rgba(5, 4, 5, 0.9)),
-    radial-gradient(circle at 50% 20%, rgba(182, 225, 214, 0.16), transparent 33%),
-    var(--main-menu-bg, url("../../assets/backgrounds/Corrupted Forest.png"));
-  background-position: center;
-  background-size: cover;
+  background: #070606;
   display: flex;
   inset: 0;
   justify-content: center;
@@ -450,6 +445,30 @@ h1 {
   padding: clamp(18px, 4vh, 40px) 24px;
   position: fixed;
   z-index: 30;
+}
+
+.main-menu-bg-layer {
+  background-image:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(5, 4, 5, 0.42) 38%, rgba(5, 4, 5, 0.9)),
+    radial-gradient(circle at 50% 20%, rgba(182, 225, 214, 0.16), transparent 33%),
+    var(--main-menu-bg, url("../../assets/backgrounds/Corrupted Forest.png"));
+  background-position: center;
+  background-size: cover;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 1600ms ease;
+}
+
+.main-menu-bg-layer.active {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main-menu-bg-layer {
+    transition: none;
+  }
 }
 
 .main-menu::before {
@@ -460,6 +479,7 @@ h1 {
   inset: 0;
   pointer-events: none;
   position: absolute;
+  z-index: 0;
 }
 
 .main-menu-inner {
@@ -4408,6 +4428,58 @@ h1 {
 
 .quest-log-entry p {
   margin: 0;
+}
+
+.ancient-tome-list {
+  margin-top: 12px;
+}
+
+.ancient-tome-list h3 {
+  margin: 0;
+}
+
+.ancient-tome-entry summary {
+  cursor: pointer;
+}
+
+.ancient-tome-category {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.ancient-tome-category > summary {
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.ancient-tome-category > summary span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin-left: 6px;
+}
+
+.ancient-tome-category > div {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ancient-tome-text {
+  display: grid;
+  gap: 8px;
+  line-height: 1.55;
+}
+
+.ancient-tome-text h3,
+.ancient-tome-text h4,
+.ancient-tome-text p,
+.ancient-tome-text ul {
+  margin: 0;
+}
+
+.ancient-tome-text ul {
+  padding-left: 18px;
 }
 
 .object-result {

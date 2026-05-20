@@ -5,6 +5,7 @@ window.DungeonContent.register("monsters", "monsterTemplate", {
   tags: ["example-tag", "biome-or-theme"],
   maxHp: 18,
   category: 1,
+  multiattack: { attacks: 1 },
   xp: 75,
   ac: 13,
   baseAc: 13,

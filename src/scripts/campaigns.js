@@ -51,6 +51,26 @@ If the Barrow Crown is not found, the first king will rise — and every oath on
     count: 8,
     folder: "campaigns/the-thornwood-pact",
   },
+  {
+    id: "embervein-first-claim",
+    name: "The First Claim of Embervein",
+    quest: {
+      giver: "Borren Ashmantle",
+      initialTitle: "Recover the First Claim",
+      initialDescription: "Borren has heard an old Embervein claim bell ringing again. Enter the Deepworks, defeat the thief at the furnace heart, and recover whatever Ashmantle relic remains.",
+      progressTitle: "The First Claim Burns",
+      progressDescription: "The Embervein Deepworks has been reopened by a soot-marked crew. Push to the furnace heart and bring the First Claim Hammer home.",
+      completedTitle: "The Hammer Returned",
+      completedDescription: "The First Claim Hammer has been recovered from the Embervein Deepworks. Borren Ashmantle may know why it matters.",
+    },
+    description: `Borren Ashmantle's family claim in the Embervein Deepworks has started ringing from below the hills.
+
+Someone has broken into the old forge-mine, restarted the furnaces, and stolen the First Claim Hammer from its sealed rack.
+
+This is a compact one-dungeon adventure for four level 2 heroes: a cold lift, coal silos, pressure valves, moving chain hoists, and a furnace-heart boss who would rather burn the mine than give the hammer back.`,
+    count: 1,
+    folder: "campaigns/the-first-claim-of-embervein",
+  },
 ];
 
 const cache = new Map();

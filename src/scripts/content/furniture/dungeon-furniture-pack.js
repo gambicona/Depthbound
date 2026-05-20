@@ -649,7 +649,15 @@ feature("tidal-current-floor", "Tidal Current Floor", ["terrain-floor", "water",
   ["powder-keg", "Powder Keg", ["forge", "mine", "industrial"], { blocksMovement: true, inspectable: true, symbol: "K", weight: 90, components: [C.hazardEnter({ damage: { count: 2, sides: 6, type: "fire" } }), C.destructible(5, 10)] }],
   ["conveyor-belt", "Conveyor Belt", ["forge", "mine", "industrial"], { symbol: ">", components: [C.difficult, C.toggle({ effect: "forced-movement" })] }],
   ["drill-rig", "Drill Rig", ["forge", "mine", "industrial"], { blocksMovement: true, blocksLineOfSight: true, inspectable: true, symbol: "D", weight: 650, components: [C.hazardEnter({ damage: { count: 1, sides: 6, type: "piercing" } }), C.toggle({ effect: "machine" })] }],
-  ["locked-supply-locker", "Locked Supply Locker", ["forge", "mine", "industrial", "container"], { blocksMovement: true, inspectable: true, symbol: "L", weight: 220, components: [C.loot({ count: 2 }), C.trap({ source: "container", chance: 0.25 })] }],
+  ["locked-supply-locker", "Locked Supply Locker", ["forge", "mine", "industrial", "container", "loot"], {
+    kind: "container",
+    blocksMovement: true,
+    inspectable: true,
+    placement: "wall-adjacent",
+    symbol: "L",
+    weight: 220,
+    components: [C.loot({ count: 2 }), C.lock({ dc: 14, chance: 1 }), C.trap({ source: "container", chance: 0.25 })],
+  }],
 ].forEach(([id, name, tags, options]) => feature(id, name, tags, { spawnChance: 0.035, ...options }));
 
 feature("undead-crate", "Undead Crate", ["old-guardroom", "dungeon", "crypt", "ruin", "undead", "container"], {

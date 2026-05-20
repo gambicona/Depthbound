@@ -109,6 +109,7 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
     campaignProgress: {},
     questFlags: {},
     partyResources: {},
+    partyTomes: [],
     lootPiles: [],
     dungeonObjects,
     party: {
@@ -152,6 +153,91 @@ function itemUsesPartyResourceInventory(item) {
   return Boolean(item?.type === "component" || item?.resourceInventory === "party" || item?.tags?.includes("party-resource") || item?.tags?.includes("quest-resource"));
 }
 
+function normalizePartyTomes(tomes = []) {
+  if (!Array.isArray(tomes)) return [];
+  return tomes
+    .map((entry, index) => {
+      if (!entry || typeof entry !== "object") return null;
+      const title = String(entry.title ?? entry.name ?? entry.handout?.title ?? `Ancient Tome ${index + 1}`).trim() || `Ancient Tome ${index + 1}`;
+      const text = String(entry.text ?? entry.handout?.text ?? entry.customDescription ?? entry.description ?? "").trim();
+      const categories = Array.from(
+        new Set([...(entry.categories ?? []), ...(entry.handout?.categories ?? []), ...(entry.journalCategories ?? [])].map((category) => String(category).trim()).filter(Boolean)),
+      );
+      if (!title && !text) return null;
+      return {
+        id: String(entry.id ?? entry.instanceId ?? `tome-${index + 1}`),
+        baseItemId: String(entry.baseItemId ?? entry.itemId ?? entry.id ?? ""),
+        title,
+        text,
+        categories,
+        collectedAt: entry.collectedAt ?? Date.now(),
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizeSpecialLock(lock = null) {
+  if (!lock || typeof lock !== "object") return null;
+  const answer = String(lock.answer ?? lock.key ?? lock.passphrase ?? "").trim();
+  if (!answer) return null;
+  return {
+    prompt: String(lock.prompt ?? "Enter the key phrase.").trim() || "Enter the key phrase.",
+    answer,
+    label: String(lock.label ?? "Special Lock").trim() || "Special Lock",
+    caseSensitive: Boolean(lock.caseSensitive),
+    unlocked: Boolean(lock.unlocked),
+  };
+}
+
+function specialLockAnswerMatches(lock, input) {
+  const normalizedLock = normalizeSpecialLock(lock);
+  if (!normalizedLock) return false;
+  const submitted = String(input ?? "").trim();
+  return normalizedLock.caseSensitive ? submitted === normalizedLock.answer : submitted.toLowerCase() === normalizedLock.answer.toLowerCase();
+}
+
+function itemUsesTomeInventory(item) {
+  return Boolean(item?.type === "handout" || item?.tomeInventory === "party" || item?.tags?.includes("handout") || item?.tags?.includes("ancient-tome"));
+}
+
+function tomeEntryFromItem(item) {
+  if (!item) return null;
+  const title = String(item.handout?.title ?? item.name ?? "Ancient Tome Page").trim() || "Ancient Tome Page";
+  const text = String(item.handout?.text ?? item.customDescription ?? item.description ?? "").trim();
+  const categories = Array.from(
+    new Set([...(item.handout?.categories ?? []), ...(item.journalCategories ?? [])].map((category) => String(category).trim()).filter(Boolean)),
+  );
+  return {
+    id: item.id ?? `${item.baseItemId ?? "handout"}-${Date.now()}`,
+    baseItemId: item.baseItemId ?? item.itemId ?? item.id ?? "",
+    title,
+    text,
+    categories,
+    collectedAt: Date.now(),
+  };
+}
+
+function addPartyTomeItem(item) {
+  const entry = tomeEntryFromItem(item);
+  if (!entry) return null;
+  state.partyTomes = normalizePartyTomes(state.partyTomes ?? []);
+  const signature = `${entry.baseItemId}|${entry.title}|${entry.text}|${entry.categories.join(",")}`;
+  const existing = state.partyTomes.find((tome) => `${tome.baseItemId}|${tome.title}|${tome.text}|${(tome.categories ?? []).join(",")}` === signature);
+  if (existing) return existing;
+  state.partyTomes.push(entry);
+  return entry;
+}
+
+function logTomeStorageForItem(item) {
+  if (!itemUsesTomeInventory(item) || typeof addLog !== "function") return;
+  const entry = tomeEntryFromItem(item);
+  if (entry) addLog(`${entry.title} is stored in the Ancient Tome journal.`, "important");
+}
+
+function logTomeStorageForItems(items = []) {
+  (items ?? []).forEach(logTomeStorageForItem);
+}
+
 function addPartyResourceItem(item, quantity = 1) {
   if (!item) return 0;
   const itemId = item.baseItemId ?? item.itemId ?? item.id;
@@ -171,6 +257,8 @@ function moveInventoryPartyResourcesToSatchel(fighters = rosterHeroes()) {
     for (const item of fighter.inventory.items) {
       if (itemUsesPartyResourceInventory(item)) {
         moved += addPartyResourceItem(item, item.quantity ?? 1);
+      } else if (itemUsesTomeInventory(item)) {
+        addPartyTomeItem(item);
       } else {
         keptItems.push(item);
       }
@@ -419,6 +507,7 @@ function createDungeonStateForParty(partyMembers, previousState, themeId = defau
   nextState.campaignProgress = cloneData(previousState?.campaignProgress ?? {});
   nextState.questFlags = cloneData(previousState?.questFlags ?? {});
   nextState.partyResources = normalizePartyResources(previousState?.partyResources ?? {});
+  nextState.partyTomes = normalizePartyTomes(previousState?.partyTomes ?? []);
   return nextState;
 }
 
@@ -437,9 +526,12 @@ function createCustomDungeonObject(templateObject, index) {
   if (!template) return null;
   const lockComponent = objectComponent(templateObject.type, "lock");
   const lockDc = templateObject.lockDc ?? lockComponent?.dc;
+  const specialLock = normalizeSpecialLock(templateObject.specialLock);
   const locked =
     typeof templateObject.locked === "boolean"
       ? templateObject.locked
+      : specialLock
+        ? true
       : lockComponent
         ? Math.random() < (lockComponent.chance ?? 0.5)
         : undefined;
@@ -451,7 +543,8 @@ function createCustomDungeonObject(templateObject, index) {
     height: templateObject.height ?? template.height ?? 1,
     ...(templateObject.pairId ? { pairId: templateObject.pairId } : {}),
     ...(templateObject.trap ? { trap: { ...templateObject.trap } } : {}),
-    ...(lockDc ? { lockDc } : {}),
+    ...(specialLock ? { specialLock } : {}),
+    ...(!specialLock && lockDc ? { lockDc } : {}),
     ...(typeof locked === "boolean" ? { locked } : {}),
     items: itemInstancesFromIds(templateObject.items ?? [], "object"),
   };
@@ -594,6 +687,7 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
     campaignProgress: cloneData(previousState?.campaignProgress ?? {}),
     questFlags: cloneData(previousState?.questFlags ?? {}),
     partyResources: normalizePartyResources(previousState?.partyResources ?? {}),
+    partyTomes: normalizePartyTomes(previousState?.partyTomes ?? []),
     lootPiles: [],
     dungeonObjects: objects,
     party: {
@@ -1359,6 +1453,7 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
   removeLegacyTestingBeastAllyFromPartyData(normalizedPartyData);
   const incomingHeroes = (Array.isArray(heroOrHeroes) ? heroOrHeroes : [heroOrHeroes]).filter((hero) => !isLegacyTestingBeastAlly(hero));
   const partyResources = normalizePartyResources(normalizedPartyData?.partyResources ?? state?.partyResources ?? {});
+  const partyTomes = normalizePartyTomes(normalizedPartyData?.partyTomes ?? state?.partyTomes ?? []);
   for (const hero of incomingHeroes) {
     if (!hero?.inventory?.items?.length) continue;
     const keptItems = [];
@@ -1367,6 +1462,9 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
         const itemId = item.baseItemId ?? item.itemId ?? item.id;
         const amount = Math.max(1, Math.floor(Number(item.quantity) || 1));
         if (itemId) partyResources[itemId] = (partyResources[itemId] ?? 0) + amount;
+      } else if (itemUsesTomeInventory(item)) {
+        const entry = tomeEntryFromItem(item);
+        if (entry) partyTomes.push(entry);
       } else {
         keptItems.push(item);
       }
@@ -1436,6 +1534,7 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
     campaignProgress: cloneData(normalizedPartyData?.campaignProgress ?? {}),
     questFlags,
     partyResources: normalizePartyResources(partyResources),
+    partyTomes: normalizePartyTomes(partyTomes),
     lootPiles: [],
     dungeonObjects: home.objects,
     party: {
@@ -3015,6 +3114,28 @@ function applyMonsterCategoryScaling(monster, hero) {
     };
   };
 
+  const scaledMultiattack = () => {
+    if (monster.behavior === "swarm") return null;
+    const config = monsterMultiattackConfig(monster);
+    const currentAttacks = config?.attacks ?? 1;
+    const attackStyleCanScale = ["melee", "charger", "skirmisher", "guardian", "brute", "ranged", "rangedKiter"].includes(monster.behavior ?? "melee");
+    if (!attackStyleCanScale) return config;
+
+    let targetAttacks = currentAttacks;
+    if (targetCategory >= 4 && categoryGap >= 3) targetAttacks = Math.max(targetAttacks, 2);
+    if (targetCategory >= 7 && categoryGap >= 4) targetAttacks = Math.max(targetAttacks, 3);
+    if (targetCategory >= 10 && categoryGap >= 6 && (monster.tags ?? []).includes("boss")) targetAttacks = Math.max(targetAttacks, 4);
+    if (targetAttacks <= 1) return config;
+
+    const damageMultiplier = targetAttacks >= 4 ? 0.32 : targetAttacks >= 3 ? 0.42 : 0.55;
+    return {
+      ...(config ?? {}),
+      attacks: Math.min(4, targetAttacks),
+      damageMultiplier: Math.min(config?.damageMultiplier ?? 1, damageMultiplier),
+      scaledFromCategoryGap: categoryGap,
+    };
+  };
+
   monster.baseCategory = monster.baseCategory ?? originalCategory;
   monster.scaledFromCategory = originalCategory;
   monster.category = targetCategory;
@@ -3027,6 +3148,8 @@ function applyMonsterCategoryScaling(monster, hero) {
   monster.attackBonus = scaleTowardAverage(monster.attackBonus ?? 0, originalAverages.attackBonus, targetAverages.attackBonus, Math.min(0.78, catchUp));
   monster.baseDamage = scaleFlatDamage(monster.baseDamage ?? monster.damage ?? { count: 1, sides: 4, bonus: 0 });
   monster.damage = { ...monster.baseDamage };
+  const multiattack = scaledMultiattack();
+  if (multiattack) monster.multiattack = multiattack;
   return monster;
 }
 
@@ -4107,6 +4230,10 @@ function addItemToInventory(fighter, item, prefix = "stack") {
     addPartyResourceItem(item, item.quantity ?? 1);
     return [item];
   }
+  if (itemUsesTomeInventory(item)) {
+    addPartyTomeItem(item);
+    return [item];
+  }
   if (item.type !== "ammunition" || !item.ammo?.kind) {
     fighter.inventory.items.push(item);
     return [item];
@@ -4473,6 +4600,40 @@ function formatDamage(damage) {
   return `${damage.count}d${damage.sides}${bonusText}${damage.type ? ` ${damage.type}` : ""}`;
 }
 
+function monsterMultiattackConfig(fighter) {
+  if (!fighter || isPartyHeroId(fighter.id)) return null;
+  const entry = fighter.multiattack;
+  if (!entry) return null;
+  const attacks = Math.max(1, Math.min(4, Math.floor(Number(typeof entry === "number" ? entry : entry.attacks) || 1)));
+  if (attacks <= 1) return null;
+  const defaultDamageMultiplier = attacks >= 4 ? 0.35 : attacks >= 3 ? 0.45 : 0.6;
+  return {
+    attacks,
+    damageMultiplier: Math.max(0.2, Math.min(1, Number(entry.damageMultiplier ?? entry.damageScale ?? defaultDamageMultiplier) || defaultDamageMultiplier)),
+    switchTargets: entry.switchTargets !== false,
+  };
+}
+
+function scaledMonsterMultiattackDamage(fighter, damage) {
+  const config = monsterMultiattackConfig(fighter);
+  if (!config) return damage;
+  const scale = (value) => Math.max(0, Math.floor((Number(value) || 0) * config.damageMultiplier));
+  const scaled = {
+    ...damage,
+    flat: damage.flat ? Math.max(1, scale(damage.flat)) : damage.flat,
+    count: damage.count ? Math.max(1, scale(damage.count)) : (damage.count ?? 0),
+    sides: damage.sides ?? 0,
+    bonus: scale(damage.bonus ?? 0),
+    extraDamage: (damage.extraDamage ?? []).map((extra) => ({
+      ...extra,
+      count: Math.max(1, Math.floor((extra.count ?? 1) * config.damageMultiplier)),
+      bonus: scale(extra.bonus ?? 0),
+    })),
+  };
+  scaled.label = formatDamage(scaled);
+  return scaled;
+}
+
 function damageFlagMatches(flags, type) {
   if (!type) return false;
   const normalizedType = String(type).toLowerCase();
@@ -4664,7 +4825,7 @@ function damageProfile(fighter, options = {}) {
           weaponName: fighter.baseDamage.weaponName,
           extraDamage: magicEffects(fighter).extraDamage,
         };
-        return { ...damage, label: formatDamage(damage) };
+        return scaledMonsterMultiattackDamage(fighter, { ...damage, label: formatDamage(damage) });
       }
       const damage = {
         flat: fighter.baseDamage.flat,
@@ -4676,7 +4837,7 @@ function damageProfile(fighter, options = {}) {
         weaponName: fighter.baseDamage.weaponName,
         extraDamage: magicEffects(fighter).extraDamage,
       };
-      return { ...damage, label: formatDamage(damage) };
+      return scaledMonsterMultiattackDamage(fighter, { ...damage, label: formatDamage(damage) });
     }
     const damage = unarmedDamageProfileWithOptions(fighter, { includeDamageModifier });
     damage.bonus = (damage.bonus ?? 0) + statusDamageBonus;
@@ -4706,8 +4867,11 @@ function damageProfile(fighter, options = {}) {
 function opportunityAttackProfile(fighter) {
   const weapon = activeMeleeWeapon(fighter);
   if (weapon) {
+    const profile = damageProfile({ ...fighter, equipment: { ...fighter.equipment, mainHand: weapon.id, offHand: fighter.equipment?.offHand } });
+    const meleeReachFeet = weapon.properties?.includes("reach") ? 10 : 5;
     return {
-      ...damageProfile({ ...fighter, equipment: { ...fighter.equipment, mainHand: weapon.id, offHand: fighter.equipment?.offHand } }),
+      ...profile,
+      range: { kind: "melee", feet: profile.range?.kind === "melee" ? (profile.range.feet ?? meleeReachFeet) : meleeReachFeet },
       attackAbility: attackAbilityForWeapon(weapon, fighter),
       weaponName: weapon.name,
       weapon,
@@ -4726,7 +4890,7 @@ function opportunityAttackProfile(fighter) {
         type: fighter.baseDamage.type,
         range: baseRange,
       };
-      return { ...damage, label: formatDamage(damage), attackAbility, weaponName: fighter.baseDamage.weaponName ?? "Natural weapon" };
+      return { ...scaledMonsterMultiattackDamage(fighter, { ...damage, label: formatDamage(damage) }), attackAbility, weaponName: fighter.baseDamage.weaponName ?? "Natural weapon" };
     }
     const damage = {
       flat: fighter.baseDamage.flat,
@@ -4736,7 +4900,7 @@ function opportunityAttackProfile(fighter) {
       type: fighter.baseDamage.type,
       range: baseRange,
     };
-    return { ...damage, label: formatDamage(damage), attackAbility: "str", weaponName: fighter.baseDamage.weaponName ?? "Melee Attack" };
+    return { ...scaledMonsterMultiattackDamage(fighter, { ...damage, label: formatDamage(damage) }), attackAbility: "str", weaponName: fighter.baseDamage.weaponName ?? "Melee Attack" };
   }
 
   return unarmedDamageProfile(fighter);
@@ -4969,6 +5133,7 @@ function createCombatant(template) {
     classCantripList: [...(template.classCantripList ?? template.cantripList ?? [])],
     spells: [...(template.spells ?? [])],
     feats: fighterFeatEntries(template),
+    multiattack: typeof template.multiattack === "number" ? template.multiattack : template.multiattack ? { ...template.multiattack } : undefined,
     extraResourcePoolUses: { ...(template.extraResourcePoolUses ?? {}) },
     partyRole: template.partyRole ?? (template.id === "hero" ? "tank" : undefined),
     position: { ...template.position },
@@ -5260,6 +5425,7 @@ function normalizeLoadedState(loadedState) {
     campaignProgress: cloneData(loadedState.campaignProgress ?? freshState.campaignProgress ?? {}),
     questFlags: cloneData(loadedState.questFlags ?? freshState.questFlags ?? {}),
     partyResources: normalizePartyResources(loadedState.partyResources ?? freshState.partyResources ?? {}),
+    partyTomes: normalizePartyTomes(loadedState.partyTomes ?? freshState.partyTomes ?? []),
     lootPiles: Array.isArray(loadedState.lootPiles) ? loadedState.lootPiles : [],
     dungeonObjects: Array.isArray(loadedState.dungeonObjects) ? loadedState.dungeonObjects : [],
     log: Array.isArray(loadedState.log) ? loadedState.log : [],

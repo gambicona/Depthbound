@@ -1290,6 +1290,8 @@ function removeSummonedAllies(reason = "fade") {
 
 function attacksPerAttackAction(fighter) {
   if (isWildShaped(fighter)) return wildShapeHasMultiattack(wildShapeBeastById(fighter.wildShapeState?.beastFormId)) ? 2 : 1;
+  const monsterMultiattack = typeof monsterMultiattackConfig === "function" ? monsterMultiattackConfig(fighter) : null;
+  if (monsterMultiattack) return monsterMultiattack.attacks;
   const level = fighter?.level ?? 1;
   if (isSidekickWarrior(fighter)) return level >= 15 ? 3 : level >= 6 ? 2 : 1;
   if (fighter?.classId === "bard" && ["college-of-valor", "college-of-swords"].includes(fighter.subclassId) && level >= 6) return 2;
@@ -2368,9 +2370,10 @@ function hostileTo(fighter, candidate) {
 function opportunityThreatensPosition(attacker, defender, position) {
   const profile = opportunityAttackProfile(attacker);
   const range = profileRangeSquares(profile);
-  const threatened = attackGridDistance(attacker.position, position) <= range && positionKey(attacker.position) !== positionKey(position);
+  const threatened = attackGridDistance(attacker.position, position) <= range;
   if (!threatened) return false;
   if (range > 1) return true;
+  if (positionKey(attacker.position) === positionKey(position)) return true;
   const attackerRoom = roomForPosition(attacker.position);
   const targetRoom = roomForPosition(position);
   if (attackerRoom && targetRoom) return attackerRoom.id === targetRoom.id;
@@ -2632,7 +2635,6 @@ function triggerCustomDungeonStory(event, context = {}) {
         text: trigger.text,
         images: trigger.images ?? [],
         actionLabel: "Continue",
-        goalText: customGoalStatus().text,
       });
     }
     return true;
@@ -2732,6 +2734,7 @@ function checkDungeonCompletion(hero = activeHero()) {
       campaignProgress: completedCampaign,
       questFlags,
       partyResources,
+      partyTomes: state.partyTomes ?? [],
       home: homeWithRegrownResources(state.home),
       monsterCompendium: state.monsterCompendium,
     });
@@ -3223,6 +3226,7 @@ function collectLootAtPosition(fighter, position) {
   const itemText = (loot.items ?? []).map((item) => item.name).join(", ");
   const lootText = [coinText, tokenText, itemText].filter(Boolean).join(" and ") || "nothing";
   addLog(`${fighter.name} collects ${lootText}.`, "important");
+  logTomeStorageForItems(loot.items ?? []);
   return true;
 }
 
@@ -3530,6 +3534,10 @@ function corridorPathBetweenDoors(door, targetDoor) {
 }
 
 function openDoor(door, actor = activeHero()) {
+  if (doorHasLockedSpecialLock(door)) {
+    void answerDoorSpecialLock(door, actor);
+    return true;
+  }
   if (actor && !activeStealthCheckInMonsterRoom(actor, "opens a door")) return false;
 
   const relatedDoors = (state.dungeon?.doors ?? []).filter(
@@ -3593,6 +3601,50 @@ function openDoor(door, actor = activeHero()) {
 
   render();
   return true;
+}
+
+function specialLockForDoor(door) {
+  const relatedDoors = (state.dungeon?.doors ?? []).filter(
+    (entry) => entry.roomId === door?.roomId && positionKey(entry) === positionKey(door),
+  );
+  const candidates = [...relatedDoors, door, reciprocalDoor(door)].filter(Boolean);
+  return candidates.map((entry) => normalizeSpecialLock(entry.specialLock)).find(Boolean) ?? null;
+}
+
+function doorHasLockedSpecialLock(door) {
+  const specialLock = specialLockForDoor(door);
+  return Boolean(specialLock && !specialLock.unlocked);
+}
+
+function markDoorSpecialLockUnlocked(door, specialLock) {
+  const relatedDoors = (state.dungeon?.doors ?? []).filter(
+    (entry) => entry.roomId === door?.roomId && positionKey(entry) === positionKey(door),
+  );
+  const reciprocal = reciprocalDoor(door);
+  for (const entry of [...relatedDoors, door, reciprocal].filter(Boolean)) {
+    entry.specialLock = { ...specialLock, unlocked: true };
+  }
+}
+
+async function answerDoorSpecialLock(door, actor = activeHero()) {
+  const specialLock = specialLockForDoor(door);
+  if (!door || !specialLock || specialLock.unlocked) return false;
+  const answer = await showGameDialog({
+    title: specialLock.label,
+    message: specialLock.prompt,
+    input: { label: "Key", value: "", maxLength: 120 },
+    confirmText: "Unlock",
+    cancelText: "Cancel",
+  });
+  if (answer === null) return false;
+  if (!specialLockAnswerMatches(specialLock, answer)) {
+    addLog(`${specialLock.label} rejects the key.`);
+    render();
+    return false;
+  }
+  markDoorSpecialLockUnlocked(door, specialLock);
+  addLog(`${actor?.name ?? activeHero()?.name ?? "The party"} unlocks the door.`, "important");
+  return openDoor(door, actor);
 }
 
 function toggleHomeDoor(position, actor = activeHero()) {
@@ -4364,6 +4416,101 @@ function woundedMonsterAlliesInRange(monster, rangeFeet = 30, options = {}) {
     .sort((a, b) => (a.hp ?? 0) / Math.max(1, a.maxHp ?? 1) - (b.hp ?? 0) / Math.max(1, b.maxHp ?? 1));
 }
 
+function monsterCanUsePreferredSpecialKind(monster, kind) {
+  return !monster?.preferredSpecialActionKind || monster.preferredSpecialActionKind === kind;
+}
+
+function shouldAttemptMonsterActiveSpecial(monster, kind) {
+  return monster?.preferredSpecialActionKind ? monsterCanUsePreferredSpecialKind(monster, kind) : shouldUseMonsterSpecial("active");
+}
+
+function monsterAiTargetSummary(targets, limit = 4) {
+  const list = (targets ?? []).slice(0, limit).map((target) => `${target.name} ${target.hp ?? "?"}/${target.maxHp ?? "?"} HP`);
+  const extra = (targets ?? []).length > limit ? `, +${targets.length - limit} more` : "";
+  return list.length ? `${list.join("; ")}${extra}` : "none";
+}
+
+const monsterAreaSpecialPattern =
+  /fireball|mass grave mortar|corpse cart spill|ashen burst|ember mortar|volcanic pulse|eruption cycle|open the pyre|caldera gate|world-pyre ascension|magma breath|dead sky|suffocating rain|blinding cyclone|crater slam|faultline strike|lava wake|split the battlefield|dust spin|thunderclap|crackling pulse|pressure rift|choir blast|tempest choir|split the heavens|starstorm fall|city-eater winds|neverending storm|cathedral winds|regent stormfall|tyrant downburst|queenly thunderbolt|baronial cyclone|breath of the plane|worldstorm body|needle spray|royal tremor|collapse district|open sinkhole|sovereign faultline|fault throne|tectonic verdict|crown of cairns|avalanche hammer|pillar fall|quake fist|graveyard slam|seismic sentence|boiling spray|tsunami front|crushing wave|endless deluge|drown the world|worldspring eruption|abyssal pressure|crown tide|leviathan roll|crush of oceans|corpse tide|hailglass volley|iceberg break|cloudburst devour|glacial advance|soot breath|furnace vent|valve twist|throw keg|molten slag breath|lava breath|anvil breath|drop the hook|anvil drop|colossus hammerfall|cave-in groan|support-beam breaker|pressure release|overpressure burst|grinding floor|plague breath|bile spray|blight belch|rot burst|rot crown pulse|doom scream|void bell toll|mournful cry|hollow wail|banshee keening|white bell wail|royal wail|grief pulse|origin wail|duke's war cry|crown of the ninefold pact|howl of hunger|panic shriek|abyssal roar|horror judgement|triple condemnation|chaos star|abyss unleashed|shriek alarm|panic spores|overmind spores|hurl debris|ethereal stomp|pit quake|world-stamp|world-cracker slam|dance of six deaths|whirling blades|rootquake|canopy collapse|first forest awakens|corpse slam|soul lantern|grave breath|soul furnace|moonlit dominion|forbidden chorus|corrupt wish|profane radiance|hellhound breath|branding lash|guilty flame|brimstone shell|burning hand of command|confession by fire|impaling advance|abyssal bile|vomit plague|dazzling spores|carrion spores|spores of filth|venom bloom|titan sporefall|midnight spores|plague king's mass|unstable fire|soul tempest|abyss storm|flaming whipstorm|gate pulse|maw of the abyss|reality tear|rift sovereignty|stampede|gravequake|stormhorn burst|root-rending roar|bossroar|venom spit|grave spark/i;
+
+const monsterControlSpecialPattern =
+  /false horizon|gravityless zone|silence of no air|thin air aura|drying wind|fog cover|foam screen|mist choke|drowning mist|black pool|blackwater seep|coral growth|absolute stillness|topple curse|reverse weight|gemscale flash|resonant note|coal toss|black smoke cloud|false lantern|lesser possession|noble possession|petty bargain|sulphur hex|sweetened damnation|infernal verdict|name in the ledger|praetor's challenge|chains of grace|false promise|prince's mark|musk charm|luring scent|locking chain|sentence to chains|living chains|chains of the ninth gate|root snare|constricting coil|stranglehold|forest judgment|living jungle|command the brambles|web snare|websnare/i;
+
+function monsterHealingActionTargets(monster) {
+  if (hasMonsterSpecial(monster, /unholy benediction/i) && !monster.usedSpecials?.UnholyBenediction) {
+    return woundedMonsterAlliesInRange(monster, 30, { includeSelf: true, predicate: monsterIsUndead });
+  }
+  if (hasMonsterSpecial(monster, /brood spores/i) && !monster.usedSpecials?.BroodSpores) {
+    return woundedMonsterAlliesInRange(monster, 30, { includeSelf: true, predicate: monsterIsFungusOrPlant });
+  }
+  if (hasMonsterSpecial(monster, /first forest awakens/i) && !monster.usedSpecials?.FirstForestHealing) {
+    return woundedMonsterAlliesInRange(monster, 30, { includeSelf: true, predicate: monsterIsFungusOrPlant });
+  }
+  if (monsterSpecialNameMatching(monster, /healing|mending|renewal|benediction|regrowth|photosynthesis/i)) {
+    return woundedMonsterAlliesInRange(monster, 30, { includeSelf: false });
+  }
+  return [];
+}
+
+function chooseMonsterSpecialActionKind(monster) {
+  if (!monster?.hasAction) {
+    addAdminLog(`${monster?.name ?? "Monster"} special scorer: no action available.`);
+    return null;
+  }
+  const names = monsterSpecialNames(monster).join(" | ");
+  const candidates = [];
+  const healTargets = monsterHealingActionTargets(monster);
+  if (healTargets.length) {
+    const missing = healTargets.reduce((sum, target) => sum + Math.max(0, (target.maxHp ?? 0) - (target.hp ?? 0)), 0);
+    const worstRatio = Math.min(...healTargets.map((target) => (target.hp ?? 0) / Math.max(1, target.maxHp ?? 1)));
+    candidates.push({
+      kind: "heal",
+      score: 18 + Math.min(36, missing / 3) + (worstRatio <= 0.35 ? 16 : worstRatio <= 0.6 ? 8 : 0) + Math.min(8, healTargets.length * 2),
+    });
+    addAdminLog(`${monster.name} special scorer: heal candidate, missing HP ${missing}, worst ally ${Math.round(worstRatio * 100)}%, targets ${monsterAiTargetSummary(healTargets)}.`);
+  } else {
+    addAdminLog(`${monster.name} special scorer: no healing candidate in 30 ft.`);
+  }
+
+  if (monsterAreaSpecialPattern.test(names)) {
+    const burstTargets = targetsInMonsterSpecialRange(monster, monsterSpecialAbilityTuning.burstRangeFeet).length;
+    const rangedTargets = targetsInMonsterSpecialRange(monster, monsterSpecialAbilityTuning.rangedSpecialFeet).length;
+    const targetCount = Math.max(burstTargets, rangedTargets);
+    if (targetCount) {
+      candidates.push({
+        kind: "area",
+        score: 14 + targetCount * 13 + (targetCount >= 2 ? 14 : 0) + monsterCategory(monster),
+      });
+      addAdminLog(`${monster.name} special scorer: area candidate, burst targets ${burstTargets}, ranged targets ${rangedTargets}, chosen count ${targetCount}.`);
+    } else {
+      addAdminLog(`${monster.name} special scorer: area specials known, but no target is in range/line of sight.`);
+    }
+  }
+
+  if (monsterControlSpecialPattern.test(names)) {
+    const closeTargets = targetsInMonsterSpecialRange(monster, monsterSpecialAbilityTuning.burstRangeFeet).length;
+    const farTargets = targetsInMonsterSpecialRange(monster, monsterSpecialAbilityTuning.rangedSpecialFeet).length;
+    const targetCount = Math.max(closeTargets, farTargets);
+    if (targetCount) {
+      candidates.push({
+        kind: "control",
+        score: 12 + targetCount * 10 + (targetCount >= 2 ? 10 : 0) + Math.ceil(monsterCategory(monster) / 2),
+      });
+      addAdminLog(`${monster.name} special scorer: control candidate, close targets ${closeTargets}, ranged targets ${farTargets}, chosen count ${targetCount}.`);
+    } else {
+      addAdminLog(`${monster.name} special scorer: control specials known, but no target is in range/line of sight.`);
+    }
+  }
+
+  if (!candidates.length) {
+    addAdminLog(`${monster.name} special scorer: no active special candidate; normal AI will decide.`);
+    return null;
+  }
+  candidates.sort((a, b) => b.score - a.score);
+  addAdminLog(`${monster.name} special scorer candidates: ${candidates.map((entry) => `${entry.kind} ${Math.round(entry.score)}`).join(", ")}. Picked ${candidates[0].kind}.`);
+  return candidates[0].kind;
+}
+
 function maybeUseMonsterSoulSiphon(monster, damage, type) {
   if (!monster?.alive || isPartyHeroId(monster.id) || damage <= 0 || String(type ?? "").toLowerCase() !== "necrotic") return 0;
   if (!hasMonsterSpecial(monster, /soul siphon/i)) return 0;
@@ -4412,12 +4559,20 @@ function maybeUseAncientPhotosynthesis(monster) {
 }
 
 async function maybeUseMonsterAllyHealingAction(monster) {
-  if (!monster?.hasAction) return false;
+  if (!monster?.hasAction) {
+    addAdminLog(`${monster?.name ?? "Monster"} healing action skipped: no action available.`);
+    return false;
+  }
+  if (!monsterCanUsePreferredSpecialKind(monster, "heal")) {
+    addAdminLog(`${monster.name} healing action skipped: scorer preferred ${monster.preferredSpecialActionKind}.`);
+    return false;
+  }
   monster.usedSpecials = monster.usedSpecials ?? {};
   if (hasMonsterSpecial(monster, /unholy benediction/i) && !monster.usedSpecials.UnholyBenediction) {
     const targets = woundedMonsterAlliesInRange(monster, 30, { includeSelf: true, predicate: monsterIsUndead });
     if (targets.length) {
       const label = monsterSpecialNameMatching(monster, /unholy benediction/i) ?? "Unholy Benediction";
+      addAdminLog(`${monster.name} chooses ${label}: wounded undead targets ${monsterAiTargetSummary(targets)}.`);
       const roll = rollDice(4, 8);
       monster.usedSpecials.UnholyBenediction = true;
       monster.hasAction = false;
@@ -4430,12 +4585,14 @@ async function maybeUseMonsterAllyHealingAction(monster) {
       render();
       return true;
     }
+    addAdminLog(`${monster.name} did not use Unholy Benediction: no wounded undead target in 30 ft.`);
   }
 
   if (hasMonsterSpecial(monster, /brood spores/i) && !monster.usedSpecials.BroodSpores) {
     const targets = woundedMonsterAlliesInRange(monster, 30, { includeSelf: true, predicate: monsterIsFungusOrPlant });
     if (targets.length) {
       const label = monsterSpecialNameMatching(monster, /brood spores/i) ?? "Brood Spores";
+      addAdminLog(`${monster.name} chooses ${label}: wounded fungus/plant targets ${monsterAiTargetSummary(targets)}.`);
       const dice = specialDamageDice(monster, 8);
       const roll = rollDice(dice.count, dice.sides);
       monster.usedSpecials.BroodSpores = true;
@@ -4446,12 +4603,14 @@ async function maybeUseMonsterAllyHealingAction(monster) {
       render();
       return true;
     }
+    addAdminLog(`${monster.name} did not use Brood Spores: no wounded fungus/plant target in 30 ft.`);
   }
 
   if (hasMonsterSpecial(monster, /first forest awakens/i) && !monster.usedSpecials.FirstForestHealing) {
     const targets = woundedMonsterAlliesInRange(monster, 30, { includeSelf: true, predicate: monsterIsFungusOrPlant });
     if (targets.length) {
       const label = monsterSpecialNameMatching(monster, /first forest awakens/i) ?? "First Forest Awakens";
+      addAdminLog(`${monster.name} chooses ${label} as healing: wounded fungus/plant targets ${monsterAiTargetSummary(targets)}.`);
       const roll = rollDice(3, 8);
       monster.usedSpecials.FirstForestHealing = true;
       monster.hasAction = false;
@@ -4461,6 +4620,7 @@ async function maybeUseMonsterAllyHealingAction(monster) {
       render();
       return true;
     }
+    addAdminLog(`${monster.name} did not use First Forest healing: no wounded fungus/plant target in 30 ft.`);
   }
 
   const label = monsterSpecialNameMatching(monster, /healing|mending|renewal|benediction|regrowth|photosynthesis/i);
@@ -4469,10 +4629,12 @@ async function maybeUseMonsterAllyHealingAction(monster) {
     if (target) {
       const roll = rollDice(2, 8);
       monster.hasAction = false;
+      addAdminLog(`${monster.name} chooses ${label}: healing lowest-health ally ${target.name} at ${target.hp}/${target.maxHp} HP.`);
       healMonsterWithSpecial(monster, target, Math.max(1, roll.total + monsterCategory(monster)), label);
       render();
       return true;
     }
+    addAdminLog(`${monster.name} did not use ${label}: no wounded monster ally in 30 ft.`);
   }
   return false;
 }
@@ -5482,6 +5644,25 @@ function spellDirectionCells(caster, direction, spell) {
   return cells;
 }
 
+function positionInSpellDirection(caster, direction, spell, position) {
+  if (!caster || !direction || !position) return false;
+  const length = Math.max(1, Math.floor((spell.area?.lengthFeet ?? spell.range?.feet ?? 15) / feetPerSquare));
+  const width = Math.max(1, Math.floor((spell.area?.widthFeet ?? 5) / feetPerSquare));
+  const deltas = {
+    north: { x: 0, y: -1 },
+    east: { x: 1, y: 0 },
+    south: { x: 0, y: 1 },
+    west: { x: -1, y: 0 },
+  };
+  const delta = deltas[direction] ?? deltas.north;
+  const dx = position.x - caster.position.x;
+  const dy = position.y - caster.position.y;
+  const forward = delta.x ? dx * delta.x : dy * delta.y;
+  const side = delta.x ? Math.abs(dy) : Math.abs(dx);
+  if (forward <= 0 || forward > length) return false;
+  return spell.area?.shape === "cone" ? side <= forward : side < width;
+}
+
 function spellPreviewCells(targeting = currentPendingSpellTargeting()) {
   if (!targeting?.hoverPosition) return new Set();
   if (targeting.mode === "point") {
@@ -5585,7 +5766,12 @@ async function confirmPendingSpellTarget(position) {
 }
 
 function breathTemplateTargets(caster, direction, spell) {
-  return spellTargetsFromCells(spellDirectionCells(caster, direction, spell)).filter((fighter) => spellAffectsFighter(caster, spell, fighter));
+  const cellTargets = spellTargetsFromCells(spellDirectionCells(caster, direction, spell));
+  const geometricTargets = Object.values(state.fighters ?? {}).filter(
+    (fighter) => fighter.alive && !fighter.dead && positionInSpellDirection(caster, direction, spell, fighter.position),
+  );
+  const targetsById = new Map([...cellTargets, ...geometricTargets].map((fighter) => [fighter.id, fighter]));
+  return [...targetsById.values()].filter((fighter) => spellAffectsFighter(caster, spell, fighter));
 }
 
 function scaledSpellDice(spell) {
@@ -6331,11 +6517,23 @@ function monsterSpecialSaveExplanation(label, damageType, saveAbility, options =
 }
 
 async function tryMonsterAreaSpecial(monster, namePattern, label, damageType, saveAbility, rangeFeet, options = {}) {
-  if (!hasMonsterSpecial(monster, namePattern) || !monster.hasAction || !shouldUseMonsterSpecial("active")) return false;
-  const targets = targetsInMonsterSpecialRange(monster, rangeFeet);
-  if (!targets.length) return false;
+  if (!hasMonsterSpecial(monster, namePattern)) return false;
   const publicLabel = options.publicLabel ?? monsterSpecialNameMatching(monster, namePattern) ?? label;
+  if (!monster.hasAction) {
+    addAdminLog(`${monster.name} cannot use ${publicLabel}: action already spent.`);
+    return false;
+  }
+  if (!shouldAttemptMonsterActiveSpecial(monster, "area")) {
+    addAdminLog(`${monster.name} skips ${publicLabel}: scorer preferred ${monster.preferredSpecialActionKind ?? "chance failed"}.`);
+    return false;
+  }
+  const targets = targetsInMonsterSpecialRange(monster, rangeFeet);
+  if (!targets.length) {
+    addAdminLog(`${monster.name} cannot use ${publicLabel}: no target within ${rangeFeet} ft with line of sight.`);
+    return false;
+  }
   const explanation = options.explanation ?? monsterSpecialSaveExplanation(publicLabel, damageType, saveAbility, options);
+  addAdminLog(`${monster.name} attempts ${publicLabel}: ${targets.length} target(s) in range, resolving up to ${options.maxTargets ?? 3}.`);
   if (await maybeUseSpellInterruptReaction(monster, publicLabel)) {
     monster.hasAction = false;
     addLog(`${monster.name}'s ${publicLabel} is interrupted before it takes hold.`, "important");
@@ -6364,11 +6562,23 @@ async function tryMonsterAreaSpecial(monster, namePattern, label, damageType, sa
 }
 
 async function tryMonsterStatusSpecial(monster, namePattern, label, saveAbility, rangeFeet, statusFactory, options = {}) {
-  if (!hasMonsterSpecial(monster, namePattern) || !monster.hasAction || !shouldUseMonsterSpecial("active")) return false;
-  const targets = targetsInMonsterSpecialRange(monster, rangeFeet);
-  if (!targets.length) return false;
+  if (!hasMonsterSpecial(monster, namePattern)) return false;
   const publicLabel = options.publicLabel ?? monsterSpecialNameMatching(monster, namePattern) ?? label;
+  if (!monster.hasAction) {
+    addAdminLog(`${monster.name} cannot use ${publicLabel}: action already spent.`);
+    return false;
+  }
+  if (!shouldAttemptMonsterActiveSpecial(monster, "control")) {
+    addAdminLog(`${monster.name} skips ${publicLabel}: scorer preferred ${monster.preferredSpecialActionKind ?? "chance failed"}.`);
+    return false;
+  }
+  const targets = targetsInMonsterSpecialRange(monster, rangeFeet);
+  if (!targets.length) {
+    addAdminLog(`${monster.name} cannot use ${publicLabel}: no target within ${rangeFeet} ft with line of sight.`);
+    return false;
+  }
   const explanation = options.explanation ?? monsterSpecialSaveExplanation(publicLabel, "status", saveAbility, options);
+  addAdminLog(`${monster.name} attempts ${publicLabel}: ${targets.length} target(s) in range, resolving up to ${options.maxTargets ?? 1}.`);
   if (await maybeUseSpellInterruptReaction(monster, publicLabel)) {
     monster.hasAction = false;
     addLog(`${monster.name}'s ${publicLabel} is interrupted before it takes hold.`, "important");
@@ -6413,6 +6623,13 @@ async function maybeUseSpellInterruptReaction(monster, label) {
 async function maybeUseMonsterStartSpecial(monster) {
   if (!monster?.alive || isPartyHeroId(monster.id)) return false;
   monster.usedSpecials = monster.usedSpecials ?? {};
+  try {
+    monster.preferredSpecialActionKind = chooseMonsterSpecialActionKind(monster);
+    addAdminLog(`${monster.name} preferred special action kind: ${monster.preferredSpecialActionKind ?? "none"}.`);
+  } catch (error) {
+    monster.preferredSpecialActionKind = null;
+    addAdminLog(`Monster special scoring failed for ${monster.name}: ${error?.message ?? error}`);
+  }
 
   if (hasMonsterSpecial(monster, /selfheal/i) && !monster.usedSpecials.SelfHeal && monster.hp <= monster.maxHp / 2 && shouldUseMonsterSpecial("defensive")) {
     const heal = rollDice(1, 6).total + monsterCategory(monster);
@@ -6462,10 +6679,11 @@ async function maybeUseMonsterStartSpecial(monster) {
     }
   }
 
-  if (hasMonsterSpecial(monster, /mass grave mortar|corpse cart spill/i) && !monster.usedSpecials.GraveMortar && shouldUseMonsterSpecial("active")) {
+  if (hasMonsterSpecial(monster, /mass grave mortar|corpse cart spill/i) && !monster.usedSpecials.GraveMortar && shouldAttemptMonsterActiveSpecial(monster, "area")) {
     const targets = targetsInMonsterSpecialRange(monster, monsterSpecialAbilityTuning.rangedSpecialFeet).slice(0, 2);
     if (targets.length) {
       const label = monsterSpecialNameMatching(monster, /mass grave mortar|corpse cart spill/i) ?? "Corpse Barrage";
+      addAdminLog(`${monster.name} chooses ${label}: ${targets.length} target(s) in ranged special range.`);
       monster.usedSpecials.GraveMortar = true;
       for (const target of targets) {
         const save = await rollSavingThrow(target, "dex", monsterSpecialDc(monster), `${monster.name}'s ${label} forces ${target.name} to make a DEX save.`);
@@ -6478,6 +6696,7 @@ async function maybeUseMonsterStartSpecial(monster) {
       render();
       return true;
     }
+    addAdminLog(`${monster.name} did not use corpse barrage special: no target in ranged special range.`);
   }
 
   if (hasMonsterSpecial(monster, /rot stench|nauseating bulk|carrion perfume/i)) {

@@ -821,6 +821,42 @@ function lowestLifeTarget(targets) {
     .sort((a, b) => a.hp / Math.max(1, a.maxHp) - b.hp / Math.max(1, b.maxHp) || a.hp - b.hp || a.id.localeCompare(b.id))[0] ?? null;
 }
 
+function monsterTargetsInCurrentAttackRange(monster) {
+  return aiTargetableEnemiesFor(monster).filter((target) => isInAttackRange(monster, target));
+}
+
+function chooseMonsterMultiattackTarget(monster, preferredTarget = null, previousTarget = null) {
+  const candidates = monsterTargetsInCurrentAttackRange(monster);
+  if (!candidates.length) return null;
+  const config = typeof monsterMultiattackConfig === "function" ? monsterMultiattackConfig(monster) : null;
+  if (preferredTarget && candidates.some((target) => target.id === preferredTarget.id)) return preferredTarget;
+  if (config?.switchTargets && previousTarget && candidates.length > 1) {
+    return lowestLifeTarget(candidates.filter((target) => target.id !== previousTarget.id)) ?? lowestLifeTarget(candidates);
+  }
+  if (previousTarget && candidates.some((target) => target.id === previousTarget.id)) return previousTarget;
+  return lowestLifeTarget(candidates) ?? closestTargetTo(monster, candidates);
+}
+
+async function performMonsterAttackSequence(monster, initialTarget) {
+  const config = typeof monsterMultiattackConfig === "function" ? monsterMultiattackConfig(monster) : null;
+  const maxAttacks = config?.attacks ?? 1;
+  let previousTarget = null;
+  for (let attackIndex = 0; attackIndex < maxAttacks; attackIndex += 1) {
+    if (activeFighter()?.id !== monster.id || !monster.hasAction || !monster.alive || partyDefeatedOrDying()) return;
+    const target = chooseMonsterMultiattackTarget(monster, attackIndex === 0 ? initialTarget : null, previousTarget);
+    if (!target) {
+      addAdminLog(`${monster.name} has no in-range target for attack ${attackIndex + 1}/${maxAttacks}.`);
+      return;
+    }
+    if (previousTarget && target.id !== previousTarget.id) {
+      addAdminLog(`${monster.name} switches multiattack target from ${previousTarget.name} to ${target.name}.`);
+    }
+    await makeAttack(monster, target, { actionLabel: attackIndex > 0 ? "follows up against" : undefined });
+    previousTarget = target;
+    if (attackIndex < maxAttacks - 1 && monster.hasAction) await sleep(Math.max(100, Math.floor(tokenSlideMs / 2)));
+  }
+}
+
 function monsterTacticalTags(monster) {
   return new Set((monster?.tags ?? []).map((tag) => String(tag).toLowerCase()));
 }
@@ -1218,38 +1254,56 @@ async function runAutonomousAllyCombatAi(ally) {
 async function runMonsterAi(monster) {
   if (!monster.alive || partyDefeatedOrDying()) return;
   const behavior = effectiveMonsterBehavior(monster);
+  addAdminLog(`${monster.name} AI turn begins: behavior=${behavior}, hp=${monster.hp}/${monster.maxHp}, action=${Boolean(monster.hasAction)}, bonus=${Boolean(monster.hasBonusAction)}, movement=${(monster.movementLeft ?? 0) * feetPerSquare} ft, position=${monster.position.x},${monster.position.y}.`);
   const monsterTurnFinished = async () => {
+    addAdminLog(`${monster.name} AI turn finishing: action=${Boolean(monster.hasAction)}, movement=${(monster.movementLeft ?? 0) * feetPerSquare} ft, position=${monster.position.x},${monster.position.y}.`);
     await sleep(tokenSlideMs);
     if (activeFighter()?.id === monster.id && !partyDefeatedOrDying()) await endTurn();
   };
   const attackThenFinishTurn = async (target) => {
     await sleep(tokenSlideMs);
+    addAdminLog(`${monster.name} attack fallback check vs ${target?.name ?? "none"}: active=${activeFighter()?.id === monster.id}, inRange=${Boolean(target && isInAttackRange(monster, target))}, hasAction=${Boolean(monster.hasAction)}.`);
     if (activeFighter()?.id === monster.id && isInAttackRange(monster, target) && monster.hasAction) {
-      await makeAttack(monster, target);
+      await performMonsterAttackSequence(monster, target);
+    } else if (target && monster.hasAction) {
+      addAdminLog(`${monster.name} cannot attack ${target.name}; normal fallback will end turn after failed range/action check.`);
     }
     await monsterTurnFinished();
   };
   const actionLocked = (monster.statusEffects ?? []).some((effect) => effect.actionLocked);
   const movementLocked = (monster.statusEffects ?? []).some((effect) => effect.speedLocked);
   if (actionLocked && movementLocked) {
+    addAdminLog(`${monster.name} AI stop: action and movement are locked by status effects.`);
     addLog(`${monster.name} is unable to act or move.`, "important");
     await monsterTurnFinished();
     return;
   }
   if (fighterStatusEffect(monster, "grappled") && await attemptGrappleEscape(monster)) {
+    addAdminLog(`${monster.name} used its turn attempting a grapple escape.`);
     await monsterTurnFinished();
     return;
   }
   if (await maybeUseAiHealingPotion(monster)) {
+    addAdminLog(`${monster.name} used AI healing potion logic.`);
     await monsterTurnFinished();
     return;
   }
-  if (await maybeUseMonsterStartSpecial(monster)) {
+  let usedStartSpecial = false;
+  try {
+    usedStartSpecial = await maybeUseMonsterStartSpecial(monster);
+  } catch (error) {
+    addAdminLog(`Monster special action failed for ${monster.name}; falling back to normal AI. ${error?.message ?? error}`);
+    monster.preferredSpecialActionKind = null;
+  }
+  if (usedStartSpecial) {
+    addAdminLog(`${monster.name} used a start/special action; normal movement/attack AI is skipped.`);
     await monsterTurnFinished();
     return;
   }
+  addAdminLog(`${monster.name} did not use a start/special action; continuing to behavior AI.`);
 
   if (isAutonomousAlly(monster)) {
+    addAdminLog(`${monster.name} is an autonomous ally; delegating to ally combat AI.`);
     await runAutonomousAllyCombatAi(monster);
     return;
   }
@@ -1257,10 +1311,12 @@ async function runMonsterAi(monster) {
   if (behavior === "swarm") {
     const swarmTarget = swarmTargetFor(monster);
     if (!swarmTarget) {
+      addAdminLog(`${monster.name} swarm AI found no valid swarm target; ending turn.`);
       endTurn();
       return;
     }
     const path = bestSwarmPath(monster, swarmTarget) ?? bestPathToward(monster, swarmTarget, false, { forcePathfinding: true });
+    addAdminLog(`${monster.name} swarm AI target=${swarmTarget.name}, path=${path?.length ?? 0} step(s).`);
     if (path?.length) {
       await moveFighterAlongPath(monster, path, true);
       addLog(`${monster.name} swarms around ${swarmTarget.name}.`);
@@ -1280,12 +1336,14 @@ async function runMonsterAi(monster) {
     const plan = behavior === "rangedKiter" ? null : chooseMonsterAttackPlan(monster, planOptions);
     const target = plan?.target ?? closestTargetTo(monster);
     if (!target) {
+      addAdminLog(`${monster.name} ${behavior} AI found no target; ending turn.`);
       endTurn();
       return;
     }
     const avoidsOpportunity = planOptions.avoidOpportunity ?? abilityScore(monster, "int") >= 11;
     const hasShotFromCurrent = isInAttackRange(monster, target);
     const startedThreatened = positionThreatenedByEnemy(monster, monster.position);
+    addAdminLog(`${monster.name} ${behavior} AI target=${target.name}, planTarget=${plan?.target?.name ?? "none"}, hasShot=${hasShotFromCurrent}, threatened=${startedThreatened}, avoidsOpportunity=${avoidsOpportunity}.`);
     const kitePath =
       quickRangedRetreatPath(monster, target) ??
       (behavior === "rangedKiter" && hasShotFromCurrent
@@ -1300,6 +1358,7 @@ async function runMonsterAi(monster) {
           ? plan.path
           : bestPathToward(monster, target, avoidsOpportunity, { forcePathfinding: true }) ??
             (avoidsOpportunity ? bestPathToward(monster, target, false, { forcePathfinding: true }) : null);
+    addAdminLog(`${monster.name} ${behavior} AI selected path=${path?.length ?? 0} step(s)${path?.length ? ` to ${path.at(-1).x},${path.at(-1).y}` : ""}.`);
     if (path?.length) {
       await moveFighterAlongPath(monster, path, true);
       const label =
@@ -1331,13 +1390,16 @@ async function runMonsterAi(monster) {
     const plan = chooseMonsterAttackPlan(monster, planOptions);
     const target = plan?.target ?? closestTargetTo(monster);
     if (!target) {
+      addAdminLog(`${monster.name} ${behavior} AI found no target; ending turn.`);
       endTurn();
       return;
     }
     const avoidsOpportunity = planOptions.avoidOpportunity ?? abilityScore(monster, "int") >= 11;
+    addAdminLog(`${monster.name} ${behavior} AI target=${target.name}, planTarget=${plan?.target?.name ?? "none"}, hasMeleeAccess=${hasMeleeAccess(monster, target)}, avoidsOpportunity=${avoidsOpportunity}, planPath=${plan?.path?.length ?? 0}.`);
     if (!hasMeleeAccess(monster, target)) {
       let attackPlan = plan;
       const shouldDash = !attackPlan && useAiDashToward(monster, target);
+      addAdminLog(`${monster.name} ${behavior} movement needed: shouldDash=${shouldDash}.`);
       if (shouldDash) {
         attackPlan =
           attackPlanAgainst(monster, target, avoidsOpportunity, null, { forcePathfinding: true }) ??
@@ -1347,6 +1409,7 @@ async function runMonsterAi(monster) {
         ? attackPlan.path
         : bestPathToward(monster, target, avoidsOpportunity, { forcePathfinding: true }) ??
           (avoidsOpportunity ? bestPathToward(monster, target, false, { forcePathfinding: true }) : null);
+      addAdminLog(`${monster.name} ${behavior} selected approach path=${path?.length ?? 0} step(s)${path?.length ? ` to ${path.at(-1).x},${path.at(-1).y}` : ""}.`);
       if (path) {
         const before = { ...monster.position };
         await moveFighterAlongPath(monster, path, true);
@@ -1363,12 +1426,15 @@ async function runMonsterAi(monster) {
                   : "advances toward";
         addLog(`${monster.name} ${verb} ${target.name} (${movedSquares * feetPerSquare} ft).`);
       }
+    } else {
+      addAdminLog(`${monster.name} already has melee access to ${target.name}; no movement needed.`);
     }
 
     await attackThenFinishTurn(target);
     return;
   }
 
+  addAdminLog(`${monster.name} has unhandled behavior ${behavior}; hesitation fallback will end turn.`);
   addLog(`${monster.name} hesitates, unsure how to act.`, "important");
   await monsterTurnFinished();
 }

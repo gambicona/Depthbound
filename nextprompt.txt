@@ -1,18 +1,18 @@
+Spell sound effects
 Sidekicks expert and spellcaster availability
 recruitable sidekicks
-
-add books and journals as items, configurable text and pics within it
-add doors and chests that require player input to open (code in numbers, in text, specific phrase word etc)
-
-Spell sound effects
+ally and companion spawn, configurable
 
 packs to find (Medizin Pack Proviant Pack, etc) that can either be sold to merchants or even factions for points or be opened to gain whatever is inside
-add stealthing through rooms a possibelste
 
 Factions with quests (Monsterhunter, buying pelts etc, elementalists, Gravebinder etc)
 Arena fighting pit for glory
 
+secret doors and rooms
+more floor and chest traps
 
-monsters cat 4-10:
-undead skeletal and zombie
-beasts all
+Variant Human
+
+Quests:
+stealthing
+find secret rooms

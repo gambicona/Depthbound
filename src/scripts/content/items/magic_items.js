@@ -209,6 +209,15 @@ registerMagicWeapon("magic-longbow-plus-2", "longbow", "Longbow +2", "rare", 850
 
 registerMagicWeapon("magic-warhammer-plus-1", "warhammer", "Warhammer +1", "uncommon", 850, { enhancementBonus: 1 });
 registerMagicWeapon("magic-warhammer-plus-2", "warhammer", "Warhammer +2", "rare", 6500, { enhancementBonus: 2 });
+registerMagicWeapon("magic-embervein-claim-hammer", "warhammer", "Embervein Claim Hammer", "uncommon", 500, {
+  attackBonus: 1,
+  damageBonus: 0,
+  extraDamage: d4("fire"),
+  unique: true,
+  dropWeight: 1,
+  tags: ["embervein", "forge", "dwarf", "ashmantle", "quest-item", "quest:borren-claim-hammer"],
+  description: "A dwarven claim hammer with an Ashmantle maker's mark under the soot. It gives +1 to attack rolls and deals an extra 1d4 fire damage.",
+});
 
 // Magic weapons: elemental and themed weapons.
 registerMagicWeapon("magic-acid-dagger", "dagger", "Acid Dagger", "uncommon", 850, {

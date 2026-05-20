@@ -417,7 +417,7 @@
         <section class="creator-section">
           <h2>Tools</h2>
           <div class="tool-grid" id="tool-grid">
-            <button type="button" data-tool="select">Select</button>
+            <button type="button" data-tool="select">Select / Edit</button>
             <button type="button" data-tool="connect">Connect Rooms</button>
             <button type="button" data-tool="hallway">Draw Hallway</button>
             <button type="button" data-tool="furniture">Place Furniture</button>
@@ -644,8 +644,9 @@
             Template item
             <select id="custom-item-template"></select>
           </label>
-          <label>Name <input id="custom-item-name" /></label>
-          <label>Description <textarea id="custom-item-description"></textarea></label>
+          <label>Name / Title <input id="custom-item-name" /></label>
+          <label>Description / Formatted Text <textarea id="custom-item-description"></textarea></label>
+          <label>Journal categories <input id="custom-item-tags" placeholder="Promiscuous" /></label>
           <div class="creator-row">
             <label>Type <input id="custom-item-type" /></label>
             <label>Weight lb <input id="custom-item-weight" type="number" step="0.1" /></label>
@@ -681,6 +682,7 @@
     <script src="src/scripts/content/items/equipment.js" defer></script>
     <script src="src/scripts/content/items/treasure.js" defer></script>
     <script src="src/scripts/content/items/materials.js" defer></script>
+    <script src="src/scripts/content/items/handouts.js" defer></script>
     <script src="src/scripts/content/items/magic_items.js" defer></script>
     <script src="src/scripts/content/items/magic_accessories.js" defer></script>
     <script src="src/scripts/content/items/magic-forest-pack.js" defer></script>

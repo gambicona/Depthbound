@@ -198,9 +198,39 @@ function showMainMenuSubmenu(section) {
 
 function randomizeMainMenuBackground() {
   if (!els.mainMenu || !mainMenuBackgrounds?.length) return;
-  const background = mainMenuBackgrounds[Math.floor(Math.random() * mainMenuBackgrounds.length)];
+  const background = chooseMainMenuBackground();
   const backgroundUrl = new URL(background, window.location.href).href;
-  els.mainMenu.style.setProperty("--main-menu-bg", `url("${backgroundUrl}")`);
+  const layers = els.mainMenuBackgroundLayers ?? [];
+  if (!layers.length) {
+    els.mainMenu.style.setProperty("--main-menu-bg", `url("${backgroundUrl}")`);
+    return;
+  }
+  mainMenuBackgroundLayerIndex = (mainMenuBackgroundLayerIndex + 1) % layers.length;
+  const activeLayer = layers[mainMenuBackgroundLayerIndex];
+  activeLayer.style.setProperty("--main-menu-bg", `url("${backgroundUrl}")`);
+  layers.forEach((layer) => layer.classList.toggle("active", layer === activeLayer));
+}
+
+function chooseMainMenuBackground() {
+  if (mainMenuBackgrounds.length <= 1) {
+    mainMenuBackgroundIndex = 0;
+    return mainMenuBackgrounds[0];
+  }
+  let index = Math.floor(Math.random() * mainMenuBackgrounds.length);
+  if (index === mainMenuBackgroundIndex) index = (index + 1) % mainMenuBackgrounds.length;
+  mainMenuBackgroundIndex = index;
+  return mainMenuBackgrounds[index];
+}
+
+function startMainMenuBackgroundRotation() {
+  randomizeMainMenuBackground();
+  window.clearInterval(mainMenuBackgroundTimer);
+  mainMenuBackgroundTimer = window.setInterval(randomizeMainMenuBackground, 10000);
+}
+
+function stopMainMenuBackgroundRotation() {
+  window.clearInterval(mainMenuBackgroundTimer);
+  mainMenuBackgroundTimer = null;
 }
 
 async function chooseSaveFolderFromMenu() {
@@ -361,7 +391,7 @@ function showMainMenu(message = "") {
   hideAbilitiesMenu();
   hideHomeMenu();
   hideStoreMenu();
-  randomizeMainMenuBackground();
+  startMainMenuBackgroundRotation();
   document.body.classList.add("menu-active");
   els.mainMenu.classList.remove("hidden");
   showMainMenuRoot();
@@ -371,6 +401,7 @@ function showMainMenu(message = "") {
 
 function hideMainMenu() {
   gameHasStarted = true;
+  stopMainMenuBackgroundRotation();
   document.body.classList.remove("menu-active");
   els.mainMenu.classList.add("hidden");
   showMainMenuRoot();
@@ -1850,6 +1881,7 @@ function switchInteractiveTutorialScene(scene) {
       campaignProgress: state.campaignProgress ?? {},
       questFlags: state.questFlags ?? {},
       partyResources: state.partyResources ?? {},
+      partyTomes: state.partyTomes ?? [],
     });
     state.isTutorial = true;
     state.tutorialScene = "home";
@@ -2486,7 +2518,7 @@ async function startNewAdventure() {
   heroOptions.raceSelection = raceSelection;
   showDungeonLayout = false;
   const initialDungeonState = createInitialState(chosenName, null, heroOptions);
-  state = createHomeState([initialDungeonState.fighters.hero], [], { cp: 0, sp: 0, gp: 0 }, initialDungeonState.party);
+  state = createHomeState([initialDungeonState.fighters.hero], [], { cp: 0, sp: 0, gp: 0 }, { ...initialDungeonState.party, partyTomes: initialDungeonState.partyTomes ?? [] });
   state.saveSlotId = slotId;
   activeSaveSlot = slotId;
   await saveAdventure(slotId, { skipOverwriteWarning: true, slotName });
@@ -2740,6 +2772,7 @@ async function returnHomeEarly() {
     campaignProgress: state.campaignProgress ?? {},
     questFlags: state.questFlags ?? {},
     partyResources: state.partyResources ?? {},
+    partyTomes: state.partyTomes ?? [],
     home: state.home,
     monsterCompendium: state.monsterCompendium,
   });

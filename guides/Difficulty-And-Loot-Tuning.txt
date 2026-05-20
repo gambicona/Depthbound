@@ -79,6 +79,7 @@ Bosses spawn in the exit room and use bossMonsterTagGroups from the theme.
 Monster scaling
 
 applyMonsterCategoryScaling handles scaling lower-category monsters upward. Tune HP and attack scaling there if low-category monsters feel too weak or too strong in higher dungeons.
+Scaling can also grant multiattack to promoted monsters: large category gaps can add 2 or 3 attacks, and boss-tagged monsters can reach 4 attacks in category 10 dungeons. Swarm monsters are excluded because their scaling already comes from spawning more bodies. Promoted multiattack uses a lower per-hit damage multiplier than native single-hit scaling so the monster becomes more active without turning every hit into a full original strike.
 
 5e CR comparison note
 
