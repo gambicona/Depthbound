@@ -2656,12 +2656,25 @@ function categoryForHeroLevel(level = 1) {
 }
 
 function heroNeedsDungeonBoss(hero) {
-  return (hero.level ?? 1) % 2 === 0;
+  return Math.round(averagePartyLevel(hero)) % 2 === 0;
 }
 
 function monsterCategory(monster) {
   return monster.category ?? monster.cat ?? 1;
 }
+
+const monsterCategoryAverages = {
+  1: { maxHp: 12, ac: 13, attackBonus: 4, damage: 5 },
+  2: { maxHp: 26, ac: 14, attackBonus: 5, damage: 8 },
+  3: { maxHp: 45, ac: 15, attackBonus: 6, damage: 10 },
+  4: { maxHp: 72, ac: 17, attackBonus: 7, damage: 14 },
+  5: { maxHp: 101, ac: 17, attackBonus: 9, damage: 18 },
+  6: { maxHp: 134, ac: 18, attackBonus: 10, damage: 23 },
+  7: { maxHp: 175, ac: 20, attackBonus: 11, damage: 27 },
+  8: { maxHp: 224, ac: 20, attackBonus: 12, damage: 33 },
+  9: { maxHp: 272, ac: 22, attackBonus: 13, damage: 38 },
+  10: { maxHp: 340, ac: 23, attackBonus: 14, damage: 43 },
+};
 
 const monsterCategoryRingColors = {
   1: "#3fae5a",
@@ -2717,10 +2730,16 @@ function monsterCategoryRingColor(monster) {
 }
 
 function averagePartyLevel(hero = state?.fighters?.hero) {
+  if (Number.isFinite(hero?.partyAverageLevel)) return hero.partyAverageLevel;
+  if (Number.isFinite(hero?.level) && Number.isFinite(hero?.partySize)) return hero.level;
   const heroIds = state?.party?.heroIds ?? ["hero"];
   const heroes = heroIds.map((id) => state?.fighters?.[id]).filter(Boolean);
   if (heroes.length === 0) return hero?.level ?? 1;
   return heroes.reduce((sum, entry) => sum + (entry.level ?? 1), 0) / heroes.length;
+}
+
+function partyTargetMonsterCategory(hero = state?.fighters?.hero) {
+  return clamp(categoryForHeroLevel(averagePartyLevel(hero)), 1, 10);
 }
 
 function partySizeForSwarm(hero = state?.fighters?.hero) {
@@ -2731,7 +2750,7 @@ function partySizeForSwarm(hero = state?.fighters?.hero) {
 
 function swarmSpawnCount(monsterTemplate, hero) {
   const partySize = partySizeForSwarm(hero);
-  const partyLevelCategory = categoryForHeroLevel(averagePartyLevel(hero));
+  const partyLevelCategory = partyTargetMonsterCategory(hero);
   const categoryGap = Math.max(0, partyLevelCategory - monsterCategory(monsterTemplate));
   const partyExtra = Math.max(0, partySize - swarmSpawnTuning.basePartySize) * swarmSpawnTuning.extraPerPartyMember;
   const levelExtra = Math.min(swarmSpawnTuning.maximumExtraFromLevelGap, categoryGap * swarmSpawnTuning.extraPerCategoryGap);
@@ -2741,7 +2760,7 @@ function swarmSpawnCount(monsterTemplate, hero) {
 function roomMonsterSpawnCount(monsterTemplate, hero) {
   if (monsterTemplate.behavior === "swarm") return swarmSpawnCount(monsterTemplate, hero);
   const partySize = partySizeForSwarm(hero);
-  const partyLevelCategory = categoryForHeroLevel(averagePartyLevel(hero));
+  const partyLevelCategory = partyTargetMonsterCategory(hero);
   const categoryGap = Math.max(0, partyLevelCategory - monsterCategory(monsterTemplate));
   const expected =
     roomMonsterSpawnTuning.baseCount +
@@ -2754,7 +2773,7 @@ function roomMonsterSpawnCount(monsterTemplate, hero) {
 }
 
 function weightedMonsterIdsForHero(hero, themeId = currentThemeId()) {
-  const targetCategory = categoryForHeroLevel(hero.level ?? 1);
+  const targetCategory = partyTargetMonsterCategory(hero);
   const allowedMonsterIds = dungeonMonsterIds(themeId);
   const entries = allowedMonsterIds
     .map((id) => ({ id, template: getMonsterTemplate(id) }))
@@ -2786,7 +2805,7 @@ function pickWeightedMonsterId(entries, usedCounts = {}, fallbackId = defaultCon
 }
 
 function bossMonsterIdForHero(hero, themeId = currentThemeId()) {
-  const targetCategory = categoryForHeroLevel(hero.level ?? 1);
+  const targetCategory = partyTargetMonsterCategory(hero);
   const bosses = dungeonBossMonsterIds(themeId)
     .map((id) => ({ id, template: getMonsterTemplate(id) }))
     .filter((entry) => entry.template && monsterCategory(entry.template) <= targetCategory)
@@ -2794,14 +2813,65 @@ function bossMonsterIdForHero(hero, themeId = currentThemeId()) {
   return bosses[0]?.id ?? null;
 }
 
+function averageDamageForProfile(damage = {}) {
+  const flat = Number(damage.flat);
+  if (Number.isFinite(flat) && flat > 0) return flat;
+  const count = Number(damage.count) || 0;
+  const sides = Number(damage.sides) || 0;
+  const bonus = Number(damage.bonus) || 0;
+  if (count <= 0 || sides <= 0) return Math.max(0, bonus);
+  return count * ((sides + 1) / 2) + bonus;
+}
+
 function applyMonsterCategoryScaling(monster, hero) {
-  const targetCategory = categoryForHeroLevel(hero.level ?? 1);
-  const categoryGap = Math.max(0, targetCategory - monsterCategory(monster));
+  const originalCategory = monsterCategory(monster);
+  const targetCategory = partyTargetMonsterCategory(hero);
+  const categoryGap = Math.max(0, targetCategory - originalCategory);
   if (categoryGap <= 0) return monster;
 
-  const hpMultiplier = 1 + categoryGap * 0.1;
-  monster.maxHp = Math.max(1, Math.ceil(monster.maxHp * hpMultiplier));
+  const originalAverages = monsterCategoryAverages[originalCategory] ?? monsterCategoryAverages[1];
+  const targetAverages = monsterCategoryAverages[targetCategory] ?? monsterCategoryAverages[10];
+  const catchUp = Math.min(0.86, 0.54 + categoryGap * 0.08);
+
+  const scaleTowardAverage = (value, sourceAverage, targetAverage, intensity = catchUp) => {
+    const currentValue = Number(value);
+    if (!Number.isFinite(currentValue)) return value;
+    const source = Math.max(1, Number(sourceAverage) || 1);
+    const target = Math.max(source, Number(targetAverage) || source);
+    const targetValue = currentValue * (1 + ((target / source) - 1) * intensity);
+    return Math.max(1, Math.round(targetValue));
+  };
+
+  const scaleFlatDamage = (damage, intensity = catchUp) => {
+    const currentAverage = averageDamageForProfile(damage);
+    if (!Number.isFinite(currentAverage) || currentAverage <= 0) return damage;
+    const source = Math.max(1, originalAverages.damage);
+    const target = Math.max(source, targetAverages.damage);
+    const targetAverage = currentAverage * (1 + ((target / source) - 1) * intensity);
+    const bonusIncrease = Math.max(0, Math.round(targetAverage - currentAverage));
+    if (bonusIncrease <= 0) return damage;
+    const scaledDamage = {
+      ...damage,
+      bonus: (damage.bonus ?? 0) + bonusIncrease,
+    };
+    return {
+      ...scaledDamage,
+      label: formatDamage(scaledDamage),
+    };
+  };
+
+  monster.baseCategory = monster.baseCategory ?? originalCategory;
+  monster.scaledFromCategory = originalCategory;
+  monster.category = targetCategory;
+  monster.scaledToCategory = targetCategory;
+  monster.maxHp = scaleTowardAverage(monster.maxHp, originalAverages.maxHp, targetAverages.maxHp);
+  monster.baseMaxHp = monster.maxHp;
   monster.hp = monster.maxHp;
+  monster.baseAc = scaleTowardAverage(monster.baseAc ?? monster.ac ?? 10, originalAverages.ac, targetAverages.ac, Math.min(0.7, catchUp));
+  monster.ac = monster.baseAc;
+  monster.attackBonus = scaleTowardAverage(monster.attackBonus ?? 0, originalAverages.attackBonus, targetAverages.attackBonus, Math.min(0.78, catchUp));
+  monster.baseDamage = scaleFlatDamage(monster.baseDamage ?? monster.damage ?? { count: 1, sides: 4, bonus: 0 });
+  monster.damage = { ...monster.baseDamage };
   return monster;
 }
 
