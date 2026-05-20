@@ -4483,6 +4483,49 @@ function damageFlagMatches(flags, type) {
 function calculateDamageModifiers(target, damage, type) {
   const normalizedType = String(type ?? "").toLowerCase();
   if (!normalizedType) return { damage, reason: null };
+  const specialNames = (target?.specialAbility ?? []).map((name) => String(name));
+  const targetHasSpecial =
+    typeof hasMonsterSpecial === "function"
+      ? (pattern) => hasMonsterSpecial(target, pattern)
+      : (pattern) => specialNames.some((name) => pattern.test(name));
+  if (targetHasSpecial(/ancient photosynthesis/i) && normalizedType === "fire" && damage > 0) {
+    target.usedSpecials = target.usedSpecials ?? {};
+    target.usedSpecials.AncientPhotosynthesisSuppressedRound = state?.round ?? 0;
+  }
+  if (targetHasSpecial(/lightning feed/i) && normalizedType === "lightning" && damage > 0) {
+    let healed = 0;
+    if (typeof applyHealingToHero === "function") {
+      healed = applyHealingToHero(target, damage);
+    } else {
+      const before = target.hp ?? 0;
+      target.hp = Math.min(target.maxHp ?? before, before + damage);
+      healed = Math.max(0, target.hp - before);
+    }
+    if (typeof addLog === "function") {
+      addLog(
+        healed > 0
+          ? `${target.name}'s Lightning Feed turns the lightning into ${healed} HP.`
+          : `${target.name}'s Lightning Feed absorbs the lightning, but it is already at full health.`,
+        "heal",
+      );
+    }
+    return { damage: 0, reason: null };
+  }
+  if (targetHasSpecial(/storm shell/i) && ["lightning", "thunder"].includes(normalizedType) && damage > 0) {
+    target.usedSpecials = target.usedSpecials ?? {};
+    const roundKey = `StormShellFeed-${state?.round ?? 0}`;
+    if (!target.usedSpecials[roundKey]) {
+      target.usedSpecials[roundKey] = true;
+      const amount = Math.max(1, Math.floor(damage / 2));
+      const healed = typeof applyHealingToHero === "function" ? applyHealingToHero(target, amount) : 0;
+      if (healed > 0 && typeof addLog === "function") {
+        addLog(`${target.name}'s Storm Shell drinks in the ${normalizedType} and restores ${healed} HP.`, "heal");
+      } else if (typeof applyStatusEffect === "function") {
+        applyStatusEffect(target, { id: `storm-shell-${state?.round ?? 0}`, label: "Storm-Empowered", attackBonus: 1, expiresAtEndOfTurn: true });
+        if (typeof addLog === "function") addLog(`${target.name}'s Storm Shell turns the ${normalizedType} into a brief attack surge.`, "important");
+      }
+    }
+  }
   const effects = magicEffects(target);
   const statusResistances = (target.statusEffects ?? []).flatMap((effect) => effect.resistances ?? []);
   const statusVulnerabilities = (target.statusEffects ?? []).flatMap((effect) => effect.vulnerabilities ?? []);

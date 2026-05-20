@@ -352,6 +352,7 @@ window.DungeonContent.register("monsters", "myconidSporeguard", {
   conditionImmunities: ["poisoned", "frightened"],
   specialAbility: [
     "Rapport Spores", // Allied plant creatures within 15 ft gain +1 attack bonus.
+    "Healing Spores", // Action: heals a wounded monster ally within 30 ft.
     "Pacifying Puff", // Once per fight: Con save or target has disadvantage on next attack.
   ],
   initiativeBonus: 3,

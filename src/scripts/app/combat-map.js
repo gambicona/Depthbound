@@ -377,6 +377,182 @@ function addAdminCheckLog({ actor, label, rollResult, bonus = 0, guidance = 0, t
   addAdminLog(`${actor?.name ?? "Unknown"} ${label}${targetText}: ${d20RollDetail(rollResult)} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${dc} => ${success ? "success" : "failure"}${note ? `. ${note}` : ""}.`);
 }
 
+function stealthState(fighter) {
+  return fighter?.stealth && fighter.stealth.active ? fighter.stealth : null;
+}
+
+function fighterIsStealthing(fighter) {
+  return Boolean(stealthState(fighter));
+}
+
+function passivePerception(fighter) {
+  return 10 + abilityMod(fighter, "wis");
+}
+
+function activePerceptionCheck(fighter, options = {}) {
+  const rollResult = rollD20ForFighter(fighter, { advantage: Boolean(options.advantage) });
+  const bonus = abilityMod(fighter, "wis");
+  return {
+    fighter,
+    rollResult,
+    roll: rollResult.roll,
+    bonus,
+    total: rollResult.roll + bonus,
+  };
+}
+
+function stealthCheck(hero) {
+  const rollResult = rollD20ForFighter(hero);
+  const roll = reliableTalentRoll(hero, "stealth", rollResult.roll);
+  const bonus = skillCheckBonus(hero, "dex", "stealth");
+  const guidance = guidanceSkillBonus();
+  return {
+    rollResult,
+    roll,
+    bonus,
+    guidance,
+    total: roll + bonus + guidance,
+  };
+}
+
+function setHeroStealth(hero, check, reason = "stealths") {
+  if (!hero) return;
+  hero.stealth = {
+    active: true,
+    total: check.total,
+    roll: check.roll,
+    bonus: check.bonus,
+    guidance: check.guidance ?? 0,
+    reason,
+  };
+}
+
+function clearHeroStealth(hero, reason = "") {
+  if (!hero?.stealth) return;
+  hero.stealth = { active: false };
+  if (reason) addLog(`${hero.name} is no longer stealthing: ${reason}.`, "important");
+}
+
+function roomMonstersForHero(hero) {
+  const room = roomForPosition(hero?.position);
+  return room ? monstersInRoom(room.id) : [];
+}
+
+function syncAutonomousAllyStealthWithLeader(leader = activeHero()) {
+  if (!leader) return;
+  for (const ally of partyHeroes().filter(isAutonomousAlly)) {
+    if (followLeaderForAlly(ally, leader)?.id !== leader.id) continue;
+    if (fighterIsStealthing(leader)) {
+      ally.stealth = { ...leader.stealth, followedHeroId: leader.id, automatic: true };
+    } else if (ally.stealth?.automatic && ally.stealth.followedHeroId === leader.id) {
+      ally.stealth = { active: false };
+    }
+  }
+}
+
+function beginHeroStealth(hero = activeHero()) {
+  if (!gameHasStarted || state.mode !== "exploration" || !heroCanAct(hero) || isAutonomousAlly(hero)) return false;
+  if (fighterIsStealthing(hero)) {
+    clearHeroStealth(hero, "the stance is dropped");
+    syncAutonomousAllyStealthWithLeader(hero);
+    render();
+    return true;
+  }
+
+  const check = stealthCheck(hero);
+  setHeroStealth(hero, check, "initial");
+  const guidanceText = check.guidance ? ` + Guidance ${check.guidance}` : "";
+  addLog(`${hero.name} starts stealthing: DEX Stealth ${check.roll} ${abilityLabel(check.bonus)}${guidanceText} = ${check.total}.`, "important");
+  addAdminLog(`${hero.name} initial stealth breakdown: ${d20RollDetail(check.rollResult)} ${abilityLabel(check.bonus)}${guidanceText} = ${check.total}.`);
+  recordD20OutcomeForFighter(hero, true);
+  syncAutonomousAllyStealthWithLeader(hero);
+  const roomMonsters = roomMonstersForHero(hero);
+  if (roomMonsters.length && !stealthBeatsPassivePerceptionForRoom(hero, roomMonsters)) {
+    revealStealthedHero(hero, roomMonsters, "is noticed while trying to hide");
+  }
+  render();
+  return true;
+}
+
+function stealthBeatsPassivePerceptionForRoom(hero, monsters = roomMonstersForHero(hero)) {
+  const stealth = stealthState(hero);
+  if (!stealth) return false;
+  return monsters.every((monster) => stealth.total > passivePerception(monster));
+}
+
+function revealStealthedHero(hero, monsters, reason = "is spotted") {
+  const watcher = [...monsters].sort((a, b) => passivePerception(b) - passivePerception(a))[0];
+  clearHeroStealth(hero);
+  syncAutonomousAllyStealthWithLeader(hero);
+  if (typeof hideFighterInfo === "function") hideFighterInfo();
+  addLog(`${hero.name} ${reason}${watcher ? ` by ${watcher.name}` : ""}. Roll initiative.`, "important");
+  if (!initiativePromptOpen) {
+    initiativePromptOpen = true;
+    void rollInitiative().finally(() => {
+      initiativePromptOpen = false;
+    });
+  }
+  render();
+}
+
+function checkStealthAgainstPassiveForRooms(hero, rooms = []) {
+  if (!fighterIsStealthing(hero)) return true;
+  for (const room of rooms) {
+    const monsters = monstersInRoom(room.id);
+    if (!monsters.length) continue;
+    const highestPassive = Math.max(...monsters.map(passivePerception));
+    const success = hero.stealth.total > highestPassive;
+    addLog(`${hero.name}'s stealth ${hero.stealth.total} ${success ? "beats" : "fails against"} passive Perception ${highestPassive} in ${room.name}.`, success ? "" : "important");
+    if (!success) {
+      revealStealthedHero(hero, monsters, "is spotted as the door opens");
+      return false;
+    }
+  }
+  return true;
+}
+
+function activeStealthCheckInMonsterRoom(hero = activeHero(), reason = "acts", options = {}) {
+  if (!fighterIsStealthing(hero) || state.mode !== "exploration") return true;
+  const monsters = options.monsters ?? roomMonstersForHero(hero);
+  if (!monsters.length) return true;
+  const check = stealthCheck(hero);
+  setHeroStealth(hero, check, reason);
+  const monsterChecks = monsters.map((monster) => activePerceptionCheck(monster, { advantage: options.perceptionAdvantage }));
+  const best = monsterChecks.sort((a, b) => b.total - a.total)[0];
+  const guidanceText = check.guidance ? ` + Guidance ${check.guidance}` : "";
+  const advantageText = options.perceptionAdvantage ? " with advantage" : "";
+  const success = check.total > (best?.total ?? 0);
+  addLog(
+    `${hero.name} ${reason} while stealthing: Stealth ${check.roll} ${abilityLabel(check.bonus)}${guidanceText} = ${check.total} vs ${best?.fighter?.name ?? "monster"} Perception${advantageText} ${best?.roll ?? "?"} ${abilityLabel(best?.bonus ?? 0)} = ${best?.total ?? "?"}.`,
+    success ? "" : "important",
+  );
+  addAdminCheckLog({ actor: hero, label: "Active stealth check", rollResult: check.rollResult, bonus: check.bonus, guidance: check.guidance, total: check.total, dc: best?.total ?? 0, target: best?.fighter?.name ?? "monsters", success, note: reason });
+  recordD20OutcomeForFighter(hero, success);
+  if (!success) {
+    revealStealthedHero(hero, monsters, "is heard");
+    return false;
+  }
+  syncAutonomousAllyStealthWithLeader(hero);
+  return true;
+}
+
+function adjacentMonstersForStealthProximity(hero, previousPosition = null) {
+  if (!fighterIsStealthing(hero) || state.mode !== "exploration") return [];
+  return aliveMonsters().filter((monster) => {
+    if (!isKnownTile(monster.position) || attackGridDistance(hero.position, monster.position) > 1) return false;
+    return !previousPosition || attackGridDistance(previousPosition, monster.position) > 1;
+  });
+}
+
+function checkStealthProximity(hero, previousPosition = null) {
+  const monsters = adjacentMonstersForStealthProximity(hero, previousPosition);
+  if (!monsters.length) return true;
+  return activeStealthCheckInMonsterRoom(hero, "moves within 5 ft of a monster", {
+    monsters,
+    perceptionAdvantage: true,
+  });
+}
+
 function turnLogSideForFighter(fighter) {
   if (isPartyHeroId(fighter?.id)) return "hero";
   if (fighter?.friendly || fighter?.team === "heroes") return "friendly";
@@ -1920,7 +2096,9 @@ function monsterThreatensHeroes(monster) {
   if (!monsterRoom) return true;
   return partyHeroes().some((hero) => {
     const heroRoom = roomForPosition(hero.position);
-    return !heroRoom || heroRoom.id === monsterRoom.id;
+    if (!heroRoom) return !fighterIsStealthing(hero) || (hero.stealth?.total ?? 0) <= passivePerception(monster);
+    if (heroRoom.id !== monsterRoom.id) return false;
+    return !fighterIsStealthing(hero) || (hero.stealth?.total ?? 0) <= passivePerception(monster);
   });
 }
 
@@ -2187,19 +2365,40 @@ function hostileTo(fighter, candidate) {
   return fighterIsHero ? !candidateIsHero : candidateIsHero;
 }
 
-function canOpportunityAttack(attacker, defender, from, to) {
-  if (state.mode !== "combat" || !attacker.alive || !defender.alive || !hostileTo(attacker, defender)) return false;
-  if (defender.disengaged) return false;
-  if (fighterHasFeat(defender, "mobile") && (defender.mobileNoOpportunityFrom ?? []).includes(attacker.id)) return false;
+function opportunityThreatensPosition(attacker, defender, position) {
   const profile = opportunityAttackProfile(attacker);
   const range = profileRangeSquares(profile);
-  const hadThreat = attackGridDistance(attacker.position, from) <= range;
-  const keepsThreat = attackGridDistance(attacker.position, to) <= range;
+  const threatened = attackGridDistance(attacker.position, position) <= range && positionKey(attacker.position) !== positionKey(position);
+  if (!threatened) return false;
+  if (range > 1) return true;
+  const attackerRoom = roomForPosition(attacker.position);
+  const targetRoom = roomForPosition(position);
+  if (attackerRoom && targetRoom) return attackerRoom.id === targetRoom.id;
+  if (Math.abs(attacker.position.x - position.x) + Math.abs(attacker.position.y - position.y) === 1) {
+    return canTraverseMovementEdge(attacker, attacker.position, position, []);
+  }
+  return hasMeleeAccess(attacker, { ...defender, position });
+}
+
+function canOpportunityAttack(attacker, defender, from, to) {
+  if (state.mode !== "combat" || !heroCanAct(attacker) || !heroCanAct(defender) || !hostileTo(attacker, defender)) return false;
+  if (!hasReactionAvailable(attacker) || defender.disengaged) return false;
+  if (fighterHasFeat(defender, "mobile") && (defender.mobileNoOpportunityFrom ?? []).includes(attacker.id)) return false;
+  const hadThreat = opportunityThreatensPosition(attacker, defender, from);
+  const keepsThreat = opportunityThreatensPosition(attacker, defender, to);
   return hadThreat && !keepsThreat;
 }
 
 async function shouldTakeOpportunityAttack(attacker, defender) {
-  return true;
+  if (!isPlayerControlledPartyFighter(attacker)) return true;
+  const profile = opportunityAttackProfile(attacker);
+  return showReactionPrompt({
+    actor: attacker,
+    title: "Opportunity Attack",
+    message: `${defender.name} is leaving ${attacker.name}'s reach. Use your reaction to attack with ${profile.weaponName}?`,
+    acceptLabel: "Attack",
+    declineLabel: "Skip",
+  });
 }
 
 async function finishEncounterAfterLastMonsterFalls() {
@@ -2229,6 +2428,7 @@ async function maybeFinishEncounterAfterHeroRecovery() {
 }
 
 async function opportunityAttack(attacker, defender) {
+  if (!consumeReaction(attacker, "an opportunity attack")) return;
   const profile = opportunityAttackProfile(attacker);
   playSoundEffect("meleeAttack");
   const attackRollResult = rollD20ForFighter(attacker, { disadvantage: defender.dodging });
@@ -3329,7 +3529,9 @@ function corridorPathBetweenDoors(door, targetDoor) {
   return [door.corridor, targetDoor.corridor];
 }
 
-function openDoor(door) {
+function openDoor(door, actor = activeHero()) {
+  if (actor && !activeStealthCheckInMonsterRoom(actor, "opens a door")) return false;
+
   const relatedDoors = (state.dungeon?.doors ?? []).filter(
     (entry) => entry.roomId === door.roomId && positionKey(entry) === positionKey(door),
   );
@@ -3380,9 +3582,12 @@ function openDoor(door) {
   state.exploration.discoveredRoomIds = Array.from(discovered);
   state.exploration.openedDoorKeys = Array.from(openedDoorKeys);
   state.exploration.openedCorridorKeys = Array.from(openedCorridorKeys);
-  addLog(`${activeHero()?.name ?? "The party"} opens the door${revealedRooms.length === 1 ? ` to ${revealedRooms[0].name}` : ""}.`, "important");
+  addLog(`${actor?.name ?? activeHero()?.name ?? "The party"} opens the door${revealedRooms.length === 1 ? ` to ${revealedRooms[0].name}` : ""}.`, "important");
 
-  if (revealedRooms.some((room) => monstersInRoom(room.id).length > 0)) {
+  const revealedMonsterRooms = revealedRooms.filter((room) => monstersInRoom(room.id).length > 0);
+  if (actor && fighterIsStealthing(actor) && revealedMonsterRooms.length > 0) {
+    checkStealthAgainstPassiveForRooms(actor, revealedMonsterRooms);
+  } else if (revealedMonsterRooms.length > 0) {
     addLog("Hostile movement answers from within. Roll initiative.", "important");
   }
 
@@ -3417,7 +3622,7 @@ function toggleHomeDoor(position, actor = activeHero()) {
     render();
     return true;
   }
-  return openDoor(door);
+  return openDoor(door, actor);
 }
 
 function doorCandidateForPosition(position, actor = activeHero()) {
@@ -3456,7 +3661,7 @@ function canOpenDoor(position, actor = activeHero()) {
   if (!hero || !door || !isKnownTile(position) || !isKnownTile(door)) return null;
   if (sharedDoorPassagesAreOpen(door)) return null;
   const heroRoom = roomForPosition(hero.position);
-  if (heroRoom && currentDiscoveredRoomIds().has(heroRoom.id) && monstersInRoom(heroRoom.id).length > 0) {
+  if (heroRoom && currentDiscoveredRoomIds().has(heroRoom.id) && monstersInRoom(heroRoom.id).length > 0 && !fighterIsStealthing(hero)) {
     return null;
   }
   return distance(hero.position, door) <= 1 ? door : null;
@@ -3465,7 +3670,7 @@ function canOpenDoor(position, actor = activeHero()) {
 function autoOpenAdjacentExplorationDoor(fighter) {
   if (!isPartyHeroId(fighter.id) || state.mode !== "exploration") return false;
   const door = doorAt(fighter.position) || doorsAtCorridorMouth(fighter.position).length > 0 ? canOpenDoor(fighter.position, fighter) : null;
-  return door ? openDoor(door) : false;
+  return door ? openDoor(door, fighter) : false;
 }
 
 function threatPresent() {
@@ -3666,6 +3871,9 @@ async function rollInitiative() {
 
   state.combatStarted = true;
   state.mode = "combat";
+  partyHeroes().forEach((hero) => {
+    if (hero.stealth) hero.stealth = { active: false };
+  });
   monsterEntries.forEach((entry) => fledMonsterIds.delete(entry.fighterId));
   state.round = 1;
   state.activeIndex = 0;
@@ -4020,7 +4228,9 @@ async function makeAttack(attacker, defender, options = {}) {
   }
   const resolvedPackets = packets.map((packet) => ({ ...packet, ...calculateDamageModifiers(defender, packet.raw, packet.type) }));
   addAdminLog(`${attacker.name} damage packets vs ${defender.name}: ${resolvedPackets.map((packet) => `${packet.label} => raw ${packet.raw}, final ${packet.damage}${packet.reason ? ` (${packet.reason})` : ""}`).join("; ")}.`);
-  let totalDamage = resolvedPackets.reduce((sum, packet) => sum + packet.damage, 0);
+  const packetTotalDamage = resolvedPackets.reduce((sum, packet) => sum + packet.damage, 0);
+  const packetNecroticDamage = resolvedPackets.reduce((sum, packet) => sum + (String(packet.type ?? "").toLowerCase() === "necrotic" ? packet.damage : 0), 0);
+  let totalDamage = packetTotalDamage;
   if (hitReaction.resistance) totalDamage = Math.floor(totalDamage / 2);
   totalDamage = maybeUseMonsterDamageReduction(defender, attacker, totalDamage, !rangedAttack);
   totalDamage = await maybeUseUncannyDodge(defender, attacker, totalDamage);
@@ -4030,6 +4240,9 @@ async function makeAttack(attacker, defender, options = {}) {
   totalDamage = await maybeUseSpiritShield(defender, attacker, totalDamage);
   applyDamageToFighter(defender, totalDamage);
   defender.lastDamagedById = attacker.id;
+  const finalNecroticDamage =
+    packetTotalDamage > 0 && packetNecroticDamage > 0 ? Math.max(0, Math.floor((packetNecroticDamage * totalDamage) / packetTotalDamage)) : 0;
+  maybeUseMonsterSoulSiphon(attacker, finalNecroticDamage, "necrotic");
   if (!rangedAttack && warlockKnowsInvocation(attacker, "lifedrinker") && totalDamage > 0) {
     const healed = applyHealingToHero(attacker, Math.max(1, Math.floor(abilityMod(attacker, "cha") / 2)));
     if (healed > 0) addLog(`${attacker.name}'s Lifedrinker restores ${healed} HP.`, "heal");
@@ -4073,6 +4286,8 @@ async function makeAttack(attacker, defender, options = {}) {
     addLog(`${defender.name} refuses to fall and remains at 1 HP.`, "important");
   }
 
+  maybeUseMonsterDropHealing(attacker, defender);
+
   if (!defender.alive) {
     addLog(`${defender.name} drops to 0 HP. ${isPartyHeroId(attacker.id) ? "Victory." : "Defeat."}`, "important");
     if (!isPartyHeroId(defender.id)) {
@@ -4114,6 +4329,152 @@ function shouldUseMonsterSpecial(kind = "active") {
         ? monsterSpecialAbilityTuning.defensiveUseChance
         : monsterSpecialAbilityTuning.activeUseChance;
   return Math.random() < chance;
+}
+
+function monsterHasAnyTag(monster, tags = []) {
+  const monsterTags = monster?.tags ?? [];
+  return tags.some((tag) => monsterTags.includes(tag));
+}
+
+function monsterIsUndead(monster) {
+  return monsterHasAnyTag(monster, ["undead", "ghost", "phantom", "wraith", "skeletal", "zombie"]);
+}
+
+function monsterIsFungusOrPlant(monster) {
+  return monsterHasAnyTag(monster, ["plant", "fungus", "mycelium", "mushroom", "spore"]);
+}
+
+function healMonsterWithSpecial(source, target, amount, label) {
+  if (!target?.alive || amount <= 0 || (target.hp ?? 0) >= (target.maxHp ?? 0)) return 0;
+  const healed = applyHealingToHero(target, amount);
+  if (healed > 0) addLog(`${source.name}'s ${label} heals ${target.name} for ${healed} HP.`, "heal");
+  return healed;
+}
+
+function woundedMonsterAlliesInRange(monster, rangeFeet = 30, options = {}) {
+  const rangeSquares = rangeFeet / feetPerSquare;
+  return combatMonsters()
+    .filter((candidate) => {
+      if (!candidate?.alive) return false;
+      if (!options.includeSelf && candidate.id === monster.id) return false;
+      if ((candidate.hp ?? 0) >= (candidate.maxHp ?? 0)) return false;
+      if (distance(candidate.position, monster.position) > rangeSquares) return false;
+      return options.predicate ? options.predicate(candidate) : true;
+    })
+    .sort((a, b) => (a.hp ?? 0) / Math.max(1, a.maxHp ?? 1) - (b.hp ?? 0) / Math.max(1, b.maxHp ?? 1));
+}
+
+function maybeUseMonsterSoulSiphon(monster, damage, type) {
+  if (!monster?.alive || isPartyHeroId(monster.id) || damage <= 0 || String(type ?? "").toLowerCase() !== "necrotic") return 0;
+  if (!hasMonsterSpecial(monster, /soul siphon/i)) return 0;
+  monster.usedSpecials = monster.usedSpecials ?? {};
+  const roundKey = `SoulSiphon-${state.round ?? 0}`;
+  if (monster.usedSpecials[roundKey]) return 0;
+  monster.usedSpecials[roundKey] = true;
+  const healed = applyHealingToHero(monster, Math.max(1, Math.floor(damage / 2)));
+  if (healed > 0) addLog(`${monster.name}'s Soul Siphon restores ${healed} HP.`, "heal");
+  return healed;
+}
+
+function maybeUseMonsterDropHealing(monster, target) {
+  if (!monster?.alive || isPartyHeroId(monster.id) || target?.alive) return false;
+  const label = monsterSpecialNameMatching(monster, /harvest contract|devouring bloom/i);
+  if (!label) return false;
+  const dice = /harvest contract/i.test(label) ? rollDice(5, 8) : rollDice(4, 8);
+  const healed = applyHealingToHero(monster, dice.total);
+  if (/harvest contract/i.test(label)) {
+    applyStatusEffect(monster, { id: "harvest-contract", label: "Harvest Contract", attackBonus: 1 });
+  } else {
+    monster.hasAction = true;
+    monster.attacksRemaining = Math.max(monster.attacksRemaining ?? 0, 1);
+  }
+  addLog(
+    healed > 0
+      ? `${monster.name}'s ${label} restores ${healed} HP as ${target.name} falls.`
+      : `${monster.name}'s ${label} flares as ${target.name} falls, but ${monster.name} is already at full health.`,
+    "heal",
+  );
+  return true;
+}
+
+function maybeUseAncientPhotosynthesis(monster) {
+  if (!hasMonsterSpecial(monster, /ancient photosynthesis/i) || (monster.hp ?? 0) >= (monster.maxHp ?? 0)) return false;
+  const suppressedRound = monster.usedSpecials?.AncientPhotosynthesisSuppressedRound;
+  if (typeof suppressedRound === "number" && (state.round ?? 0) <= suppressedRound + 1) return false;
+  const roll = rollDice(1, 8);
+  const healed = applyHealingToHero(monster, Math.max(1, roll.total + monsterCategory(monster)));
+  if (healed > 0) {
+    addLog(`${monster.name}'s Ancient Photosynthesis restores ${healed} HP.`, "heal");
+    render();
+    return true;
+  }
+  return false;
+}
+
+async function maybeUseMonsterAllyHealingAction(monster) {
+  if (!monster?.hasAction) return false;
+  monster.usedSpecials = monster.usedSpecials ?? {};
+  if (hasMonsterSpecial(monster, /unholy benediction/i) && !monster.usedSpecials.UnholyBenediction) {
+    const targets = woundedMonsterAlliesInRange(monster, 30, { includeSelf: true, predicate: monsterIsUndead });
+    if (targets.length) {
+      const label = monsterSpecialNameMatching(monster, /unholy benediction/i) ?? "Unholy Benediction";
+      const roll = rollDice(4, 8);
+      monster.usedSpecials.UnholyBenediction = true;
+      monster.hasAction = false;
+      let healedAny = false;
+      for (const target of targets) {
+        healedAny = healMonsterWithSpecial(monster, target, roll.total, label) > 0 || healedAny;
+        applyStatusEffect(target, { id: "unholy-benediction", label: "Benediction", attackBonus: 1, durationRounds: 1 });
+      }
+      if (healedAny) addLog(`${label} also gives the healed undead +1 attack until next round.`, "important");
+      render();
+      return true;
+    }
+  }
+
+  if (hasMonsterSpecial(monster, /brood spores/i) && !monster.usedSpecials.BroodSpores) {
+    const targets = woundedMonsterAlliesInRange(monster, 30, { includeSelf: true, predicate: monsterIsFungusOrPlant });
+    if (targets.length) {
+      const label = monsterSpecialNameMatching(monster, /brood spores/i) ?? "Brood Spores";
+      const dice = specialDamageDice(monster, 8);
+      const roll = rollDice(dice.count, dice.sides);
+      monster.usedSpecials.BroodSpores = true;
+      monster.hasAction = false;
+      for (const target of targets.slice(0, 3)) {
+        healMonsterWithSpecial(monster, target, Math.max(1, roll.total + dice.bonus), label);
+      }
+      render();
+      return true;
+    }
+  }
+
+  if (hasMonsterSpecial(monster, /first forest awakens/i) && !monster.usedSpecials.FirstForestHealing) {
+    const targets = woundedMonsterAlliesInRange(monster, 30, { includeSelf: true, predicate: monsterIsFungusOrPlant });
+    if (targets.length) {
+      const label = monsterSpecialNameMatching(monster, /first forest awakens/i) ?? "First Forest Awakens";
+      const roll = rollDice(3, 8);
+      monster.usedSpecials.FirstForestHealing = true;
+      monster.hasAction = false;
+      for (const target of targets.slice(0, 4)) {
+        healMonsterWithSpecial(monster, target, Math.max(1, roll.total + monsterCategory(monster)), label);
+      }
+      render();
+      return true;
+    }
+  }
+
+  const label = monsterSpecialNameMatching(monster, /healing|mending|renewal|benediction|regrowth|photosynthesis/i);
+  if (label) {
+    const [target] = woundedMonsterAlliesInRange(monster, 30, { includeSelf: false });
+    if (target) {
+      const roll = rollDice(2, 8);
+      monster.hasAction = false;
+      healMonsterWithSpecial(monster, target, Math.max(1, roll.total + monsterCategory(monster)), label);
+      render();
+      return true;
+    }
+  }
+  return false;
 }
 
 function maybeUseMonsterDamageReduction(defender, attacker, incomingDamage, meleeAttack) {
@@ -4322,43 +4683,43 @@ function savingThrowExplanation(message = "", ability = "") {
   const abilityText = String(ability).toUpperCase();
   if (/forge|furnace|coal|cinder|ember|fire|flame|burn|magma|lava|scald|boiling/.test(lower)) {
     return {
-      flavor: `${label} erupts in a wave of heat, sparks, and choking forge grit. ${abilityText} measures whether the target can duck behind cover, turn aside, or move through the blast before the worst of it lands.`,
-      failure: "Failure means the heat catches fully, usually causing fire damage or a short-lived burning penalty.",
-      success: "Success means the target avoids the center of the blast, often taking reduced damage or avoiding the rider effect.",
+      flavor: `${label} releases heat, sparks, or molten spray around the target. ${abilityText} measures whether they get clear before the fire catches them directly.`,
+      failure: "Failure means the target takes the listed fire damage and any burn, armor, or movement rider applies.",
+      success: "Success means the target avoids the direct blast, taking reduced damage or avoiding the rider.",
     };
   }
   if (/poison|venom|sick|stench|bile|rot|plague|nausea/.test(lower)) {
     return {
-      flavor: `${label} carries venom, rot, or fouled air. ${abilityText} measures whether the target's body fights it off before it spreads.`,
-      failure: "Failure means poison, sickness, damage, or a weakening condition takes hold.",
-      success: "Success means the target resists the worst of the toxin or disease.",
+      flavor: `${label} delivers venom, rot, or foul air into the target's body. ${abilityText} measures whether they fight it off before it spreads.`,
+      failure: "Failure means poison damage, sickness, nausea, or another weakening condition applies.",
+      success: "Success means the target resists the toxin or disease rider.",
     };
   }
   if (/dread|fear|whisper|malice|mind|hymn|chorus|verdict|debt|soul|life drain|drain|psychic/.test(lower)) {
     return {
-      flavor: `${label} attacks nerve, courage, or soul rather than armor. ${abilityText} measures whether the target keeps their mind and spirit steady.`,
-      failure: "Failure means fear, necrotic harm, psychic pressure, or a weakening condition breaks through.",
-      success: "Success means the target keeps control and shrugs off the worst of it.",
+      flavor: `${label} presses on the target's mind, courage, or life force. ${abilityText} measures whether they keep control before the effect takes hold.`,
+      failure: "Failure means fear, necrotic damage, psychic pressure, or a weakening condition applies.",
+      success: "Success means the target keeps control and avoids the main rider.",
     };
   }
   if (/chain|pull|drag|snare|web|grip|coil|cage|restrain|hamstring|pin|shard|needle|glass|cutting|whip/.test(lower)) {
     return {
-      flavor: `${label} tries to catch, cut, pin, or drag the target out of position. ${abilityText} measures whether they twist free before it locks in.`,
-      failure: "Failure means movement is reduced, stopped, forced, or punished, sometimes with extra damage.",
-      success: "Success means the target keeps their footing and avoids the controlling rider.",
+      flavor: `${label} hooks, pins, cuts, or drags at the target. ${abilityText} measures whether they pull free before it controls their movement.`,
+      failure: "Failure means the target is moved, slowed, restrained, or takes the listed extra damage.",
+      success: "Success means the target keeps their footing and avoids the movement rider.",
     };
   }
   if (/storm|lightning|thunder|static|current|tide|water|ice|frost|mist|pressure|wind|air|chok|dust|smoke/.test(lower)) {
     return {
-      flavor: `${label} turns the battlefield itself into the attack. ${abilityText} measures whether the target can breathe, brace, or move with the sudden elemental force.`,
-      failure: "Failure means elemental damage, lost reactions, slowed movement, or another short-lived condition.",
-      success: "Success means the target rides out the surge or only catches a glancing effect.",
+      flavor: `${label} releases a burst of lightning, thunder, air, cold, or choking vapor around the target. ${abilityText} measures whether they brace, dodge, or hold their breath in time.`,
+      failure: "Failure means the target takes the listed elemental damage and any reaction loss, push, slow, or choking rider applies.",
+      success: "Success means the target avoids the direct burst or only takes the reduced effect.",
     };
   }
   return {
-    flavor: `${label} is a special monster ability. ${abilityText} measures whether the target can resist the effect before it takes hold.`,
-    failure: "Failure means the ability's harmful rider applies.",
-    success: "Success means the target avoids or reduces the rider effect.",
+    flavor: `${label} adds a special effect to the monster's attack. ${abilityText} measures whether the target avoids that follow-up effect.`,
+    failure: "Failure means the listed damage, condition, movement, or reaction rider applies.",
+    success: "Success means the target avoids or reduces that rider.",
   };
 }
 
@@ -4499,6 +4860,7 @@ function applySpecialDamage(source, target, damage, type, label) {
   const note = modified.reason ? ` ${target.name} is ${modified.reason} to ${type} damage.` : "";
   addLog(`${source.name}'s ${label} deals ${modified.damage} ${type} damage to ${target.name}.${note}`, "damage");
   if (modified.damage !== damage || modified.reason) addAdminLog(`Damage modifier: ${target.name} incoming ${damage} ${type}, final ${modified.damage}${modified.reason ? ` (${modified.reason})` : ""}.`);
+  maybeUseMonsterSoulSiphon(source, modified.damage, type);
   return modified.damage;
 }
 
@@ -5700,33 +6062,36 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
   if (!names.length || !shouldUseMonsterSpecial("onHit")) return;
   const normalized = names.join(" | ");
   const dc = monsterSpecialDc(monster);
+  const matchingSpecialName = (pattern, fallback) => monsterSpecialNameMatching(monster, pattern) ?? fallback;
 
   if (/venom|poison|sickening|claw fever|deep venom|infernal sting|rotting tendrils|wyrmwood sap/i.test(normalized)) {
-    const label = /infernal sting/i.test(normalized) ? "infernal sting" : "venom";
+    const label = matchingSpecialName(/venom|poison|sickening|claw fever|deep venom|infernal sting|rotting tendrils|wyrmwood sap/i, "venom");
     const save = await rollSavingThrow(target, "con", dc, `${monster.name}'s ${label} forces ${target.name} to make a CON save.`);
     if (!save.success) {
-      const dice = specialDamageDice(monster, /infernal sting/i.test(normalized) ? 4 : critical ? 8 : 6);
+      const dice = specialDamageDice(monster, /infernal sting/i.test(label) ? 4 : critical ? 8 : 6);
       const roll = rollDice(dice.count, dice.sides);
       applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "poison", label);
-      if (/sickening|claw fever/i.test(normalized)) {
+      if (/sickening|claw fever/i.test(label)) {
         applyStatusEffect(target, { id: "sickened", label: "Sickened", attackBonus: -1, expiresAtEndOfTurn: true });
       }
-      if (/wyrmwood sap/i.test(normalized)) {
+      if (/wyrmwood sap/i.test(label)) {
         applyStatusEffect(target, { id: "sap-sickened", label: "Sap-Sickened", attackBonus: -1, expiresAtEndOfTurn: true });
       }
     }
   }
 
   if (/dread whisper|condemning mark|bone debt|marrow verdict/i.test(normalized)) {
-    const save = await rollSavingThrow(target, "wis", dc, `${monster.name}'s dread presence forces ${target.name} to make a WIS save.`);
+    const label = matchingSpecialName(/dread whisper|condemning mark|bone debt|marrow verdict/i, "dread presence");
+    const save = await rollSavingThrow(target, "wis", dc, `${monster.name}'s ${label} forces ${target.name} to make a WIS save.`);
     if (!save.success) {
-      applyStatusEffect(target, { id: `dread-${monster.id}`, label: /condemning mark/i.test(normalized) ? "Condemned" : "Shaken", attackBonus: -1, expiresAtEndOfTurn: true });
+      applyStatusEffect(target, { id: `dread-${monster.id}`, label: /condemning mark/i.test(label) ? "Condemned" : "Shaken", attackBonus: -1, expiresAtEndOfTurn: true });
       addLog(`${target.name}'s attacks are shaken until the end of their next turn.`, "important");
     }
   }
 
   if (/dust bite|dust cough|smoke|smoke veil|sandblind ambush/i.test(normalized)) {
-    const save = await rollSavingThrow(target, "con", dc, `${monster.name}'s choking dust forces ${target.name} to make a CON save.`);
+    const label = matchingSpecialName(/dust bite|dust cough|smoke|smoke veil|sandblind ambush/i, "choking dust");
+    const save = await rollSavingThrow(target, "con", dc, `${monster.name}'s ${label} forces ${target.name} to make a CON save.`);
     if (!save.success) {
       applyStatusEffect(target, { id: "smoke-choked", label: "Smoke-Choked", attackBonus: -1, expiresAtEndOfTurn: true });
       addLog(`${target.name} coughs through grit and smoke until the end of their next turn.`, "important");
@@ -5734,17 +6099,19 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
   }
 
   if (/kindle|heated spear|melt armor|lava wake|ignite ground|white-hot beam|magma breath|boiling spray|scalding puff|burning guard|cinder crown/i.test(normalized)) {
-    const save = await rollSavingThrow(target, "dex", dc, `${monster.name}'s burning strike forces ${target.name} to make a DEX save.`);
+    const label = matchingSpecialName(/kindle|heated spear|melt armor|lava wake|ignite ground|white-hot beam|magma breath|boiling spray|scalding puff|burning guard|cinder crown/i, "burning strike");
+    const save = await rollSavingThrow(target, "dex", dc, `${monster.name}'s ${label} forces ${target.name} to make a DEX save.`);
     if (!save.success) {
       const dice = specialDamageDice(monster, critical ? 8 : 6);
       const roll = rollDice(dice.count, dice.sides);
-      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "fire", "Elemental Flame");
-      if (/melt armor|white-hot beam/i.test(normalized)) applyStatusEffect(target, { id: "melted-armor", label: "Armor Melted", acBonus: -1, expiresAtEndOfTurn: true });
+      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "fire", label);
+      if (/melt armor|white-hot beam/i.test(label)) applyStatusEffect(target, { id: "melted-armor", label: "Armor Melted", acBonus: -1, expiresAtEndOfTurn: true });
     }
   }
 
   if (/ash cough|choking grasp|suffocating rain|dead sky|airless bite|drying wind|silence of no air|thin air aura|mist choke|drowning mist/i.test(normalized)) {
-    const save = await rollSavingThrow(target, "con", dc, `${monster.name}'s choking element forces ${target.name} to make a CON save.`);
+    const label = matchingSpecialName(/ash cough|choking grasp|suffocating rain|dead sky|airless bite|drying wind|silence of no air|thin air aura|mist choke|drowning mist/i, "choking element");
+    const save = await rollSavingThrow(target, "con", dc, `${monster.name}'s ${label} forces ${target.name} to make a CON save.`);
     if (!save.success) {
       applyStatusEffect(target, { id: "element-choked", label: "Choked", attackBonus: -1, speedBonusFeet: -5, expiresAtEndOfTurn: true });
       addLog(`${target.name} struggles for air until the end of their next turn.`, "important");
@@ -5752,51 +6119,56 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
   }
 
   if (/glass splinters|glasswind cut|razor pass|needle draft|needle spray|bleeding edge|shard pin|shatter spines|hailglass volley|aurora slash|prismatic lance|salt lash/i.test(normalized)) {
-    const save = await rollSavingThrow(target, "dex", dc, `${monster.name}'s cutting element forces ${target.name} to make a DEX save.`);
+    const label = matchingSpecialName(/glass splinters|glasswind cut|razor pass|needle draft|needle spray|bleeding edge|shard pin|shatter spines|hailglass volley|aurora slash|prismatic lance|salt lash/i, "cutting element");
+    const save = await rollSavingThrow(target, "dex", dc, `${monster.name}'s ${label} forces ${target.name} to make a DEX save.`);
     if (!save.success) {
       const dice = specialDamageDice(monster, critical ? 8 : 6);
       const roll = rollDice(dice.count, dice.sides);
-      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "slashing", "Elemental Shards");
-      if (/shard pin|hailglass volley|needle/i.test(normalized)) applyStatusEffect(target, { id: "pinned-shards", label: "Shard-Pinned", speedBonusFeet: -10, expiresAtEndOfTurn: true });
+      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "slashing", label);
+      if (/shard pin|hailglass volley|needle/i.test(label)) applyStatusEffect(target, { id: "pinned-shards", label: "Shard-Pinned", speedBonusFeet: -10, expiresAtEndOfTurn: true });
     }
   }
 
   if (/static bite|lightning lash|crackling pulse|queenly thunderbolt|stormlord descent|rod draw|lesser stormcall|thunderclap|choir blast/i.test(normalized)) {
-    const save = await rollSavingThrow(target, "dex", dc, `${monster.name}'s storm strike forces ${target.name} to make a DEX save.`);
+    const label = matchingSpecialName(/static bite|lightning lash|crackling pulse|queenly thunderbolt|stormlord descent|rod draw|lesser stormcall|thunderclap|choir blast/i, "storm effect");
+    const save = await rollSavingThrow(target, "dex", dc, `${monster.name}'s ${label} forces ${target.name} to make a DEX save.`);
     if (!save.success) {
       const dice = specialDamageDice(monster, critical ? 8 : 6);
       const roll = rollDice(dice.count, dice.sides);
-      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), /thunder|choir/i.test(normalized) ? "thunder" : "lightning", "Elemental Storm");
+      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), /thunder|choir/i.test(label) ? "thunder" : "lightning", label);
       target.hasReaction = false;
     }
   }
 
   if (/life drain|greater life drain|abyssal drain|astral reap|devour soul|unending appetite/i.test(normalized)) {
-    const save = await rollSavingThrow(target, "con", dc, `${monster.name}'s life drain forces ${target.name} to make a CON save.`);
+    const label = matchingSpecialName(/life drain|greater life drain|abyssal drain|astral reap|devour soul|unending appetite/i, "life drain");
+    const save = await rollSavingThrow(target, "con", dc, `${monster.name}'s ${label} forces ${target.name} to make a CON save.`);
     if (!save.success) {
-      const dice = specialDamageDice(monster, /greater|abyssal|astral|devour soul|unending appetite/i.test(normalized) ? 8 : 6);
+      const dice = specialDamageDice(monster, /greater|abyssal|astral|devour soul|unending appetite/i.test(label) ? 8 : 6);
       const roll = rollDice(dice.count, dice.sides);
-      const dealt = applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "necrotic", "life drain");
+      const dealt = applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "necrotic", label);
       applyStatusEffect(target, { id: "drained", label: "Drained", speedBonusFeet: -5, expiresAtEndOfTurn: true });
-      if (/abyssal drain|devour soul|unending appetite/i.test(normalized) && dealt > 0) {
-        const healed = applyHealingToHero(monster, /devour soul|unending appetite/i.test(normalized) ? Math.ceil(dealt / 2) : dealt);
+      if (/abyssal drain|devour soul|unending appetite/i.test(label) && dealt > 0) {
+        const healed = applyHealingToHero(monster, /devour soul|unending appetite/i.test(label) ? Math.ceil(dealt / 2) : dealt);
         if (healed > 0) addLog(`${monster.name} steals ${healed} HP from the draining wound.`, "heal");
       }
     }
   }
 
   if (/hellspines|stygian brand|hellbow pin|bone cage/i.test(normalized)) {
-    const ability = /hellbow pin/i.test(normalized) ? "str" : "dex";
-    const save = await rollSavingThrow(target, ability, dc, `${monster.name}'s pinning strike forces ${target.name} to make a ${ability.toUpperCase()} save.`);
+    const label = matchingSpecialName(/hellspines|stygian brand|hellbow pin|bone cage/i, "pinning strike");
+    const ability = /hellbow pin/i.test(label) ? "str" : "dex";
+    const save = await rollSavingThrow(target, ability, dc, `${monster.name}'s ${label} forces ${target.name} to make a ${ability.toUpperCase()} save.`);
     if (!save.success) {
-      const speedPenalty = /stygian brand/i.test(normalized) ? -10 : -5;
-      applyStatusEffect(target, { id: "pinned", label: "Pinned", speedBonusFeet: speedPenalty, speedLocked: /hellbow pin/i.test(normalized), expiresAtEndOfTurn: true });
+      const speedPenalty = /stygian brand/i.test(label) ? -10 : -5;
+      applyStatusEffect(target, { id: "pinned", label: "Pinned", speedBonusFeet: speedPenalty, speedLocked: /hellbow pin/i.test(label), expiresAtEndOfTurn: true });
       addLog(`${target.name}'s movement is hindered until the end of their next turn.`, "important");
     }
   }
 
   if (/ruin scratch|mind-pounce|mindrot sermon/i.test(normalized)) {
-    const save = await rollSavingThrow(target, "wis", dc, `${monster.name}'s ruinous strike forces ${target.name} to make a WIS save.`);
+    const label = matchingSpecialName(/ruin scratch|mind-pounce|mindrot sermon/i, "ruinous strike");
+    const save = await rollSavingThrow(target, "wis", dc, `${monster.name}'s ${label} forces ${target.name} to make a WIS save.`);
     if (!save.success) {
       applyStatusEffect(target, { id: "ruined-reactions", label: "Ruined", attackBonus: -1, expiresAtEndOfTurn: true });
       target.hasReaction = false;
@@ -5805,7 +6177,8 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
   }
 
   if (/needling malice|ruin hymn|mindrot cloud|corruptive sporulation/i.test(normalized)) {
-    const save = await rollSavingThrow(target, "wis", dc, `${monster.name}'s malice forces ${target.name} to make a WIS save.`);
+    const label = matchingSpecialName(/needling malice|ruin hymn|mindrot cloud|corruptive sporulation/i, "malice");
+    const save = await rollSavingThrow(target, "wis", dc, `${monster.name}'s ${label} forces ${target.name} to make a WIS save.`);
     if (!save.success) {
       applyStatusEffect(target, { id: "maliced", label: "Maliced", saveBonus: -1, expiresAtEndOfTurn: true });
       addLog(`${target.name}'s next saves are weakened until the end of their next turn.`, "important");
@@ -5813,43 +6186,48 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
   }
 
   if (/blood scent|blood in the water|salt the wound|bite and tear|feeding frenzy|flesh verdict|engulfing mass|acid maw|thousand maws|devouring bloom/i.test(normalized) && (target.hp ?? 0) <= Math.ceil((target.maxHp ?? 1) / 2)) {
+    const label = matchingSpecialName(/blood scent|blood in the water|salt the wound|bite and tear|feeding frenzy|flesh verdict|engulfing mass|acid maw|thousand maws|devouring bloom/i, "frenzy");
     const dice = specialDamageDice(monster, /flesh verdict/i.test(normalized) ? 8 : 6);
     const roll = rollDice(dice.count, dice.sides);
-    const type = /flesh verdict|blood scent|devouring bloom/i.test(normalized) ? "necrotic" : /acid maw/i.test(normalized) ? "acid" : "slashing";
-    const dealt = applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), type, "frenzy");
-    if (/engulfing mass|devouring bloom/i.test(normalized) && dealt > 0) {
+    const type = /flesh verdict|blood scent|devouring bloom/i.test(label) ? "necrotic" : /acid maw/i.test(label) ? "acid" : "slashing";
+    const dealt = applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), type, label);
+    if (/engulfing mass|devouring bloom/i.test(label) && dealt > 0) {
       const healed = applyHealingToHero(monster, Math.max(1, Math.floor(dealt / 2)));
       if (healed > 0) addLog(`${monster.name} feeds and regains ${healed} HP.`, "heal");
     }
   }
 
   if (/spectral chain|hooking chain|chain coil|living chains|dragging lash|hookcap pull|canopy snatch|luring scent|hook and drag|dragged into the teeth|tidal pull|pull under|baronial undertow|leviathan drag|burial pull/i.test(normalized)) {
-    const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s chain forces ${target.name} to make a STR save.`);
+    const label = matchingSpecialName(/spectral chain|hooking chain|chain coil|living chains|dragging lash|hookcap pull|canopy snatch|luring scent|hook and drag|dragged into the teeth|tidal pull|pull under|baronial undertow|leviathan drag|burial pull/i, "chain");
+    const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s ${label} forces ${target.name} to make a STR save.`);
     if (!save.success) {
       pullTargetToward(monster, target);
-      if (/canopy snatch|dragged into the teeth|drop the hook|bone cage/i.test(normalized)) applyStatusEffect(target, { id: "restrained", label: "Restrained", speedLocked: true, attackBonus: -2, expiresAtEndOfTurn: true });
+      if (/canopy snatch|dragged into the teeth|drop the hook|bone cage/i.test(label)) applyStatusEffect(target, { id: "restrained", label: "Restrained", speedLocked: true, attackBonus: -2, expiresAtEndOfTurn: true });
     }
   }
 
   if (/lightning whip/i.test(normalized)) {
-    const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s lightning whip forces ${target.name} to make a STR save.`);
+    const label = matchingSpecialName(/lightning whip/i, "lightning whip");
+    const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s ${label} forces ${target.name} to make a STR save.`);
     if (!save.success) {
       const dice = specialDamageDice(monster, 8);
       const roll = rollDice(dice.count, dice.sides);
-      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "lightning", "Lightning Whip");
+      applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), "lightning", label);
       pullTargetToward(monster, target);
     }
   }
 
   if (/constricting coil|stranglehold|crushing claws|forest judgment|hoist prisoner|heated coil|living chain|cinder chain judgment|mud grip|clay bind|root lock|engulfing slide|coral snare|bone cage/i.test(normalized)) {
-    const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s crushing claws force ${target.name} to make a STR save.`);
+    const label = matchingSpecialName(/constricting coil|stranglehold|crushing claws|forest judgment|hoist prisoner|heated coil|living chain|cinder chain judgment|mud grip|clay bind|root lock|engulfing slide|coral snare|bone cage/i, "crushing claws");
+    const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s ${label} forces ${target.name} to make a STR save.`);
     if (!save.success) {
       applyStatusEffect(target, { id: "restrained", label: "Restrained", speedLocked: true, attackBonus: -2, expiresAtEndOfTurn: true });
     }
   }
 
   if (/crushing dominion/i.test(normalized)) {
-    const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s crushing dominion forces ${target.name} to make a STR save.`);
+    const label = matchingSpecialName(/crushing dominion/i, "crushing dominion");
+    const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s ${label} forces ${target.name} to make a STR save.`);
     if (!save.success) {
       applyProneCondition(target, "crushing-dominion");
       pushTargetAway(monster, target);
@@ -5857,13 +6235,14 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
   }
 
   if (/crippling|hamstring|web|snare|dragging grasp|drowning grip|gear nip|grinding teeth|sleep poison bolt|ice slick|cold bite|frozen undertow|glacial advance|polar night|current guard/i.test(normalized)) {
-    const ability = /web|snare/i.test(normalized) ? "dex" : "str";
-    const save = await rollSavingThrow(target, ability, dc, `${monster.name}'s restraint forces ${target.name} to make a ${ability.toUpperCase()} save.`);
+    const label = matchingSpecialName(/crippling|hamstring|web|snare|dragging grasp|drowning grip|gear nip|grinding teeth|sleep poison bolt|ice slick|cold bite|frozen undertow|glacial advance|polar night|current guard/i, "restraint");
+    const ability = /web|snare/i.test(label) ? "dex" : "str";
+    const save = await rollSavingThrow(target, ability, dc, `${monster.name}'s ${label} forces ${target.name} to make a ${ability.toUpperCase()} save.`);
     if (!save.success) {
-      if (/hamstring|crippling|gear nip|grinding teeth|sleep poison bolt/i.test(normalized)) {
+      if (/hamstring|crippling|gear nip|grinding teeth|sleep poison bolt/i.test(label)) {
         applyStatusEffect(target, { id: "hamstrung", label: "Hamstrung", speedBonusFeet: -10, expiresAtEndOfTurn: true });
         addLog(`${target.name}'s speed is reduced by 10 ft until the end of their next turn.`, "important");
-        if (/sleep poison bolt/i.test(normalized)) target.hasReaction = false;
+        if (/sleep poison bolt/i.test(label)) target.hasReaction = false;
       } else {
         applyStatusEffect(target, { id: "snared", label: "Snared", speedLocked: true, expiresAtEndOfTurn: true });
         addLog(`${target.name}'s movement is stopped until the end of their next turn.`, "important");
@@ -5872,15 +6251,16 @@ async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) 
   }
 
   if (/charge|pounce|lunge|rush|swooping|stomp|slam|burning dive|impaling advance|world-stamp|rift charge|siege charge|falling star dive|brittle dash|falling fronds|pouncing vines|briar slam|four-season slam|minecart shove|lava step|support-beam breaker|quake fist|stone pounce|avalanche hammer|pillar fall|crater slam|faultline strike|magma fault|crushing deep|pressure crush|whitewater rush|mudslide rush|thunderhead crash|tyrant downburst|shattering charge/i.test(normalized) && (monster.lastMoveFeet ?? 0) >= monsterSpecialAbilityTuning.chargeMinFeet) {
+    const label = matchingSpecialName(/charge|pounce|lunge|rush|swooping|stomp|slam|burning dive|impaling advance|world-stamp|rift charge|siege charge|falling star dive|brittle dash|falling fronds|pouncing vines|briar slam|four-season slam|minecart shove|lava step|support-beam breaker|quake fist|stone pounce|avalanche hammer|pillar fall|crater slam|faultline strike|magma fault|crushing deep|pressure crush|whitewater rush|mudslide rush|thunderhead crash|tyrant downburst|shattering charge/i, "charge");
     const dice = specialDamageDice(monster, critical ? 8 : 6);
     const roll = rollDice(dice.count, dice.sides);
-    const type = /burning dive|falling star dive|lava step|magma fault/i.test(normalized) ? "fire" : /impaling advance/i.test(normalized) ? "piercing" : /rift charge/i.test(normalized) ? "force" : /thunderhead|downburst/i.test(normalized) ? "thunder" : "bludgeoning";
-    applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), type, "charge");
-    const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s charge forces ${target.name} to make a STR save.`);
+    const type = /burning dive|falling star dive|lava step|magma fault/i.test(label) ? "fire" : /impaling advance/i.test(label) ? "piercing" : /rift charge/i.test(label) ? "force" : /thunderhead|downburst/i.test(label) ? "thunder" : "bludgeoning";
+    applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), type, label);
+    const save = await rollSavingThrow(target, "str", dc, `${monster.name}'s ${label} forces ${target.name} to make a STR save.`);
     if (!save.success && pushTargetAway(monster, target)) {
       addLog(`${target.name} is shoved back by ${monster.name}.`, "important");
     }
-    if (/pouncing vines/i.test(normalized) && !save.success) applyProneCondition(target, "pouncing-vines");
+    if (/pouncing vines/i.test(label) && !save.success) applyProneCondition(target, "pouncing-vines");
   }
 }
 
@@ -5907,42 +6287,42 @@ function monsterSpecialSaveExplanation(label, damageType, saveAbility, options =
   const rider = options.onFailStatus?.label ? ` and may leave the target ${String(options.onFailStatus.label).toLowerCase()}` : "";
   if (/dust spin/.test(lower)) {
     return {
-      flavor: `${label} whips grit, bone-dry air, and cutting debris around the target. ${abilityText} measures whether they duck through the spinning dust before it slices into them.`,
+      flavor: `${label} throws grit and cutting debris around the target. ${abilityText} measures whether they duck clear before the debris hits and slows them.`,
       failure: "Failure means slashing damage lands and the dust drags at their movement, slowing them briefly.",
       success: "Success means they slip through the edge of the vortex and avoid the movement penalty.",
     };
   }
   if (/thunderclap|choir blast|tempest choir|tyrant downburst|baronial cyclone|city-eater winds|neverending storm|worldstorm|stormfall|split the heavens|breath of the plane/.test(lower)) {
     return {
-      flavor: `${label} hammers the area with violent air pressure and sound. ${abilityText} measures whether the target can brace, keep balance, and stay oriented.`,
+      flavor: `${label} hits the area with thunder, wind, or crushing pressure. ${abilityText} measures whether the target braces before the blast damages or shoves them.`,
       failure: `Failure means ${damageType} damage hits hard${rider}, and the blast may shove them out of position.`,
-      success: "Success means they ride out the shockwave and take only a glancing effect.",
+      success: "Success means they stay braced and take only the reduced effect.",
     };
   }
   if (/crackling|lightning|starstorm|queenly thunderbolt/.test(lower)) {
     return {
-      flavor: `${label} lashes the area with arcing stormlight. ${abilityText} measures whether the target grounds themselves before the current jumps through them.`,
+      flavor: `${label} arcs lightning through the target's space. ${abilityText} measures whether they dodge or ground themselves before the current hits directly.`,
       failure: `Failure means ${damageType} damage courses through them${rider}.`,
-      success: "Success means the worst of the charge snaps past instead of through them.",
+      success: "Success means the worst of the current misses or only clips them.",
     };
   }
   if (/falling machinery|drop the hook|anvil drop|colossus hammerfall|cave-in groan/.test(lower)) {
     return {
-      flavor: `${label} brings heavy mineworks, hooks, stone, or forge-weight crashing down. ${abilityText} measures whether the target dives clear before the impact lands.`,
+      flavor: `${label} drops heavy hooks, stone, machinery, or forge-weight onto the target. ${abilityText} measures whether they dive clear before impact.`,
       failure: "Failure means bludgeoning damage lands hard and the target is knocked prone.",
       success: "Success means the target avoids the center of the falling weight.",
     };
   }
   if (/pressure release/.test(lower)) {
     return {
-      flavor: `${label} vents a scalding blast from the machinery. ${abilityText} measures whether the target can get out of the line before heat and pressure slam into them.`,
+      flavor: `${label} vents scalding pressure in a line. ${abilityText} measures whether the target gets out of the blast before it burns or shoves them.`,
       failure: "Failure means fire damage hits directly and the blast may push the target back.",
       success: "Success means the target turns aside from the worst of the venting pressure.",
     };
   }
   if (/web snare/.test(lower)) {
     return {
-      flavor: `${label} launches sticky strands around the target's feet and limbs. ${abilityText} measures whether they slip clear before the web tightens.`,
+      flavor: `${label} launches sticky strands at the target's feet and limbs. ${abilityText} measures whether they slip clear before the web stops them.`,
       failure: "Failure means the target is snared and cannot move briefly.",
       success: "Success means the web misses or tears loose before it can hold.",
     };
@@ -6043,6 +6423,10 @@ async function maybeUseMonsterStartSpecial(monster) {
     return false;
   }
 
+  maybeUseAncientPhotosynthesis(monster);
+
+  if (await maybeUseMonsterAllyHealingAction(monster)) return true;
+
   if (hasMonsterSpecial(monster, /shellguard|thornhide|briarhide|thickhide|frosthide|stubborn beast/i) && !monster.usedSpecials.ShellGuard && shouldUseMonsterSpecial("defensive")) {
     applyStatusEffect(monster, { id: "guarded", label: "Guarded", acBonus: monsterSpecialAbilityTuning.shellGuardAcBonus, expiresAtEndOfTurn: true });
     monster.usedSpecials.ShellGuard = true;
@@ -6081,12 +6465,13 @@ async function maybeUseMonsterStartSpecial(monster) {
   if (hasMonsterSpecial(monster, /mass grave mortar|corpse cart spill/i) && !monster.usedSpecials.GraveMortar && shouldUseMonsterSpecial("active")) {
     const targets = targetsInMonsterSpecialRange(monster, monsterSpecialAbilityTuning.rangedSpecialFeet).slice(0, 2);
     if (targets.length) {
+      const label = monsterSpecialNameMatching(monster, /mass grave mortar|corpse cart spill/i) ?? "Corpse Barrage";
       monster.usedSpecials.GraveMortar = true;
       for (const target of targets) {
-        const save = await rollSavingThrow(target, "dex", monsterSpecialDc(monster), `${monster.name}'s corpse barrage forces ${target.name} to make a DEX save.`);
+        const save = await rollSavingThrow(target, "dex", monsterSpecialDc(monster), `${monster.name}'s ${label} forces ${target.name} to make a DEX save.`);
         const dice = specialDamageDice(monster, 8);
         const roll = rollDice(dice.count, dice.sides);
-        applySpecialDamage(monster, target, Math.max(1, Math.floor((roll.total + dice.bonus) / (save.success ? 2 : 1))), /mortar/i.test(monsterSpecialNames(monster).join(" ")) ? "bludgeoning" : "poison", "Corpse Barrage");
+        applySpecialDamage(monster, target, Math.max(1, Math.floor((roll.total + dice.bonus) / (save.success ? 2 : 1))), /mortar/i.test(label) ? "bludgeoning" : "poison", label);
         if (!save.success) applyStatusEffect(target, { id: "nauseated", label: "Nauseated", attackBonus: -1, expiresAtEndOfTurn: true });
       }
       monster.hasAction = false;
@@ -6096,8 +6481,9 @@ async function maybeUseMonsterStartSpecial(monster) {
   }
 
   if (hasMonsterSpecial(monster, /rot stench|nauseating bulk|carrion perfume/i)) {
+    const label = monsterSpecialNameMatching(monster, /rot stench|nauseating bulk|carrion perfume/i) ?? "Stench";
     for (const target of monsterTargetableHeroes().filter((hero) => distance(hero.position, monster.position) <= 1)) {
-      const save = await rollSavingThrow(target, "con", monsterSpecialDc(monster), `${monster.name}'s stench forces ${target.name} to make a CON save.`);
+      const save = await rollSavingThrow(target, "con", monsterSpecialDc(monster), `${monster.name}'s ${label} forces ${target.name} to make a CON save.`);
       if (!save.success) applyStatusEffect(target, { id: "nauseated", label: "Nauseated", attackBonus: -1, expiresAtEndOfTurn: true });
     }
   }
@@ -6332,15 +6718,18 @@ async function endTurn() {
 function scheduleMonsterTurnStallGuard(fighter) {
   if (!fighter || isPlayerControlledPartyFighter(fighter) || !fighter.alive || partyDefeatedOrDying()) return;
   const activeMonsterId = fighter.id;
+  const aiStartedAt = fighter.aiTurnStartedAt ?? 0;
   window.setTimeout(() => {
     const current = activeFighter();
     const visibleDialogOpen = Boolean(els.gameDialog && !els.gameDialog.classList.contains("hidden"));
     const reactionPromptOpen = Boolean(document.querySelector(".reaction-prompt"));
     if (!current || current.id !== activeMonsterId || isPlayerControlledPartyFighter(current) || visibleDialogOpen || reactionPromptOpen || partyDefeatedOrDying()) return;
+    if (current.aiTurnResolving) return;
+    if ((current.aiTurnStartedAt ?? 0) > aiStartedAt) return;
     addLog(`${current.name}'s turn stalled before acting, so combat advances.`, "important");
     window.DepthboundPlaytest?.syncNow?.();
     endTurn();
-  }, Math.max(6500, tokenSlideMs * 14));
+  }, Math.max(15000, tokenSlideMs * 28));
 }
 
 function maybeRunMonsterTurn() {
@@ -6362,19 +6751,22 @@ function maybeRunMonsterTurn() {
     const current = activeFighter();
     if (current && !isPlayerControlledPartyFighter(current)) {
       addAdminLog(`Monster AI starts for ${current.name}.`);
+      current.aiTurnStartedAt = performance.now();
       current.nextAiDecisionAt = performance.now() + monsterAiDecisionIntervalMs;
       pathfindingJobsThisTurn = 0;
       perfStats.aiUpdates += 1;
       const activeMonsterId = current.id;
+      current.aiTurnResolving = true;
       window.setTimeout(() => {
         const stillActive = activeFighter()?.id === activeMonsterId;
         const visibleDialogOpen = Boolean(els.gameDialog && !els.gameDialog.classList.contains("hidden"));
         const reactionPromptOpen = Boolean(document.querySelector(".reaction-prompt"));
         if (!stillActive || visibleDialogOpen || reactionPromptOpen || partyDefeatedOrDying()) return;
+        if (current.aiTurnResolving) return;
         addLog(`${current.name}'s turn stalled, so combat advances.`, "important");
         window.DepthboundPlaytest?.syncNow?.();
         endTurn();
-      }, Math.max(5000, tokenSlideMs * 12));
+      }, Math.max(15000, tokenSlideMs * 28));
       Promise.resolve()
         .then(() => runMonsterAi(current))
         .catch((error) => {
@@ -6383,6 +6775,9 @@ function maybeRunMonsterTurn() {
           addLog(`${current.name}'s turn could not resolve and is skipped.`, "important");
           window.DepthboundPlaytest?.syncNow?.();
           endTurn();
+        })
+        .finally(() => {
+          current.aiTurnResolving = false;
         });
     } else {
       addAdminLog(`Monster AI timer found no monster: active ${current?.name ?? "none"}.`);

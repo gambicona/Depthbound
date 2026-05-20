@@ -1345,6 +1345,7 @@ window.DungeonContent.register("monsters", "hellCrownPraetor", {
   damageImmunities: ["fire", "poison"],
   conditionImmunities: ["poisoned", "charmed", "frightened"],
   specialAbility: [
+    "Infernal Benediction", // Action: heals a wounded monster ally within 30 ft.
     "Praetor's Challenge", // Once per fight: one target makes Wis save against 20 or is compelled to attack the praetor next turn if able.
   ],
   initiativeBonus: 5,

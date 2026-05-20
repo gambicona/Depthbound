@@ -562,6 +562,7 @@ window.DungeonContent.register("monsters", "stoneCrownWarden", {
   conditionImmunities: ["poisoned", "petrified"],
   specialAbility: [
     "Crown of Cairns", // Summon or empower small stone adds once per fight.
+    "Stone Regrowth", // Action: heals a wounded monster ally within 30 ft.
     "Seismic Sentence", // 20 ft radius pulse; Dex save 15 or damage and prone.
   ],
   initiativeBonus: 2,

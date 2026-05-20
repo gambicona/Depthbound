@@ -159,10 +159,15 @@ function createCombatantToken(combatant) {
   wildShapeBadge.textContent = "W";
   wildShapeBadge.title = "Wild Shape";
 
+  const stealthBadge = document.createElement("span");
+  stealthBadge.className = "stealth-token-badge";
+  stealthBadge.textContent = "H";
+  stealthBadge.title = "Hidden";
+
   tokenImage.addEventListener("load", () => showCombatantTokenArt(token));
   tokenImage.addEventListener("error", () => hideCombatantTokenArt(token));
 
-  token.append(tokenImage, tokenLabel, wildShapeBadge);
+  token.append(tokenImage, tokenLabel, wildShapeBadge, stealthBadge);
   setCombatantTokenArt(token, tokenArtPath);
 
   const hpBar = document.createElement("div");
@@ -938,6 +943,7 @@ function placeToken(fighter) {
   token.classList.toggle("spell-click-target", isSpellTokenTargetable(spellTargeting, fighter));
   token.classList.toggle("flying-token", fighterIsFlying(fighter));
   token.classList.toggle("wildshaped-druid-token", heroToken && fighter.classId === "druid" && isWildShaped(fighter));
+  token.classList.toggle("stealthing-hero-token", heroToken && fighterIsStealthing(fighter));
   token.classList.toggle("dying-hero-token", heroToken && fighter.alive && !fighter.dead && (fighter.hp ?? 0) <= 0);
   const art = combatantTokenArt(fighter);
   setCombatantTokenArt(token, art);
@@ -1119,6 +1125,8 @@ function renderHeroStatusCard(element, fighter) {
     ? `${escapeHtml(fighter.damage?.weaponName ?? "Beast Attack")} / ${escapeHtml(beast?.name ?? "Beast Form")}`
     : `${escapeHtml(weapon?.name ?? "Unarmed")} / ${escapeHtml(armor?.name ?? "No armor")}`;
   const classResourceText = importantClassResourceText(fighter);
+  const stealth = stealthState(fighter);
+  const canToggleStealth = gameHasStarted && state.mode === "exploration" && heroCanAct(fighter) && !isAutonomousAlly(fighter);
   element.innerHTML = `
     <div class="fighter-top">
       ${combatantArtworkMarkup(fighter, "sidebar-hero-art")}
@@ -1127,6 +1135,7 @@ function renderHeroStatusCard(element, fighter) {
         <div class="fighter-role">${escapeHtml(combatantRoleLabel(fighter))}</div>
       </div>
       <div class="card-actions">
+        <button class="icon-button stealth-hero stealth-hero-button ${stealth ? "active" : ""}" type="button" title="${stealth ? `Stealth ${stealth.total}. Click to stop stealthing.` : "Roll Stealth"}" aria-label="${stealth ? "Stop stealthing" : "Roll stealth"}" ${canToggleStealth ? "" : "disabled"}>Stealth</button>
         <button class="icon-button open-inventory" type="button" title="Inventory and equipment" aria-label="Inventory and equipment" ${canFighterReceiveInventory(fighter) ? "" : "disabled"}>I</button>
         <button class="icon-button rename-hero" type="button" title="Rename character" aria-label="Rename character" ${fighter.renameable === false ? "disabled" : ""}>...</button>
       </div>
@@ -1142,6 +1151,7 @@ function renderHeroStatusCard(element, fighter) {
     <div class="status-line">
       ${fighter.dodging ? '<span class="status-pill status-dodge">Dodging</span>' : ""}
       ${fighter.disengaged ? '<span class="status-pill status-disengage">Disengaged</span>' : ""}
+      ${stealth ? `<span class="status-pill status-dodge" title="Current Stealth total ${stealth.total}">Stealth ${stealth.total}</span>` : ""}
       ${(fighter.statusEffects ?? []).map((effect) => `<span class="status-pill status-dodge" title="${escapeAttribute(temporaryEffectDetails(effect))}">${escapeHtml(statusEffectPillText(effect))}</span>`).join("")}
       ${fighter.hp <= 0 && !fighter.dead && heroIsStableAtZero(fighter) ? '<span class="status-pill status-dodge">Stable</span>' : ""}
       ${fighter.hp <= 0 && !fighter.dead && !heroIsStableAtZero(fighter) ? `<span class="status-pill status-dodge">Death saves ${fighter.deathSaves?.successes ?? 0}/3 | ${fighter.deathSaves?.failures ?? 0}/3</span>` : ""}
@@ -1154,6 +1164,7 @@ function renderHeroStatusCard(element, fighter) {
     <div class="wallet-line">XP: ${fighter.xp ?? 0} / ${xpForNextLevel(fighter.level ?? 1)} - Hit Dice: ${fighter.hitDiceRemaining ?? 0}/${fighter.level ?? 1}${(fighter.spellPointMax ?? 0) > 0 ? ` - Spell Points: ${fighter.spellPoints ?? 0}/${fighter.spellPointMax ?? 0}` : ""} - Rests: ${state.shortRestsUsed ?? 0}/${state.shortRestLimit ?? 3} - Inventory: ${escapeHtml(moneyText(fighter.inventory.money))} - Hero Tokens: ${fighter.inventory.heroTokens ?? 0}</div>
   `;
 
+  element.querySelector(".stealth-hero").addEventListener("click", () => beginHeroStealth(fighter));
   element.querySelector(".rename-hero").addEventListener("click", renameHero);
   element.querySelector(".open-inventory").addEventListener("click", showInventoryMenu);
   element.querySelector(".temporary-effects-button").addEventListener("click", () => showTemporaryEffectsInfo(fighter));
@@ -1625,6 +1636,7 @@ function setAllyFollowHero(allyId, heroId) {
   const hero = state.fighters[heroId];
   if (!isAutonomousAlly(ally) || !isClassHero(hero) || !isPartyHeroId(hero.id)) return;
   ally.followHeroId = hero.id;
+  syncAutonomousAllyStealthWithLeader(hero);
   addLog(`${ally.name} now follows ${hero.name}.`, "important");
   showCombatantInfo(ally);
   render();
@@ -1900,6 +1912,7 @@ function showDungeonObjectInfo(object) {
             <button type="button" data-action="open-monster-compendium">Open Compendium</button>
             <button type="button" data-action="open-library-tutorial" data-topic="homeExpansion">Home Expansion Guide</button>
             <button type="button" data-action="open-library-tutorial" data-topic="comfortZones">Comfort Zones Guide</button>
+            <button type="button" data-action="open-library-tutorial" data-topic="stealth">Stealth Guide</button>
           </div>`
         : object.type === "home-cooking-pot"
           ? `<button type="button" data-action="cook-home-meal">Cook Hearty Meal</button>`
@@ -2858,6 +2871,31 @@ const homeLibraryTutorials = {
       },
     ],
   },
+  stealth: {
+    title: "Stealth Guide",
+    steps: [
+      {
+        title: "Start Stealth",
+        body: "In exploration, press Stealth on a hero card to roll Dexterity (Stealth). The result is shown on the hero card and with an H badge on the map token.",
+      },
+      {
+        title: "Sneak Past Rooms",
+        body: "When a stealthing hero opens a door to monsters, their Stealth total is compared to each monster's passive Perception. If Stealth wins, initiative does not start.",
+      },
+      {
+        title: "Who Breaks Stealth",
+        body: "A non-stealthing hero entering the monster room starts danger normally. AI allies automatically stealth when the hero they follow is stealthing.",
+      },
+      {
+        title: "New Checks",
+        body: "A new Stealth roll happens when a stealthing hero acts in a monster room, such as opening another door, looting a chest, disarming a trap, investigating furniture, or using a feature.",
+      },
+      {
+        title: "Too Close",
+        body: "Moving within 5 ft of a monster also rolls a new Stealth check. The nearby monster rolls active Perception with advantage. If the hero is noticed, initiative starts.",
+      },
+    ],
+  },
 };
 
 function showHomeLibraryTutorial(topic = "homeExpansion", stepIndex = 0) {
@@ -3179,6 +3217,7 @@ function freeCaptiveCreature(objectId) {
   }
   if (state.mode === "combat" && activeFighter()?.id !== hero.id) return;
   if (state.mode === "combat" && !hero.hasAction) return;
+  if (!activeStealthCheckInMonsterRoom(hero, `opens ${objectTemplate(object.type)?.name ?? "a cage"}`)) return;
 
   const position = nearestOpenCellAroundObject(object);
   if (!position) {
@@ -3573,6 +3612,7 @@ function takeObjectItem(objectId, itemId) {
     renderLog();
     return;
   }
+  if (!activeStealthCheckInMonsterRoom(hero, `opens ${objectTemplate(object.type)?.name ?? "a container"}`)) return;
 
   if (object.trap) {
     const mageHand = (hero.statusEffects ?? []).some((effect) => effect.id === "mage-hand");
@@ -3612,6 +3652,7 @@ function pickObjectLock(objectId) {
     renderLog();
     return;
   }
+  if (!activeStealthCheckInMonsterRoom(hero, `picks ${objectTemplate(object.type)?.name ?? "a lock"}`)) return;
 
   const rollResult = rollD20ForFighter(hero);
   const roll = reliableTalentRoll(hero, "disarm", rollResult.roll);
@@ -3673,6 +3714,7 @@ function disarmTrap(objectId) {
   if (!trap || !trap.detected || trap.armed === false || trap.disarmed) return;
   trap.disarmAttemptsByHero ??= {};
   if (trap.disarmAttemptsByHero[hero.id]) return;
+  if (!activeStealthCheckInMonsterRoom(hero, `disarms ${objectTemplate(object.type)?.name ?? "a trap"}`)) return;
 
   const rollResult = rollD20ForFighter(hero);
   const roll = reliableTalentRoll(hero, "investigation", rollResult.roll);
@@ -4142,6 +4184,7 @@ function useObjectInteraction(objectId) {
     renderLog();
     return;
   }
+  if (!activeStealthCheckInMonsterRoom(hero, `uses ${template.name}`)) return;
 
   const option = bestUniqueInteractionOption(hero, component);
   const rollResult = rollD20ForFighter(hero);
@@ -4221,6 +4264,7 @@ function farmResourceNode(objectId) {
     renderLog();
     return;
   }
+  if (!activeStealthCheckInMonsterRoom(hero, `gathers from ${template.name}`)) return;
 
   const rollResult = rollD20ForFighter(hero);
   const skillId = component.skill ?? null;
@@ -4267,6 +4311,7 @@ function investigateObject(objectId) {
   const template = object ? objectTemplate(object.type) : null;
   if (!object || !objectCanInspect(object) || object.investigated || state.mode === "combat") return;
   if (!objectCells(object).some((cell) => Math.max(Math.abs(hero.position.x - cell.x), Math.abs(hero.position.y - cell.y)) === 1)) return;
+  if (!activeStealthCheckInMonsterRoom(hero, `investigates ${template.name}`)) return;
 
   object.investigated = true;
   const inspectEvent = objectComponent(object, "inspectEvent");

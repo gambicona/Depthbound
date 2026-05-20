@@ -799,6 +799,18 @@ h1 {
   width: 32px;
 }
 
+.stealth-hero-button {
+  font-size: 0.72rem;
+  min-width: 54px;
+  padding: 0 8px;
+  width: auto;
+}
+
+.stealth-hero-button.active {
+  border-color: rgba(98, 206, 178, 0.74);
+  color: #bfffee;
+}
+
 .dock-action {
   position: relative;
 }
@@ -1479,6 +1491,30 @@ h1 {
   inset: -6px;
   pointer-events: none;
   position: absolute;
+}
+
+.stealth-token-badge {
+  align-items: center;
+  background: rgba(10, 36, 32, 0.96);
+  border: 1px solid rgba(98, 206, 178, 0.74);
+  border-radius: 999px;
+  box-shadow: 0 0 8px rgba(98, 206, 178, 0.38);
+  color: #bfffee;
+  display: none;
+  font-size: 0.58rem;
+  font-weight: 900;
+  height: 16px;
+  justify-content: center;
+  line-height: 1;
+  position: absolute;
+  right: -8px;
+  top: -8px;
+  width: 16px;
+  z-index: 3;
+}
+
+.token.hero.stealthing-hero-token .stealth-token-badge {
+  display: flex;
 }
 
 .token.monster {

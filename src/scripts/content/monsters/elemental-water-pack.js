@@ -419,6 +419,7 @@ window.DungeonContent.register("monsters", "whitewaterMatron", {
   conditionImmunities: ["poisoned"],
   specialAbility: [
     "Whitewater Rush", // Line charge; Str save 14 or pushed 10 ft.
+    "Mending Current", // Action: heals a wounded monster ally within 30 ft.
     "Foam Screen", // Once per fight: creates concealment around herself.
   ],
   initiativeBonus: 1,

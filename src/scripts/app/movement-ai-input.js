@@ -174,6 +174,7 @@ async function moveFighterAlongPath(fighter, path, silent = false) {
     }
     movedSteps += 1;
     movedCost += movementCostAtPosition(step, fighter);
+    if (isPlayerControlledPartyFighter(fighter) && !checkStealthProximity(fighter, previousPosition)) break;
     collectLootAtPosition(fighter, step);
     triggerTrapAtPosition(fighter, step);
     triggerGrabbedEntityTileEffects(fighter, previousPosition);
@@ -450,6 +451,7 @@ async function moveFightersAlongPathsTogether(plans) {
   const blockedTrapKeys = detectedArmedTrapKeys();
   const blockedHazardKeys = hazardousTerrainKeys();
   const stoppedBeforeTrap = new Set();
+  let stoppedByStealthDetection = false;
   for (let stepIndex = 0; stepIndex < maxLength; stepIndex += 1) {
     let anyMovedThisTick = false;
     for (const plan of activePlans) {
@@ -465,6 +467,7 @@ async function moveFightersAlongPathsTogether(plans) {
         stoppedBeforeTrap.add(plan.hero.id);
         continue;
       }
+      const previousPosition = { ...plan.hero.position };
       const previousRoomId = roomForPosition(plan.hero.position)?.id ?? "";
       plan.hero.position = { ...step };
       const nextRoom = roomForPosition(plan.hero.position);
@@ -472,6 +475,11 @@ async function moveFightersAlongPathsTogether(plans) {
         void triggerCustomDungeonStory("enterRoom", { roomId: nextRoom.id, room: nextRoom, fighter: plan.hero });
       }
       anyMovedThisTick = true;
+      if (isPlayerControlledPartyFighter(plan.hero) && !checkStealthProximity(plan.hero, previousPosition)) {
+        plan.stoppedBeforeTrap = true;
+        stoppedByStealthDetection = true;
+        continue;
+      }
       collectLootAtPosition(plan.hero, step);
       if (triggerTrapAtPosition(plan.hero, step)) {
         const trap = objectAt(step);
@@ -482,6 +490,7 @@ async function moveFightersAlongPathsTogether(plans) {
     }
     if (anyMovedThisTick) renderRoom();
     await sleep(Math.max(30, Math.round(tokenSlideMs * 0.35)));
+    if (stoppedByStealthDetection) break;
   }
 
   for (const plan of activePlans) {
@@ -578,7 +587,7 @@ function handleTileClick(position) {
 
   const door = canOpenDoor(position);
   if (door) {
-    openDoor(door);
+    openDoor(door, hero);
     return;
   }
 
@@ -607,7 +616,7 @@ async function moveHeroByKeyboard(delta) {
 
   const door = canOpenDoor(destination);
   if (door) {
-    openDoor(door);
+    openDoor(door, hero);
     return;
   }
 
@@ -925,15 +934,19 @@ function normalRangeSquares(fighter) {
   return Math.max(1, Math.floor((range?.normal ?? range?.feet ?? 5) / feetPerSquare));
 }
 
+function positionThreatenedByEnemy(mover, position) {
+  return aiTargetableEnemiesFor(mover).some((enemy) => opportunityThreatensPosition(enemy, mover, position));
+}
+
 function roomWalkableSet(room, fighter = null) {
   const walkable = new Set((room?.cells ?? []).map(positionKey));
   blockingObjectKeys(fighter).forEach((tileKey) => walkable.delete(tileKey));
   return fighter ? monsterMovementWalkable(fighter, walkable) : walkable;
 }
 
-function roomOnlyPath(mover, destination, room) {
+function roomOnlyPath(mover, destination, room, options = {}) {
   const walkable = roomWalkableSet(room, mover);
-  if (!consumeMonsterPathfindingJob(mover)) return null;
+  if (!consumeMonsterPathfindingJob(mover, options.forcePathfinding)) return null;
   return findPath(mover.position, destination, mover, state.fighters, {
     gridSize: currentGridSize(),
     walkable,
@@ -941,17 +954,19 @@ function roomOnlyPath(mover, destination, room) {
   });
 }
 
-function bestRoomKitePath(mover, target, avoidOpportunity = false) {
+function bestRoomKitePath(mover, target, avoidOpportunity = false, options = {}) {
   const room = roomForPosition(mover.position);
   if (!room) return null;
 
   const range = normalRangeSquares(mover);
+  const avoidMelee = options.avoidMelee !== false;
   const reachable = Array.from(
     monsterReachableTiles(mover, {
       gridSize: currentGridSize(),
       walkable: roomWalkableSet(room, mover),
-      maxCost: mover.movementLeft,
+      maxCost: options.maxCost ?? mover.movementLeft,
       canTraverse: () => true,
+      forcePathfinding: options.forcePathfinding,
     }).entries(),
   ).map(([key, cost]) => ({ position: positionFromKey(key), cost }));
 
@@ -960,11 +975,19 @@ function bestRoomKitePath(mover, target, avoidOpportunity = false) {
   const candidates = [current, ...reachableStops].filter(
     (entry) => attackGridDistance(entry.position, target.position) <= range && hasClearLineOfSight(entry.position, target.position),
   );
-  const pool = candidates.length ? candidates : [current, ...reachableStops];
+  const safeCandidates = avoidMelee ? candidates.filter((entry) => !positionThreatenedByEnemy(mover, entry.position)) : candidates;
+  const pool = safeCandidates.length ? safeCandidates : candidates.length ? candidates : [current, ...reachableStops];
   if (pool.length === 0) return null;
 
   pool.sort((a, b) => {
-    const distanceDifference = candidates.length
+    const attackablePool = safeCandidates.length || candidates.length;
+    const threatenedDifference = Number(positionThreatenedByEnemy(mover, a.position)) - Number(positionThreatenedByEnemy(mover, b.position));
+    if (threatenedDifference) return threatenedDifference;
+    if (options.preferShortStep) {
+      const costDifference = a.cost - b.cost;
+      if (costDifference) return costDifference;
+    }
+    const distanceDifference = attackablePool
       ? distance(b.position, target.position) - distance(a.position, target.position)
       : distance(a.position, target.position) - distance(b.position, target.position);
     return distanceDifference || a.cost - b.cost;
@@ -972,8 +995,38 @@ function bestRoomKitePath(mover, target, avoidOpportunity = false) {
 
   for (const entry of pool) {
     if (positionKey(entry.position) === positionKey(mover.position)) return null;
-    const path = roomOnlyPath(mover, entry.position, room);
+    const path = roomOnlyPath(mover, entry.position, room, options);
     if (path && (!avoidOpportunity || !pathProvokesOpportunity(mover, path))) return path;
+  }
+  return null;
+}
+
+function quickRangedRetreatPath(mover, target) {
+  if (attackRangeSquares(mover) <= 1 || !positionThreatenedByEnemy(mover, mover.position) || (mover.movementLeft ?? 0) <= 0) return null;
+  const room = roomForPosition(mover.position);
+  if (!room) return null;
+
+  const range = normalRangeSquares(mover);
+  const maxCost = Math.min(2, mover.movementLeft ?? 0);
+  const reachable = Array.from(
+    monsterReachableTiles(mover, {
+      gridSize: currentGridSize(),
+      walkable: roomWalkableSet(room, mover),
+      maxCost,
+      canTraverse: () => true,
+      forcePathfinding: true,
+    }).entries(),
+  ).map(([key, cost]) => ({ position: positionFromKey(key), cost }));
+
+  const candidates = reachable
+    .filter((entry) => entry.cost > 0 && canEndMovementOnTile(mover, entry.position))
+    .filter((entry) => !positionThreatenedByEnemy(mover, entry.position))
+    .filter((entry) => attackGridDistance(entry.position, target.position) <= range && hasClearLineOfSight(entry.position, target.position))
+    .sort((a, b) => a.cost - b.cost || distance(b.position, target.position) - distance(a.position, target.position));
+
+  for (const entry of candidates) {
+    const path = roomOnlyPath(mover, entry.position, room, { forcePathfinding: true });
+    if (path?.length) return path;
   }
   return null;
 }
@@ -1165,28 +1218,34 @@ async function runAutonomousAllyCombatAi(ally) {
 async function runMonsterAi(monster) {
   if (!monster.alive || partyDefeatedOrDying()) return;
   const behavior = effectiveMonsterBehavior(monster);
-  const monsterTurnFinished = () => {
-    window.setTimeout(() => {
-      if (activeFighter()?.id === monster.id && !partyDefeatedOrDying()) endTurn();
-    }, tokenSlideMs);
+  const monsterTurnFinished = async () => {
+    await sleep(tokenSlideMs);
+    if (activeFighter()?.id === monster.id && !partyDefeatedOrDying()) await endTurn();
+  };
+  const attackThenFinishTurn = async (target) => {
+    await sleep(tokenSlideMs);
+    if (activeFighter()?.id === monster.id && isInAttackRange(monster, target) && monster.hasAction) {
+      await makeAttack(monster, target);
+    }
+    await monsterTurnFinished();
   };
   const actionLocked = (monster.statusEffects ?? []).some((effect) => effect.actionLocked);
   const movementLocked = (monster.statusEffects ?? []).some((effect) => effect.speedLocked);
   if (actionLocked && movementLocked) {
     addLog(`${monster.name} is unable to act or move.`, "important");
-    monsterTurnFinished();
+    await monsterTurnFinished();
     return;
   }
   if (fighterStatusEffect(monster, "grappled") && await attemptGrappleEscape(monster)) {
-    monsterTurnFinished();
+    await monsterTurnFinished();
     return;
   }
   if (await maybeUseAiHealingPotion(monster)) {
-    monsterTurnFinished();
+    await monsterTurnFinished();
     return;
   }
   if (await maybeUseMonsterStartSpecial(monster)) {
-    monsterTurnFinished();
+    await monsterTurnFinished();
     return;
   }
 
@@ -1207,17 +1266,7 @@ async function runMonsterAi(monster) {
       addLog(`${monster.name} swarms around ${swarmTarget.name}.`);
     }
 
-    window.setTimeout(async () => {
-      if (activeFighter()?.id === monster.id && isInAttackRange(monster, swarmTarget) && monster.hasAction) {
-        await makeAttack(monster, swarmTarget);
-      }
-
-      window.setTimeout(() => {
-        if (activeFighter()?.id === monster.id && !partyDefeatedOrDying()) {
-          endTurn();
-        }
-      }, tokenSlideMs);
-    }, tokenSlideMs);
+    await attackThenFinishTurn(swarmTarget);
     return;
   }
 
@@ -1228,36 +1277,43 @@ async function runMonsterAi(monster) {
         : behavior === "controller"
           ? { preferHealer: true, preferWounded: true, avoidOpportunity: true, randomness: 2.25 }
           : {};
-    const plan = chooseMonsterAttackPlan(monster, planOptions);
+    const plan = behavior === "rangedKiter" ? null : chooseMonsterAttackPlan(monster, planOptions);
     const target = plan?.target ?? closestTargetTo(monster);
     if (!target) {
       endTurn();
       return;
     }
     const avoidsOpportunity = planOptions.avoidOpportunity ?? abilityScore(monster, "int") >= 11;
-    const path = plan?.path?.length
-      ? plan.path
-      : bestRoomKitePath(monster, target, avoidsOpportunity) ??
-        (avoidsOpportunity ? bestRoomKitePath(monster, target, false) : null) ??
-        bestPathToward(monster, target, avoidsOpportunity, { forcePathfinding: true }) ??
-        (avoidsOpportunity ? bestPathToward(monster, target, false, { forcePathfinding: true }) : null);
-    if (path) {
+    const hasShotFromCurrent = isInAttackRange(monster, target);
+    const startedThreatened = positionThreatenedByEnemy(monster, monster.position);
+    const kitePath =
+      quickRangedRetreatPath(monster, target) ??
+      (behavior === "rangedKiter" && hasShotFromCurrent
+        ? null
+        : bestRoomKitePath(monster, target, avoidsOpportunity, { forcePathfinding: true })) ??
+      (avoidsOpportunity ? bestRoomKitePath(monster, target, false, { forcePathfinding: true }) : null);
+    const path = kitePath?.length
+      ? kitePath
+      : hasShotFromCurrent
+        ? null
+        : plan?.path?.length
+          ? plan.path
+          : bestPathToward(monster, target, avoidsOpportunity, { forcePathfinding: true }) ??
+            (avoidsOpportunity ? bestPathToward(monster, target, false, { forcePathfinding: true }) : null);
+    if (path?.length) {
       await moveFighterAlongPath(monster, path, true);
-      const label = behavior === "artillery" ? "finds a firing angle" : behavior === "controller" ? "sets up a control angle" : "repositions inside the room";
+      const label =
+        behavior === "artillery"
+          ? "finds a firing angle"
+          : behavior === "controller"
+            ? "sets up a control angle"
+            : startedThreatened
+              ? "backs out of melee"
+              : "repositions inside the room";
       addLog(`${monster.name} ${label}.`);
     }
 
-    window.setTimeout(async () => {
-      if (activeFighter()?.id === monster.id && isInAttackRange(monster, target) && monster.hasAction) {
-        await makeAttack(monster, target);
-      }
-
-      window.setTimeout(() => {
-        if (activeFighter()?.id === monster.id && !partyDefeatedOrDying()) {
-          endTurn();
-        }
-      }, tokenSlideMs);
-    }, tokenSlideMs);
+    await attackThenFinishTurn(target);
     return;
   }
 
@@ -1309,22 +1365,12 @@ async function runMonsterAi(monster) {
       }
     }
 
-    window.setTimeout(async () => {
-      if (activeFighter()?.id === monster.id && isInAttackRange(monster, target) && monster.hasAction) {
-        await makeAttack(monster, target);
-      }
-
-      window.setTimeout(() => {
-        if (activeFighter()?.id === monster.id && !partyDefeatedOrDying()) {
-          endTurn();
-        }
-      }, tokenSlideMs);
-    }, tokenSlideMs);
+    await attackThenFinishTurn(target);
     return;
   }
 
   addLog(`${monster.name} hesitates, unsure how to act.`, "important");
-  monsterTurnFinished();
+  await monsterTurnFinished();
 }
 
 function heroCanStartMovement() {
@@ -1353,7 +1399,7 @@ function tryOpenDoorFromHeroPosition() {
   const hero = activeHero();
   if (state.mode === "home" && hero && toggleHomeDoor(hero.position, hero)) return true;
   const door = hero ? canOpenDoor(hero.position) : null;
-  return door ? openDoor(door) : false;
+  return door ? openDoor(door, hero) : false;
 }
 
 function tilePositionFromPoint(clientX, clientY) {

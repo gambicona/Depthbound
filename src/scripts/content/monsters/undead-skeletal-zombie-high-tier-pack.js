@@ -593,6 +593,7 @@ window.DungeonContent.register("monsters", "bonePriestOfTheHollowChoir", {
   conditionImmunities: ["poisoned", "exhaustion", "frightened"],
   specialAbility: [
     "Cathedral Dirge", // Implemented dread burst: area save or psychic/thunder damage and possible fear.
+    "Grave Benediction", // Action: heals a wounded monster ally within 30 ft.
     "Grave Breath", // Implemented necrotic burst: area save or necrotic damage and drain.
     "Hollow Choir Rebuild", // NEW: once per fight, reforms one destroyed lesser skeletal ally at low HP.
   ],
