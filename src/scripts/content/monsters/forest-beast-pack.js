@@ -180,6 +180,7 @@ window.DungeonContent.register("monsters", "direForestWolf", {
 window.DungeonContent.register("monsters", "mossbackBear", {
   name: "Mossback Bear",
   role: "Heavy forest brute",
+  sizeSquares: 2,
   tags: ["beast", "forest", "bear"],
   maxHp: 32,
   category: 2,
@@ -327,6 +328,7 @@ window.DungeonContent.register("monsters", "elderDireWolf", {
 window.DungeonContent.register("monsters", "giantGloomwebSpider", {
   name: "Giant Gloomweb Spider",
   role: "Huge venomous ambusher",
+  sizeSquares: 2,
   tags: ["beast", "forest", "spider", "poison"],
   maxHp: 38,
   category: 3,
@@ -410,6 +412,7 @@ window.DungeonContent.register("monsters", "stormhornStag", {
 window.DungeonContent.register("monsters", "ancientBriarBear", {
   name: "Ancient Briar Bear",
   role: "Category 3 forest beast boss",
+  sizeSquares: 2,
   tags: ["beast", "forest", "bear", "boss"],
   maxHp: 70,
   category: 3,

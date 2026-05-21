@@ -57,13 +57,7 @@ function movementLimitFor(fighter) {
 }
 
 function occupyingFighterAt(position, ignoredFighter = null) {
-  return Object.values(state.fighters).find(
-    (fighter) =>
-      fighter.alive &&
-      fighter.id !== ignoredFighter?.id &&
-      fighter.position.x === position.x &&
-      fighter.position.y === position.y,
-  ) ?? null;
+  return window.DungeonGrid.occupiedFighterAt(position, state.fighters, ignoredFighter);
 }
 
 function carriedFighterOccupiesPosition(fighter, position) {
@@ -80,7 +74,37 @@ function canMoveThroughOccupiedTile(fighter, position) {
 }
 
 function canEndMovementOnTile(fighter, position) {
-  return !window.DungeonGrid.isOccupied(position, state.fighters, fighter) || carriedFighterOccupiesPosition(fighter, position);
+  return window.DungeonGrid.fighterCells(fighter, position).every(
+    (cell) => !window.DungeonGrid.isOccupied(cell, state.fighters, fighter) || carriedFighterOccupiesPosition(fighter, cell),
+  );
+}
+
+function fighterFootprintWalkableAt(fighter, position, walkable = movementWalkableFor(fighter)) {
+  return window.DungeonGrid.fighterCells(fighter, position).every(
+    (cell) => window.DungeonGrid.isInsideGrid(cell, currentGridSize()) && walkable.has(positionKey(cell)),
+  );
+}
+
+function canMoveThroughOccupiedFootprint(fighter, position) {
+  return window.DungeonGrid.fighterCells(fighter, position).every(
+    (cell) => !window.DungeonGrid.isOccupied(cell, state.fighters, fighter) || canMoveThroughOccupiedTile(fighter, cell),
+  );
+}
+
+function canFighterOccupyPosition(fighter, position, walkable = movementWalkableFor(fighter), allowMoveThrough = false) {
+  if (!fighterFootprintWalkableAt(fighter, position, walkable)) return false;
+  return allowMoveThrough ? canMoveThroughOccupiedFootprint(fighter, position) : canEndMovementOnTile(fighter, position);
+}
+
+function canTraverseFootprintMovementEdge(fighter, from, to, path = []) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.abs(dx) + Math.abs(dy) !== 1) return false;
+  const previousKeys = new Set(window.DungeonGrid.fighterCells(fighter, from).map(positionKey));
+  const enteringCells = window.DungeonGrid.fighterCells(fighter, to).filter((cell) => !previousKeys.has(positionKey(cell)));
+  return enteringCells.every((cell) =>
+    canTraverseMovementEdge(fighter, { x: cell.x - dx, y: cell.y - dy }, cell, path),
+  );
 }
 
 function isValidPathStep(fighter, from, to, path = []) {
@@ -88,22 +112,23 @@ function isValidPathStep(fighter, from, to, path = []) {
   const dy = Math.abs(to.y - from.y);
   if (dx + dy !== 1) return false;
   if (!window.DungeonGrid.isInsideGrid(to, currentGridSize())) return false;
-  if (!movementWalkableFor(fighter).has(positionKey(to))) return false;
-  if (!canTraverseMovementEdge(fighter, from, to, path)) return false;
-  if (window.DungeonGrid.isOccupied(to, state.fighters, fighter) && !canMoveThroughOccupiedTile(fighter, to)) return false;
+  if (!canFighterOccupyPosition(fighter, to, movementWalkableFor(fighter), true)) return false;
+  if (!canTraverseFootprintMovementEdge(fighter, from, to, path)) return false;
   return !path.some((step) => positionKey(step) === positionKey(to));
 }
 
 function findMovementPath(fighter, destination) {
   const options = {
     gridSize: currentGridSize(),
-    canTraverse: (from, to, path) => canTraverseMovementEdge(fighter, from, to, path),
+    canTraverse: (from, to, path) => canTraverseFootprintMovementEdge(fighter, from, to, path),
     stateKey: (position, path) => movementStateKey(fighter, position, path),
     canEnterOccupied: (position) => canMoveThroughOccupiedTile(fighter, position),
+    canOccupy: (position) => canFighterOccupyPosition(fighter, position, movementWalkableFor(fighter), true),
   };
   const safePath = findPath(fighter.position, destination, fighter, state.fighters, {
     ...options,
     walkable: trapAwareWalkableFor(fighter, destination),
+    canOccupy: (position) => canFighterOccupyPosition(fighter, position, trapAwareWalkableFor(fighter, destination), true),
   });
   if (safePath) return safePath;
   return findPath(fighter.position, destination, fighter, state.fighters, {
@@ -116,9 +141,10 @@ function findMovementPathWithWalkable(fighter, destination, walkable) {
   return findPath(fighter.position, destination, fighter, state.fighters, {
     gridSize: currentGridSize(),
     walkable,
-    canTraverse: (from, to, path) => canTraverseMovementEdge(fighter, from, to, path),
+    canTraverse: (from, to, path) => canTraverseFootprintMovementEdge(fighter, from, to, path),
     stateKey: (position, path) => movementStateKey(fighter, position, path),
     canEnterOccupied: (position) => canMoveThroughOccupiedTile(fighter, position),
+    canOccupy: (position) => canFighterOccupyPosition(fighter, position, walkable, true),
   });
 }
 
@@ -315,7 +341,7 @@ function followTargetPositionForAlly(ally, leader) {
   const occupied = new Set(
     Object.values(state.fighters)
       .filter((fighter) => fighter.alive && fighter.id !== ally.id)
-      .map((fighter) => positionKey(fighter.position)),
+      .flatMap((fighter) => window.DungeonGrid.fighterCells(fighter).map(positionKey)),
   );
   return Array.from(walkable)
     .map(positionFromKey)
@@ -363,8 +389,7 @@ function occupiedByUnselectedHeroOrObstacle(position, movingHeroIds) {
   return Object.values(state.fighters).some(
     (fighter) =>
       fighter.alive &&
-      fighter.position.x === position.x &&
-      fighter.position.y === position.y &&
+      window.DungeonGrid.fighterOccupies(fighter, position) &&
       !movingHeroIds.has(fighter.id),
   );
 }
@@ -376,7 +401,7 @@ function groupMoveDestinations(destination, heroes, anchorHero = heroes[0], anch
   const unselectedBlockedKeys = new Set(
     Object.values(state.fighters)
       .filter((fighter) => fighter.alive && !movingHeroIds.has(fighter.id))
-      .map((fighter) => positionKey(fighter.position)),
+      .flatMap((fighter) => window.DungeonGrid.fighterCells(fighter).map(positionKey)),
   );
   const assigned = new Set();
   const sortedHeroes = [
@@ -523,7 +548,7 @@ function canAdminTeleportTo(position) {
   if (!isKnownTile(position)) return false;
   if (!dungeonFloorKeys().has(key)) return false;
   if (blockingObjectKeys().has(key)) return false;
-  if (window.DungeonGrid.isOccupied(position, state.fighters, activeHero())) return false;
+  if (!canFighterOccupyPosition(activeHero(), position, currentWalkable(activeHero()))) return false;
   return true;
 }
 
@@ -746,6 +771,7 @@ function monsterReachableTiles(monster, options) {
     moveCost: (_from, to) => movementCostAtPosition(to, monster),
     ...options,
     canEnterOccupied: options?.canEnterOccupied ?? ((position) => canMoveThroughOccupiedTile(monster, position)),
+    canOccupy: options?.canOccupy ?? ((position) => canFighterOccupyPosition(monster, position, options?.walkable ?? monsterMovementWalkable(monster), true)),
   });
 }
 
@@ -760,10 +786,15 @@ function pathProvokesOpportunity(mover, path = []) {
 
 function canAttackFromPosition(attacker, target, position) {
   const range = attackRangeSquares(attacker);
+  const movedAttacker = { ...attacker, position };
   if (range <= 1) {
-    return hasMeleeAccess({ ...attacker, position }, target);
+    return hasMeleeAccess(movedAttacker, target);
   }
-  return attackGridDistance(position, target.position) <= range && hasClearLineOfSight(position, target.position);
+  return attackGridDistanceBetweenFighters(movedAttacker, target) <= range && hasClearLineOfSightBetweenFighters(movedAttacker, target);
+}
+
+function fighterDistanceFromPosition(fighter, position, target) {
+  return attackGridDistanceBetweenFighters({ ...fighter, position }, target);
 }
 
 function pathForMonster(monster, destination, walkable = monsterMovementWalkable(monster), options = {}) {
@@ -771,9 +802,10 @@ function pathForMonster(monster, destination, walkable = monsterMovementWalkable
   return findPath(monster.position, destination, monster, state.fighters, {
     gridSize: currentGridSize(),
     walkable,
-    canTraverse: (from, to, path) => canTraverseMovementEdge(monster, from, to, path),
+    canTraverse: (from, to, path) => canTraverseFootprintMovementEdge(monster, from, to, path),
     stateKey: (position, path) => movementStateKey(monster, position, path),
     canEnterOccupied: (position) => canMoveThroughOccupiedTile(monster, position),
+    canOccupy: (position) => canFighterOccupyPosition(monster, position, walkable, true),
   });
 }
 
@@ -790,7 +822,7 @@ function attackPlanAgainst(monster, target, avoidOpportunity = false, baseWalkab
       gridSize: currentGridSize(),
       walkable,
       maxCost: monster.movementLeft,
-      canTraverse: (from, to, path) => canTraverseMovementEdge(monster, from, to, path),
+      canTraverse: (from, to, path) => canTraverseFootprintMovementEdge(monster, from, to, path),
       stateKey: (position, path) => movementStateKey(monster, position, path),
       forcePathfinding: options.forcePathfinding,
     }).keys(),
@@ -807,12 +839,12 @@ function attackPlanAgainst(monster, target, avoidOpportunity = false, baseWalkab
     .filter(Boolean)
     .filter((plan) => !avoidOpportunity || !pathProvokesOpportunity(monster, plan.path));
 
-  return candidates.sort((a, b) => a.cost - b.cost || distance(a.position, target.position) - distance(b.position, target.position))[0] ?? null;
+  return candidates.sort((a, b) => a.cost - b.cost || fighterDistanceFromPosition(monster, a.position, target) - fighterDistanceFromPosition(monster, b.position, target))[0] ?? null;
 }
 
 function closestTargetTo(monster, targets = aiTargetableEnemiesFor(monster)) {
   const candidates = targets.filter((target) => (target.hp ?? 0) > 0);
-  return candidates.slice().sort((a, b) => distance(monster.position, a.position) - distance(monster.position, b.position) || a.id.localeCompare(b.id))[0] ?? null;
+  return candidates.slice().sort((a, b) => attackGridDistanceBetweenFighters(monster, a) - attackGridDistanceBetweenFighters(monster, b) || a.id.localeCompare(b.id))[0] ?? null;
 }
 
 function lowestLifeTarget(targets) {
@@ -893,7 +925,7 @@ function chooseMonsterAttackPlan(monster, options = {}) {
   const intelligence = abilityScore(monster, "int");
   const smarterMovement = options.avoidOpportunity ?? intelligence >= 11;
   const targetPriority = (target, { preferWeak = false, preferHealer = false } = {}) => {
-    const close = distance(monster.position, target.position);
+    const close = attackGridDistanceBetweenFighters(monster, target);
     const hpRatio = target.hp / Math.max(1, target.maxHp);
     const distanceScore = options.preferDistant ? -close * 0.85 : close * 1.25;
     const weakBias = preferWeak ? hpRatio * 2 : hpRatio * 0.65;
@@ -941,7 +973,7 @@ function bestPathToward(mover, target, avoidOpportunity = false, options = {}) {
     monsterReachableTiles(mover, {
       gridSize: currentGridSize(),
       walkable,
-      canTraverse: (from, to, path) => canTraverseMovementEdge(mover, from, to, path),
+      canTraverse: (from, to, path) => canTraverseFootprintMovementEdge(mover, from, to, path),
       stateKey: (position, path) => movementStateKey(mover, position, path),
       forcePathfinding: options.forcePathfinding,
     }).entries(),
@@ -953,7 +985,7 @@ function bestPathToward(mover, target, avoidOpportunity = false, options = {}) {
   if (reachable.length === 0) return null;
 
   reachable.sort((a, b) => {
-    const distanceDifference = distance(a.position, target.position) - distance(b.position, target.position);
+    const distanceDifference = fighterDistanceFromPosition(mover, a.position, target) - fighterDistanceFromPosition(mover, b.position, target);
     return distanceDifference || b.cost - a.cost;
   });
 
@@ -986,7 +1018,8 @@ function roomOnlyPath(mover, destination, room, options = {}) {
   return findPath(mover.position, destination, mover, state.fighters, {
     gridSize: currentGridSize(),
     walkable,
-    canTraverse: () => true,
+    canTraverse: (from, to, path) => canTraverseFootprintMovementEdge(mover, from, to, path),
+    canOccupy: (position) => canFighterOccupyPosition(mover, position, walkable, true),
   });
 }
 
@@ -1001,7 +1034,7 @@ function bestRoomKitePath(mover, target, avoidOpportunity = false, options = {})
       gridSize: currentGridSize(),
       walkable: roomWalkableSet(room, mover),
       maxCost: options.maxCost ?? mover.movementLeft,
-      canTraverse: () => true,
+      canTraverse: (from, to, path) => canTraverseFootprintMovementEdge(mover, from, to, path),
       forcePathfinding: options.forcePathfinding,
     }).entries(),
   ).map(([key, cost]) => ({ position: positionFromKey(key), cost }));
@@ -1009,7 +1042,7 @@ function bestRoomKitePath(mover, target, avoidOpportunity = false, options = {})
   const current = { position: mover.position, cost: 0 };
   const reachableStops = reachable.filter((entry) => canEndMovementOnTile(mover, entry.position));
   const candidates = [current, ...reachableStops].filter(
-    (entry) => attackGridDistance(entry.position, target.position) <= range && hasClearLineOfSight(entry.position, target.position),
+    (entry) => canAttackFromPosition(mover, target, entry.position),
   );
   const safeCandidates = avoidMelee ? candidates.filter((entry) => !positionThreatenedByEnemy(mover, entry.position)) : candidates;
   const pool = safeCandidates.length ? safeCandidates : candidates.length ? candidates : [current, ...reachableStops];
@@ -1024,8 +1057,8 @@ function bestRoomKitePath(mover, target, avoidOpportunity = false, options = {})
       if (costDifference) return costDifference;
     }
     const distanceDifference = attackablePool
-      ? distance(b.position, target.position) - distance(a.position, target.position)
-      : distance(a.position, target.position) - distance(b.position, target.position);
+      ? fighterDistanceFromPosition(mover, b.position, target) - fighterDistanceFromPosition(mover, a.position, target)
+      : fighterDistanceFromPosition(mover, a.position, target) - fighterDistanceFromPosition(mover, b.position, target);
     return distanceDifference || a.cost - b.cost;
   });
 
@@ -1049,7 +1082,7 @@ function quickRangedRetreatPath(mover, target) {
       gridSize: currentGridSize(),
       walkable: roomWalkableSet(room, mover),
       maxCost,
-      canTraverse: () => true,
+      canTraverse: (from, to, path) => canTraverseFootprintMovementEdge(mover, from, to, path),
       forcePathfinding: true,
     }).entries(),
   ).map(([key, cost]) => ({ position: positionFromKey(key), cost }));
@@ -1057,8 +1090,8 @@ function quickRangedRetreatPath(mover, target) {
   const candidates = reachable
     .filter((entry) => entry.cost > 0 && canEndMovementOnTile(mover, entry.position))
     .filter((entry) => !positionThreatenedByEnemy(mover, entry.position))
-    .filter((entry) => attackGridDistance(entry.position, target.position) <= range && hasClearLineOfSight(entry.position, target.position))
-    .sort((a, b) => a.cost - b.cost || distance(b.position, target.position) - distance(a.position, target.position));
+    .filter((entry) => canAttackFromPosition(mover, target, entry.position))
+    .sort((a, b) => a.cost - b.cost || fighterDistanceFromPosition(mover, b.position, target) - fighterDistanceFromPosition(mover, a.position, target));
 
   for (const entry of candidates) {
     const path = roomOnlyPath(mover, entry.position, room, { forcePathfinding: true });
@@ -1078,8 +1111,8 @@ function swarmTargetFor(monster) {
     : [monster];
   return candidates
     .sort((a, b) => {
-      const distanceToA = Math.min(...swarmMates.map((entry) => distance(entry.position, a.position)));
-      const distanceToB = Math.min(...swarmMates.map((entry) => distance(entry.position, b.position)));
+      const distanceToA = Math.min(...swarmMates.map((entry) => attackGridDistanceBetweenFighters(entry, a)));
+      const distanceToB = Math.min(...swarmMates.map((entry) => attackGridDistanceBetweenFighters(entry, b)));
       return distanceToA - distanceToB || a.id.localeCompare(b.id);
     })[0] ?? null;
 }
@@ -1093,16 +1126,21 @@ function bestSwarmPath(mover, target) {
       gridSize: currentGridSize(),
       walkable,
       maxCost: mover.movementLeft,
-      canTraverse: (from, to, path) => canTraverseMovementEdge(mover, from, to, path),
+      canTraverse: (from, to, path) => canTraverseFootprintMovementEdge(mover, from, to, path),
       stateKey: (position, path) => movementStateKey(mover, position, path),
     }).entries(),
   ).map(([key, cost]) => ({ position: positionFromKey(key), cost }));
 
   const targetRoom = roomForPosition(target.position);
-  const adjacentOpen = adjacentCells(target.position)
+  const adjacentOpen = Array.from(new Map(
+    window.DungeonGrid.fighterCells(target)
+      .flatMap((cell) => adjacentCells(cell))
+      .filter((position) => !window.DungeonGrid.fighterOccupies(target, position))
+      .map((position) => [positionKey(position), position]),
+  ).values())
     .filter((position) => walkable.has(positionKey(position)))
     .filter((position) => !targetRoom || roomForPosition(position)?.id === targetRoom.id)
-    .filter((position) => !window.DungeonGrid.isOccupied(position, state.fighters, mover))
+    .filter((position) => canEndMovementOnTile(mover, position))
     .filter((position) => canTraverseMovementEdge(mover, position, target.position, []));
 
   const adjacentKeys = new Set(adjacentOpen.map(positionKey));
@@ -1112,7 +1150,7 @@ function bestSwarmPath(mover, target) {
   if (pool.length === 0) return null;
 
   pool.sort((a, b) => {
-    const distanceDifference = distance(a.position, target.position) - distance(b.position, target.position);
+    const distanceDifference = fighterDistanceFromPosition(mover, a.position, target) - fighterDistanceFromPosition(mover, b.position, target);
     return distanceDifference || a.cost - b.cost;
   });
 

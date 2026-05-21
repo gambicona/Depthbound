@@ -442,6 +442,7 @@ window.DungeonContent.register("monsters", "fungalBroodmother", {
 window.DungeonContent.register("monsters", "briarboundTreantling", {
   name: "Briarbound Treantling",
   role: "Young forest tree brute",
+  sizeSquares: 2,
   tags: ["plant", "forest", "treant", "briar", "brute"],
   maxHp: 62,
   category: 4,
@@ -510,6 +511,7 @@ window.DungeonContent.register("monsters", "hookcapMycelialHorror", {
 window.DungeonContent.register("monsters", "stranglerFigHunter", {
   name: "Strangler Fig Hunter",
   role: "Jungle grappling predator tree",
+  sizeSquares: 2,
   tags: ["plant", "jungle", "fig", "grappler", "hunter"],
   maxHp: 72,
   category: 4,
@@ -588,6 +590,7 @@ window.DungeonContent.register("monsters", "shamblingMoundHeart", {
 window.DungeonContent.register("monsters", "ironbarkGuardian", {
   name: "Ironbark Guardian",
   role: "Armored forest sentinel",
+  sizeSquares: 2,
   tags: ["plant", "forest", "ironbark", "guardian", "tank"],
   maxHp: 92,
   category: 5,
@@ -689,6 +692,7 @@ window.DungeonContent.register("monsters", "venomBloomMatron", {
 window.DungeonContent.register("monsters", "corpseFlowerRegent", {
   name: "Corpse Flower Regent",
   role: "Category 5 corpse-fed plant boss",
+  sizeSquares: 2,
   tags: ["plant", "forest", "jungle", "corpse-flower", "boss", "necrotic"],
   maxHp: 225,
   category: 5,
@@ -836,6 +840,7 @@ window.DungeonContent.register("monsters", "jaguarThornCreeper", {
 window.DungeonContent.register("monsters", "thorncrownTreant", {
   name: "Thorncrown Treant",
   role: "Category 6 forest plant boss",
+  sizeSquares: 2,
   tags: ["plant", "forest", "treant", "thorn", "boss", "commander"],
   maxHp: 310,
   category: 6,
@@ -880,6 +885,7 @@ window.DungeonContent.register("monsters", "thorncrownTreant", {
 window.DungeonContent.register("monsters", "ancientRootbreaker", {
   name: "Ancient Rootbreaker",
   role: "Massive forest root brute",
+  sizeSquares: 2,
   tags: ["plant", "forest", "root", "ancient", "brute"],
   maxHp: 175,
   category: 7,
@@ -948,6 +954,7 @@ window.DungeonContent.register("monsters", "mindrotMycelium", {
 window.DungeonContent.register("monsters", "emeraldHydraVine", {
   name: "Emerald Hydra-Vine",
   role: "Jungle multi-headed vine predator",
+  sizeSquares: 2,
   tags: ["plant", "jungle", "vine", "hydra", "multiattack"],
   maxHp: 205,
   category: 7,
@@ -983,6 +990,7 @@ window.DungeonContent.register("monsters", "emeraldHydraVine", {
 window.DungeonContent.register("monsters", "sporeTitanOfTheDeep", {
   name: "Spore Titan of the Deep",
   role: "Category 7 underdark plant boss",
+  sizeSquares: 2,
   tags: ["plant", "underdark", "fungus", "titan", "boss"],
   maxHp: 400,
   category: 7,
@@ -1027,6 +1035,7 @@ window.DungeonContent.register("monsters", "sporeTitanOfTheDeep", {
 window.DungeonContent.register("monsters", "wyrmwoodTreant", {
   name: "Wyrmwood Treant",
   role: "Ancient poisonous forest treant",
+  sizeSquares: 2,
   tags: ["plant", "forest", "treant", "wyrmwood", "poison"],
   maxHp: 235,
   category: 8,
@@ -1130,6 +1139,7 @@ window.DungeonContent.register("monsters", "mantrapQueensFang", {
 window.DungeonContent.register("monsters", "jungleGreenheartColossus", {
   name: "Jungle Greenheart Colossus",
   role: "Category 8 jungle plant boss",
+  sizeSquares: 3,
   tags: ["plant", "jungle", "greenheart", "colossus", "boss"],
   maxHp: 490,
   category: 8,
@@ -1174,6 +1184,7 @@ window.DungeonContent.register("monsters", "jungleGreenheartColossus", {
 window.DungeonContent.register("monsters", "worldrootSentinel", {
   name: "Worldroot Sentinel",
   role: "Mythic forest guardian",
+  sizeSquares: 3,
   tags: ["plant", "forest", "worldroot", "sentinel", "guardian"],
   maxHp: 295,
   category: 9,
@@ -1209,6 +1220,7 @@ window.DungeonContent.register("monsters", "worldrootSentinel", {
 window.DungeonContent.register("monsters", "abyssalSporeGrove", {
   name: "Abyssal Spore Grove",
   role: "Huge underdark corrupt fungus colony",
+  sizeSquares: 2,
   tags: ["plant", "underdark", "fungus", "grove", "corruption"],
   maxHp: 315,
   category: 9,
@@ -1243,6 +1255,7 @@ window.DungeonContent.register("monsters", "abyssalSporeGrove", {
 window.DungeonContent.register("monsters", "bloodCanopyDevourer", {
   name: "Blood Canopy Devourer",
   role: "Apex jungle canopy predator",
+  sizeSquares: 2,
   tags: ["plant", "jungle", "canopy", "devourer", "apex"],
   maxHp: 335,
   category: 9,
@@ -1278,6 +1291,7 @@ window.DungeonContent.register("monsters", "bloodCanopyDevourer", {
 window.DungeonContent.register("monsters", "eldergroveAvatar", {
   name: "Eldergrove Avatar",
   role: "Category 9 forest plant boss",
+  sizeSquares: 3,
   tags: ["plant", "forest", "eldergrove", "avatar", "boss"],
   maxHp: 575,
   category: 9,
@@ -1322,6 +1336,7 @@ window.DungeonContent.register("monsters", "eldergroveAvatar", {
 window.DungeonContent.register("monsters", "primevalTreantOfSeasons", {
   name: "Primeval Treant of Seasons",
   role: "Legendary forest treant avatar",
+  sizeSquares: 3,
   tags: ["plant", "forest", "treant", "primeval", "seasons"],
   maxHp: 345,
   category: 10,
@@ -1391,6 +1406,7 @@ window.DungeonContent.register("monsters", "deepMycelialOvermind", {
 window.DungeonContent.register("monsters", "thousandMawGodflower", {
   name: "Thousand-Maw Godflower",
   role: "Mythic jungle carnivorous blossom",
+  sizeSquares: 3,
   tags: ["plant", "jungle", "flower", "thousand-maw", "mythic"],
   maxHp: 390,
   category: 10,
@@ -1426,6 +1442,7 @@ window.DungeonContent.register("monsters", "thousandMawGodflower", {
 window.DungeonContent.register("monsters", "rootOfTheFirstForest", {
   name: "Root of the First Forest",
   role: "Category 10 plant boss",
+  sizeSquares: 3,
   tags: ["plant", "forest", "worldroot", "primordial", "boss"],
   maxHp: 660,
   category: 10,

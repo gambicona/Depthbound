@@ -343,6 +343,7 @@ window.DungeonContent.register("monsters", "boneLockbreaker", {
 window.DungeonContent.register("monsters", "boneMaulBrute", {
   name: "Bone-Maul Brute",
   role: "Massive skeletal crusher",
+  sizeSquares: 2,
   maxHp: 42,
   category: 3,
   xp: 250,

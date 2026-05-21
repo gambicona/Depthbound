@@ -915,6 +915,7 @@ window.DungeonContent.register("monsters", "nineBrandMaledictor", {
 window.DungeonContent.register("monsters", "infernalSiegeBrute", {
   name: "Infernal Siege Brute",
   role: "Massive wall-breaker devil",
+  sizeSquares: 2,
   tags: ["fiend", "devil", "siege", "brute"],
   maxHp: 124,
   category: 6,
@@ -1043,6 +1044,7 @@ window.DungeonContent.register("monsters", "ashenErinyes", {
 window.DungeonContent.register("monsters", "furnaceTyrant", {
   name: "Furnace Tyrant",
   role: "Burning aura juggernaut",
+  sizeSquares: 2,
   tags: ["fiend", "devil", "furnace", "brute"],
   maxHp: 152,
   category: 7,
@@ -1169,6 +1171,7 @@ window.DungeonContent.register("monsters", "inquisitorMalrec", {
 window.DungeonContent.register("monsters", "pitBornDevastator", {
   name: "Pit-Born Devastator",
   role: "Huge infernal destroyer",
+  sizeSquares: 2,
   tags: ["fiend", "devil", "pit", "brute"],
   maxHp: 178,
   category: 8,
@@ -1500,6 +1503,7 @@ window.DungeonContent.register("monsters", "dukeOfChainsVoragul", {
 window.DungeonContent.register("monsters", "aspectOfThePit", {
   name: "Aspect of the Pit",
   role: "Avatar-level pit devil",
+  sizeSquares: 2,
   tags: ["fiend", "devil", "pit", "avatar", "flying"],
   maxHp: 295,
   category: 10,
@@ -1579,6 +1583,7 @@ window.DungeonContent.register("monsters", "infernalSeraphOfChains", {
 window.DungeonContent.register("monsters", "contractTitan", {
   name: "Contract Titan",
   role: "Colossal infernal enforcer",
+  sizeSquares: 3,
   tags: ["fiend", "devil", "titan", "contract", "brute"],
   maxHp: 318,
   category: 10,
@@ -1618,6 +1623,7 @@ window.DungeonContent.register("monsters", "contractTitan", {
 window.DungeonContent.register("monsters", "crownedArchdevilAvatar", {
   name: "Crowned Archdevil Avatar",
   role: "Category 10 final devil boss",
+  sizeSquares: 3,
   tags: ["fiend", "devil", "boss", "archdevil", "avatar"],
   maxHp: 575,
   category: 10,

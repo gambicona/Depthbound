@@ -1032,6 +1032,7 @@ window.DungeonContent.register("monsters", "lordOfTheUnburiedCourt", {
 window.DungeonContent.register("monsters", "ancientPhantomDragon", {
   name: "Ancient Phantom Dragon",
   role: "Large flying breath ghost",
+  sizeSquares: 2,
   tags: ["undead", "ghost", "dragon", "phantom", "flying"],
   maxHp: 188,
   category: 8,
@@ -1244,6 +1245,7 @@ window.DungeonContent.register("monsters", "oracleOfDeadStars", {
 window.DungeonContent.register("monsters", "graveTitanPhantom", {
   name: "Grave-Titan Phantom",
   role: "Massive incorporeal bruiser",
+  sizeSquares: 2,
   tags: ["undead", "ghost", "titan", "phantom", "flying"],
   maxHp: 246,
   category: 9,

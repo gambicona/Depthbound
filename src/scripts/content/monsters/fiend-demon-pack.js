@@ -1039,6 +1039,7 @@ window.DungeonContent.register("monsters", "sixBladeMarilith", {
 window.DungeonContent.register("monsters", "abyssalTyrantSpawn", {
   name: "Abyssal Tyrant Spawn",
   role: "Huge commanding brute",
+  sizeSquares: 2,
   tags: ["fiend", "demon", "tyrant", "brute"],
   maxHp: 178,
   category: 7,
@@ -1372,6 +1373,7 @@ window.DungeonContent.register("monsters", "heraldOfTheDemonPrince", {
 window.DungeonContent.register("monsters", "abyssalSiegeTitan", {
   name: "Abyssal Siege Titan",
   role: "Colossal wall-breaker demon",
+  sizeSquares: 3,
   tags: ["fiend", "demon", "titan", "siege"],
   maxHp: 280,
   category: 9,
@@ -1498,6 +1500,7 @@ window.DungeonContent.register("monsters", "princeSpawnGharazhul", {
 window.DungeonContent.register("monsters", "abyssGateColossus", {
   name: "Abyss-Gate Colossus",
   role: "Living portal titan",
+  sizeSquares: 3,
   tags: ["fiend", "demon", "gate", "titan", "brute"],
   maxHp: 330,
   category: 10,
@@ -1537,6 +1540,7 @@ window.DungeonContent.register("monsters", "abyssGateColossus", {
 window.DungeonContent.register("monsters", "avatarOfEndlessHunger", {
   name: "Avatar of Endless Hunger",
   role: "Demon prince hunger aspect",
+  sizeSquares: 3,
   tags: ["fiend", "demon", "avatar", "hunger"],
   maxHp: 310,
   category: 10,
@@ -1616,6 +1620,7 @@ window.DungeonContent.register("monsters", "chaosStarSeraph", {
 window.DungeonContent.register("monsters", "manifestDemonPrinceAzrakhul", {
   name: "Manifest Demon Prince Azrakhul",
   role: "Category 10 final demon boss",
+  sizeSquares: 3,
   tags: ["fiend", "demon", "boss", "demon-prince", "avatar"],
   maxHp: 600,
   category: 10,

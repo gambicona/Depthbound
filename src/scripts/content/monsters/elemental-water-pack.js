@@ -588,6 +588,7 @@ window.DungeonContent.register("monsters", "brineCrownedHorror", {
 window.DungeonContent.register("monsters", "glacierbackGuardian", {
   name: "Glacierback Guardian",
   role: "Huge ice-backed defender",
+  sizeSquares: 2,
   tags: ["elemental", "water", "ice", "glacier", "guardian"],
   maxHp: 118,
   category: 5,
@@ -690,6 +691,7 @@ window.DungeonContent.register("monsters", "whirlpoolDancer", {
 window.DungeonContent.register("monsters", "frostTideLeviathan", {
   name: "Frost-Tide Leviathan",
   role: "Category 5 water boss",
+  sizeSquares: 2,
   tags: ["elemental", "water", "ice", "tide", "boss", "leviathan"],
   maxHp: 205,
   category: 5,
@@ -734,6 +736,7 @@ window.DungeonContent.register("monsters", "frostTideLeviathan", {
 window.DungeonContent.register("monsters", "blackwaterColossus", {
   name: "Blackwater Colossus",
   role: "Toxic deep-water giant",
+  sizeSquares: 3,
   tags: ["elemental", "water", "blackwater", "colossus", "poison"],
   maxHp: 155,
   category: 6,
@@ -801,6 +804,7 @@ window.DungeonContent.register("monsters", "steamstormOracle", {
 window.DungeonContent.register("monsters", "icebergBreaker", {
   name: "Iceberg Breaker",
   role: "Massive ice impact brute",
+  sizeSquares: 2,
   tags: ["elemental", "water", "ice", "iceberg", "brute"],
   maxHp: 165,
   category: 6,
@@ -835,6 +839,7 @@ window.DungeonContent.register("monsters", "icebergBreaker", {
 window.DungeonContent.register("monsters", "pearlEyedAbyssalRegent", {
   name: "Pearl-Eyed Abyssal Regent",
   role: "Category 6 water boss",
+  sizeSquares: 2,
   tags: ["elemental", "water", "deep", "abyssal", "boss", "regent"],
   maxHp: 260,
   category: 6,
@@ -1023,6 +1028,7 @@ window.DungeonContent.register("monsters", "maelstromBaron", {
 window.DungeonContent.register("monsters", "livingGlacier", {
   name: "Living Glacier",
   role: "Slow catastrophic ice mass",
+  sizeSquares: 3,
   tags: ["elemental", "water", "ice", "glacier", "colossus"],
   maxHp: 235,
   category: 8,
@@ -1090,6 +1096,7 @@ window.DungeonContent.register("monsters", "drowningMistArchon", {
 window.DungeonContent.register("monsters", "coralCathedralBeast", {
   name: "Coral Cathedral Beast",
   role: "Massive living coral temple",
+  sizeSquares: 3,
   tags: ["elemental", "water", "coral", "cathedral", "beast"],
   maxHp: 250,
   category: 8,
@@ -1124,6 +1131,7 @@ window.DungeonContent.register("monsters", "coralCathedralBeast", {
 window.DungeonContent.register("monsters", "queenOfTheCrushingDeep", {
   name: "Queen of the Crushing Deep",
   role: "Category 8 water boss",
+  sizeSquares: 2,
   tags: ["elemental", "water", "deep", "boss", "queen"],
   maxHp: 385,
   category: 8,
@@ -1168,6 +1176,7 @@ window.DungeonContent.register("monsters", "queenOfTheCrushingDeep", {
 window.DungeonContent.register("monsters", "oceanicAvatar", {
   name: "Oceanic Avatar",
   role: "Avatar of the open sea",
+  sizeSquares: 3,
   tags: ["elemental", "water", "ocean", "avatar"],
   maxHp: 285,
   category: 9,
@@ -1236,6 +1245,7 @@ window.DungeonContent.register("monsters", "absoluteZeroElemental", {
 window.DungeonContent.register("monsters", "boilingWorldspring", {
   name: "Boiling Worldspring",
   role: "Scalding world-source spirit",
+  sizeSquares: 2,
   tags: ["elemental", "water", "boiling", "spring", "paraelemental", "ranged"],
   maxHp: 300,
   category: 9,
@@ -1269,6 +1279,7 @@ window.DungeonContent.register("monsters", "boilingWorldspring", {
 window.DungeonContent.register("monsters", "theLeviathanCurrent", {
   name: "The Leviathan Current",
   role: "Category 9 water boss",
+  sizeSquares: 3,
   tags: ["elemental", "water", "leviathan", "current", "boss"],
   maxHp: 460,
   category: 9,
@@ -1313,6 +1324,7 @@ window.DungeonContent.register("monsters", "theLeviathanCurrent", {
 window.DungeonContent.register("monsters", "primordialSea", {
   name: "Primordial Sea",
   role: "Ancient sea incarnation",
+  sizeSquares: 3,
   tags: ["elemental", "water", "primordial", "sea", "avatar"],
   maxHp: 360,
   category: 10,
@@ -1347,6 +1359,7 @@ window.DungeonContent.register("monsters", "primordialSea", {
 window.DungeonContent.register("monsters", "polarNightColossus", {
   name: "Polar Night Colossus",
   role: "Dark arctic colossus",
+  sizeSquares: 3,
   tags: ["elemental", "water", "ice", "polar", "night", "colossus"],
   maxHp: 340,
   category: 10,
@@ -1381,6 +1394,7 @@ window.DungeonContent.register("monsters", "polarNightColossus", {
 window.DungeonContent.register("monsters", "cloudburstWorldEater", {
   name: "Cloudburst World-Eater",
   role: "Water-air deluge catastrophe",
+  sizeSquares: 3,
   tags: ["elemental", "water", "rain", "storm", "paraelemental", "flying"],
   maxHp: 380,
   category: 10,
@@ -1414,6 +1428,7 @@ window.DungeonContent.register("monsters", "cloudburstWorldEater", {
 window.DungeonContent.register("monsters", "sovereignOfTheEndlessDeluge", {
   name: "Sovereign of the Endless Deluge",
   role: "Category 10 water boss",
+  sizeSquares: 3,
   tags: ["elemental", "water", "deluge", "boss", "sovereign"],
   maxHp: 620,
   category: 10,

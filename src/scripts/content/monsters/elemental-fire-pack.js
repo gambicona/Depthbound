@@ -832,6 +832,7 @@ window.DungeonContent.register("monsters", "volcanicHeartTyrant", {
 window.DungeonContent.register("monsters", "lavaTideColossus", {
   name: "Lava-Tide Colossus",
   role: "Huge molten area brute",
+  sizeSquares: 2,
   tags: ["elemental", "lava", "magma", "brute", "giant"],
   maxHp: 134,
   category: 6,
@@ -870,6 +871,7 @@ window.DungeonContent.register("monsters", "lavaTideColossus", {
 window.DungeonContent.register("monsters", "ashCycloneRavager", {
   name: "Ash Cyclone Ravager",
   role: "Flying ash vortex controller",
+  sizeSquares: 2,
   tags: ["elemental", "ash", "air", "paraelemental", "flying"],
   maxHp: 116,
   category: 6,
@@ -997,6 +999,7 @@ window.DungeonContent.register("monsters", "cinderCrownElder", {
 window.DungeonContent.register("monsters", "pyroclasmTitanling", {
   name: "Pyroclasm Titanling",
   role: "Siege-scale fire elemental",
+  sizeSquares: 2,
   tags: ["elemental", "fire", "magma", "titan", "brute"],
   maxHp: 176,
   category: 7,
@@ -1035,6 +1038,7 @@ window.DungeonContent.register("monsters", "pyroclasmTitanling", {
 window.DungeonContent.register("monsters", "ashMonsoon", {
   name: "Ash Monsoon",
   role: "Massive flying ash storm",
+  sizeSquares: 2,
   tags: ["elemental", "ash", "air", "paraelemental", "flying"],
   maxHp: 150,
   category: 7,
@@ -1074,6 +1078,7 @@ window.DungeonContent.register("monsters", "ashMonsoon", {
 window.DungeonContent.register("monsters", "magmaDrakeElemental", {
   name: "Magma Drake Elemental",
   role: "Molten flying predator",
+  sizeSquares: 2,
   tags: ["elemental", "magma", "fire", "drake", "flying"],
   maxHp: 168,
   category: 7,
@@ -1162,6 +1167,7 @@ window.DungeonContent.register("monsters", "brassCalderaEfreet", {
 window.DungeonContent.register("monsters", "livingVolcano", {
   name: "Living Volcano",
   role: "Walking eruption engine",
+  sizeSquares: 3,
   tags: ["elemental", "fire", "magma", "volcano", "brute"],
   maxHp: 232,
   category: 8,
@@ -1239,6 +1245,7 @@ window.DungeonContent.register("monsters", "obsidianPhoenix", {
 window.DungeonContent.register("monsters", "pyroglassJuggernaut", {
   name: "Pyroglass Juggernaut",
   role: "Obsidian armored destroyer",
+  sizeSquares: 2,
   tags: ["elemental", "fire", "glass", "obsidian", "soldier"],
   maxHp: 248,
   category: 8,
@@ -1277,6 +1284,7 @@ window.DungeonContent.register("monsters", "pyroglassJuggernaut", {
 window.DungeonContent.register("monsters", "wardenOfTheCalderaGate", {
   name: "Warden of the Caldera Gate",
   role: "Category 8 elemental boss",
+  sizeSquares: 2,
   tags: ["elemental", "magma", "fire", "boss", "guardian"],
   maxHp: 394,
   category: 8,
@@ -1326,6 +1334,7 @@ window.DungeonContent.register("monsters", "wardenOfTheCalderaGate", {
 window.DungeonContent.register("monsters", "solarFurnaceAvatar", {
   name: "Solar Furnace Avatar",
   role: "Radiant-hot fire artillery",
+  sizeSquares: 2,
   tags: ["elemental", "fire", "solar", "avatar", "ranged"],
   maxHp: 242,
   category: 9,
@@ -1404,6 +1413,7 @@ window.DungeonContent.register("monsters", "apocalypseAshElemental", {
 window.DungeonContent.register("monsters", "magmaWorldbreaker", {
   name: "Magma Worldbreaker",
   role: "Massive lava siege elemental",
+  sizeSquares: 3,
   tags: ["elemental", "magma", "lava", "worldbreaker", "brute"],
   maxHp: 286,
   category: 9,
@@ -1442,6 +1452,7 @@ window.DungeonContent.register("monsters", "magmaWorldbreaker", {
 window.DungeonContent.register("monsters", "lordOfTheBurningFault", {
   name: "Lord of the Burning Fault",
   role: "Category 9 elemental boss",
+  sizeSquares: 3,
   tags: ["elemental", "fire", "magma", "boss", "titan"],
   maxHp: 446,
   category: 9,
@@ -1491,6 +1502,7 @@ window.DungeonContent.register("monsters", "lordOfTheBurningFault", {
 window.DungeonContent.register("monsters", "primordialFirestorm", {
   name: "Primordial Firestorm",
   role: "Avatar-tier flying inferno",
+  sizeSquares: 3,
   tags: ["elemental", "fire", "storm", "primordial", "flying"],
   maxHp: 320,
   category: 10,
@@ -1530,6 +1542,7 @@ window.DungeonContent.register("monsters", "primordialFirestorm", {
 window.DungeonContent.register("monsters", "worldAshColossus", {
   name: "World-Ash Colossus",
   role: "Primordial ash extinction brute",
+  sizeSquares: 3,
   tags: ["elemental", "ash", "paraelemental", "primordial", "colossus"],
   maxHp: 352,
   category: 10,
@@ -1568,6 +1581,7 @@ window.DungeonContent.register("monsters", "worldAshColossus", {
 window.DungeonContent.register("monsters", "heartOfTheElementalPyre", {
   name: "Heart of the Elemental Pyre",
   role: "Living gate to the Plane of Fire",
+  sizeSquares: 3,
   tags: ["elemental", "fire", "planar", "avatar", "ranged"],
   maxHp: 304,
   category: 10,
@@ -1607,6 +1621,7 @@ window.DungeonContent.register("monsters", "heartOfTheElementalPyre", {
 window.DungeonContent.register("monsters", "primordialSultanOfCinder", {
   name: "Primordial Sultan of Cinder",
   role: "Category 10 elemental boss",
+  sizeSquares: 2,
   tags: ["elemental", "fire", "efreeti", "primordial", "boss"],
   maxHp: 610,
   category: 10,

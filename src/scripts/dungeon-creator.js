@@ -329,8 +329,17 @@ function objectCellsForCreator(object) {
   }));
 }
 
+function monsterFootprintSource(monster) {
+  const template = window.DungeonContent.get("monsters", monster.monsterId);
+  return { ...(template ?? {}), ...(monster.overrides ?? {}) };
+}
+
+function monsterCellsForCreator(monster, position = monster.position) {
+  return window.DungeonGrid.fighterCells(monsterFootprintSource(monster), position);
+}
+
 function monsterAt(position) {
-  return state.monsters.find((monster) => monster.position.x === position.x && monster.position.y === position.y) ?? null;
+  return state.monsters.find((monster) => monsterCellsForCreator(monster).some((cell) => cell.x === position.x && cell.y === position.y)) ?? null;
 }
 
 function occupied(position, exceptId = "", incomingType = "") {
@@ -339,6 +348,13 @@ function occupied(position, exceptId = "", incomingType = "") {
   return objectsAt(position).some((object) => {
     if (object.id === exceptId) return false;
     return incomingIsTerrainFloor ? objectIsTerrainFloor(object) : !objectIsTerrainFloor(object);
+  });
+}
+
+function monsterCanFitAt(template, room, position) {
+  return window.DungeonGrid.fighterCells(template, position).every((cell) => {
+    const cellRoom = roomAt(cell);
+    return cellRoom?.id === room.id && !occupied(cell);
   });
 }
 
@@ -1531,9 +1547,8 @@ function placeFurniture(position) {
 
 function placeMonster(position) {
   const room = roomAt(position);
-  if (!room || !state.selectedMonsterId || occupied(position)) return;
   const template = window.DungeonContent.get("monsters", state.selectedMonsterId);
-  if (!template) return;
+  if (!room || !state.selectedMonsterId || !template || !monsterCanFitAt(template, room, position)) return;
   const id = `${els.monsterIsBoss.checked ? "boss" : "monster"}-custom-${state.monsters.length + 1}`;
   state.monsters.push({
     id,

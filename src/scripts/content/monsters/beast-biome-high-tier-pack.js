@@ -27,6 +27,7 @@
   window.DungeonContent.register("monsters", "highTierIronwoodBear", {
     name: "Ironwood Bear",
     role: "Armored forest bruiser",
+    sizeSquares: 2,
     tags: [
       "beast",
       "forest",
@@ -177,6 +178,7 @@
   window.DungeonContent.register("monsters", "highTierGloomwebBroodmother", {
     name: "Gloomweb Broodmother",
     role: "Huge venomous spider",
+    sizeSquares: 2,
     tags: [
       "beast",
       "forest",
@@ -216,6 +218,7 @@
   window.DungeonContent.register("monsters", "highTierOakmawCaveBear", {
     name: "Oakmaw Cave Bear",
     role: "Category 5 forest beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "forest",
@@ -261,6 +264,7 @@
   window.DungeonContent.register("monsters", "highTierMossHornMegaloceros", {
     name: "Moss-Horn Megaloceros",
     role: "Huge trampling forest grazer",
+    sizeSquares: 2,
     tags: [
       "beast",
       "forest",
@@ -376,6 +380,7 @@
   window.DungeonContent.register("monsters", "highTierAncientDireOwlbear", {
     name: "Ancient Dire Owlbear",
     role: "Savage old-growth predator",
+    sizeSquares: 2,
     tags: [
       "beast",
       "forest",
@@ -411,6 +416,7 @@
   window.DungeonContent.register("monsters", "highTierVenomrootSerpent", {
     name: "Venomroot Serpent",
     role: "Poisonous root-colored constrictor",
+    sizeSquares: 2,
     tags: [
       "beast",
       "forest",
@@ -495,6 +501,7 @@
   window.DungeonContent.register("monsters", "highTierElderMossbackMammoth", {
     name: "Elder Mossback Mammoth",
     role: "Massive forest trampler",
+    sizeSquares: 2,
     tags: [
       "beast",
       "forest",
@@ -530,6 +537,7 @@
   window.DungeonContent.register("monsters", "highTierNightleafRoc", {
     name: "Nightleaf Roc",
     role: "Dark-winged forest hunter",
+    sizeSquares: 2,
     tags: [
       "beast",
       "forest",
@@ -567,6 +575,7 @@
   window.DungeonContent.register("monsters", "highTierRootTuskBehemoth", {
     name: "Root-Tusk Behemoth",
     role: "Category 8 forest beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "forest",
@@ -647,6 +656,7 @@
   window.DungeonContent.register("monsters", "highTierStormbarkElk", {
     name: "Stormbark Elk",
     role: "Thunderous antlered giant",
+    sizeSquares: 2,
     tags: [
       "beast",
       "forest",
@@ -682,6 +692,7 @@
   window.DungeonContent.register("monsters", "highTierOldKingBear", {
     name: "Old King Bear",
     role: "Category 9 forest beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "forest",
@@ -727,6 +738,7 @@
   window.DungeonContent.register("monsters", "highTierWorldwoodMammoth", {
     name: "Worldwood Mammoth",
     role: "Living mountain of forest flesh",
+    sizeSquares: 3,
     tags: [
       "beast",
       "forest",
@@ -762,6 +774,7 @@
   window.DungeonContent.register("monsters", "highTierGreenEclipseRoc", {
     name: "Green Eclipse Roc",
     role: "Vast canopy-shadow bird",
+    sizeSquares: 3,
     tags: [
       "beast",
       "forest",
@@ -988,6 +1001,7 @@
   window.DungeonContent.register("monsters", "highTierDuneplateTortoise", {
     name: "Duneplate Tortoise",
     role: "Slow desert fortress-beast",
+    sizeSquares: 2,
     tags: [
       "beast",
       "desert",
@@ -1071,6 +1085,7 @@
   window.DungeonContent.register("monsters", "highTierMirageManeManticore", {
     name: "Mirage-Mane Manticore",
     role: "Category 5 desert beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "desert",
@@ -1124,6 +1139,7 @@
   window.DungeonContent.register("monsters", "highTierBoneDuneBulette", {
     name: "Bone-Dune Bulette",
     role: "Burrowing desert landshark",
+    sizeSquares: 2,
     tags: [
       "beast",
       "desert",
@@ -1207,6 +1223,7 @@
   window.DungeonContent.register("monsters", "highTierGreatSandmawWorm", {
     name: "Great Sandmaw Worm",
     role: "Category 6 desert beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "desert",
@@ -1259,6 +1276,7 @@
   window.DungeonContent.register("monsters", "highTierSiroccoWyvern", {
     name: "Sirocco Wyvern",
     role: "Hot-wind flying hunter",
+    sizeSquares: 2,
     tags: [
       "beast",
       "desert",
@@ -1304,6 +1322,7 @@
   window.DungeonContent.register("monsters", "highTierSaltjawCrocodile", {
     name: "Saltjaw Crocodile",
     role: "Desert oasis ambusher",
+    sizeSquares: 2,
     tags: [
       "beast",
       "desert",
@@ -1396,6 +1415,7 @@
   window.DungeonContent.register("monsters", "highTierThunderDuneTrampler", {
     name: "Thunder-Dune Trampler",
     role: "Massive horned desert charger",
+    sizeSquares: 2,
     tags: [
       "beast",
       "desert",
@@ -1437,6 +1457,7 @@
   window.DungeonContent.register("monsters", "highTierCrystalViperMatriarch", {
     name: "Crystal Viper Matriarch",
     role: "Huge venomous glass snake",
+    sizeSquares: 2,
     tags: [
       "beast",
       "desert",
@@ -1480,6 +1501,7 @@
   window.DungeonContent.register("monsters", "highTierTheWalkingDune", {
     name: "The Walking Dune",
     role: "Category 8 desert beast boss",
+    sizeSquares: 3,
     tags: [
       "beast",
       "desert",
@@ -1532,6 +1554,7 @@
   window.DungeonContent.register("monsters", "highTierRedMirageRoc", {
     name: "Red Mirage Roc",
     role: "Blazing sky predator",
+    sizeSquares: 2,
     tags: [
       "beast",
       "desert",
@@ -1671,6 +1694,7 @@
   window.DungeonContent.register("monsters", "highTierTitanDuneWorm", {
     name: "Titan Dune Worm",
     role: "Colossal desert burrower",
+    sizeSquares: 3,
     tags: [
       "beast",
       "desert",
@@ -1713,6 +1737,7 @@
   window.DungeonContent.register("monsters", "highTierSolarFangManticore", {
     name: "Solar Fang Manticore",
     role: "Radiant-hot desert aerial brute",
+    sizeSquares: 2,
     tags: [
       "beast",
       "desert",
@@ -1756,6 +1781,7 @@
   window.DungeonContent.register("monsters", "highTierTheSandThatHunts", {
     name: "The Sand That Hunts",
     role: "Category 10 desert beast boss",
+    sizeSquares: 3,
     tags: [
       "beast",
       "desert",
@@ -1850,6 +1876,7 @@
   window.DungeonContent.register("monsters", "highTierIronfangMolebear", {
     name: "Ironfang Molebear",
     role: "Digging brute",
+    sizeSquares: 2,
     tags: [
       "beast",
       "underground",
@@ -1971,6 +1998,7 @@
   window.DungeonContent.register("monsters", "highTierRockhideCaveRhino", {
     name: "Rockhide Cave Rhino",
     role: "Armored underground charger",
+    sizeSquares: 2,
     tags: [
       "beast",
       "underground",
@@ -2006,6 +2034,7 @@
   window.DungeonContent.register("monsters", "highTierTheBlindTunnelBull", {
     name: "The Blind Tunnel Bull",
     role: "Category 5 underground beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "underground",
@@ -2126,6 +2155,7 @@
   window.DungeonContent.register("monsters", "highTierGloomhornUnderRhino", {
     name: "Gloomhorn Under-Rhino",
     role: "Category 6 underground beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "underground",
@@ -2174,6 +2204,7 @@
   window.DungeonContent.register("monsters", "highTierPaleCaveWyvern", {
     name: "Pale Cave Wyvern",
     role: "Winged cavern stinger",
+    sizeSquares: 2,
     tags: [
       "beast",
       "underground",
@@ -2215,6 +2246,7 @@
   window.DungeonContent.register("monsters", "highTierBasaltShelledAnkylosaur", {
     name: "Basalt-Shelled Ankylosaur",
     role: "Armored tail-crusher",
+    sizeSquares: 2,
     tags: [
       "beast",
       "underground",
@@ -2298,6 +2330,7 @@
   window.DungeonContent.register("monsters", "highTierCavernLeviathanCub", {
     name: "Cavern Leviathan Cub",
     role: "Massive tunnel serpent",
+    sizeSquares: 2,
     tags: [
       "beast",
       "underground",
@@ -2415,6 +2448,7 @@
   window.DungeonContent.register("monsters", "highTierAbyssalCaveBear", {
     name: "Abyssal Cave Bear",
     role: "Huge pale apex brute",
+    sizeSquares: 2,
     tags: [
       "beast",
       "underground",
@@ -2450,6 +2484,7 @@
   window.DungeonContent.register("monsters", "highTierSubterraneanThunderhorn", {
     name: "Subterranean Thunderhorn",
     role: "Cave-cracking horned beast",
+    sizeSquares: 2,
     tags: [
       "beast",
       "underground",
@@ -2534,6 +2569,7 @@
   window.DungeonContent.register("monsters", "highTierWorldRootBurrower", {
     name: "World-Root Burrower",
     role: "Legendary tunneling beast",
+    sizeSquares: 3,
     tags: [
       "beast",
       "underground",
@@ -2569,6 +2605,7 @@
   window.DungeonContent.register("monsters", "highTierTitanCaveDrakebeast", {
     name: "Titan Cave Drakebeast",
     role: "Winged cavern apex beast",
+    sizeSquares: 3,
     tags: [
       "beast",
       "underground",
@@ -2606,6 +2643,7 @@
   window.DungeonContent.register("monsters", "highTierTheMawBelowAllRoads", {
     name: "The Maw Below All Roads",
     role: "Category 10 underground beast boss",
+    sizeSquares: 3,
     tags: [
       "beast",
       "underground",
@@ -2693,6 +2731,7 @@
   window.DungeonContent.register("monsters", "highTierLeechhideCrocodile", {
     name: "Leechhide Crocodile",
     role: "Blood-drinking swamp predator",
+    sizeSquares: 2,
     tags: [
       "beast",
       "swamp",
@@ -2728,6 +2767,7 @@
   window.DungeonContent.register("monsters", "highTierOldMireCrocodile", {
     name: "Old Mire Crocodile",
     role: "Category 4 swamp beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "swamp",
@@ -2808,6 +2848,7 @@
   window.DungeonContent.register("monsters", "highTierRotwaterSerpent", {
     name: "Rotwater Serpent",
     role: "Venomous marsh constrictor",
+    sizeSquares: 2,
     tags: [
       "beast",
       "swamp",
@@ -2847,6 +2888,7 @@
   window.DungeonContent.register("monsters", "highTierBlackfenHydraBeast", {
     name: "Blackfen Hydra-Beast",
     role: "Category 5 swamp beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "swamp",
@@ -2927,6 +2969,7 @@
   window.DungeonContent.register("monsters", "highTierMudbackBehemoth", {
     name: "Mudback Behemoth",
     role: "Huge swamp trampler",
+    sizeSquares: 2,
     tags: [
       "beast",
       "swamp",
@@ -3007,6 +3050,7 @@
   window.DungeonContent.register("monsters", "highTierCorpseReedAlligator", {
     name: "Corpse-Reed Alligator",
     role: "Grave-water ambusher",
+    sizeSquares: 2,
     tags: [
       "beast",
       "swamp",
@@ -3083,6 +3127,7 @@
   window.DungeonContent.register("monsters", "highTierSloughbackTyrant", {
     name: "Sloughback Tyrant",
     role: "Category 7 swamp beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "swamp",
@@ -3131,6 +3176,7 @@
   window.DungeonContent.register("monsters", "highTierFenLeviathanSpawn", {
     name: "Fen Leviathan Spawn",
     role: "Gigantic water serpent",
+    sizeSquares: 2,
     tags: [
       "beast",
       "swamp",
@@ -3167,6 +3213,7 @@
   window.DungeonContent.register("monsters", "highTierMoldhornRhinobeast", {
     name: "Moldhorn Rhinobeast",
     role: "Fungal marsh charger",
+    sizeSquares: 2,
     tags: [
       "beast",
       "swamp",
@@ -3202,6 +3249,7 @@
   window.DungeonContent.register("monsters", "highTierMudCrownedBehemoth", {
     name: "Mud-Crowned Behemoth",
     role: "Category 8 swamp beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "swamp",
@@ -3247,6 +3295,7 @@
   window.DungeonContent.register("monsters", "highTierBlackwaterFangcat", {
     name: "Blackwater Fangcat",
     role: "Huge nocturnal swamp cat",
+    sizeSquares: 2,
     tags: [
       "beast",
       "swamp",
@@ -3282,6 +3331,7 @@
   window.DungeonContent.register("monsters", "highTierGravefenCrocolisk", {
     name: "Gravefen Crocolisk",
     role: "Ancient armored swamp hunter",
+    sizeSquares: 2,
     tags: [
       "beast",
       "swamp",
@@ -3371,6 +3421,7 @@
   window.DungeonContent.register("monsters", "highTierWorldMireCrocodile", {
     name: "World-Mire Crocodile",
     role: "Colossal swamp apex beast",
+    sizeSquares: 3,
     tags: [
       "beast",
       "swamp",
@@ -3406,6 +3457,7 @@
   window.DungeonContent.register("monsters", "highTierPlaguewingMarshRoc", {
     name: "Plaguewing Marsh Roc",
     role: "Toxic swamp sky hunter",
+    sizeSquares: 2,
     tags: [
       "beast",
       "swamp",
@@ -3447,6 +3499,7 @@
   window.DungeonContent.register("monsters", "highTierTheFenThatBites", {
     name: "The Fen That Bites",
     role: "Category 10 swamp beast boss",
+    sizeSquares: 3,
     tags: [
       "beast",
       "swamp",
@@ -3540,6 +3593,7 @@
   window.DungeonContent.register("monsters", "highTierSnowplateBear", {
     name: "Snowplate Bear",
     role: "Armored polar bruiser",
+    sizeSquares: 2,
     tags: [
       "beast",
       "arctic",
@@ -3720,6 +3774,7 @@
   window.DungeonContent.register("monsters", "highTierOldSnowmawBear", {
     name: "Old Snowmaw Bear",
     role: "Category 5 arctic beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "arctic",
@@ -3772,6 +3827,7 @@
   window.DungeonContent.register("monsters", "highTierGlacierbackMammoth", {
     name: "Glacierback Mammoth",
     role: "Huge arctic trampler",
+    sizeSquares: 2,
     tags: [
       "beast",
       "arctic",
@@ -3857,6 +3913,7 @@
   window.DungeonContent.register("monsters", "highTierRimeTuskMammoth", {
     name: "Rime-Tusk Mammoth",
     role: "Category 6 arctic beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "arctic",
@@ -3951,6 +4008,7 @@
   window.DungeonContent.register("monsters", "highTierWhiteoutRoc", {
     name: "Whiteout Roc",
     role: "Snowstorm sky predator",
+    sizeSquares: 2,
     tags: [
       "beast",
       "arctic",
@@ -4048,6 +4106,7 @@
   window.DungeonContent.register("monsters", "highTierFrostscaleSpinosaur", {
     name: "Frostscale Spinosaur",
     role: "Cold river dinosaur",
+    sizeSquares: 2,
     tags: [
       "beast",
       "arctic",
@@ -4091,6 +4150,7 @@
   window.DungeonContent.register("monsters", "highTierAuroraSerpent", {
     name: "Aurora Serpent",
     role: "Shimmering arctic snake",
+    sizeSquares: 2,
     tags: [
       "beast",
       "arctic",
@@ -4133,6 +4193,7 @@
   window.DungeonContent.register("monsters", "highTierTheWhiteMammoth", {
     name: "The White Mammoth",
     role: "Category 8 arctic beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "arctic",
@@ -4185,6 +4246,7 @@
   window.DungeonContent.register("monsters", "highTierPolarNightBear", {
     name: "Polar Night Bear",
     role: "Huge shadow-white killer",
+    sizeSquares: 2,
     tags: [
       "beast",
       "arctic",
@@ -4227,6 +4289,7 @@
   window.DungeonContent.register("monsters", "highTierIcecliffWyvern", {
     name: "Icecliff Wyvern",
     role: "Frozen cliff flier",
+    sizeSquares: 2,
     tags: [
       "beast",
       "arctic",
@@ -4271,6 +4334,7 @@
   window.DungeonContent.register("monsters", "highTierGlacierjawTyrant", {
     name: "Glacierjaw Tyrant",
     role: "Category 9 arctic beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "arctic",
@@ -4323,6 +4387,7 @@
   window.DungeonContent.register("monsters", "highTierWorldIceMammoth", {
     name: "World-Ice Mammoth",
     role: "Legendary glacier trampler",
+    sizeSquares: 3,
     tags: [
       "beast",
       "arctic",
@@ -4365,6 +4430,7 @@
   window.DungeonContent.register("monsters", "highTierAuroraCrownRoc", {
     name: "Aurora Crown Roc",
     role: "Colossal polar sky hunter",
+    sizeSquares: 3,
     tags: [
       "beast",
       "arctic",
@@ -4409,6 +4475,7 @@
   window.DungeonContent.register("monsters", "highTierTheFirstWinterBear", {
     name: "The First Winter Bear",
     role: "Category 10 arctic beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "arctic",
@@ -4658,6 +4725,7 @@
   window.DungeonContent.register("monsters", "highTierSewerCrocodileAncient", {
     name: "Sewer Crocodile Ancient",
     role: "Category 5 urban beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "urban",
@@ -4819,6 +4887,7 @@
   window.DungeonContent.register("monsters", "highTierChimneyNestHorrorBat", {
     name: "Chimney Nest Horror Bat",
     role: "Huge soot-winged flier",
+    sizeSquares: 2,
     tags: [
       "beast",
       "urban",
@@ -4856,6 +4925,7 @@
   window.DungeonContent.register("monsters", "highTierFoundryYardBull", {
     name: "Foundry Yard Bull",
     role: "Industrial charging beast",
+    sizeSquares: 2,
     tags: [
       "beast",
       "urban",
@@ -4972,6 +5042,7 @@
   window.DungeonContent.register("monsters", "highTierAqueductSerpent", {
     name: "Aqueduct Serpent",
     role: "Waterway constrictor",
+    sizeSquares: 2,
     tags: [
       "beast",
       "urban",
@@ -5008,6 +5079,7 @@
   window.DungeonContent.register("monsters", "highTierTheBellTowerRoc", {
     name: "The Bell-Tower Roc",
     role: "Category 8 urban beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "urban",
@@ -5090,6 +5162,7 @@
   window.DungeonContent.register("monsters", "highTierOldPlagueRatTitan", {
     name: "Old Plague Rat Titan",
     role: "Huge diseased sewer beast",
+    sizeSquares: 2,
     tags: [
       "beast",
       "urban",
@@ -5126,6 +5199,7 @@
   window.DungeonContent.register("monsters", "highTierTheThingUnderTheBridge", {
     name: "The Thing Under the Bridge",
     role: "Category 9 urban beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "urban",
@@ -5172,6 +5246,7 @@
   window.DungeonContent.register("monsters", "highTierCityEaterDireRat", {
     name: "City-Eater Dire Rat",
     role: "Colossal urban infestation beast",
+    sizeSquares: 3,
     tags: [
       "beast",
       "urban",
@@ -5208,6 +5283,7 @@
   window.DungeonContent.register("monsters", "highTierClocktowerHarrierRoc", {
     name: "Clocktower Harrier Roc",
     role: "Vast bird nesting over the city",
+    sizeSquares: 2,
     tags: [
       "beast",
       "urban",
@@ -5296,6 +5372,7 @@
   window.DungeonContent.register("monsters", "highTierReefclawShark", {
     name: "Reefclaw Shark",
     role: "Coral reef predator",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5332,6 +5409,7 @@
   window.DungeonContent.register("monsters", "highTierPearlbackTurtle", {
     name: "Pearlback Turtle",
     role: "Armored sea beast",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5371,6 +5449,7 @@
   window.DungeonContent.register("monsters", "highTierOldReefShark", {
     name: "Old Reef Shark",
     role: "Category 4 water beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5417,6 +5496,7 @@
   window.DungeonContent.register("monsters", "highTierTidefangCrocodile", {
     name: "Tidefang Crocodile",
     role: "Brackish ambusher",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5493,6 +5573,7 @@
   window.DungeonContent.register("monsters", "highTierBlackfinSawshark", {
     name: "Blackfin Sawshark",
     role: "Category 5 water beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5539,6 +5620,7 @@
   window.DungeonContent.register("monsters", "highTierKelpStranglerSerpent", {
     name: "Kelp-Strangler Serpent",
     role: "Water constrictor",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5575,6 +5657,7 @@
   window.DungeonContent.register("monsters", "highTierWhitewaterBullHippo", {
     name: "Whitewater Bull Hippo",
     role: "Violent river beast",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5611,6 +5694,7 @@
   window.DungeonContent.register("monsters", "highTierTheRiverMaw", {
     name: "The River Maw",
     role: "Category 6 water beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5693,6 +5777,7 @@
   window.DungeonContent.register("monsters", "highTierRiptideOrca", {
     name: "Riptide Orca",
     role: "Fast pack whale predator",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5729,6 +5814,7 @@
   window.DungeonContent.register("monsters", "highTierCoralShellDragonTurtle", {
     name: "Coral-Shell Dragon Turtle",
     role: "Category 7 water beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5778,6 +5864,7 @@
   window.DungeonContent.register("monsters", "highTierLeviathanCalf", {
     name: "Leviathan Calf",
     role: "Young sea titan",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5814,6 +5901,7 @@
   window.DungeonContent.register("monsters", "highTierStormfinManta", {
     name: "Stormfin Manta",
     role: "Huge thunderstorm ray",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5850,6 +5938,7 @@
   window.DungeonContent.register("monsters", "highTierOldWhitewaterHippo", {
     name: "Old Whitewater Hippo",
     role: "Category 8 water beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5896,6 +5985,7 @@
   window.DungeonContent.register("monsters", "highTierAbyssalSawtoothShark", {
     name: "Abyssal Sawtooth Shark",
     role: "Deep black apex shark",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5932,6 +6022,7 @@
   window.DungeonContent.register("monsters", "highTierCrownEelOfTheDeep", {
     name: "Crown-Eel of the Deep",
     role: "Huge lightning eel",
+    sizeSquares: 2,
     tags: [
       "beast",
       "water",
@@ -5968,6 +6059,7 @@
   window.DungeonContent.register("monsters", "highTierTheTideLeviathan", {
     name: "The Tide Leviathan",
     role: "Category 9 water beast boss",
+    sizeSquares: 3,
     tags: [
       "beast",
       "water",
@@ -6014,6 +6106,7 @@
   window.DungeonContent.register("monsters", "highTierWorldSeaSerpent", {
     name: "World-Sea Serpent",
     role: "Colossal ocean constrictor",
+    sizeSquares: 3,
     tags: [
       "beast",
       "water",
@@ -6050,6 +6143,7 @@
   window.DungeonContent.register("monsters", "highTierAbyssCrownWhale", {
     name: "Abyss Crown Whale",
     role: "Ancient deep whale beast",
+    sizeSquares: 3,
     tags: [
       "beast",
       "water",
@@ -6086,6 +6180,7 @@
   window.DungeonContent.register("monsters", "highTierTheFirstShark", {
     name: "The First Shark",
     role: "Category 10 water beast boss",
+    sizeSquares: 3,
     tags: [
       "beast",
       "water",
@@ -6208,6 +6303,7 @@
   window.DungeonContent.register("monsters", "highTierOldCragRam", {
     name: "Old Crag Ram",
     role: "Category 4 mountain beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "mountain",
@@ -6370,6 +6466,7 @@
   window.DungeonContent.register("monsters", "highTierThunderhornYak", {
     name: "Thunderhorn Yak",
     role: "Storm-mountain charger",
+    sizeSquares: 2,
     tags: [
       "beast",
       "mountain",
@@ -6405,6 +6502,7 @@
   window.DungeonContent.register("monsters", "highTierGranitebackBear", {
     name: "Graniteback Bear",
     role: "Stone-furred mountain bear",
+    sizeSquares: 2,
     tags: [
       "beast",
       "mountain",
@@ -6440,6 +6538,7 @@
   window.DungeonContent.register("monsters", "highTierIronbeakRoc", {
     name: "Ironbeak Roc",
     role: "Category 6 mountain beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "mountain",
@@ -6487,6 +6586,7 @@
   window.DungeonContent.register("monsters", "highTierAvalancheMammoth", {
     name: "Avalanche Mammoth",
     role: "Snow-mountain trampler",
+    sizeSquares: 2,
     tags: [
       "beast",
       "mountain",
@@ -6529,6 +6629,7 @@
   window.DungeonContent.register("monsters", "highTierSkycragWyvern", {
     name: "Skycrag Wyvern",
     role: "Cliff-nesting stinger",
+    sizeSquares: 2,
     tags: [
       "beast",
       "mountain",
@@ -6570,6 +6671,7 @@
   window.DungeonContent.register("monsters", "highTierTheStonehornBull", {
     name: "The Stonehorn Bull",
     role: "Category 7 mountain beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "mountain",
@@ -6615,6 +6717,7 @@
   window.DungeonContent.register("monsters", "highTierPeakTyrantEagle", {
     name: "Peak-Tyrant Eagle",
     role: "Gigantic mountain bird",
+    sizeSquares: 2,
     tags: [
       "beast",
       "mountain",
@@ -6652,6 +6755,7 @@
   window.DungeonContent.register("monsters", "highTierShalehideDinosaur", {
     name: "Shalehide Dinosaur",
     role: "Plate-backed mountain relic",
+    sizeSquares: 2,
     tags: [
       "beast",
       "mountain",
@@ -6690,6 +6794,7 @@
   window.DungeonContent.register("monsters", "highTierTheAvalancheBear", {
     name: "The Avalanche Bear",
     role: "Category 8 mountain beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "mountain",
@@ -6742,6 +6847,7 @@
   window.DungeonContent.register("monsters", "highTierCloudpiercerRoc", {
     name: "Cloudpiercer Roc",
     role: "Sky-shadow apex flier",
+    sizeSquares: 2,
     tags: [
       "beast",
       "mountain",
@@ -6779,6 +6885,7 @@
   window.DungeonContent.register("monsters", "highTierWorldCragMammoth", {
     name: "World-Crag Mammoth",
     role: "Colossal mountain trampler",
+    sizeSquares: 3,
     tags: [
       "beast",
       "mountain",
@@ -6814,6 +6921,7 @@
   window.DungeonContent.register("monsters", "highTierKingThunderhorn", {
     name: "King Thunderhorn",
     role: "Category 9 mountain beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "mountain",
@@ -6859,6 +6967,7 @@
   window.DungeonContent.register("monsters", "highTierTitanCliffLion", {
     name: "Titan Cliff Lion",
     role: "Legendary mountain stalker",
+    sizeSquares: 2,
     tags: [
       "beast",
       "mountain",
@@ -6894,6 +7003,7 @@
   window.DungeonContent.register("monsters", "highTierStormcrownRoc", {
     name: "Stormcrown Roc",
     role: "Colossal bird of mountain storms",
+    sizeSquares: 3,
     tags: [
       "beast",
       "mountain",
@@ -6931,6 +7041,7 @@
   window.DungeonContent.register("monsters", "highTierTheMountainSFirstRam", {
     name: "The Mountain's First Ram",
     role: "Category 10 mountain beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "mountain",
@@ -7017,6 +7128,7 @@
   window.DungeonContent.register("monsters", "highTierRedhornAurochs", {
     name: "Redhorn Aurochs",
     role: "Heavy plains charger",
+    sizeSquares: 2,
     tags: [
       "beast",
       "grassland",
@@ -7052,6 +7164,7 @@
   window.DungeonContent.register("monsters", "highTierOldRedhornBull", {
     name: "Old Redhorn Bull",
     role: "Category 4 grassland beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "grassland",
@@ -7212,6 +7325,7 @@
   window.DungeonContent.register("monsters", "highTierPrairieThunderbeast", {
     name: "Prairie Thunderbeast",
     role: "Rhino-like plains charger",
+    sizeSquares: 2,
     tags: [
       "beast",
       "grassland",
@@ -7284,6 +7398,7 @@
   window.DungeonContent.register("monsters", "highTierGreatSteppeRhino", {
     name: "Great Steppe Rhino",
     role: "Category 6 grassland beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "grassland",
@@ -7444,6 +7559,7 @@
   window.DungeonContent.register("monsters", "highTierThunderstepElephant", {
     name: "Thunderstep Elephant",
     role: "Huge plains trampler",
+    sizeSquares: 2,
     tags: [
       "beast",
       "grassland",
@@ -7479,6 +7595,7 @@
   window.DungeonContent.register("monsters", "highTierGoldenRocOfTheSavanna", {
     name: "Golden Roc of the Savanna",
     role: "Huge plains sky hunter",
+    sizeSquares: 2,
     tags: [
       "beast",
       "grassland",
@@ -7516,6 +7633,7 @@
   window.DungeonContent.register("monsters", "highTierTheRedGrassTyrant", {
     name: "The Red Grass Tyrant",
     role: "Category 8 grassland beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "grassland",
@@ -7561,6 +7679,7 @@
   window.DungeonContent.register("monsters", "highTierWorldHerdMammoth", {
     name: "World-Herd Mammoth",
     role: "Colossal herd leader",
+    sizeSquares: 3,
     tags: [
       "beast",
       "grassland",
@@ -7631,6 +7750,7 @@
   window.DungeonContent.register("monsters", "highTierTheHerdbreakerAurochs", {
     name: "The Herdbreaker Aurochs",
     role: "Category 9 grassland beast boss",
+    sizeSquares: 2,
     tags: [
       "beast",
       "grassland",
@@ -7676,6 +7796,7 @@
   window.DungeonContent.register("monsters", "highTierTitanSteppeElephant", {
     name: "Titan Steppe Elephant",
     role: "Legendary plains trampler",
+    sizeSquares: 3,
     tags: [
       "beast",
       "grassland",

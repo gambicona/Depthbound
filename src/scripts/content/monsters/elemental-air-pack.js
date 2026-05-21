@@ -585,6 +585,7 @@ window.DungeonContent.register("monsters", "eyeOfTheLesserStorm", {
 window.DungeonContent.register("monsters", "thunderheadRavager", {
   name: "Thunderhead Ravager",
   role: "Heavy thundercloud bruiser",
+  sizeSquares: 2,
   tags: ["elemental", "air", "thunderhead", "brute"],
   maxHp: 118,
   category: 5,
@@ -653,6 +654,7 @@ window.DungeonContent.register("monsters", "glasswindAssassin", {
 window.DungeonContent.register("monsters", "vacuumMaw", {
   name: "Vacuum Maw",
   role: "Airless void paraelemental",
+  sizeSquares: 2,
   tags: ["elemental", "air", "vacuum", "void", "paraelemental"],
   maxHp: 125,
   category: 5,
@@ -687,6 +689,7 @@ window.DungeonContent.register("monsters", "vacuumMaw", {
 window.DungeonContent.register("monsters", "skyCrownStormlord", {
   name: "Sky-Crown Stormlord",
   role: "Category 5 air boss",
+  sizeSquares: 2,
   tags: ["elemental", "air", "storm", "boss", "lord"],
   maxHp: 205,
   category: 5,
@@ -730,6 +733,7 @@ window.DungeonContent.register("monsters", "skyCrownStormlord", {
 window.DungeonContent.register("monsters", "livingTornado", {
   name: "Living Tornado",
   role: "Huge mobile vortex",
+  sizeSquares: 2,
   tags: ["elemental", "air", "tornado", "hazard"],
   maxHp: 155,
   category: 6,
@@ -764,6 +768,7 @@ window.DungeonContent.register("monsters", "livingTornado", {
 window.DungeonContent.register("monsters", "lightningRodColossus", {
   name: "Lightning Rod Colossus",
   role: "Tall storm conductor",
+  sizeSquares: 2,
   tags: ["elemental", "air", "lightning", "colossus"],
   maxHp: 135,
   category: 6,
@@ -875,6 +880,7 @@ window.DungeonContent.register("monsters", "cloudPalaceTyrant", {
 window.DungeonContent.register("monsters", "hurricaneMyrmidon", {
   name: "Hurricane Myrmidon",
   role: "Elite hurricane soldier",
+  sizeSquares: 2,
   tags: ["elemental", "air", "hurricane", "myrmidon"],
   maxHp: 195,
   category: 7,
@@ -909,6 +915,7 @@ window.DungeonContent.register("monsters", "hurricaneMyrmidon", {
 window.DungeonContent.register("monsters", "thunderSerpent", {
   name: "Thunder Serpent",
   role: "Serpentine storm elemental",
+  sizeSquares: 2,
   tags: ["elemental", "air", "thunder", "serpent"],
   maxHp: 185,
   category: 7,
@@ -943,6 +950,7 @@ window.DungeonContent.register("monsters", "thunderSerpent", {
 window.DungeonContent.register("monsters", "stratosphereSentinel", {
   name: "Stratosphere Sentinel",
   role: "High-altitude guardian",
+  sizeSquares: 2,
   tags: ["elemental", "air", "stratosphere", "sentinel"],
   maxHp: 190,
   category: 7,
@@ -1021,6 +1029,7 @@ window.DungeonContent.register("monsters", "baronOfTheOpenSky", {
 window.DungeonContent.register("monsters", "worldstormAvatar", {
   name: "Worldstorm Avatar",
   role: "Avatar of a global storm",
+  sizeSquares: 3,
   tags: ["elemental", "air", "worldstorm", "avatar"],
   maxHp: 235,
   category: 8,
@@ -1054,6 +1063,7 @@ window.DungeonContent.register("monsters", "worldstormAvatar", {
 window.DungeonContent.register("monsters", "cycloneCathedral", {
   name: "Cyclone Cathedral",
   role: "Massive sacred storm formation",
+  sizeSquares: 3,
   tags: ["elemental", "air", "cyclone", "cathedral", "control"],
   maxHp: 220,
   category: 8,
@@ -1122,6 +1132,7 @@ window.DungeonContent.register("monsters", "auroraRazorwing", {
 window.DungeonContent.register("monsters", "queenOfTheHighTempest", {
   name: "Queen of the High Tempest",
   role: "Category 8 air boss",
+  sizeSquares: 2,
   tags: ["elemental", "air", "tempest", "boss", "queen"],
   maxHp: 385,
   category: 8,
@@ -1198,6 +1209,7 @@ window.DungeonContent.register("monsters", "gravitylessVoidwind", {
 window.DungeonContent.register("monsters", "continentalCyclone", {
   name: "Continental Cyclone",
   role: "Cyclone large enough to erase cities",
+  sizeSquares: 3,
   tags: ["elemental", "air", "cyclone", "continent", "catastrophe"],
   maxHp: 270,
   category: 9,
@@ -1232,6 +1244,7 @@ window.DungeonContent.register("monsters", "continentalCyclone", {
 window.DungeonContent.register("monsters", "heavenSplittingThunderhead", {
   name: "Heaven-Splitting Thunderhead",
   role: "Mythic thundercloud colossus",
+  sizeSquares: 3,
   tags: ["elemental", "air", "thunderhead", "colossus"],
   maxHp: 300,
   category: 9,
@@ -1266,6 +1279,7 @@ window.DungeonContent.register("monsters", "heavenSplittingThunderhead", {
 window.DungeonContent.register("monsters", "theSkybreakerRegent", {
   name: "The Skybreaker Regent",
   role: "Category 9 air boss",
+  sizeSquares: 2,
   tags: ["elemental", "air", "skybreaker", "boss", "regent"],
   maxHp: 460,
   category: 9,
@@ -1309,6 +1323,7 @@ window.DungeonContent.register("monsters", "theSkybreakerRegent", {
 window.DungeonContent.register("monsters", "primordialTempest", {
   name: "Primordial Tempest",
   role: "Ancient storm incarnation",
+  sizeSquares: 3,
   tags: ["elemental", "air", "primordial", "tempest", "avatar"],
   maxHp: 360,
   category: 10,
@@ -1342,6 +1357,7 @@ window.DungeonContent.register("monsters", "primordialTempest", {
 window.DungeonContent.register("monsters", "endlessGaleColossus", {
   name: "Endless Gale Colossus",
   role: "Colossus of pure pressure and wind",
+  sizeSquares: 3,
   tags: ["elemental", "air", "gale", "colossus"],
   maxHp: 340,
   category: 10,
@@ -1409,6 +1425,7 @@ window.DungeonContent.register("monsters", "starstormElemental", {
 window.DungeonContent.register("monsters", "sovereignOfTheInnerAir", {
   name: "Sovereign of the Inner Air",
   role: "Category 10 air boss",
+  sizeSquares: 2,
   tags: ["elemental", "air", "inner-plane", "boss", "sovereign"],
   maxHp: 620,
   category: 10,

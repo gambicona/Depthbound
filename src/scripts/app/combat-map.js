@@ -539,8 +539,8 @@ function activeStealthCheckInMonsterRoom(hero = activeHero(), reason = "acts", o
 function adjacentMonstersForStealthProximity(hero, previousPosition = null) {
   if (!fighterIsStealthing(hero) || state.mode !== "exploration") return [];
   return aliveMonsters().filter((monster) => {
-    if (!isKnownTile(monster.position) || attackGridDistance(hero.position, monster.position) > 1) return false;
-    return !previousPosition || attackGridDistance(previousPosition, monster.position) > 1;
+    if (!window.DungeonGrid.fighterCells(monster).some(isKnownTile) || attackGridDistanceBetweenFighters(hero, monster) > 1) return false;
+    return !previousPosition || attackGridDistanceBetweenFighters({ ...hero, position: previousPosition }, monster) > 1;
   });
 }
 
@@ -673,7 +673,7 @@ async function maybeUseBendLuckAttack(attacker, totalAttack, defenderAc) {
   if (!isPartyHeroId(attacker?.id) || totalAttack >= defenderAc || totalAttack + 3 < defenderAc) return { totalAttack, used: false };
   const candidate = partyHeroes().find((hero) => {
     const ability = reactionAbility(hero, "bendLuck");
-    return hero.id !== attacker.id && heroCanAct(hero) && hasReactionAvailable(hero) && canSpendCombatAbility(hero, ability) && distance(hero.position, attacker.position) <= 12;
+    return hero.id !== attacker.id && heroCanAct(hero) && hasReactionAvailable(hero) && canSpendCombatAbility(hero, ability) && fightersWithinSquares(hero, attacker, 12);
   });
   if (!candidate) return { totalAttack, used: false };
   const useLuck = await showReactionPrompt({
@@ -779,7 +779,7 @@ function reactionCandidates(id, target, rangeSquares = 12, includeTarget = true)
     if (!heroCanAct(hero) || !hasReactionAvailable(hero)) return false;
     if (!includeTarget && hero.id === target.id) return false;
     const ability = reactionAbility(hero, id);
-    return canSpendCombatAbility(hero, ability) && distance(hero.position, target.position) <= rangeSquares;
+    return canSpendCombatAbility(hero, ability) && fightersWithinSquares(hero, target, rangeSquares);
   });
 }
 
@@ -896,7 +896,7 @@ async function maybeUseCuttingWordsReaction(attacker, defender, totalAttack, def
 
 async function maybeUseBeastTailReaction(attacker, defender, totalAttack, defenderAc) {
   if (!isPartyHeroId(defender?.id) || defender.subclassId !== "beast" || barbarianBeastForm(defender) !== "tail") return { acBonus: 0, blocked: false };
-  if (totalAttack < defenderAc || !hasReactionAvailable(defender) || distance(attacker.position, defender.position) > 2 || !hasClearLineOfSight(defender.position, attacker.position)) return { acBonus: 0, blocked: false };
+  if (totalAttack < defenderAc || !hasReactionAvailable(defender) || !fightersWithinSquares(attacker, defender, 2) || !hasClearLineOfSightBetweenFighters(defender, attacker)) return { acBonus: 0, blocked: false };
   const useTail = await showReactionPrompt({
     actor: defender,
     title: "Bestial Tail",
@@ -1155,7 +1155,7 @@ async function maybeUseSubclassAfterDamageReactions(defender, attacker, damage, 
   if (!isPartyHeroId(defender?.id) || damage <= 0 || !defender.alive || !attacker?.alive || !hasReactionAvailable(defender)) return;
 
   const wrath = reactionAbility(defender, "wrathOfTheStorm");
-  if (canSpendCombatAbility(defender, wrath) && distance(defender.position, attacker.position) <= 12 && hasClearLineOfSight(defender.position, attacker.position)) {
+  if (canSpendCombatAbility(defender, wrath) && fightersWithinSquares(defender, attacker, 12) && hasClearLineOfSightBetweenFighters(defender, attacker)) {
     const useWrath = await showReactionPrompt({
       actor: defender,
       title: "Wrath of the Storm",
@@ -1251,8 +1251,8 @@ function warriorDefenderCandidates(attacker, target) {
       (candidate.sidekickWarriorRole ?? "attacker") === "defender" &&
       hasReactionAvailable(candidate) &&
       heroCanAct(candidate) &&
-      attackGridDistance(candidate.position, attacker.position) <= 1 &&
-      hasClearLineOfSight(candidate.position, attacker.position) &&
+      attackGridDistanceBetweenFighters(candidate, attacker) <= 1 &&
+      hasClearLineOfSightBetweenFighters(candidate, attacker) &&
       !hostileTo(candidate, target) &&
       hostileTo(candidate, attacker),
   );
@@ -1387,18 +1387,17 @@ function applyProneCondition(target, source = "shove") {
 
 function canPushTargetToPosition(attacker, target, position) {
   if (!position || !window.DungeonGrid.isInsideGrid(position, currentGridSize())) return false;
-  if (!currentWalkable(target).has(positionKey(position))) return false;
-  if (window.DungeonGrid.isOccupied(position, state.fighters, target)) return false;
+  if (!canFighterOccupyPosition(target, position, currentWalkable(target))) return false;
   const dx = Math.abs(position.x - target.position.x);
   const dy = Math.abs(position.y - target.position.y);
-  if (dx + dy === 1) return canTraverseMovementEdge(target, target.position, position, []);
+  if (dx + dy === 1) return canTraverseFootprintMovementEdge(target, target.position, position, []);
   if (Math.max(dx, dy) !== 1) return false;
   const cornerA = { x: position.x, y: target.position.y };
   const cornerB = { x: target.position.x, y: position.y };
   const walkable = currentWalkable(target);
   return (
-    (walkable.has(positionKey(cornerA)) && canTraverseMovementEdge(target, target.position, cornerA, []) && canTraverseMovementEdge(target, cornerA, position, [])) ||
-    (walkable.has(positionKey(cornerB)) && canTraverseMovementEdge(target, target.position, cornerB, []) && canTraverseMovementEdge(target, cornerB, position, []))
+    (canFighterOccupyPosition(target, cornerA, walkable) && canTraverseFootprintMovementEdge(target, target.position, cornerA, []) && canTraverseFootprintMovementEdge(target, cornerA, position, [])) ||
+    (canFighterOccupyPosition(target, cornerB, walkable) && canTraverseFootprintMovementEdge(target, target.position, cornerB, []) && canTraverseFootprintMovementEdge(target, cornerB, position, []))
   );
 }
 
@@ -1528,7 +1527,7 @@ async function applyWeaponRiderSecondary(attacker, defender, rider, attackDamage
     if (!save.success) applyStatusEffect(defender, { id: "restrained", label: "Restrained", speedLocked: true, durationRounds: 2 });
   }
   if (rider.id === "hail-of-thorns" && attackDamage?.range?.kind !== "melee") {
-    const splashTargets = Object.values(state.fighters).filter((fighter) => fighter.id !== defender.id && hostileTo(attacker, fighter) && fighter.alive && distance(defender.position, fighter.position) <= 1);
+    const splashTargets = Object.values(state.fighters).filter((fighter) => fighter.id !== defender.id && hostileTo(attacker, fighter) && fighter.alive && fightersWithinSquares(defender, fighter, 1));
     for (const target of splashTargets) {
       const save = await rollSavingThrow(target, "dex", 8 + proficiencyBonus(attacker) + abilityMod(attacker, spellcastingAbility(attacker)), `${attacker.name}'s Hail of Thorns bursts around ${defender.name}.`);
       const damage = Math.max(1, Math.floor((rider.damageBonus ?? 5) / (save.success ? 2 : 1)));
@@ -2082,11 +2081,14 @@ function doorsAtCorridorMouth(position) {
 function visibleMonsters() {
   const activeTiles = activeTileKeys();
   const activeInitiativeIds = new Set((state.initiative ?? []).map((entry) => entry.fighterId));
-  return aliveMonsters().filter((monster) => (activeInitiativeIds.has(monster.id) || activeTiles.has(positionKey(monster.position))) && isKnownTile(monster.position));
+  return aliveMonsters().filter((monster) =>
+    (activeInitiativeIds.has(monster.id) || window.DungeonGrid.fighterCells(monster).some((cell) => activeTiles.has(positionKey(cell)))) &&
+      window.DungeonGrid.fighterCells(monster).some(isKnownTile),
+  );
 }
 
 function monsterHasLineOfSightToHero(monster) {
-  return partyHeroes().some((hero) => hasClearLineOfSight(monster.position, hero.position));
+  return partyHeroes().some((hero) => hasClearLineOfSightBetweenFighters(monster, hero));
 }
 
 function monsterThreatensHeroes(monster) {
@@ -2124,23 +2126,28 @@ function combatNeedsHeroTurns() {
 }
 
 function hasMeleeAccess(attacker, defender) {
-  const dx = Math.abs(attacker.position.x - defender.position.x);
-  const dy = Math.abs(attacker.position.y - defender.position.y);
-  if (Math.max(dx, dy) !== 1) return false;
-  if (dx + dy === 1) return canTraverseMovementEdge(attacker, attacker.position, defender.position, []);
+  for (const attackerCell of window.DungeonGrid.fighterCells(attacker)) {
+    for (const defenderCell of window.DungeonGrid.fighterCells(defender)) {
+      const dx = Math.abs(attackerCell.x - defenderCell.x);
+      const dy = Math.abs(attackerCell.y - defenderCell.y);
+      if (Math.max(dx, dy) !== 1) continue;
+      if (dx + dy === 1 && canTraverseMovementEdge(attacker, attackerCell, defenderCell, [])) return true;
 
-  const cornerA = { x: defender.position.x, y: attacker.position.y };
-  const cornerB = { x: attacker.position.x, y: defender.position.y };
-  const walkable = dungeonFloorKeys();
-  const canReachViaA =
-    walkable.has(positionKey(cornerA)) &&
-    canTraverseMovementEdge(attacker, attacker.position, cornerA, []) &&
-    canTraverseMovementEdge(attacker, cornerA, defender.position, []);
-  const canReachViaB =
-    walkable.has(positionKey(cornerB)) &&
-    canTraverseMovementEdge(attacker, attacker.position, cornerB, []) &&
-    canTraverseMovementEdge(attacker, cornerB, defender.position, []);
-  return canReachViaA || canReachViaB;
+      const cornerA = { x: defenderCell.x, y: attackerCell.y };
+      const cornerB = { x: attackerCell.x, y: defenderCell.y };
+      const walkable = dungeonFloorKeys();
+      const canReachViaA =
+        walkable.has(positionKey(cornerA)) &&
+        canTraverseMovementEdge(attacker, attackerCell, cornerA, []) &&
+        canTraverseMovementEdge(attacker, cornerA, defenderCell, []);
+      const canReachViaB =
+        walkable.has(positionKey(cornerB)) &&
+        canTraverseMovementEdge(attacker, attackerCell, cornerB, []) &&
+        canTraverseMovementEdge(attacker, cornerB, defenderCell, []);
+      if (canReachViaA || canReachViaB) return true;
+    }
+  }
+  return false;
 }
 
 function adjacentMonster() {
@@ -2165,6 +2172,18 @@ function attackUsesRangedProfile(fighter) {
 
 function attackGridDistance(a, b) {
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+}
+
+function attackGridDistanceBetweenFighters(attacker, defender) {
+  return Math.min(
+    ...window.DungeonGrid.fighterCells(attacker).flatMap((attackerCell) =>
+      window.DungeonGrid.fighterCells(defender).map((defenderCell) => attackGridDistance(attackerCell, defenderCell)),
+    ),
+  );
+}
+
+function attackGridDistanceFromFighterToPosition(fighter, position) {
+  return Math.min(...window.DungeonGrid.fighterCells(fighter).map((cell) => attackGridDistance(cell, position)));
 }
 
 function lineCellsBetween(from, to) {
@@ -2231,24 +2250,30 @@ function hasClearLineOfSight(from, to) {
   return true;
 }
 
+function hasClearLineOfSightBetweenFighters(attacker, defender) {
+  return window.DungeonGrid.fighterCells(attacker).some((attackerCell) =>
+    window.DungeonGrid.fighterCells(defender).some((defenderCell) => hasClearLineOfSight(attackerCell, defenderCell)),
+  );
+}
+
 function isWithinAttackDistance(attacker, defender) {
   const range = attackRangeSquares(attacker);
   if (range <= 1) return hasMeleeAccess(attacker, defender);
-  return attackGridDistance(attacker.position, defender.position) <= range;
+  return attackGridDistanceBetweenFighters(attacker, defender) <= range;
 }
 
 function isInAttackRange(attacker, defender) {
   if (!isWithinAttackDistance(attacker, defender)) return false;
-  if (attackRangeSquares(attacker) > 1) return hasClearLineOfSight(attacker.position, defender.position);
-  return !attackUsesRangedProfile(attacker) || hasClearLineOfSight(attacker.position, defender.position);
+  if (attackRangeSquares(attacker) > 1) return hasClearLineOfSightBetweenFighters(attacker, defender);
+  return !attackUsesRangedProfile(attacker) || hasClearLineOfSightBetweenFighters(attacker, defender);
 }
 
 function isInAttackRangeWithProfile(attacker, defender, profile) {
   const range = profileRangeSquares(profile);
-  const withinDistance = range <= 1 ? hasMeleeAccess(attacker, defender) : attackGridDistance(attacker.position, defender.position) <= range;
+  const withinDistance = range <= 1 ? hasMeleeAccess(attacker, defender) : attackGridDistanceBetweenFighters(attacker, defender) <= range;
   if (!withinDistance) return false;
-  if (range > 1) return hasClearLineOfSight(attacker.position, defender.position);
-  return profile.range?.kind !== "ranged" || hasClearLineOfSight(attacker.position, defender.position);
+  if (range > 1) return hasClearLineOfSightBetweenFighters(attacker, defender);
+  return profile.range?.kind !== "ranged" || hasClearLineOfSightBetweenFighters(attacker, defender);
 }
 
 function objectTargetName(object) {
@@ -2259,7 +2284,7 @@ function objectTargetPosition(object, attacker = activeFighter()) {
   const cells = objectCells(object);
   if (!cells.length) return object?.position;
   if (!attacker?.position) return cells[0];
-  return cells.slice().sort((a, b) => attackGridDistance(attacker.position, a) - attackGridDistance(attacker.position, b))[0];
+  return cells.slice().sort((a, b) => attackGridDistanceFromFighterToPosition(attacker, a) - attackGridDistanceFromFighterToPosition(attacker, b))[0];
 }
 
 function isObjectInAttackRangeWithProfile(attacker, object, profile) {
@@ -2267,9 +2292,9 @@ function isObjectInAttackRangeWithProfile(attacker, object, profile) {
   const range = profileRangeSquares(profile);
   const cells = objectCells(object);
   if (range <= 1) {
-    return cells.some((cell) => attackGridDistance(attacker.position, cell) <= 1);
+    return cells.some((cell) => attackGridDistanceFromFighterToPosition(attacker, cell) <= 1);
   }
-  return cells.some((cell) => attackGridDistance(attacker.position, cell) <= range && hasClearLineOfSight(attacker.position, cell));
+  return cells.some((cell) => attackGridDistanceFromFighterToPosition(attacker, cell) <= range && window.DungeonGrid.fighterCells(attacker).some((attackerCell) => hasClearLineOfSight(attackerCell, cell)));
 }
 
 function destructibleObjectTargets(hero = activeFighter()) {
@@ -2347,7 +2372,7 @@ function canOffHandAttack(fighter) {
 
 function nearestVisibleMonster() {
   const hero = activeHero();
-  return visibleMonsters().sort((a, b) => distance(a.position, hero.position) - distance(b.position, hero.position))[0] ?? null;
+  return visibleMonsters().sort((a, b) => attackGridDistanceBetweenFighters(a, hero) - attackGridDistanceBetweenFighters(b, hero))[0] ?? null;
 }
 
 function attackBonusForAbility(fighter, ability) {
@@ -2370,17 +2395,11 @@ function hostileTo(fighter, candidate) {
 function opportunityThreatensPosition(attacker, defender, position) {
   const profile = opportunityAttackProfile(attacker);
   const range = profileRangeSquares(profile);
-  const threatened = attackGridDistance(attacker.position, position) <= range;
+  const movedDefender = { ...defender, position };
+  const threatened = attackGridDistanceBetweenFighters(attacker, movedDefender) <= range;
   if (!threatened) return false;
   if (range > 1) return true;
-  if (positionKey(attacker.position) === positionKey(position)) return true;
-  const attackerRoom = roomForPosition(attacker.position);
-  const targetRoom = roomForPosition(position);
-  if (attackerRoom && targetRoom) return attackerRoom.id === targetRoom.id;
-  if (Math.abs(attacker.position.x - position.x) + Math.abs(attacker.position.y - position.y) === 1) {
-    return canTraverseMovementEdge(attacker, attacker.position, position, []);
-  }
-  return hasMeleeAccess(attacker, { ...defender, position });
+  return hasMeleeAccess(attacker, movedDefender);
 }
 
 function canOpportunityAttack(attacker, defender, from, to) {
@@ -3288,10 +3307,8 @@ function forcedMovementDestination(fighter, object, distanceSquares = 1) {
     });
   const walkable = currentWalkable(fighter);
   return cells.find((cell) => {
-    if (!window.DungeonGrid.isInsideGrid(cell, currentGridSize())) return false;
-    if (!walkable.has(positionKey(cell))) return false;
-    if (window.DungeonGrid.isOccupied(cell, state.fighters, fighter)) return false;
-    return canTraverseMovementEdge(fighter, fighter.position, cell, []);
+    if (!canFighterOccupyPosition(fighter, cell, walkable)) return false;
+    return canTraverseFootprintMovementEdge(fighter, fighter.position, cell, []);
   }) ?? null;
 }
 
@@ -3923,6 +3940,12 @@ async function rollInitiative() {
 
   state.combatStarted = true;
   state.mode = "combat";
+  for (const entry of state.initiative) {
+    const fighter = state.fighters[entry.fighterId];
+    if (!fighter || !heroCanAct(fighter)) continue;
+    const actionLocked = (fighter.statusEffects ?? []).some((effect) => effect.actionLocked);
+    fighter.hasReaction = !actionLocked;
+  }
   partyHeroes().forEach((hero) => {
     if (hero.stealth) hero.stealth = { active: false };
   });
@@ -3999,7 +4022,7 @@ async function attackDestructibleObject(attacker, object, options = {}) {
 
   const weapon = options.weapon ?? (options.weaponSlot ? weaponFromSlot(attacker, options.weaponSlot) : activeWeapon(attacker));
   const attackDamage = damageProfile(attacker, { weapon, includeDamageModifier: options.includeDamageModifier });
-  const thrownAsMelee = weapon?.properties?.includes("thrown") && objectCells(object).some((cell) => attackGridDistance(attacker.position, cell) <= 1);
+  const thrownAsMelee = weapon?.properties?.includes("thrown") && objectCells(object).some((cell) => attackGridDistanceFromFighterToPosition(attacker, cell) <= 1);
   if (thrownAsMelee) attackDamage.range = { kind: "melee", feet: 5 };
   if (!isObjectInAttackRangeWithProfile(attacker, object, attackDamage)) {
     addLog(`${attacker.name} is too far away to attack ${objectTargetName(object)}. Move closer first.`);
@@ -4081,7 +4104,7 @@ async function makeAttack(attacker, defender, options = {}) {
     return;
   }
 
-  if (profileRangeSquares(attackDamage) > 1 && !hasClearLineOfSight(attacker.position, defender.position)) {
+  if (profileRangeSquares(attackDamage) > 1 && !hasClearLineOfSightBetweenFighters(attacker, defender)) {
     addLog(`${attacker.name} does not have a clear line of sight to ${defender.name}.`);
     render();
     return;
@@ -4269,7 +4292,7 @@ async function makeAttack(attacker, defender, options = {}) {
     if (rider.riderStatus === "charmed") applyStatusEffect(defender, { id: "beguiled", label: "Beguiled", attackBonus: -2, expiresAtEndOfTurn: true });
     if (rider.riderStatus === "stunned") applyStatusEffect(defender, { id: "stunned", label: "Stunned", speedLocked: true, actionLocked: true, durationRounds: 1 });
     if (rider.riderStatus === "sweeping") {
-      const splash = visibleMonsters().find((monster) => monster.id !== defender.id && distance(monster.position, defender.position) <= 1);
+      const splash = visibleMonsters().find((monster) => monster.id !== defender.id && fightersWithinSquares(monster, defender, 1));
       if (splash) applySpecialDamage(attacker, splash, Math.max(1, Math.floor(rider.damageBonus / 2)), attackDamage.type, "Sweeping Attack");
     }
   }
@@ -4410,7 +4433,7 @@ function woundedMonsterAlliesInRange(monster, rangeFeet = 30, options = {}) {
       if (!candidate?.alive) return false;
       if (!options.includeSelf && candidate.id === monster.id) return false;
       if ((candidate.hp ?? 0) >= (candidate.maxHp ?? 0)) return false;
-      if (distance(candidate.position, monster.position) > rangeSquares) return false;
+      if (!fightersWithinSquares(candidate, monster, rangeSquares)) return false;
       return options.predicate ? options.predicate(candidate) : true;
     })
     .sort((a, b) => (a.hp ?? 0) / Math.max(1, a.maxHp ?? 1) - (b.hp ?? 0) / Math.max(1, b.maxHp ?? 1));
@@ -4767,7 +4790,7 @@ function maybeUseMonsterDeathDefiance(monster, damagePackets = []) {
 async function maybeTriggerMonsterDeathBurst(monster) {
   if (!hasMonsterSpecial(monster, /death throes|greater death throes|industrial catastrophe|continental melt|end-breath ash|pebble scatter|iceberg break|split the heavens|worldspring eruption/i)) return false;
   const rangeFeet = hasMonsterSpecial(monster, /greater death throes/i) ? 30 : 20;
-  const targets = monsterTargetableHeroes().filter((hero) => hero.alive && distance(hero.position, monster.position) <= rangeFeet / feetPerSquare);
+  const targets = monsterTargetableHeroes().filter((hero) => hero.alive && fightersWithinSquares(hero, monster, rangeFeet / feetPerSquare));
   if (!targets.length) return false;
   const label = hasMonsterSpecial(monster, /industrial catastrophe/i) ? "Industrial Catastrophe" : hasMonsterSpecial(monster, /continental melt/i) ? "Continental Melt" : hasMonsterSpecial(monster, /end-breath ash/i) ? "End-Breath Ash" : hasMonsterSpecial(monster, /pebble scatter/i) ? "Pebble Scatter" : hasMonsterSpecial(monster, /iceberg break/i) ? "Iceberg Break" : hasMonsterSpecial(monster, /split the heavens/i) ? "Split the Heavens" : hasMonsterSpecial(monster, /worldspring eruption/i) ? "Worldspring Eruption" : hasMonsterSpecial(monster, /greater death throes/i) ? "Greater Death Throes" : "Death Throes";
   const dc = monsterSpecialDc(monster);
@@ -4827,7 +4850,7 @@ function savingThrow(target, ability, dc) {
 
 function auraSaveBonus(target) {
   if (!isPartyHeroId(target?.id)) return 0;
-  const paladin = partyHeroes().find((hero) => hero.alive && (hero.level ?? 1) >= 6 && hero.classId === "paladin" && distance(hero.position, target.position) <= 2);
+  const paladin = partyHeroes().find((hero) => hero.alive && (hero.level ?? 1) >= 6 && hero.classId === "paladin" && fightersWithinSquares(hero, target, 2));
   return paladin ? Math.max(1, abilityMod(paladin, "cha")) : 0;
 }
 
@@ -4968,7 +4991,7 @@ async function rollSavingThrow(target, ability, dc, message, explanation = null)
   if (!save.success) {
     const candidate = partyHeroes().find((hero) => {
       const ability = reactionAbility(hero, "bendLuck");
-      return hero.id !== target.id && heroCanAct(hero) && hasReactionAvailable(hero) && canSpendCombatAbility(hero, ability) && distance(hero.position, target.position) <= 12;
+      return hero.id !== target.id && heroCanAct(hero) && hasReactionAvailable(hero) && canSpendCombatAbility(hero, ability) && fightersWithinSquares(hero, target, 12);
     });
     if (candidate && save.total + 3 >= dc) {
       const useLuck = await showReactionPrompt({
@@ -5443,8 +5466,16 @@ function clearPendingSpellTargeting() {
 function fighterAtPosition(position) {
   if (!position) return null;
   return Object.values(state.fighters).find(
-    (fighter) => fighter.alive && !fighter.dead && fighter.position.x === position.x && fighter.position.y === position.y,
+    (fighter) => fighter.alive && !fighter.dead && window.DungeonGrid.fighterOccupies(fighter, position),
   ) ?? null;
+}
+
+function fighterInRangeAndSight(source, target, range) {
+  return attackGridDistanceBetweenFighters(source, target) <= range && hasClearLineOfSightBetweenFighters(source, target);
+}
+
+function fightersWithinSquares(a, b, range) {
+  return attackGridDistanceBetweenFighters(a, b) <= range;
 }
 
 function spellTargetsFor(caster, spell) {
@@ -5454,20 +5485,20 @@ function spellTargetsFor(caster, spell) {
   }
   if (spell.target === "ally") {
     if (spell.id === "spare-the-dying") {
-      return partyHeroes().filter((hero) => !hero.dead && distance(caster.position, hero.position) <= range);
+      return partyHeroes().filter((hero) => !hero.dead && fightersWithinSquares(caster, hero, range));
     }
-    return partyHeroes().filter((hero) => hero.alive && distance(caster.position, hero.position) <= range);
+    return partyHeroes().filter((hero) => hero.alive && fightersWithinSquares(caster, hero, range));
   }
   if (spell.target === "enemy") {
-    return visibleMonsters().filter((monster) => monster.alive && distance(caster.position, monster.position) <= range && hasClearLineOfSight(caster.position, monster.position));
+    return visibleMonsters().filter((monster) => monster.alive && fighterInRangeAndSight(caster, monster, range));
   }
   if (spell.target === "creature") {
     return Object.values(state.fighters).filter(
-      (fighter) => fighter.alive && !fighter.dead && isKnownTile(fighter.position) && distance(caster.position, fighter.position) <= range && hasClearLineOfSight(caster.position, fighter.position),
+      (fighter) => fighter.alive && !fighter.dead && window.DungeonGrid.fighterCells(fighter).some(isKnownTile) && fighterInRangeAndSight(caster, fighter, range),
     );
   }
   if (spell.target === "point") {
-    return visibleMonsters().filter((monster) => monster.alive && distance(caster.position, monster.position) <= range && hasClearLineOfSight(caster.position, monster.position));
+    return visibleMonsters().filter((monster) => monster.alive && fighterInRangeAndSight(caster, monster, range));
   }
   return [];
 }
@@ -5483,8 +5514,9 @@ function isValidSpellPointTarget(caster, spell, position) {
   const key = positionKey(position);
   if (!window.DungeonGrid.isInsideGrid(position, currentGridSize())) return false;
   if (!isKnownTile(position) || !currentWalkable().has(key)) return false;
-  if (distance(caster.position, position) > spellRangeSquares(spell)) return false;
-  if (!hasClearLineOfSight(caster.position, position)) return false;
+  const pointTarget = { id: "spell-point", position };
+  if (attackGridDistanceBetweenFighters(caster, pointTarget) > spellRangeSquares(spell)) return false;
+  if (!hasClearLineOfSightBetweenFighters(caster, pointTarget)) return false;
   const casterRoom = roomForPosition(caster.position);
   const targetRoom = roomForPosition(position);
   return !casterRoom || targetRoom?.id === casterRoom.id;
@@ -5513,7 +5545,9 @@ function spellAreaCells(originPosition, spell) {
 
 function spellTargetsFromCells(cells) {
   const keys = new Set(cells.map(positionKey));
-  return Object.values(state.fighters).filter((fighter) => fighter.alive && !fighter.dead && keys.has(positionKey(fighter.position)));
+  return Object.values(state.fighters).filter(
+    (fighter) => fighter.alive && !fighter.dead && window.DungeonGrid.fighterCells(fighter).some((cell) => keys.has(positionKey(cell))),
+  );
 }
 
 function areaTargetsForSpell(origin, spell, caster) {
@@ -5575,7 +5609,8 @@ async function applyPersistentSpellAreasAtTurnStart(fighter) {
   for (const area of [...ensureSpellAreas()]) {
     const caster = state.fighters?.[area.casterId];
     const spell = getContentDefinition("spells", area.spellId);
-    if (!caster || !spell || !persistentAreaCells(area).some((cell) => positionKey(cell) === positionKey(fighter.position))) continue;
+    const areaKeys = new Set(persistentAreaCells(area).map(positionKey));
+    if (!caster || !spell || !window.DungeonGrid.fighterCells(fighter).some((cell) => areaKeys.has(positionKey(cell)))) continue;
     if (!spellAffectsFighter(caster, spell, fighter)) continue;
     const castSpell = { ...spell, castLevel: area.castLevel, casterLevel: caster.level ?? 1 };
     addLog(`${fighter.name} starts their turn in ${area.spellName}.`, "important");
@@ -5590,7 +5625,7 @@ async function applySpiritGuardiansAtTurnStart(fighter) {
   if (!fighter?.alive || fighter.dead) return;
   for (const caster of Object.values(state.fighters ?? {})) {
     const guardian = (caster.statusEffects ?? []).find((effect) => effect.id === "spirit-guardians" && effect.aura);
-    if (!guardian || !hostileTo(caster, fighter) || distance(caster.position, fighter.position) > Math.floor((guardian.aura.radiusFeet ?? 15) / feetPerSquare)) continue;
+    if (!guardian || !hostileTo(caster, fighter) || attackGridDistanceBetweenFighters(caster, fighter) > Math.floor((guardian.aura.radiusFeet ?? 15) / feetPerSquare)) continue;
     const save = await rollSavingThrow(fighter, guardian.aura.save ?? "wis", spellSaveDc(caster), `${caster.name}'s Spirit Guardians batter ${fighter.name}.`);
     const roll = rollDice(guardian.aura.damage?.count ?? 3, guardian.aura.damage?.sides ?? 8);
     const raw = save.success ? Math.floor(roll.total / 2) : roll.total;
@@ -5768,7 +5803,7 @@ async function confirmPendingSpellTarget(position) {
 function breathTemplateTargets(caster, direction, spell) {
   const cellTargets = spellTargetsFromCells(spellDirectionCells(caster, direction, spell));
   const geometricTargets = Object.values(state.fighters ?? {}).filter(
-    (fighter) => fighter.alive && !fighter.dead && positionInSpellDirection(caster, direction, spell, fighter.position),
+    (fighter) => fighter.alive && !fighter.dead && window.DungeonGrid.fighterCells(fighter).some((cell) => positionInSpellDirection(caster, direction, spell, cell)),
   );
   const targetsById = new Map([...cellTargets, ...geometricTargets].map((fighter) => [fighter.id, fighter]));
   return [...targetsById.values()].filter((fighter) => spellAffectsFighter(caster, spell, fighter));
@@ -5907,9 +5942,8 @@ function pullTargetToward(source, target) {
   const dy = Math.sign(source.position.y - target.position.y);
   const destination = { x: target.position.x + dx, y: target.position.y + dy };
   if (!window.DungeonGrid.isInsideGrid(destination, currentGridSize())) return false;
-  if (!movementWalkableFor(target).has(positionKey(destination))) return false;
-  if (!canTraverseMovementEdge(target, target.position, destination, [])) return false;
-  if (window.DungeonGrid.isOccupied(destination, state.fighters, target)) return false;
+  if (!canFighterOccupyPosition(target, destination, movementWalkableFor(target))) return false;
+  if (!canTraverseFootprintMovementEdge(target, target.position, destination, [])) return false;
   target.position = destination;
   return true;
 }
@@ -6130,7 +6164,7 @@ async function castSpellAtPoint(caster, spell, position) {
   if (!canCastSpell(caster, spell) || !position) return;
   spell = { ...spell, casterLevel: caster.level ?? 1 };
   if (spell.effect?.kind === "teleport") {
-    if (window.DungeonGrid.isOccupied(position, state.fighters, caster)) {
+    if (!canFighterOccupyPosition(caster, position, currentWalkable(caster))) {
       addLog(`${spell.name} needs an empty destination.`, "important");
       render();
       return;
@@ -6464,7 +6498,7 @@ function maybeUseUndeadFortitude(monster, incomingDamage = 0) {
 
 function targetsInMonsterSpecialRange(monster, feet = monsterSpecialAbilityTuning.rangedSpecialFeet) {
   const maxSquares = feet / feetPerSquare;
-  return monsterTargetableHeroes().filter((hero) => hero.alive && distance(monster.position, hero.position) <= maxSquares && hasClearLineOfSight(monster.position, hero.position));
+  return monsterTargetableHeroes().filter((hero) => hero.alive && attackGridDistanceBetweenFighters(monster, hero) <= maxSquares && hasClearLineOfSightBetweenFighters(monster, hero));
 }
 
 function monsterSpecialSaveExplanation(label, damageType, saveAbility, options = {}) {
@@ -6600,7 +6634,7 @@ async function maybeUseSpellInterruptReaction(monster, label) {
   const candidate = partyHeroes().find((hero) => {
     if (!heroCanAct(hero) || !hasReactionAvailable(hero)) return false;
     const ability = fighterAbilityDefinitions(hero).find((entry) => entry.subclassEffect?.kind === "interruptSpell");
-    return canSpendCombatAbility(hero, ability) && distance(hero.position, monster.position) <= 12;
+    return canSpendCombatAbility(hero, ability) && fightersWithinSquares(hero, monster, 12);
   });
   if (!candidate) return false;
   const ability = fighterAbilityDefinitions(candidate).find((entry) => entry.subclassEffect?.kind === "interruptSpell");
@@ -6657,13 +6691,13 @@ async function maybeUseMonsterStartSpecial(monster) {
   }
 
   if (hasMonsterSpecial(monster, /rapport spores|shriek alarm/i)) {
-    for (const ally of combatMonsters().filter((candidate) => candidate.id !== monster.id && candidate.tags?.includes("plant") && distance(candidate.position, monster.position) <= 3)) {
+    for (const ally of combatMonsters().filter((candidate) => candidate.id !== monster.id && candidate.tags?.includes("plant") && fightersWithinSquares(candidate, monster, 3))) {
       applyStatusEffect(ally, { id: "spore-rapport", label: "Spore Rapport", attackBonus: 1, expiresAtEndOfTurn: true });
     }
   }
 
   if (hasMonsterSpecial(monster, /phalanx of flame/i)) {
-    const adjacentFiend = combatMonsters().some((ally) => ally.id !== monster.id && ally.tags?.includes("fiend") && distance(ally.position, monster.position) <= 1);
+    const adjacentFiend = combatMonsters().some((ally) => ally.id !== monster.id && ally.tags?.includes("fiend") && fightersWithinSquares(ally, monster, 1));
     if (adjacentFiend) applyStatusEffect(monster, { id: "phalanx-of-flame", label: "Phalanx", acBonus: 1, attackBonus: 1, expiresAtEndOfTurn: true });
   }
 
@@ -6671,7 +6705,7 @@ async function maybeUseMonsterStartSpecial(monster) {
     const allyTags = monster.tags ?? [];
     const bonusIsFire = hasMonsterSpecial(monster, /stoke the furnace|forgeheart pulse|heart of ore and flame/i);
     const bonusIsUndead = hasMonsterSpecial(monster, /command the dead|carrion crown command|imperial corpse decree|unburied retinue|lockstep/i);
-    for (const ally of combatMonsters().filter((candidate) => candidate.id !== monster.id && candidate.alive && distance(candidate.position, monster.position) <= 3)) {
+    for (const ally of combatMonsters().filter((candidate) => candidate.id !== monster.id && candidate.alive && fightersWithinSquares(candidate, monster, 3))) {
       const sharesTheme = (candidate.tags ?? []).some((tag) => allyTags.includes(tag) && ["embervein-deepworks", "embervein", "deepworks", "forge", "mine", "fire", "gear"].includes(tag));
       const sharesUndead = bonusIsUndead && (candidate.tags ?? []).some((tag) => ["undead", "skeletal", "zombie"].includes(tag));
       if (!sharesTheme && !sharesUndead) continue;
@@ -6701,14 +6735,14 @@ async function maybeUseMonsterStartSpecial(monster) {
 
   if (hasMonsterSpecial(monster, /rot stench|nauseating bulk|carrion perfume/i)) {
     const label = monsterSpecialNameMatching(monster, /rot stench|nauseating bulk|carrion perfume/i) ?? "Stench";
-    for (const target of monsterTargetableHeroes().filter((hero) => distance(hero.position, monster.position) <= 1)) {
+    for (const target of monsterTargetableHeroes().filter((hero) => fightersWithinSquares(hero, monster, 1))) {
       const save = await rollSavingThrow(target, "con", monsterSpecialDc(monster), `${monster.name}'s ${label} forces ${target.name} to make a CON save.`);
       if (!save.success) applyStatusEffect(target, { id: "nauseated", label: "Nauseated", attackBonus: -1, expiresAtEndOfTurn: true });
     }
   }
 
   if (hasMonsterSpecial(monster, /furnace aura|hellfire wings|filth aura|crown of thorns|molten trail|bright seam|ignition flood|wake the deepworks|heart of ore and flame/i)) {
-    for (const target of monsterTargetableHeroes().filter((hero) => distance(hero.position, monster.position) <= 1)) {
+    for (const target of monsterTargetableHeroes().filter((hero) => fightersWithinSquares(hero, monster, 1))) {
       const dice = specialDamageDice(monster, 6);
       const roll = rollDice(dice.count, dice.sides);
       const isFilth = hasMonsterSpecial(monster, /filth aura/i);
@@ -6737,7 +6771,7 @@ async function maybeUseMonsterStartSpecial(monster) {
 
   if (hasMonsterSpecial(monster, /command the coals|pyre command|sultan's decree of flame|pearl command|current of kings|mantle command|open sky decree|skybreaker law|palace winds|cathedral winds|continental command|seismic dominion/i)) {
     const allyTags = monster.tags ?? [];
-    for (const ally of combatMonsters().filter((candidate) => candidate.id !== monster.id && candidate.alive && distance(candidate.position, monster.position) <= 3)) {
+    for (const ally of combatMonsters().filter((candidate) => candidate.id !== monster.id && candidate.alive && fightersWithinSquares(candidate, monster, 3))) {
       const sharesElement = (candidate.tags ?? []).some((tag) => allyTags.includes(tag) && ["elemental", "fire", "air", "earth", "water", "storm", "stone", "ice"].includes(tag));
       if (!sharesElement) continue;
       applyStatusEffect(ally, { id: "elemental-command", label: "Commanded", attackBonus: 1, expiresAtEndOfTurn: true });
@@ -6746,7 +6780,7 @@ async function maybeUseMonsterStartSpecial(monster) {
 
   if (hasMonsterSpecial(monster, /high tempest aura|thin air aura|maelstrom aura|buried city aura/i)) {
     const type = hasMonsterSpecial(monster, /maelstrom/i) ? "cold" : hasMonsterSpecial(monster, /buried city/i) ? "bludgeoning" : "thunder";
-    for (const target of monsterTargetableHeroes().filter((hero) => distance(hero.position, monster.position) <= 1)) {
+    for (const target of monsterTargetableHeroes().filter((hero) => fightersWithinSquares(hero, monster, 1))) {
       const dice = specialDamageDice(monster, 6);
       const roll = rollDice(dice.count, dice.sides);
       applySpecialDamage(monster, target, Math.max(1, Math.floor((roll.total + dice.bonus) / 2)), type, "Elemental Aura");
@@ -6880,7 +6914,7 @@ async function maybeUseMonsterStartSpecial(monster) {
   }), { maxTargets: 3, pullTargets: true })) return true;
   if (await tryMonsterAreaSpecial(monster, /stampede|gravequake|stormhorn burst|root-rending roar|bossroar/i, "Roar", "bludgeoning", "str", monsterSpecialAbilityTuning.burstRangeFeet)) {
     for (const target of monsterTargetableHeroes()) {
-      if (distance(monster.position, target.position) <= monsterSpecialAbilityTuning.burstRangeFeet / feetPerSquare) {
+      if (fightersWithinSquares(monster, target, monsterSpecialAbilityTuning.burstRangeFeet / feetPerSquare)) {
         applyStatusEffect(target, { id: "shaken", label: "Shaken", attackBonus: monsterSpecialAbilityTuning.bossRoarAttackPenalty, expiresAtEndOfTurn: true });
       }
     }

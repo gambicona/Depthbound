@@ -256,6 +256,7 @@ window.DungeonContent.register("monsters", "claybinderAcolyte", {
 window.DungeonContent.register("monsters", "gravenIdolGuardian", {
   name: "Graven Idol Guardian",
   role: "Category 2 earth boss",
+  sizeSquares: 2,
   tags: ["elemental", "earth", "idol", "stone", "boss", "guardian"],
   maxHp: 62,
   category: 2,
@@ -509,6 +510,7 @@ window.DungeonContent.register("monsters", "mudslideRavager", {
 window.DungeonContent.register("monsters", "graniteBulwark", {
   name: "Granite Bulwark",
   role: "Defensive stone wall monster",
+  sizeSquares: 2,
   tags: ["elemental", "earth", "granite", "guardian", "tank"],
   maxHp: 90,
   category: 4,
@@ -656,6 +658,7 @@ window.DungeonContent.register("monsters", "crystalChoirSeer", {
 window.DungeonContent.register("monsters", "basaltStomper", {
   name: "Basalt Stomper",
   role: "Massive basalt bruiser",
+  sizeSquares: 2,
   tags: ["elemental", "earth", "basalt", "brute"],
   maxHp: 125,
   category: 5,
@@ -690,6 +693,7 @@ window.DungeonContent.register("monsters", "basaltStomper", {
 window.DungeonContent.register("monsters", "mountainHeartGolem", {
   name: "Mountain-Heart Golem",
   role: "Category 5 earth boss",
+  sizeSquares: 3,
   tags: ["elemental", "earth", "mountain", "golem", "boss"],
   maxHp: 205,
   category: 5,
@@ -734,6 +738,7 @@ window.DungeonContent.register("monsters", "mountainHeartGolem", {
 window.DungeonContent.register("monsters", "ironrootColossus", {
   name: "Ironroot Colossus",
   role: "Root-and-ore giant defender",
+  sizeSquares: 3,
   tags: ["elemental", "earth", "metal", "root", "colossus"],
   maxHp: 155,
   category: 6,
@@ -802,6 +807,7 @@ window.DungeonContent.register("monsters", "glassEdgeTerran", {
 window.DungeonContent.register("monsters", "tremorShellBehemoth", {
   name: "Tremor-Shell Behemoth",
   role: "Armored tremor beast",
+  sizeSquares: 2,
   tags: ["elemental", "earth", "tremor", "behemoth", "tank"],
   maxHp: 165,
   category: 6,
@@ -836,6 +842,7 @@ window.DungeonContent.register("monsters", "tremorShellBehemoth", {
 window.DungeonContent.register("monsters", "deepMantleRegent", {
   name: "Deep Mantle Regent",
   role: "Category 6 earth boss",
+  sizeSquares: 2,
   tags: ["elemental", "earth", "mantle", "boss", "regent"],
   maxHp: 260,
   category: 6,
@@ -880,6 +887,7 @@ window.DungeonContent.register("monsters", "deepMantleRegent", {
 window.DungeonContent.register("monsters", "obsidianTitanling", {
   name: "Obsidian Titanling",
   role: "Young black-glass titan",
+  sizeSquares: 2,
   tags: ["elemental", "earth", "obsidian", "titan", "brute"],
   maxHp: 195,
   category: 7,
@@ -948,6 +956,7 @@ window.DungeonContent.register("monsters", "livingLandslide", {
 window.DungeonContent.register("monsters", "gemscaleEarthSerpent", {
   name: "Gemscale Earth Serpent",
   role: "Burrowing crystal serpent",
+  sizeSquares: 2,
   tags: ["elemental", "earth", "crystal", "serpent", "burrower"],
   maxHp: 190,
   category: 7,
@@ -1093,6 +1102,7 @@ window.DungeonContent.register("monsters", "crystalMonolith", {
 window.DungeonContent.register("monsters", "sinkholeDevourer", {
   name: "Sinkhole Devourer",
   role: "Terrain-eating earth horror",
+  sizeSquares: 2,
   tags: ["elemental", "earth", "sinkhole", "devourer", "control"],
   maxHp: 250,
   category: 8,
@@ -1171,6 +1181,7 @@ window.DungeonContent.register("monsters", "archonOfBuriedCities", {
 window.DungeonContent.register("monsters", "continentalShard", {
   name: "Continental Shard",
   role: "Fragment of a living continent",
+  sizeSquares: 3,
   tags: ["elemental", "earth", "continent", "shard", "titan"],
   maxHp: 285,
   category: 9,
@@ -1238,6 +1249,7 @@ window.DungeonContent.register("monsters", "gravityGeode", {
 window.DungeonContent.register("monsters", "worldpillarColossus", {
   name: "Worldpillar Colossus",
   role: "Tower-sized pillar guardian",
+  sizeSquares: 3,
   tags: ["elemental", "earth", "worldpillar", "colossus", "guardian"],
   maxHp: 300,
   category: 9,
@@ -1316,6 +1328,7 @@ window.DungeonContent.register("monsters", "theSeismicPatriarch", {
 window.DungeonContent.register("monsters", "primordialBedrock", {
   name: "Primordial Bedrock",
   role: "Ancient bedrock avatar",
+  sizeSquares: 3,
   tags: ["elemental", "earth", "primordial", "bedrock", "avatar"],
   maxHp: 360,
   category: 10,
@@ -1350,6 +1363,7 @@ window.DungeonContent.register("monsters", "primordialBedrock", {
 window.DungeonContent.register("monsters", "diamondFaultAvatar", {
   name: "Diamond Fault Avatar",
   role: "Cutting diamond-earth demigod",
+  sizeSquares: 3,
   tags: ["elemental", "earth", "diamond", "fault", "avatar"],
   maxHp: 340,
   category: 10,
@@ -1384,6 +1398,7 @@ window.DungeonContent.register("monsters", "diamondFaultAvatar", {
 window.DungeonContent.register("monsters", "livingMountain", {
   name: "Living Mountain",
   role: "Walking mountain catastrophe",
+  sizeSquares: 3,
   tags: ["elemental", "earth", "mountain", "colossus", "catastrophe"],
   maxHp: 380,
   category: 10,
@@ -1418,6 +1433,7 @@ window.DungeonContent.register("monsters", "livingMountain", {
 window.DungeonContent.register("monsters", "sovereignOfTheInnerEarth", {
   name: "Sovereign of the Inner Earth",
   role: "Category 10 earth boss",
+  sizeSquares: 3,
   tags: ["elemental", "earth", "inner-plane", "boss", "sovereign"],
   maxHp: 620,
   category: 10,

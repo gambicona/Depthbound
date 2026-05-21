@@ -382,6 +382,7 @@ window.DungeonContent.register("monsters", "marrowMagistrate", {
 window.DungeonContent.register("monsters", "corpseBloomHulk", {
   name: "Corpse-Bloom Hulk",
   role: "Poisonous swollen zombie",
+  sizeSquares: 2,
   tags: ["undead", "zombie", "plague", "hulk"],
   maxHp: 150,
   category: 5,
@@ -623,6 +624,7 @@ window.DungeonContent.register("monsters", "bonePriestOfTheHollowChoir", {
 window.DungeonContent.register("monsters", "stitchedSiegeCorpse", {
   name: "Stitched Siege Corpse",
   role: "Huge stitched zombie attacker",
+  sizeSquares: 2,
   tags: ["undead", "zombie", "stitched", "siege"],
   maxHp: 198,
   category: 6,
@@ -698,6 +700,7 @@ window.DungeonContent.register("monsters", "graveTarVomiter", {
 window.DungeonContent.register("monsters", "corpseMasonJuggernaut", {
   name: "Corpse-Mason Juggernaut",
   role: "Category 6 zombie boss",
+  sizeSquares: 2,
   tags: ["undead", "zombie", "boss", "juggernaut"],
   maxHp: 372,
   category: 6,
@@ -863,6 +866,7 @@ window.DungeonContent.register("monsters", "barrowboneCastellan", {
 window.DungeonContent.register("monsters", "graveMoundDevourer", {
   name: "Grave-Mound Devourer",
   role: "Hungry corpse mass",
+  sizeSquares: 2,
   tags: ["undead", "zombie", "devourer", "grave-mound"],
   maxHp: 248,
   category: 7,
@@ -900,6 +904,7 @@ window.DungeonContent.register("monsters", "graveMoundDevourer", {
 window.DungeonContent.register("monsters", "rottingPlagueGiant", {
   name: "Rotting Plague Giant",
   role: "Oversized zombie plague brute",
+  sizeSquares: 2,
   tags: ["undead", "zombie", "giant", "plague"],
   maxHp: 270,
   category: 7,
@@ -1102,6 +1107,7 @@ window.DungeonContent.register("monsters", "boneTaxCollector", {
 window.DungeonContent.register("monsters", "corpseTideColossus", {
   name: "Corpse-Tide Colossus",
   role: "Mass of corpses that pushes the room",
+  sizeSquares: 3,
   tags: ["undead", "zombie", "colossus", "corpse-tide"],
   maxHp: 330,
   category: 8,
@@ -1344,6 +1350,7 @@ window.DungeonContent.register("monsters", "ossuaryRegent", {
 window.DungeonContent.register("monsters", "thousandStitchCorpseEngine", {
   name: "Thousand-Stitch Corpse Engine",
   role: "Engine of sewn corpses",
+  sizeSquares: 3,
   tags: ["undead", "zombie", "stitched", "engine"],
   maxHp: 380,
   category: 9,
@@ -1504,6 +1511,7 @@ window.DungeonContent.register("monsters", "ancientBoneTyrant", {
 window.DungeonContent.register("monsters", "starvedLegionAvatar", {
   name: "Starved Legion Avatar",
   role: "Composite skeleton legion",
+  sizeSquares: 2,
   tags: ["undead", "skeletal", "old-guardroom", "legion", "avatar"],
   maxHp: 430,
   category: 10,
@@ -1585,6 +1593,7 @@ window.DungeonContent.register("monsters", "firstSkeletonKing", {
 window.DungeonContent.register("monsters", "worldGraveColossus", {
   name: "World-Grave Colossus",
   role: "Apocalyptic zombie giant",
+  sizeSquares: 3,
   tags: ["undead", "zombie", "colossus", "world-grave"],
   maxHp: 460,
   category: 10,
@@ -1622,6 +1631,7 @@ window.DungeonContent.register("monsters", "worldGraveColossus", {
 window.DungeonContent.register("monsters", "crownRotDevourer", {
   name: "Crown-Rot Devourer",
   role: "Royal corpse-eating horror",
+  sizeSquares: 2,
   tags: ["undead", "zombie", "devourer", "crown-rot"],
   maxHp: 438,
   category: 10,

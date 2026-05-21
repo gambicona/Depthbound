@@ -5137,11 +5137,15 @@ function createCombatant(template) {
     extraResourcePoolUses: { ...(template.extraResourcePoolUses ?? {}) },
     partyRole: template.partyRole ?? (template.id === "hero" ? "tank" : undefined),
     position: { ...template.position },
+    sizeSquares: Math.max(1, Math.floor(Number(template.sizeSquares ?? template.spaceSquares ?? 1) || 1)),
+    footprintWidth: template.footprintWidth ? Math.max(1, Math.floor(Number(template.footprintWidth) || 1)) : undefined,
+    footprintHeight: template.footprintHeight ? Math.max(1, Math.floor(Number(template.footprintHeight) || 1)) : undefined,
     hp: template.maxHp,
     alive: true,
     movementLeft: Math.floor((template.baseSpeedFeet ?? template.speedFeet) / feetPerSquare),
     hasAction: true,
     hasBonusAction: true,
+    hasReaction: true,
     dodging: false,
     disengaged: false,
     canMoveThroughMonsters: false,
@@ -5174,13 +5178,31 @@ function openRoomCellsForSpawn(room, blockedKeys = new Set(), gridSize = current
   });
 }
 
-function roomSpawnCells(room, blockedKeys = new Set(), gridSize = currentGridSize(), floorKeys = null) {
-  const interiorCells = openRoomCellsForSpawn(room, blockedKeys, gridSize, false, floorKeys);
-  return interiorCells.length ? interiorCells : openRoomCellsForSpawn(room, blockedKeys, gridSize, true, floorKeys);
+function spawnCandidateFitsFootprint(room, position, blockedKeys = new Set(), gridSize = currentGridSize(), floorKeys = null, footprintSource = null, includeDoors = false) {
+  const doorKeys = roomDoorKeys(room);
+  return window.DungeonGrid.fighterCells(footprintSource ?? {}, position).every((cell) => {
+    const key = positionKey(cell);
+    return (
+      window.DungeonGrid.isInsideGrid(cell, gridSize) &&
+      roomHasCell(room, cell) &&
+      (!floorKeys || floorKeys.has(key)) &&
+      (includeDoors || !doorKeys.has(key)) &&
+      !blockedKeys.has(key)
+    );
+  });
 }
 
-function clusteredSpawnCells(room, count, origin, blockedKeys = new Set(), gridSize = currentGridSize(), floorKeys = null) {
-  const openCells = roomSpawnCells(room, blockedKeys, gridSize, floorKeys);
+function roomSpawnCells(room, blockedKeys = new Set(), gridSize = currentGridSize(), floorKeys = null, footprintSource = null) {
+  const interiorCells = openRoomCellsForSpawn(room, blockedKeys, gridSize, false, floorKeys)
+    .filter((cell) => spawnCandidateFitsFootprint(room, cell, blockedKeys, gridSize, floorKeys, footprintSource, false));
+  return interiorCells.length
+    ? interiorCells
+    : openRoomCellsForSpawn(room, blockedKeys, gridSize, true, floorKeys)
+      .filter((cell) => spawnCandidateFitsFootprint(room, cell, blockedKeys, gridSize, floorKeys, footprintSource, true));
+}
+
+function clusteredSpawnCells(room, count, origin, blockedKeys = new Set(), gridSize = currentGridSize(), floorKeys = null, footprintSource = null) {
+  const openCells = roomSpawnCells(room, blockedKeys, gridSize, floorKeys, footprintSource);
   if (openCells.length === 0) return [];
   const openKeys = new Set(openCells.map(positionKey));
   const seeds = openCells
@@ -5208,8 +5230,8 @@ function clusteredSpawnCells(room, count, origin, blockedKeys = new Set(), gridS
   return openCells.slice(0, count);
 }
 
-function safeRoomSpawnCell(room, origin, blockedKeys = new Set(), gridSize = currentGridSize(), floorKeys = null) {
-  return clusteredSpawnCells(room, 1, origin, blockedKeys, gridSize, floorKeys)[0] ?? null;
+function safeRoomSpawnCell(room, origin, blockedKeys = new Set(), gridSize = currentGridSize(), floorKeys = null, footprintSource = null) {
+  return clusteredSpawnCells(room, 1, origin, blockedKeys, gridSize, floorKeys, footprintSource)[0] ?? null;
 }
 
 function createMonsterForRoom(monsterTemplate, room, position, id, name, hero) {
@@ -5262,14 +5284,11 @@ function createDungeonMonsters(dungeon, heroPosition, hero, exitRoomId = "", dun
     const monsterTemplate = getMonsterTemplate(monsterId);
     if (!monsterTemplate) continue;
     const spawnCount = roomMonsterSpawnCount(monsterTemplate, hero);
-    const spawnCells = clusteredSpawnCells(room, spawnCount, heroPosition, objectBlockedKeys, dungeon.gridSize, floorKeys);
-    if (spawnCells.length === 0) continue;
-    const actualCount = Math.min(spawnCount, spawnCells.length);
-    const roomTemplates = roomMonsterComposition(monsterTemplate, actualCount, monsterEntries, usedMonsterCounts);
+    const roomTemplates = roomMonsterComposition(monsterTemplate, spawnCount, monsterEntries, usedMonsterCounts);
     const roomTemplateCounts = {};
     for (let spawnIndex = 0; spawnIndex < roomTemplates.length; spawnIndex += 1) {
-      const position = spawnCells[spawnIndex];
       const template = roomTemplates[spawnIndex] ?? monsterTemplate;
+      const position = safeRoomSpawnCell(room, heroPosition, objectBlockedKeys, dungeon.gridSize, floorKeys, template);
       if (!position) continue;
       roomTemplateCounts[template.id] = (roomTemplateCounts[template.id] ?? 0) + 1;
       usedMonsterCounts[template.id] = (usedMonsterCounts[template.id] ?? 0) + 1;
@@ -5277,7 +5296,7 @@ function createDungeonMonsters(dungeon, heroPosition, hero, exitRoomId = "", dun
       const suffix = duplicateInRoom ? ` ${roomTemplateCounts[template.id]}` : "";
       const monster = createMonsterForRoom(template, room, position, `monster-${room.id}-${spawnIndex + 1}`, `${template.name}${suffix}`, hero);
       monsters[monster.id] = monster;
-      objectBlockedKeys.add(positionKey(position));
+      window.DungeonGrid.fighterCells(monster).forEach((cell) => objectBlockedKeys.add(positionKey(cell)));
     }
   }
 
@@ -5294,8 +5313,11 @@ function createDungeonMonsters(dungeon, heroPosition, hero, exitRoomId = "", dun
       });
       applyMonsterCategoryScaling(boss, hero);
       boss.roomId = bossRoom.id;
-      boss.position = safeRoomSpawnCell(bossRoom, heroPosition, objectBlockedKeys, dungeon.gridSize, floorKeys);
-      if (boss.position) monsters[boss.id] = boss;
+      boss.position = safeRoomSpawnCell(bossRoom, heroPosition, objectBlockedKeys, dungeon.gridSize, floorKeys, boss);
+      if (boss.position) {
+        monsters[boss.id] = boss;
+        window.DungeonGrid.fighterCells(boss).forEach((cell) => objectBlockedKeys.add(positionKey(cell)));
+      }
     }
   }
 
@@ -5314,7 +5336,7 @@ function normalizeMonsterRoomPositions(gameState) {
   );
   Object.values(gameState.fighters)
     .filter((fighter) => fighter.id === "hero" || gameState.party?.heroIds?.includes(fighter.id))
-    .forEach((fighter) => blockedKeys.add(positionKey(fighter.position)));
+    .forEach((fighter) => window.DungeonGrid.fighterCells(fighter).forEach((cell) => blockedKeys.add(positionKey(cell))));
 
   for (const fighter of Object.values(gameState.fighters)) {
     if (fighter.id === "hero" || gameState.party?.heroIds?.includes(fighter.id) || !fighter.alive) continue;
@@ -5327,21 +5349,21 @@ function normalizeMonsterRoomPositions(gameState) {
     }
 
     const currentKey = positionKey(fighter.position);
-    const legalKeys = new Set(roomSpawnCells(room, blockedKeys, dungeon.gridSize, floorKeys).map(positionKey));
+    const legalKeys = new Set(roomSpawnCells(room, blockedKeys, dungeon.gridSize, floorKeys, fighter).map(positionKey));
     if (legalKeys.has(currentKey)) {
       fighter.roomId = room.id;
-      blockedKeys.add(currentKey);
+      window.DungeonGrid.fighterCells(fighter).forEach((cell) => blockedKeys.add(positionKey(cell)));
       continue;
     }
 
-    const replacement = safeRoomSpawnCell(room, gameState.fighters.hero?.position ?? fighter.position, blockedKeys, dungeon.gridSize, floorKeys);
+    const replacement = safeRoomSpawnCell(room, gameState.fighters.hero?.position ?? fighter.position, blockedKeys, dungeon.gridSize, floorKeys, fighter);
     if (!replacement) {
       delete gameState.fighters[fighter.id];
       continue;
     }
     fighter.position = { ...replacement };
     fighter.roomId = room.id;
-    blockedKeys.add(positionKey(replacement));
+    window.DungeonGrid.fighterCells(fighter).forEach((cell) => blockedKeys.add(positionKey(cell)));
   }
 }
 

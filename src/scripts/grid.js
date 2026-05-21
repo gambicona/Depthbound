@@ -14,13 +14,43 @@ window.DungeonGrid = {
     return position.x >= 0 && position.x < gridSize && position.y >= 0 && position.y < gridSize;
   },
 
-  isOccupied(position, fighters, ignoredFighter = null) {
-    return Object.values(fighters).some(
+  fighterFootprintDimensions(fighter = {}) {
+    const size = Math.max(1, Math.floor(Number(fighter.sizeSquares ?? fighter.spaceSquares ?? 1) || 1));
+    return {
+      width: Math.max(1, Math.floor(Number(fighter.footprintWidth ?? size) || size)),
+      height: Math.max(1, Math.floor(Number(fighter.footprintHeight ?? size) || size)),
+    };
+  },
+
+  fighterCells(fighter = {}, position = fighter.position) {
+    if (!position) return [];
+    const { width, height } = window.DungeonGrid.fighterFootprintDimensions(fighter);
+    return Array.from({ length: width * height }, (_, index) => ({
+      x: position.x + (index % width),
+      y: position.y + Math.floor(index / width),
+    }));
+  },
+
+  fighterOccupies(fighter, position) {
+    return window.DungeonGrid.fighterCells(fighter).some((cell) => cell.x === position.x && cell.y === position.y);
+  },
+
+  occupiedFighterAt(position, fighters, ignoredFighter = null) {
+    return Object.values(fighters).find(
       (fighter) =>
         fighter.alive &&
         fighter.id !== ignoredFighter?.id &&
-        fighter.position.x === position.x &&
-        fighter.position.y === position.y,
+        window.DungeonGrid.fighterOccupies(fighter, position),
+    ) ?? null;
+  },
+
+  isOccupied(position, fighters, ignoredFighter = null) {
+    return Boolean(window.DungeonGrid.occupiedFighterAt(position, fighters, ignoredFighter));
+  },
+
+  isFootprintOccupied(fighter, position, fighters, ignoredFighter = fighter) {
+    return window.DungeonGrid.fighterCells(fighter, position).some((cell) =>
+      window.DungeonGrid.isOccupied(cell, fighters, ignoredFighter),
     );
   },
 
@@ -53,6 +83,7 @@ window.DungeonGrid = {
     const includeDiagonals = options.includeDiagonals ?? false;
     const stateKey = options.stateKey ?? ((position) => window.DungeonGrid.positionKey(position));
     const canEnterOccupied = options.canEnterOccupied ?? (() => false);
+    const canOccupy = options.canOccupy ?? (() => true);
     const neighborsFor = options.neighborsFor ?? ((position, path) =>
        window.DungeonGrid.neighbors(position, gridSize, includeDiagonals)
         );
@@ -60,6 +91,7 @@ window.DungeonGrid = {
     const moveCost = options.moveCost ?? (() => 1);
     if (window.DungeonGrid.isOccupied(goal, fighters, mover) && !canEnterOccupied(goal, [])) return null;
     if (walkable && !walkable.has(window.DungeonGrid.positionKey(goal))) return null;
+    if (!canOccupy(goal, [])) return null;
 
     const queue = [{ position: start, path: [] }];
     let queueIndex = 0;
@@ -76,6 +108,7 @@ window.DungeonGrid = {
         if (walkable && !walkable.has(key)) continue;
         if (!canTraverse(current.position, next, current.path)) continue;
         const nextPath = [...current.path, next];
+        if (!canOccupy(next, nextPath)) continue;
         const nextStateKey = stateKey(next, nextPath);
         if (visited.has(nextStateKey) || (window.DungeonGrid.isOccupied(next, fighters, mover) && !canEnterOccupied(next, nextPath))) continue;
         visited.add(nextStateKey);
@@ -94,6 +127,7 @@ window.DungeonGrid = {
     const includeDiagonals = options.includeDiagonals ?? false;
     const stateKey = options.stateKey ?? ((position) => window.DungeonGrid.positionKey(position));
     const canEnterOccupied = options.canEnterOccupied ?? (() => false);
+    const canOccupy = options.canOccupy ?? (() => true);
     const reachable = new Map();
     const queue = [{ position: fighter.position, cost: 0, path: [] }];
     let queueIndex = 0;
@@ -116,6 +150,7 @@ window.DungeonGrid = {
         if (
           (walkable && !walkable.has(key)) ||
           !canTraverse(current.position, next, current.path) ||
+          !canOccupy(next, nextPath) ||
           nextCost > maxCost ||
           (window.DungeonGrid.isOccupied(next, fighters, fighter) && !canEnterOccupied(next, nextPath))
         ) {

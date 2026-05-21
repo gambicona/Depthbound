@@ -767,6 +767,7 @@ window.DungeonContent.register("monsters", "awakenedSupportBeam", {
 window.DungeonContent.register("monsters", "redValveEngine", {
   name: "Red Valve Engine",
   role: "Category 5 pressure boss",
+  sizeSquares: 2,
   tags: ["construct", "engine", "steam", "boss"],
   maxHp: 220,
   category: 5,
@@ -976,6 +977,7 @@ window.DungeonContent.register("monsters", "masterOfBrokenGears", {
 window.DungeonContent.register("monsters", "adamantineMineGolem", {
   name: "Adamantine Mine Golem",
   role: "Extremely tough construct tank",
+  sizeSquares: 2,
   tags: ["construct", "golem", "adamantine", "mine"],
   maxHp: 220,
   category: 7,
@@ -1135,6 +1137,7 @@ window.DungeonContent.register("monsters", "ironthaneOfTheDeepworks", {
 window.DungeonContent.register("monsters", "conveyorBeltDevourer", {
   name: "Conveyor-Belt Devourer",
   role: "Industrial maw construct",
+  sizeSquares: 2,
   tags: ["construct", "conveyor", "devourer", "forge"],
   maxHp: 270,
   category: 8,
@@ -1209,6 +1212,7 @@ window.DungeonContent.register("monsters", "livingBlackOil", {
 window.DungeonContent.register("monsters", "volcanicDeepDrake", {
   name: "Volcanic Deep Drake",
   role: "Lava-breath dragonkin",
+  sizeSquares: 2,
   tags: ["dragon", "drake", "fire", "underground"],
   maxHp: 292,
   category: 8,
@@ -1246,6 +1250,7 @@ window.DungeonContent.register("monsters", "volcanicDeepDrake", {
 window.DungeonContent.register("monsters", "forgeheartColossus", {
   name: "Forgeheart Colossus",
   role: "Category 8 construct boss",
+  sizeSquares: 3,
   tags: ["construct", "colossus", "forge", "boss"],
   maxHp: 490,
   category: 8,
@@ -1332,6 +1337,7 @@ window.DungeonContent.register("monsters", "emberveinPitEngineer", {
 window.DungeonContent.register("monsters", "oreveinTitan", {
   name: "Orevein Titan",
   role: "Living giant of the mine",
+  sizeSquares: 3,
   tags: ["giant", "ore", "titan", "underground"],
   maxHp: 340,
   category: 9,
@@ -1369,6 +1375,7 @@ window.DungeonContent.register("monsters", "oreveinTitan", {
 window.DungeonContent.register("monsters", "pressureCoreElemental", {
   name: "Pressure-Core Elemental",
   role: "Steam and force avatar",
+  sizeSquares: 2,
   tags: ["elemental", "air", "fire", "steam", "pressure"],
   maxHp: 302,
   category: 9,
@@ -1456,6 +1463,7 @@ window.DungeonContent.register("monsters", "queenOfCindersAndChains", {
 window.DungeonContent.register("monsters", "primordialSlagAncient", {
   name: "Primordial Slag Ancient",
   role: "World-old molten elemental",
+  sizeSquares: 3,
   tags: ["elemental", "fire", "earth", "slag", "primordial"],
   maxHp: 360,
   category: 10,
@@ -1493,6 +1501,7 @@ window.DungeonContent.register("monsters", "primordialSlagAncient", {
 window.DungeonContent.register("monsters", "catastropheEngine", {
   name: "Catastrophe Engine",
   role: "Apocalyptic mining machine",
+  sizeSquares: 3,
   tags: ["construct", "engine", "catastrophe", "forge"],
   maxHp: 388,
   category: 10,
@@ -1531,6 +1540,7 @@ window.DungeonContent.register("monsters", "catastropheEngine", {
 window.DungeonContent.register("monsters", "worldAnvilDragon", {
   name: "World-Anvil Dragon",
   role: "Legendary forge dragon",
+  sizeSquares: 3,
   tags: ["dragon", "fire", "metal", "forge"],
   maxHp: 375,
   category: 10,
@@ -1568,6 +1578,7 @@ window.DungeonContent.register("monsters", "worldAnvilDragon", {
 window.DungeonContent.register("monsters", "theEmberveinAwakened", {
   name: "The Embervein, Awakened",
   role: "Category 10 dungeon-core boss",
+  sizeSquares: 3,
   tags: ["elemental", "fire", "earth", "boss", "dungeon-core"],
   maxHp: 680,
   category: 10,

@@ -825,7 +825,7 @@ function renderDungeonObjects() {
 function preferredMonsterTargetOverObject(object) {
   const objectKeys = new Set(objectCells(object).map(positionKey));
   return visibleMonsters()
-    .filter((monster) => objectKeys.has(positionKey(monster.position)))
+    .filter((monster) => window.DungeonGrid.fighterCells(monster).some((cell) => objectKeys.has(positionKey(cell))))
     .find((monster) => selectedHeroCanTargetMonster(monster)) ?? null;
 }
 
@@ -923,9 +923,17 @@ function placeToken(fighter) {
   if (!token) return;
 
   const scaledTileSizePx = currentTileSizePx();
+  const footprint = window.DungeonGrid.fighterFootprintDimensions(fighter);
   updateTokenMovementClass(token, fighter);
-  token.style.left = `${(fighter.position.x + 0.5) * scaledTileSizePx}px`;
-  token.style.top = `${(fighter.position.y + 0.5) * scaledTileSizePx}px`;
+  token.style.left = `${(fighter.position.x + footprint.width / 2) * scaledTileSizePx}px`;
+  token.style.top = `${(fighter.position.y + footprint.height / 2) * scaledTileSizePx}px`;
+  if (footprint.width > 1 || footprint.height > 1) {
+    token.style.width = `${footprint.width * scaledTileSizePx}px`;
+    token.style.height = `${footprint.height * scaledTileSizePx}px`;
+  } else {
+    token.style.removeProperty("width");
+    token.style.removeProperty("height");
+  }
   const heroToken = isRosterHeroId(fighter.id);
   if (heroToken) {
     token.style.setProperty("--token-ring-color", heroClassTokenColor(fighter));
@@ -959,7 +967,7 @@ function renderableFighters(activeTiles = activeTileKeys()) {
   return Object.values(state.fighters).filter((fighter) => {
     if (isRosterHeroId(fighter.id)) return true;
     if (!fighter.alive) return false;
-    const visible = showDungeonLayout || initiativeIds.has(fighter.id) || activeTiles.has(positionKey(fighter.position));
+    const visible = showDungeonLayout || initiativeIds.has(fighter.id) || window.DungeonGrid.fighterCells(fighter).some((cell) => activeTiles.has(positionKey(cell)));
     if (visible) recordMonsterEncounter(fighter);
     return visible;
   });
@@ -1000,10 +1008,11 @@ function renderRoom() {
       ? reachableTiles(hero, state.fighters, {
           gridSize: currentGridSize(),
           walkable,
-          canTraverse: (from, to, path) => canTraverseMovementEdge(hero, from, to, path),
+          canTraverse: (from, to, path) => canTraverseFootprintMovementEdge(hero, from, to, path),
           moveCost: (_from, to) => movementCostAtPosition(to, hero),
           stateKey: (position, path) => movementStateKey(hero, position, path),
           canEnterOccupied: (position) => canMoveThroughOccupiedTile(hero, position),
+          canOccupy: (position) => canFighterOccupyPosition(hero, position, walkable, true),
         })
       : new Map();
   const dragPathIndexByKey = new Map((dragPath ?? []).map((step, index) => [positionKey(step), index]));
@@ -2360,7 +2369,7 @@ function homeProtectedKeys(home = state.home) {
     if (object.type === "home-bookshelf") objectCells(object).forEach((cell) => keys.add(positionKey(cell)));
   }
   for (const fighter of Object.values(state.fighters ?? {}).filter((entry) => isRosterHeroId(entry.id))) {
-    keys.add(positionKey(fighter.position));
+    window.DungeonGrid.fighterCells(fighter).forEach((cell) => keys.add(positionKey(cell)));
   }
   return keys;
 }
@@ -3224,7 +3233,7 @@ function freeCaptiveCreature(objectId) {
   if (state.mode === "combat" && !hero.hasAction) return;
   if (!activeStealthCheckInMonsterRoom(hero, `opens ${objectTemplate(object.type)?.name ?? "a cage"}`)) return;
 
-  const position = nearestOpenCellAroundObject(object);
+  const position = nearestOpenCellAroundObject(object, template);
   if (!position) {
     object.lastResult = `There is no room to free ${template.name}.`;
     addLog(object.lastResult, "important");
@@ -3799,7 +3808,7 @@ function disarmTrap(objectId) {
   showDungeonObjectInfo(object);
 }
 
-function nearestOpenCellAroundObject(object) {
+function nearestOpenCellAroundObject(object, footprintSource = null) {
   const startCells = objectCells(object);
   const walkable = currentWalkable();
   const queue = startCells.flatMap((cell) => adjacentCells(cell).map((position) => ({ position, distance: 1 })));
@@ -3811,11 +3820,11 @@ function nearestOpenCellAroundObject(object) {
     if (visited.has(key)) continue;
     visited.add(key);
 
-    if (
-      walkable.has(key) &&
-      !window.DungeonGrid.isOccupied(current.position, state.fighters) &&
-      window.DungeonGrid.isInsideGrid(current.position, currentGridSize())
-    ) {
+    if (window.DungeonGrid.fighterCells(footprintSource ?? {}, current.position).every((cell) =>
+      walkable.has(positionKey(cell)) &&
+        !window.DungeonGrid.isOccupied(cell, state.fighters) &&
+        window.DungeonGrid.isInsideGrid(cell, currentGridSize()),
+    )) {
       return current.position;
     }
 
@@ -3836,18 +3845,18 @@ function spawnInvestigationAmbush(object) {
     ...blockingObjectKeys(),
     ...Object.values(state.fighters)
       .filter((fighter) => fighter.alive)
-      .map((fighter) => positionKey(fighter.position)),
+      .flatMap((fighter) => window.DungeonGrid.fighterCells(fighter).map(positionKey)),
   ]);
+  const monsterTemplate = getMonsterTemplate(pickWeightedMonsterId(weightedMonsterIdsForHero(activeHero())));
   const position = objectRoom
-    ? safeRoomSpawnCell(objectRoom, activeHero().position, blockedKeys, currentGridSize(), spawnFloorKeysForDungeon())
-    : nearestOpenCellAroundObject(object);
+    ? safeRoomSpawnCell(objectRoom, activeHero().position, blockedKeys, currentGridSize(), spawnFloorKeysForDungeon(), monsterTemplate)
+    : nearestOpenCellAroundObject(object, monsterTemplate);
   if (!position) {
     addLog("Something stirs nearby, but there is no space for it to emerge.");
     object.lastResult = "Something stirs nearby, but there is no space for it to emerge.";
     return null;
   }
 
-  const monsterTemplate = getMonsterTemplate(pickWeightedMonsterId(weightedMonsterIdsForHero(activeHero())));
   const monster = createCombatant({
     ...monsterTemplate,
     id: `ambush-${Date.now()}`,
@@ -3878,11 +3887,13 @@ function inspectEventSpawnMonsters(object, component = {}) {
     ...blockingObjectKeys(),
     ...Object.values(state.fighters)
       .filter((fighter) => fighter.alive)
-      .map((fighter) => positionKey(fighter.position)),
+      .flatMap((fighter) => window.DungeonGrid.fighterCells(fighter).map(positionKey)),
   ]);
   const spawnCount = component.count ?? roomMonsterSpawnCount(monsterTemplate, hero);
-  const positions = clusteredSpawnCells(objectRoom, spawnCount, hero.position, blockedKeys, currentGridSize(), spawnFloorKeysForDungeon());
-  const spawned = positions.slice(0, Math.min(spawnCount, positions.length)).map((position, index) => {
+  const spawned = [];
+  for (let index = 0; index < spawnCount; index += 1) {
+    const position = safeRoomSpawnCell(objectRoom, hero.position, blockedKeys, currentGridSize(), spawnFloorKeysForDungeon(), monsterTemplate);
+    if (!position) continue;
     const monster = createCombatant({
       ...monsterTemplate,
       id: `inspect-event-${monsterTemplate.id}-${Date.now()}-${index + 1}`,
@@ -3892,8 +3903,9 @@ function inspectEventSpawnMonsters(object, component = {}) {
     applyMonsterCategoryScaling(monster, hero);
     monster.roomId = objectRoom.id;
     state.fighters[monster.id] = monster;
-    return monster;
-  });
+    window.DungeonGrid.fighterCells(monster).forEach((cell) => blockedKeys.add(positionKey(cell)));
+    spawned.push(monster);
+  }
   if (spawned.length && state.mode === "combat") spawned.forEach(addMonsterToInitiative);
   return spawned;
 }
@@ -4868,7 +4880,7 @@ function addAdminXp(xpAmount) {
   renderInventoryMenu();
 }
 
-function freeAdminSpawnPosition() {
+function freeAdminSpawnPosition(footprintSource = null) {
   const hero = activeHero();
   const room = roomForPosition(hero.position);
   const visibleCells = Array.from(visibleWalkable()).map(positionFromKey);
@@ -4876,9 +4888,9 @@ function freeAdminSpawnPosition() {
     ...blockingObjectKeys(),
     ...Object.values(state.fighters)
       .filter((fighter) => fighter.alive)
-      .map((fighter) => positionKey(fighter.position)),
+      .flatMap((fighter) => window.DungeonGrid.fighterCells(fighter).map(positionKey)),
   ]);
-  const candidates = room ? roomSpawnCells(room, blockedKeys, currentGridSize(), spawnFloorKeysForDungeon()) : visibleCells;
+  const candidates = room ? roomSpawnCells(room, blockedKeys, currentGridSize(), spawnFloorKeysForDungeon(), footprintSource) : visibleCells;
   const currentKey = positionKey(hero.position);
 
   return candidates
@@ -4890,7 +4902,11 @@ function freeAdminSpawnPosition() {
       currentWalkable().has(positionKey(position)) &&
       positionKey(position) !== currentKey &&
       isKnownTile(position) &&
-      !window.DungeonGrid.isOccupied(position, state.fighters),
+      window.DungeonGrid.fighterCells(footprintSource ?? {}, position).every((cell) =>
+        currentWalkable().has(positionKey(cell)) &&
+          isKnownTile(cell) &&
+          !window.DungeonGrid.isOccupied(cell, state.fighters),
+      ),
   );
 }
 
@@ -4909,7 +4925,7 @@ function addMonsterToInitiative(monster) {
 function spawnAdminMonster(monsterId) {
   if (!adminEnabled()) return;
   const template = getMonsterTemplate(monsterId);
-  const position = template ? freeAdminSpawnPosition() : null;
+  const position = template ? freeAdminSpawnPosition(template) : null;
   if (!template || !position) {
     addLog("Admin: no open space for that monster.", "important");
     render();
@@ -4920,9 +4936,18 @@ function spawnAdminMonster(monsterId) {
   const spawnRoom = roomForPosition(position);
   const hero = activeHero();
   const spawnCount = template.behavior === "swarm" && spawnRoom ? swarmSpawnCount(template, hero) : 1;
-  const blockedKeys = new Set([...blockingObjectKeys(), ...Object.values(state.fighters).filter((fighter) => fighter.alive).map((fighter) => positionKey(fighter.position))]);
-  const positions = spawnRoom ? clusteredSpawnCells(spawnRoom, spawnCount, hero.position, blockedKeys, currentGridSize(), spawnFloorKeysForDungeon()) : [position];
-  const spawned = positions.slice(0, Math.min(spawnCount, positions.length)).map((spawnPosition, index) => {
+  const blockedKeys = new Set([
+    ...blockingObjectKeys(),
+    ...Object.values(state.fighters)
+      .filter((fighter) => fighter.alive)
+      .flatMap((fighter) => window.DungeonGrid.fighterCells(fighter).map(positionKey)),
+  ]);
+  const spawned = [];
+  for (let index = 0; index < spawnCount; index += 1) {
+    const spawnPosition = spawnRoom
+      ? safeRoomSpawnCell(spawnRoom, hero.position, blockedKeys, currentGridSize(), spawnFloorKeysForDungeon(), template)
+      : position;
+    if (!spawnPosition) continue;
     adminItemInstanceCounter += 1;
     const monster = createCombatant({
       ...template,
@@ -4933,8 +4958,9 @@ function spawnAdminMonster(monsterId) {
     applyMonsterCategoryScaling(monster, hero);
     monster.roomId = roomForPosition(spawnPosition)?.id ?? "admin-spawn";
     state.fighters[monster.id] = monster;
-    return monster;
-  });
+    window.DungeonGrid.fighterCells(monster).forEach((cell) => blockedKeys.add(positionKey(cell)));
+    spawned.push(monster);
+  }
   if (spawned.length === 0) {
     addLog("Admin: no open room floor for that monster.", "important");
     render();
@@ -5511,7 +5537,7 @@ function itemTransferTargets(source = activeHero()) {
   return candidates
     .filter((hero) => hero.id !== source.id && hero.alive && !hero.dead)
     .filter((hero) => canFighterReceiveInventory(hero))
-    .filter((hero) => distance(source.position, hero.position) <= maxSquares);
+    .filter((hero) => attackGridDistanceBetweenFighters(source, hero) <= maxSquares);
 }
 
 function dropItemBesideFighter(fighter, item) {
@@ -8391,7 +8417,11 @@ const beastMasterCompanionOptions = [
 ];
 
 function companionSpawnPosition(owner) {
-  const occupied = new Set(Object.values(state.fighters ?? {}).filter((fighter) => fighter.alive && fighter.position).map((fighter) => positionKey(fighter.position)));
+  const occupied = new Set(
+    Object.values(state.fighters ?? {})
+      .filter((fighter) => fighter.alive && fighter.position)
+      .flatMap((fighter) => window.DungeonGrid.fighterCells(fighter).map(positionKey)),
+  );
   const base = owner?.position ?? { x: 4, y: 6 };
   const candidates = [
     { x: base.x + 1, y: base.y },
@@ -9185,7 +9215,11 @@ function applySubclassRider(hero, effect, label) {
 }
 
 function nearestOpenSummonPosition(owner) {
-  const occupied = new Set(Object.values(state.fighters ?? {}).filter((fighter) => fighter.alive).map((fighter) => positionKey(fighter.position)));
+  const occupied = new Set(
+    Object.values(state.fighters ?? {})
+      .filter((fighter) => fighter.alive)
+      .flatMap((fighter) => window.DungeonGrid.fighterCells(fighter).map(positionKey)),
+  );
   for (const next of window.DungeonGrid.neighbors(owner.position, currentGridSize())) {
     if (!dungeonFloorKeys().has(positionKey(next)) || occupied.has(positionKey(next))) continue;
     if (canTraverseMovementEdge(owner, owner.position, next, [])) return next;
@@ -9290,7 +9324,7 @@ async function handleGenericSubclassEffect(hero, ability) {
   }
 
   if (effect.kind === "aoeDamage") {
-    const targets = visibleMonsters().filter((monster) => distance(hero.position, monster.position) <= (effect.radius ?? 3));
+    const targets = visibleMonsters().filter((monster) => attackGridDistanceBetweenFighters(hero, monster) <= (effect.radius ?? 3));
     if (!targets.length) {
       refundFighterAbilityUse(hero, ability);
       addLog(`${hero.name} has no enemies in range for ${ability.name}.`, "important");
@@ -9471,7 +9505,7 @@ function attackWouldThrowWeapon(fighter, target, options = {}) {
   const weapon = options.weapon ?? (options.weaponSlot ? weaponFromSlot(fighter, options.weaponSlot) : activeWeapon(fighter));
   if (!weapon?.properties?.includes("thrown")) return false;
   if (objectIsDestructible(target)) {
-    const adjacent = objectCells(target).some((cell) => attackGridDistance(fighter.position, cell) <= 1);
+    const adjacent = objectCells(target).some((cell) => attackGridDistanceFromFighterToPosition(fighter, cell) <= 1);
     return !adjacent;
   }
   return !hasMeleeAccess(fighter, target);
@@ -9683,7 +9717,7 @@ async function useFighterAbility(abilityId) {
       return;
     }
     const rangeSquares = (hero.level ?? 1) >= 6 ? 6 : 1;
-    if (target.id !== hero.id && distance(hero.position, target.position) > rangeSquares) {
+    if (target.id !== hero.id && attackGridDistanceBetweenFighters(hero, target) > rangeSquares) {
       refundFighterAbilityUse(hero, ability);
       addLog(`${target.name} is too far away for ${hero.name}'s help.`, "important");
       render();
@@ -10005,7 +10039,7 @@ async function useFighterAbility(abilityId) {
     const aura = (hero.knownStormAuras ?? [])[0] ?? "stormAuraDesert";
     if (aura === "stormAuraTundra") {
       const tempHp = Math.max(2, abilityMod(hero, "con") + Math.floor((hero.level ?? 1) / 3));
-      for (const ally of partyHeroes().filter((target) => distance(target.position, hero.position) <= 2)) applyStatusEffect(ally, { id: `tundra-aura-${hero.id}`, label: "Tundra Aura", tempHp, expiresAtStartOfTurn: true });
+      for (const ally of partyHeroes().filter((target) => attackGridDistanceBetweenFighters(target, hero) <= 2)) applyStatusEffect(ally, { id: `tundra-aura-${hero.id}`, label: "Tundra Aura", tempHp, expiresAtStartOfTurn: true });
       addLog(`${hero.name}'s tundra aura grants ${tempHp} temporary HP nearby.`, "important");
     } else {
       const target = currentAttackTargetForAbility();
@@ -10096,7 +10130,7 @@ async function useFighterAbility(abilityId) {
   }
 
   if (ability.id === "dreadfulWord") {
-    const targets = visibleMonsters().filter((target) => distance(hero.position, target.position) <= 6 && hasClearLineOfSight(hero.position, target.position));
+    const targets = visibleMonsters().filter((target) => attackGridDistanceBetweenFighters(hero, target) <= 6 && hasClearLineOfSightBetweenFighters(hero, target));
     if (!targets.length) {
       refundFighterAbilityUse(hero, ability);
       addLog(`${hero.name} has no nearby visible enemies for Dreadful Word.`, "important");
@@ -10245,7 +10279,7 @@ async function useFighterAbility(abilityId) {
   }
 
   if (ability.id === "channelDivinity") {
-    const targets = visibleMonsters().filter((monster) => distance(hero.position, monster.position) <= 3);
+    const targets = visibleMonsters().filter((monster) => attackGridDistanceBetweenFighters(hero, monster) <= 3);
     addLog(`${hero.name} uses Channel Divinity.`, "important");
     for (const target of targets) {
       applySpecialDamage(hero, target, Math.max(1, rollDice(2, 8).total + abilityMod(hero, spellcastingAbility(hero))), "radiant", "Channel Divinity");

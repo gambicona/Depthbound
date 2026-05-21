@@ -346,6 +346,7 @@ window.DungeonContent.register("monsters", "corpseStitchedGoliath", {
   name: "Corpse-Stitched Goliath",
   role: "Massive zombie brute",
   tags: ["undead", "zombie", "brute"],
+  sizeSquares: 2,
   maxHp: 48,
   category: 3,
   xp: 260,
@@ -472,6 +473,7 @@ window.DungeonContent.register("monsters", "graveflameWarlock", {
 window.DungeonContent.register("monsters", "plagueGraveTitan", {
   name: "Plague-Grave Titan",
   role: "Category 3 zombie boss",
+  sizeSquares: 2,
   tags: ["undead", "zombie", "boss", "brute", "disease"],
   maxHp: 68,
   category: 3,
