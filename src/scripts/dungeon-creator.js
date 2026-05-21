@@ -175,6 +175,7 @@ const els = {
   saveDungeon: document.querySelector("#save-dungeon"),
   campaignDungeons: document.querySelector("#campaign-dungeons"),
   saveCampaignOverride: document.querySelector("#save-campaign-override"),
+  calcXp: document.querySelector("#calc-xp"),
   status: document.querySelector("#creator-status"),
   exportJson: document.querySelector("#export-json"),
   copyJson: document.querySelector("#copy-json"),
@@ -308,6 +309,81 @@ function objectCanUseSpecialLock(object) {
     tags.includes("loot") ||
     components.some((component) => ["lock", "loot", "definedLootContainer"].includes(component?.type)),
   );
+}
+
+function containerTrapTemplates() {
+  return window.DungeonContent
+    .list("traps")
+    .filter((trap) => trap.placement === "chest")
+    .sort((a, b) => String(a.name ?? a.id).localeCompare(String(b.name ?? b.id)));
+}
+
+function objectCanUseContainerTrap(object) {
+  const def = window.DungeonContent.get("furniture", object?.type);
+  const tags = def?.tags ?? [];
+  const components = def?.components ?? [];
+  return Boolean(
+    def &&
+      def.kind !== "trap" &&
+      (object?.type === "chest" ||
+        def.kind === "container" ||
+        tags.includes("container") ||
+        tags.includes("chest") ||
+        tags.includes("crate") ||
+        tags.includes("barrel") ||
+        components.some((component) => ["loot", "definedLootContainer"].includes(component?.type)))
+  );
+}
+
+function containerTrapDraft(trap) {
+  return {
+    id: trap?.id ?? "",
+    spotDc: trap?.spotDc ?? 12,
+  };
+}
+
+function containerTrapOptionList(selectedTrapId = "") {
+  return containerTrapTemplates()
+    .map((trap) => `<option value="${escapeAttribute(trap.id)}" ${trap.id === selectedTrapId ? "selected" : ""}>${escapeHtml(trap.name ?? trap.id)}</option>`)
+    .join("");
+}
+
+function trapTemplateFromCreatorSelection(trapId) {
+  const template = window.DungeonContent.get("traps", trapId);
+  if (!template) return null;
+  return {
+    id: template.id,
+    name: template.name,
+    spotDc: template.spotDc ?? 12,
+    spotDifficulty: template.spotDifficulty ?? "Normal",
+    damage: { ...(template.damage ?? { count: 1, sides: 4, type: "piercing" }) },
+    magical: Boolean(template.magical),
+    disarmSkillOptions: clone(template.disarmSkillOptions ?? []),
+    ...(template.disarmSkill ? { disarmSkill: template.disarmSkill } : {}),
+    ...(template.disarmAbility ? { disarmAbility: template.disarmAbility } : {}),
+    description: template.description ?? "A hidden container trap.",
+  };
+}
+
+function updateObjectTrapFromCard(object, changedField) {
+  const enabledInput = readSelectedLockField("data-object-field='trapEnabled'");
+  if (!enabledInput?.checked) {
+    delete object.trap;
+    if (changedField === "trapEnabled") renderSelected();
+    return;
+  }
+  const selectedTrapId = readSelectedLockField("data-object-field='trapId'")?.value || containerTrapTemplates()[0]?.id || "";
+  const trap = trapTemplateFromCreatorSelection(selectedTrapId);
+  if (!trap) {
+    delete object.trap;
+    return;
+  }
+  const spotInput = readSelectedLockField("data-object-field='trapSpotDc'");
+  object.trap = {
+    ...trap,
+    spotDc: Math.max(1, Number(spotInput?.value) || trap.spotDc || 12),
+  };
+  if (changedField === "trapEnabled" || changedField === "trapId") renderSelected();
 }
 
 function objectTypeIsTerrainFloor(type) {
@@ -452,6 +528,13 @@ function doorForExport(door) {
   const exported = { ...door };
   if (specialLock) exported.specialLock = specialLock;
   else delete exported.specialLock;
+  if (exported.hidden) {
+    exported.hidden = true;
+    exported.spotDc = Math.max(1, Number(exported.spotDc) || 15);
+  } else {
+    delete exported.hidden;
+    delete exported.spotDc;
+  }
   return exported;
 }
 
@@ -528,6 +611,7 @@ function templateFromState(options = {}) {
       ...(typeof object.locked === "boolean" ? { locked: object.locked } : {}),
       ...(normalizeCreatorSpecialLock(object.specialLock) ? { specialLock: normalizeCreatorSpecialLock(object.specialLock), locked: true } : {}),
       ...(!normalizeCreatorSpecialLock(object.specialLock) && object.lockDc ? { lockDc: object.lockDc } : {}),
+      ...(object.trap ? { trap: clone(object.trap) } : {}),
       items: [...(object.items ?? [])],
     })),
     monsters: state.monsters.map((monster) => ({
@@ -560,6 +644,22 @@ function templateFromState(options = {}) {
 
 function setStatus(text) {
   els.status.textContent = text;
+}
+
+function xpForMonster(monster) {
+  const template = window.DungeonContent.get("monsters", monster.monsterId) ?? {};
+  const value = monster.overrides?.xp ?? template.xp ?? 0;
+  return Math.max(0, Math.floor(Number(value) || 0));
+}
+
+function calculateDungeonMonsterXp() {
+  const total = state.monsters.reduce((sum, monster) => sum + xpForMonster(monster), 0);
+  const bossTotal = state.monsters.filter((monster) => monster.isBoss).reduce((sum, monster) => sum + xpForMonster(monster), 0);
+  const missing = state.monsters.filter((monster) => xpForMonster(monster) <= 0);
+  const parts = [`Monster XP: ${total.toLocaleString()} from ${state.monsters.length} monster${state.monsters.length === 1 ? "" : "s"}`];
+  if (bossTotal > 0) parts.push(`boss XP: ${bossTotal.toLocaleString()}`);
+  if (missing.length) parts.push(`${missing.length} missing XP`);
+  setStatus(`${parts.join(" - ")}.`);
 }
 
 function furnitureEntryMatchesTool(entry, tool = state.tool) {
@@ -874,6 +974,7 @@ function renderGrid() {
         room ? "room" : "",
         corridorKeys.has(cellKey) ? "corridor" : "",
         doorKeys.has(cellKey) ? "door" : "",
+        door?.hidden ? "hidden-door" : "",
         startKey === cellKey ? "start" : "",
         exitKey === cellKey ? "exit" : "",
         portalKeys.has(cellKey) ? "portal" : "",
@@ -886,12 +987,12 @@ function renderGrid() {
         x === 0 && y % 5 === 0 ? "axis-y" : "",
       ].filter(Boolean).join(" ");
       const template = object ? window.DungeonContent.get("furniture", object.type) : null;
-      const label = monster ? "M" : object ? (template?.symbol ?? (object.type === "portal" ? "P" : "F")) : startKey === cellKey ? "S" : exitKey === cellKey ? "E" : door ? "D" : "";
+      const label = monster ? "M" : object ? (template?.symbol ?? (object.type === "portal" ? "P" : "F")) : startKey === cellKey ? "S" : exitKey === cellKey ? "E" : door?.hidden ? "H" : door ? "D" : "";
       const iconPath = object ? furnitureIconPath(template, object.type) : "";
       const content = object && !monster
         ? `${iconPath ? `<img class="creator-cell-object-icon hidden" data-creator-furniture-image src="${escapeAttribute(iconPath)}" alt="" draggable="false" />` : ""}<span>${escapeHtml(label)}</span>`
         : escapeHtml(label);
-      const title = object ? template?.name ?? object.type : door ? `Door in ${room?.name ?? room?.id ?? "room"}` : room?.name ?? "";
+      const title = object ? template?.name ?? object.type : door ? `${door.hidden ? "Hidden door" : "Door"} in ${room?.name ?? room?.id ?? "room"}` : room?.name ?? "";
       cells.push(`<button type="button" class="${classes}" data-x="${x}" data-y="${y}" data-axis-x="${x}" data-axis-y="${y}" ${door ? `data-door-id="${escapeAttribute(doorId(room, door))}"` : ""} title="${escapeAttribute(title)}">${content}</button>`);
     }
   }
@@ -1003,6 +1104,20 @@ function updateDoorSpecialLockFromCard(entity, changedField) {
   if (changedField === "enabled") renderSelected();
 }
 
+function updateDoorHiddenFromCard(entity, changedField) {
+  const hiddenInput = readSelectedLockField("data-door-hidden-field='hidden'");
+  const hidden = Boolean(hiddenInput?.checked);
+  if (!hidden) {
+    delete entity.door.hidden;
+    delete entity.door.spotDc;
+    if (changedField === "hidden") renderSelected();
+    return;
+  }
+  entity.door.hidden = true;
+  entity.door.spotDc = Math.max(1, Number(readSelectedLockField("data-door-hidden-field='spotDc'")?.value) || 15);
+  if (changedField === "hidden") renderSelected();
+}
+
 function clearStoryTriggerForm() {
   state.selectedStoryTriggerId = "";
   els.storyTriggerTitle.value = "";
@@ -1076,13 +1191,19 @@ function renderSelected() {
   if (selected.__door) {
     const lock = specialLockDraft(selected.door.specialLock);
     const enabled = Boolean(selected.door.specialLock);
+    const hidden = Boolean(selected.door.hidden);
+    const spotDc = Math.max(1, Number(selected.door.spotDc) || 15);
     els.selectedCard.innerHTML = `<b>Door</b><br>Door in ${escapeHtml(selected.room.name ?? selected.room.id)} at ${selected.door.x}, ${selected.door.y}
       <label><input data-door-lock-field="enabled" type="checkbox" ${enabled ? "checked" : ""} /> Special phrase lock</label>
       <label>Lock name <input data-door-lock-field="label" value="${escapeAttribute(lock.label)}" ${enabled ? "" : "disabled"} /></label>
       <label>Prompt <input data-door-lock-field="prompt" value="${escapeAttribute(lock.prompt)}" ${enabled ? "" : "disabled"} /></label>
       <label>Correct key <input data-door-lock-field="answer" value="${escapeAttribute(lock.answer)}" ${enabled ? "" : "disabled"} /></label>
       <label><input data-door-lock-field="caseSensitive" type="checkbox" ${lock.caseSensitive ? "checked" : ""} ${enabled ? "" : "disabled"} /> Case-sensitive answer</label>
-      <small>When a player opens this door, they must enter the exact configured key before it opens.</small>`;
+      <small>When a player opens this door, they must enter the exact configured key before it opens.</small>
+      <hr>
+      <label><input data-door-hidden-field="hidden" type="checkbox" ${hidden ? "checked" : ""} /> Hidden door</label>
+      <label>Spot DC <input data-door-hidden-field="spotDc" type="number" min="1" value="${spotDc}" ${hidden ? "" : "disabled"} /></label>
+      <small>Hidden doors look like normal wall until a passive or active Investigation check reveals them.</small>`;
     return;
   }
   if (selected.monsterId) {
@@ -1107,6 +1228,9 @@ function renderSelected() {
     const specialLock = specialLockDraft(selected.specialLock);
     const specialLockEnabled = Boolean(selected.specialLock);
     const canUseSpecialLock = objectCanUseSpecialLock(selected);
+    const canUseContainerTrap = objectCanUseContainerTrap(selected);
+    const trapDraft = containerTrapDraft(selected.trap);
+    const trapOptions = containerTrapOptionList(trapDraft.id);
     els.selectedCard.innerHTML = `<b>${def?.name ?? selected.type}</b><br>${def?.kind === "trap" ? "Trap" : "Furniture"} at ${selected.position.x}, ${selected.position.y}<br>Loot: ${(selected.items ?? []).map(itemName).join(", ") || "none"}
       ${
         lock && !specialLockEnabled
@@ -1121,6 +1245,18 @@ function renderSelected() {
              <label>Prompt <input data-object-field="specialLockPrompt" value="${escapeAttribute(specialLock.prompt)}" ${specialLockEnabled ? "" : "disabled"} /></label>
              <label>Correct key <input data-object-field="specialLockAnswer" value="${escapeAttribute(specialLock.answer)}" ${specialLockEnabled ? "" : "disabled"} /></label>
              <label><input data-object-field="specialLockCaseSensitive" type="checkbox" ${specialLock.caseSensitive ? "checked" : ""} ${specialLockEnabled ? "" : "disabled"} /> Case-sensitive answer</label>`
+          : ""
+      }
+      ${
+        canUseContainerTrap
+          ? `<label><input data-object-field="trapEnabled" type="checkbox" ${selected.trap ? "checked" : ""} /> Trapped container</label>
+             <label>Trap
+               <select data-object-field="trapId" ${selected.trap ? "" : "disabled"}>
+                 ${trapOptions}
+               </select>
+             </label>
+             <label>Trap Spot DC <input data-object-field="trapSpotDc" type="number" value="${trapDraft.spotDc}" ${selected.trap ? "" : "disabled"} /></label>
+             ${selected.trap?.description ? `<small>${escapeHtml(selected.trap.description)}</small>` : ""}`
           : ""
       }
       <div class="room-move-controls">
@@ -2011,6 +2147,14 @@ function init() {
       return;
     }
 
+    const hiddenDoorInput = event.target.closest("[data-door-hidden-field]");
+    if (hiddenDoorInput && selected?.__door) {
+      updateDoorHiddenFromCard(selected, hiddenDoorInput.dataset.doorHiddenField);
+      renderGrid();
+      renderExport();
+      return;
+    }
+
     const roomInput = event.target.closest("[data-room-field]");
     if (roomInput && selected?.cells) {
       if (roomInput.dataset.roomField === "name") {
@@ -2028,6 +2172,7 @@ function init() {
       if (field === "locked") selected.locked = objectInput.checked;
       if (field === "lockDc") selected.lockDc = Math.max(1, Number(objectInput.value) || 12);
       if (field.startsWith("specialLock")) updateObjectSpecialLockFromCard(selected, field);
+      if (field.startsWith("trap")) updateObjectTrapFromCard(selected, field);
       renderExport();
       return;
     }
@@ -2049,11 +2194,23 @@ function init() {
     renderItemSelects();
     renderExport();
   });
+  els.selectedCard.addEventListener("change", (event) => {
+    const selected = selectedEntity();
+    const objectInput = event.target.closest("[data-object-field]");
+    if (!objectInput || !selected?.type) return;
+    const field = objectInput.dataset.objectField;
+    if (field === "locked") selected.locked = objectInput.checked;
+    if (field === "lockDc") selected.lockDc = Math.max(1, Number(objectInput.value) || 12);
+    if (field.startsWith("specialLock")) updateObjectSpecialLockFromCard(selected, field);
+    if (field.startsWith("trap")) updateObjectTrapFromCard(selected, field);
+    renderExport();
+  });
   els.saveDungeon.addEventListener("click", saveDungeon);
   els.saveCampaignOverride?.addEventListener("click", () => {
     void saveCampaignOverride();
   });
   els.copyJson.addEventListener("click", renderExport);
+  els.calcXp?.addEventListener("click", calculateDungeonMonsterXp);
   els.importJson.addEventListener("click", () => {
     try {
       loadTemplate(JSON.parse(els.exportJson.value));

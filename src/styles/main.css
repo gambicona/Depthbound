@@ -826,6 +826,13 @@ h1 {
   width: auto;
 }
 
+.search-room-button {
+  font-size: 0.72rem;
+  min-width: 54px;
+  padding: 0 8px;
+  width: auto;
+}
+
 .stealth-hero-button.active {
   border-color: rgba(98, 206, 178, 0.74);
   color: #bfffee;
@@ -1062,6 +1069,12 @@ h1 {
 .tile.open-door::after {
   background: var(--door-open);
   border-color: rgba(200, 215, 223, 0.42);
+}
+
+.tile.hidden-door-revealed::after {
+  background: linear-gradient(135deg, rgba(98, 206, 178, 0.92), rgba(215, 168, 79, 0.72));
+  border-color: rgba(191, 255, 238, 0.72);
+  box-shadow: 0 0 10px rgba(98, 206, 178, 0.32);
 }
 
 .tile.reachable {

@@ -2,7 +2,7 @@
 const fighterSubclassFeatureLevels = [3, 7, 10, 15, 18];
 const thirdCasterSpellPoints = { 3: 4, 4: 6, 5: 6, 6: 6, 7: 14, 8: 14, 9: 14, 10: 17, 11: 17, 12: 17, 13: 27, 14: 27, 15: 27, 16: 32, 17: 32, 18: 32, 19: 38, 20: 38 };
 const wizardCantrips = ["mage-hand", "blade-ward", "fire-bolt", "mind-sliver", "thunderclap", "chill-touch", "acid-splash", "booming-blade", "frostbite", "green-flame-blade", "ray-of-frost", "shocking-grasp", "toll-the-dead"];
-const wizardCombatSpells = ["magic-missile", "shield", "burning-hands", "sleep", "grease", "scorching-ray", "web", "misty-step", "shatter", "lightning-bolt", "fireball", "haste"];
+const wizardCombatSpells = ["magic-missile", "shield", "burning-hands", "sleep", "grease", "scorching-ray", "web", "misty-step", "shatter", "lightning-bolt", "fireball", "haste", "dispel-magic"];
 const superiorityUsesByLevel = [{ level: 7, uses: 5 }, { level: 15, uses: 6 }];
 const arcaneShotUses = { refresh: "shortRest", uses: 2, resource: "bonusAction", resourcePool: "arcaneShot" };
 const superiorityUse = { refresh: "shortRest", uses: 4, usesByLevel: superiorityUsesByLevel, resource: "bonusAction", resourcePool: "superiority" };

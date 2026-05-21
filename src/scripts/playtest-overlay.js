@@ -390,7 +390,7 @@
     if (role !== "guest") return;
     els.fighterInfo
       ?.querySelectorAll(
-        "[data-action='take-object-item'], [data-action='pick-lock'], [data-action='disarm-trap'], [data-action='investigate-object'], [data-action='farm-resource-node'], [data-action='use-object-interaction'], [data-action='free-captive'], [data-action='attack-object'], [data-action='home-store-item'], [data-action='home-store-all-items'], [data-action='home-take-all-items'], [data-action='home-deposit-all-coins'], [data-action='home-withdraw-all-coins']",
+        "[data-action='take-object-item'], [data-action='pick-lock'], [data-action='disarm-trap'], [data-action='dispel-trap'], [data-action='investigate-object'], [data-action='farm-resource-node'], [data-action='use-object-interaction'], [data-action='free-captive'], [data-action='attack-object'], [data-action='home-store-item'], [data-action='home-store-all-items'], [data-action='home-take-all-items'], [data-action='home-deposit-all-coins'], [data-action='home-withdraw-all-coins']",
       )
       .forEach((button) => {
         const action = button.dataset.action;
@@ -1020,7 +1020,7 @@
       "click",
       (event) => {
         const trigger = event.target?.closest?.(
-          "#go-new-dungeon, #go-barrow-crown, #go-thornwood-pact, #go-embervein-first-claim, #return-home, [data-campaign-dungeon], #start-adventure, [data-action='load-slot']",
+          "#go-new-dungeon, #go-barrow-crown, #go-thornwood-pact, #go-embervein-first-claim, #go-dwarven-smithy-ember-oath, #return-home, [data-campaign-dungeon], #start-adventure, [data-action='load-slot']",
         );
         if (trigger) pulseHostSnapshots();
       },
@@ -1218,6 +1218,7 @@
         hero.position = { ...step };
         const nextRoom = roomForPosition(hero.position);
         if (isPlayerControlledPartyFighter(hero) && nextRoom && nextRoom.id !== previousRoomId) {
+          checkPassiveHiddenDoorsForRoom(nextRoom);
           void triggerCustomDungeonStory("enterRoom", { roomId: nextRoom.id, room: nextRoom, fighter: hero });
         }
         movedSteps += 1;
@@ -1388,6 +1389,7 @@
         "take-object-item",
         "pick-lock",
         "disarm-trap",
+        "dispel-trap",
         "investigate-object",
         "farm-resource-node",
         "use-object-interaction",
@@ -1408,6 +1410,7 @@
         if (action === "take-object-item") takeObjectItem(objectId, itemId);
         if (action === "pick-lock") pickObjectLock(objectId);
         if (action === "disarm-trap") disarmTrap(objectId);
+        if (action === "dispel-trap") dispelMagicTrap(objectId);
         if (action === "investigate-object") investigateObject(objectId);
         if (action === "farm-resource-node") farmResourceNode(objectId);
         if (action === "use-object-interaction") useObjectInteraction(objectId);
@@ -1882,7 +1885,7 @@
           if (hero) setActiveHero(hero.id);
         }
         const objectAction = targetElement?.closest(
-          "#fighter-info [data-action='take-object-item'], #fighter-info [data-action='pick-lock'], #fighter-info [data-action='disarm-trap'], #fighter-info [data-action='investigate-object'], #fighter-info [data-action='farm-resource-node'], #fighter-info [data-action='use-object-interaction'], #fighter-info [data-action='free-captive'], #fighter-info [data-action='attack-object'], #fighter-info [data-action='home-store-item'], #fighter-info [data-action='home-store-all-items'], #fighter-info [data-action='home-take-all-items'], #fighter-info [data-action='home-deposit-all-coins'], #fighter-info [data-action='home-withdraw-all-coins']",
+          "#fighter-info [data-action='take-object-item'], #fighter-info [data-action='pick-lock'], #fighter-info [data-action='disarm-trap'], #fighter-info [data-action='dispel-trap'], #fighter-info [data-action='investigate-object'], #fighter-info [data-action='farm-resource-node'], #fighter-info [data-action='use-object-interaction'], #fighter-info [data-action='free-captive'], #fighter-info [data-action='attack-object'], #fighter-info [data-action='home-store-item'], #fighter-info [data-action='home-store-all-items'], #fighter-info [data-action='home-take-all-items'], #fighter-info [data-action='home-deposit-all-coins'], #fighter-info [data-action='home-withdraw-all-coins']",
         );
         if (objectAction) {
           event.preventDefault();

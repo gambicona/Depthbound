@@ -227,7 +227,7 @@ window.DungeonContent.register("classes", "druid", {
   weaponProficiencies: ["club", "dagger", "dart", "javelin", "mace", "quarterstaff", "scimitar", "sickle", "sling", "spear"],
   spellcastingAbility: "wis",
   spellPointProgression: fullCasterSpellPoints,
-  spellList: ["cure_wounds", "healing_word", "entangle", "faerie_fire", "thunderwave", "barkskin", "heat_metal", "moonbeam", "spike_growth", "call_lightning"],
+  spellList: ["cure_wounds", "healing_word", "entangle", "faerie_fire", "thunderwave", "barkskin", "heat_metal", "moonbeam", "spike_growth", "call_lightning", "dispel_magic"],
   cantripList: ["guidance", "produce-flame", "thorn-whip", "thunderclap", "frostbite", "poison-spray", "primal-savagery", "resistance", "shillelagh"],
   spells: [],
   token: "D",

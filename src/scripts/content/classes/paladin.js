@@ -22,7 +22,7 @@ window.DungeonContent.register("classes", "paladin", {
   weaponProficiencies: ["simple", "martial"],
   spellcastingAbility: "cha",
   spellPointProgression: halfCasterSpellPoints,
-  spellList: ["bless", "cure_wounds", "divine_favor", "shield_of_faith", "compelled_duel", "heroism", "thunderous_smite", "wrathful_smite", "aid", "branding_smite"],
+  spellList: ["bless", "cure_wounds", "divine_favor", "shield_of_faith", "compelled_duel", "heroism", "thunderous_smite", "wrathful_smite", "aid", "branding_smite", "dispel_magic"],
   spells: [],
   token: "P",
   classFeatures: [

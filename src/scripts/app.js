@@ -295,6 +295,9 @@ els.fighterInfo.addEventListener("click", (event) => {
   if (button.dataset.action === "disarm-trap") {
     disarmTrap(button.dataset.object);
   }
+  if (button.dataset.action === "dispel-trap") {
+    dispelMagicTrap(button.dataset.object);
+  }
   if (button.dataset.action === "investigate-object") {
     investigateObject(button.dataset.object);
   }
@@ -463,6 +466,7 @@ els.goAdventure?.addEventListener("click", () => setHomeMenuPanel("adventure"));
 els.goBarrowCrown?.addEventListener("click", () => void startCampaignDungeon("barrow-crown"));
 els.goThornwoodPact?.addEventListener("click", () => void startCampaignDungeon("thornwood-pact"));
 els.goEmberveinFirstClaim?.addEventListener("click", () => void startCampaignDungeon("embervein-first-claim"));
+els.goDwarvenSmithyEmberOath?.addEventListener("click", () => void startCampaignDungeon("dwarven-smithy-ember-oath"));
 els.goNewDungeon?.addEventListener("click", startNewDungeonWithHero);
 els.levelUp.addEventListener("click", levelUpHero);
 els.replaceRangerCompanion?.addEventListener("click", () => void replaceDeadBeastMasterCompanion());

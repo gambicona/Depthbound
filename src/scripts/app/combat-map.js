@@ -1815,6 +1815,142 @@ function currentDiscoveredRoomIds() {
   return new Set(state.exploration?.discoveredRoomIds ?? []);
 }
 
+function hiddenDoorKey(door) {
+  return door ? `${door.roomId ?? ""}:${positionKey(door)}` : "";
+}
+
+function doorIsHidden(door) {
+  return Boolean(door?.hidden);
+}
+
+function hiddenDoorIsDiscovered(door) {
+  if (!doorIsHidden(door)) return true;
+  const doorKey = hiddenDoorKey(door);
+  return Boolean(
+    doorKey &&
+      ((state.exploration?.discoveredHiddenDoorKeys ?? []).includes(doorKey) ||
+        (state.exploration?.openedDoorKeys ?? []).includes(positionKey(door))),
+  );
+}
+
+function doorIsVisibleToPlayers(door) {
+  return showDungeonLayout || hiddenDoorIsDiscovered(door);
+}
+
+function visibleRoomDoors(room) {
+  return (room?.doors ?? []).filter((door) => doorIsVisibleToPlayers({ ...door, roomId: room.id }));
+}
+
+function hiddenDoorsInRoom(room) {
+  if (!room) return [];
+  return (state.dungeon?.doors ?? []).filter((door) => door.roomId === room.id && doorIsHidden(door) && !hiddenDoorIsDiscovered(door));
+}
+
+function hiddenDoorSearchAttempted(hero, room) {
+  return Boolean(hero?.id && room?.id && (state.exploration?.hiddenDoorSearchAttempts?.[hero.id] ?? []).includes(room.id));
+}
+
+function markHiddenDoorSearchAttempted(hero, room) {
+  if (!hero?.id || !room?.id) return;
+  state.exploration ??= {};
+  state.exploration.hiddenDoorSearchAttempts ??= {};
+  const attempts = new Set(state.exploration.hiddenDoorSearchAttempts[hero.id] ?? []);
+  attempts.add(room.id);
+  state.exploration.hiddenDoorSearchAttempts[hero.id] = Array.from(attempts);
+}
+
+function revealHiddenDoor(door, finder = null, source = "search") {
+  if (!door || !doorIsHidden(door)) return false;
+  state.exploration ??= {};
+  const discovered = new Set(state.exploration.discoveredHiddenDoorKeys ?? []);
+  const key = hiddenDoorKey(door);
+  if (!key || discovered.has(key)) return false;
+  discovered.add(key);
+  state.exploration.discoveredHiddenDoorKeys = Array.from(discovered);
+  const room = (state.dungeon?.rooms ?? []).find((entry) => entry.id === door.roomId);
+  const roomText = room?.name ? ` in ${room.name}` : "";
+  const finderText = finder?.name ?? "The party";
+  addLog(`${finderText} reveals a hidden door${roomText}.`, "important");
+  return true;
+}
+
+function passiveInvestigationScore(hero) {
+  return 10 + skillCheckBonus(hero, "int", "investigation");
+}
+
+function checkPassiveHiddenDoorsForRoom(room) {
+  const doors = hiddenDoorsInRoom(room);
+  if (!doors.length) return false;
+  let revealed = false;
+  for (const door of doors) {
+    const dc = Math.max(1, Number(door.spotDc) || 15);
+    const finder = partyHeroes()
+      .filter((hero) => heroCanAct(hero))
+      .find((hero) => passiveInvestigationScore(hero) >= dc);
+    if (finder) {
+      revealed = revealHiddenDoor(door, finder, "passive") || revealed;
+      addAdminLog(`${finder.name} passive Investigation ${passiveInvestigationScore(finder)} spots hidden door at ${door.x},${door.y} vs DC ${dc}.`);
+    }
+  }
+  if (revealed) render();
+  return revealed;
+}
+
+function searchRoomForHiddenDoors(hero = activeHero()) {
+  if (!hero || state.mode === "combat" || !heroCanAct(hero) || isAutonomousAlly(hero)) return false;
+  const room = roomForPosition(hero.position);
+  if (!room) {
+    addLog(`${hero.name} needs to be inside a room to search it.`);
+    renderLog();
+    return false;
+  }
+  if (hiddenDoorSearchAttempted(hero, room)) {
+    addLog(`${hero.name} has already searched ${room.name ?? "this room"} for hidden doors.`);
+    renderLog();
+    return false;
+  }
+  if (!activeStealthCheckInMonsterRoom(hero, "searches the room")) return false;
+
+  markHiddenDoorSearchAttempted(hero, room);
+  const doors = hiddenDoorsInRoom(room);
+  const rollResult = rollD20ForFighter(hero);
+  const roll = reliableTalentRoll(hero, "investigation", rollResult.roll);
+  const bonus = skillCheckBonus(hero, "int", "investigation");
+  const guidance = guidanceSkillBonus();
+  const total = roll + bonus + guidance;
+  const guidanceText = guidance ? ` + Guidance ${guidance}` : "";
+  let revealed = 0;
+  let hardestDc = 0;
+  for (const door of doors) {
+    const dc = Math.max(1, Number(door.spotDc) || 15);
+    hardestDc = Math.max(hardestDc, dc);
+    if (total >= dc && revealHiddenDoor(door, hero, "search")) revealed += 1;
+  }
+  const targetDc = doors.length ? hardestDc : 15;
+  recordD20OutcomeForFighter(hero, revealed > 0);
+  addLog(
+    `${hero.name} searches ${room.name ?? "the room"}: INT ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total}${
+      doors.length ? ` vs hidden door DC up to ${hardestDc}` : ""
+    }. ${revealed ? `${revealed} hidden door${revealed === 1 ? "" : "s"} found.` : "No hidden door found."}`,
+    revealed ? "important" : undefined,
+  );
+  addAdminCheckLog({
+    actor: hero,
+    label: "Investigation check to search room",
+    target: room.name ?? room.id,
+    rollResult,
+    bonus,
+    guidance,
+    total,
+    dc: targetDc,
+    success: revealed > 0,
+    note: doors.length ? `${doors.length} hidden door candidate${doors.length === 1 ? "" : "s"}` : "no hidden doors in room",
+  });
+  advanceDungeonTime(600, `${hero.name} searching ${room.name ?? "the room"}`, { force: true });
+  render();
+  return true;
+}
+
 function activeRoomIds() {
   const rooms = state.dungeon?.rooms ?? [];
   if (showDungeonLayout) return new Set(rooms.map((room) => room.id));
@@ -1836,7 +1972,7 @@ function activeRoomIds() {
   const discovered = currentDiscoveredRoomIds();
   for (const room of rooms) {
     if (ids.has(room.id) || !discovered.has(room.id)) continue;
-    const hasNearbyOpenedDoor = room.doors.some((door) => {
+    const hasNearbyOpenedDoor = visibleRoomDoors(room).some((door) => {
       const doorKey = positionKey(door);
       if (!opened.has(doorKey)) return false;
       const corridor = door.corridor ?? door;
@@ -1861,7 +1997,7 @@ function activeTileKeys() {
   for (const room of rooms) {
     if (!activeRooms.has(room.id)) continue;
     room.cells.forEach((cell) => keys.add(positionKey(cell)));
-    room.doors.forEach((door) => keys.add(positionKey(door)));
+    visibleRoomDoors(room).forEach((door) => keys.add(positionKey(door)));
   }
 
   const heroPositions = partyHeroes().map((hero) => hero.position);
@@ -1880,6 +2016,7 @@ function activeTileKeys() {
   for (const door of state.dungeon?.doors ?? []) {
     const doorKey = positionKey(door);
     const corridorKey = door.corridor ? positionKey(door.corridor) : "";
+    if (!doorIsVisibleToPlayers(door)) continue;
     if (activeRooms.has(door.roomId) || keys.has(corridorKey)) keys.add(doorKey);
   }
 
@@ -1894,14 +2031,14 @@ function rememberedTileKeys() {
   for (const room of state.dungeon?.rooms ?? []) {
     if (!discovered.has(room.id)) continue;
     room.cells.forEach((cell) => keys.add(positionKey(cell)));
-    room.doors.forEach((door) => keys.add(positionKey(door)));
+    visibleRoomDoors(room).forEach((door) => keys.add(positionKey(door)));
   }
 
   const opened = currentOpenedKeys();
   opened.forEach((tileKey) => keys.add(tileKey));
   visibleWalkable().forEach((tileKey) => keys.add(tileKey));
   for (const door of state.dungeon?.doors ?? []) {
-    if (adjacentCells(door).some((cell) => opened.has(positionKey(cell)))) {
+    if (doorIsVisibleToPlayers(door) && adjacentCells(door).some((cell) => opened.has(positionKey(cell)))) {
       keys.add(positionKey(door));
     }
   }
@@ -1955,7 +2092,7 @@ function visibleWalkable(fighter = null) {
   for (const room of state.dungeon?.rooms ?? []) {
     if (discovered.has(room.id)) {
       room.cells.forEach((cell) => known.add(positionKey(cell)));
-      room.doors.forEach((door) => known.add(positionKey(door)));
+      visibleRoomDoors(room).forEach((door) => known.add(positionKey(door)));
     }
   }
   const corridorKeys = corridorTiles();
@@ -1969,7 +2106,7 @@ function visibleWalkable(fighter = null) {
     }
   });
   for (const door of state.dungeon?.doors ?? []) {
-    if (adjacentCells(door).some((cell) => openedKeys.has(positionKey(cell)))) {
+    if (doorIsVisibleToPlayers(door) && adjacentCells(door).some((cell) => openedKeys.has(positionKey(cell)))) {
       known.add(positionKey(door));
     }
   }
@@ -1979,11 +2116,12 @@ function visibleWalkable(fighter = null) {
 
 function doorAt(position) {
   const tileKey = positionKey(position);
-  return (state.dungeon?.doors ?? []).find((door) => positionKey(door) === tileKey) ?? null;
+  return (state.dungeon?.doors ?? []).find((door) => positionKey(door) === tileKey && doorIsVisibleToPlayers(door)) ?? null;
 }
 
 function doorPassageBetween(from, to) {
   return (state.dungeon?.doors ?? []).find((door) => {
+    if (!doorIsVisibleToPlayers(door)) return false;
     const doorKey = positionKey(door);
     const corridorKey = door.corridor ? positionKey(door.corridor) : "";
     const fromKey = positionKey(from);
@@ -2075,7 +2213,7 @@ function roomForPosition(position) {
 
 function doorsAtCorridorMouth(position) {
   const tileKey = positionKey(position);
-  return (state.dungeon?.doors ?? []).filter((door) => door.corridor && positionKey(door.corridor) === tileKey);
+  return (state.dungeon?.doors ?? []).filter((door) => door.corridor && positionKey(door.corridor) === tileKey && doorIsVisibleToPlayers(door));
 }
 
 function visibleMonsters() {
@@ -3390,12 +3528,12 @@ function triggerFloorTrap(fighter, trap) {
   const template = objectTemplate(trap.type);
   const trapDamage = template.damage ?? objectComponent(trap, "trap")?.damage ?? { count: 1, sides: 4, type: "piercing" };
   const damageRoll = rollDice(trapDamage.count, trapDamage.sides);
-  const rawDamage = damageRoll.total;
+  const rawDamage = damageRoll.total + (trapDamage.bonus ?? 0);
   if (isPartyHeroId(fighter.id) && adminEnabled() && adminGodMode) {
     trap.armed = false;
     trap.spent = true;
     trap.lastResult = `${fighter.name} triggered it, but god mode prevented the damage.`;
-    addLog(`${fighter.name} triggers a spike trap. God mode prevents the damage.`, "important");
+    addLog(`${fighter.name} triggers ${template.name ?? "a trap"}. God mode prevents the damage.`, "important");
     return true;
   }
   const modified = calculateDamageModifiers(fighter, rawDamage, trapDamage.type);
@@ -3466,6 +3604,7 @@ function triggerPortalAtPosition(fighter, position) {
 }
 
 function checkTrapDetectionOnReveal() {
+  if (window.DepthboundPlaytest?.role === "guest") return;
   const heroes = partyHeroes();
   if (!heroes.length) return;
   const activeTiles = activeTileKeys();

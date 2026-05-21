@@ -196,6 +196,7 @@ async function moveFighterAlongPath(fighter, path, silent = false) {
     moveGrabbedEntityWithCarrier(fighter, previousPosition, step);
     const nextRoom = roomForPosition(fighter.position);
     if (isPlayerControlledPartyFighter(fighter) && nextRoom && nextRoom.id !== previousRoomId) {
+      checkPassiveHiddenDoorsForRoom(nextRoom);
       void triggerCustomDungeonStory("enterRoom", { roomId: nextRoom.id, room: nextRoom, fighter });
     }
     movedSteps += 1;
@@ -497,6 +498,7 @@ async function moveFightersAlongPathsTogether(plans) {
       plan.hero.position = { ...step };
       const nextRoom = roomForPosition(plan.hero.position);
       if (isPlayerControlledPartyFighter(plan.hero) && nextRoom && nextRoom.id !== previousRoomId) {
+        checkPassiveHiddenDoorsForRoom(nextRoom);
         void triggerCustomDungeonStory("enterRoom", { roomId: nextRoom.id, room: nextRoom, fighter: plan.hero });
       }
       anyMovedThisTick = true;
@@ -563,7 +565,10 @@ function adminTeleportHero(position) {
 
   hero.position = { ...position };
   const nextRoom = roomForPosition(hero.position);
-  if (nextRoom) void triggerCustomDungeonStory("enterRoom", { roomId: nextRoom.id, room: nextRoom, fighter: hero });
+  if (nextRoom) {
+    checkPassiveHiddenDoorsForRoom(nextRoom);
+    void triggerCustomDungeonStory("enterRoom", { roomId: nextRoom.id, room: nextRoom, fighter: hero });
+  }
   dragPath = null;
   dragHeroId = null;
   collectLootAtPosition(hero, position);

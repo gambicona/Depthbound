@@ -540,6 +540,7 @@ const els = {
   goBarrowCrown: document.querySelector("#go-barrow-crown"),
   goThornwoodPact: document.querySelector("#go-thornwood-pact"),
   goEmberveinFirstClaim: document.querySelector("#go-embervein-first-claim"),
+  goDwarvenSmithyEmberOath: document.querySelector("#go-dwarven-smithy-ember-oath"),
   goNewDungeon: document.querySelector("#go-new-dungeon"),
   levelPanel: document.querySelector(".level-panel"),
   levelUp: document.querySelector("#level-up"),

@@ -22,7 +22,7 @@ window.DungeonContent.register("classes", "bard", {
   weaponProficiencies: ["simple", "crossbow-hand", "longsword", "rapier", "shortsword"],
   spellcastingAbility: "cha",
   spellPointProgression: fullCasterSpellPoints,
-  spellList: ["healing_word", "dissonant_whispers", "faerie_fire", "heroism", "hideous_laughter", "heat_metal", "hold_person", "shatter", "hypnotic_pattern", "mass_healing_word"],
+  spellList: ["healing_word", "dissonant_whispers", "faerie_fire", "heroism", "hideous_laughter", "heat_metal", "hold_person", "shatter", "hypnotic_pattern", "dispel_magic", "mass_healing_word"],
   cantripList: ["vicious-mockery", "mage-hand", "blade-ward", "thunderclap"],
   spells: [],
   token: "B",

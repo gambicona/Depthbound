@@ -93,6 +93,8 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
       discoveredRoomIds: [dungeon.entranceRoomId],
       openedDoorKeys: [],
       openedCorridorKeys: [],
+      discoveredHiddenDoorKeys: [],
+      hiddenDoorSearchAttempts: {},
     },
     exit,
     completed: false,
@@ -521,12 +523,30 @@ function customRoomForPosition(dungeon, position) {
   return (dungeon?.rooms ?? []).find((room) => roomHasCell(room, position)) ?? null;
 }
 
+function normalizeCustomDungeonTrap(trap = null) {
+  if (!trap || typeof trap !== "object") return null;
+  const template = trap.id ? getContentDefinition("traps", trap.id) : null;
+  return {
+    id: trap.id ?? template?.id ?? "custom-trap",
+    name: trap.name ?? template?.name ?? "Custom Trap",
+    spotDc: trap.spotDc ?? template?.spotDc ?? 12,
+    spotDifficulty: trap.spotDifficulty ?? template?.spotDifficulty ?? "Normal",
+    damage: cloneData(trap.damage ?? template?.damage ?? { count: 1, sides: 4, type: "piercing" }),
+    magical: Boolean(trap.magical ?? template?.magical),
+    disarmSkillOptions: cloneData(trap.disarmSkillOptions ?? template?.disarmSkillOptions ?? []),
+    disarmSkill: trap.disarmSkill ?? template?.disarmSkill,
+    disarmAbility: trap.disarmAbility ?? template?.disarmAbility,
+    description: trap.description ?? template?.description ?? "A hidden container trap.",
+  };
+}
+
 function createCustomDungeonObject(templateObject, index) {
   const template = objectTemplate(templateObject.type);
   if (!template) return null;
   const lockComponent = objectComponent(templateObject.type, "lock");
   const lockDc = templateObject.lockDc ?? lockComponent?.dc;
   const specialLock = normalizeSpecialLock(templateObject.specialLock);
+  const trap = normalizeCustomDungeonTrap(templateObject.trap);
   const locked =
     typeof templateObject.locked === "boolean"
       ? templateObject.locked
@@ -542,7 +562,7 @@ function createCustomDungeonObject(templateObject, index) {
     width: templateObject.width ?? template.width ?? 1,
     height: templateObject.height ?? template.height ?? 1,
     ...(templateObject.pairId ? { pairId: templateObject.pairId } : {}),
-    ...(templateObject.trap ? { trap: { ...templateObject.trap } } : {}),
+    ...(trap ? { trap } : {}),
     ...(specialLock ? { specialLock } : {}),
     ...(!specialLock && lockDc ? { lockDc } : {}),
     ...(typeof locked === "boolean" ? { locked } : {}),
@@ -671,6 +691,8 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
       discoveredRoomIds: [dungeon.entranceRoomId],
       openedDoorKeys: [],
       openedCorridorKeys: [],
+      discoveredHiddenDoorKeys: [],
+      hiddenDoorSearchAttempts: {},
     },
     exit: template.exit,
     completed: false,
@@ -1517,6 +1539,8 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
       discoveredRoomIds: ["home-room"],
       openedDoorKeys: [],
       openedCorridorKeys: [],
+      discoveredHiddenDoorKeys: [],
+      hiddenDoorSearchAttempts: {},
     },
     exit: {
       roomId: "home-room",
@@ -3689,6 +3713,10 @@ function createFeatureTrap(component, themeId = currentThemeId()) {
     spotDc: component?.spotDc ?? component?.dc ?? 13,
     spotDifficulty: component?.spotDifficulty ?? "Normal",
     damage: { ...damage },
+    magical: Boolean(component?.magical),
+    disarmSkillOptions: cloneData(component?.disarmSkillOptions ?? []),
+    disarmSkill: component?.disarmSkill,
+    disarmAbility: component?.disarmAbility,
     description: component?.description ?? "A hidden trap built into this feature.",
   };
 }
@@ -3719,6 +3747,7 @@ function createFeatureObject(type, position, id, themeId = currentThemeId()) {
       object.armed = true;
       object.spotDc = trapComponent.spotDc ?? difficulty.dc;
       object.spotDifficulty = trapComponent.spotDifficulty ?? difficulty.label;
+      object.magical = Boolean(trapComponent.magical);
     } else {
       const defaultChance = type === "chest" ? getContentDefinition("themes", themeId)?.traps?.chestChance ?? 0.3 : 1;
       if (Math.random() < (trapComponent.chance ?? defaultChance)) object.trap = createFeatureTrap(trapComponent, themeId);
@@ -3827,6 +3856,10 @@ function randomChestTrap(themeId = currentThemeId()) {
         spotDc: template.spotDc ?? 12,
         spotDifficulty: template.spotDifficulty ?? "Normal",
         damage: { ...(template.damage ?? { count: 1, sides: 4, type: "piercing" }) },
+        magical: Boolean(template.magical),
+        disarmSkillOptions: cloneData(template.disarmSkillOptions ?? []),
+        disarmSkill: template.disarmSkill,
+        disarmAbility: template.disarmAbility,
         description: template.description ?? "A hidden chest trap.",
       }
     : null;

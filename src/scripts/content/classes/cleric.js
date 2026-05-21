@@ -32,6 +32,7 @@ window.DungeonContent.register("classes", "cleric", {
     "spiritual_weapon",
     "hold_person",
     "spirit_guardians",
+    "dispel_magic",
     "mass_healing_word",
   ],
   cantripList: ["guidance", "sacred-flame", "spare-the-dying", "resistance", "toll-the-dead"],

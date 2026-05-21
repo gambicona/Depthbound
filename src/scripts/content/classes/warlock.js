@@ -56,7 +56,7 @@ window.DungeonContent.register("classes", "warlock", {
   weaponProficiencies: ["simple"],
   spellcastingAbility: "cha",
   spellPointProgression: pactSpellPoints,
-  spellList: ["armor_of_agathys", "arms_of_hadar", "hex", "hellish_rebuke", "cause_fear", "darkness", "hold_person", "misty_step", "hunger_of_hadar", "vampiric_touch", "fly"],
+  spellList: ["armor_of_agathys", "arms_of_hadar", "hex", "hellish_rebuke", "cause_fear", "darkness", "hold_person", "misty_step", "hunger_of_hadar", "vampiric_touch", "fly", "dispel_magic"],
   cantripList: ["mage-hand", "blade-ward", "mind-sliver", "eldritch-blast", "thunderclap", "chill-touch", "booming-blade", "frostbite", "green-flame-blade", "poison-spray", "toll-the-dead"],
   spells: [],
   token: "Wk",

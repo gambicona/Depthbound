@@ -995,7 +995,7 @@ function renderRoom() {
       : rememberedTileKeys();
   renderTileButtons(rememberedTiles);
   const walkable = currentWalkable(hero);
-  const doorKeys = new Set((state.dungeon?.doors ?? []).map(positionKey));
+  const doorKeys = new Set((state.dungeon?.doors ?? []).filter(doorIsVisibleToPlayers).map(positionKey));
   const openedDoorKeys = new Set(state.exploration?.openedDoorKeys ?? []);
   const visibleWalls = exposedWallKeys();
   const spellTargeting = currentPendingSpellTargeting();
@@ -1025,7 +1025,7 @@ function renderRoom() {
     const isActiveTile = activeTiles.has(key);
     const isReachable = reachable.has(key);
     const isWalkable = walkable.has(key);
-    const doorsHere = (state.dungeon?.doors ?? []).filter((door) => positionKey(door) === key);
+    const doorsHere = (state.dungeon?.doors ?? []).filter((door) => positionKey(door) === key && doorIsVisibleToPlayers(door));
     const renderableDoorsHere = doorsHere.filter((entry) => entry.edge || entry.corridor);
     const door = renderableDoorsHere[0] ?? null;
     const isDoor = renderableDoorsHere.length > 0 || (doorKeys.has(key) && Boolean(door));
@@ -1049,6 +1049,7 @@ function renderRoom() {
     tile.classList.toggle("hidden-tile", !isKnown && !isSeenWall);
     tile.classList.toggle("seen-wall", isSeenWall);
     tile.classList.toggle("door", isDoor && isKnown);
+    tile.classList.toggle("hidden-door-revealed", isDoor && isKnown && renderableDoorsHere.some(doorIsHidden));
     tile.classList.toggle("door-north", isDoor && isKnown && renderableDoorsHere.some((entry) => homeDoorDirection(entry, position) === "north"));
     tile.classList.toggle("door-east", isDoor && isKnown && renderableDoorsHere.some((entry) => homeDoorDirection(entry, position) === "east"));
     tile.classList.toggle("door-south", isDoor && isKnown && renderableDoorsHere.some((entry) => homeDoorDirection(entry, position) === "south"));
@@ -1136,6 +1137,19 @@ function renderHeroStatusCard(element, fighter) {
   const classResourceText = importantClassResourceText(fighter);
   const stealth = stealthState(fighter);
   const canToggleStealth = gameHasStarted && state.mode === "exploration" && heroCanAct(fighter) && !isAutonomousAlly(fighter);
+  const searchRoom = roomForPosition(fighter.position);
+  const canSearchRoom =
+    gameHasStarted &&
+    state.mode === "exploration" &&
+    heroCanAct(fighter) &&
+    !isAutonomousAlly(fighter) &&
+    Boolean(searchRoom) &&
+    !hiddenDoorSearchAttempted(fighter, searchRoom);
+  const searchTitle = searchRoom
+    ? hiddenDoorSearchAttempted(fighter, searchRoom)
+      ? `Already searched ${searchRoom.name ?? "this room"}`
+      : `Search ${searchRoom.name ?? "room"}`
+    : "Search room";
   element.innerHTML = `
     <div class="fighter-top">
       ${combatantArtworkMarkup(fighter, "sidebar-hero-art")}
@@ -1145,6 +1159,7 @@ function renderHeroStatusCard(element, fighter) {
       </div>
       <div class="card-actions">
         <button class="icon-button stealth-hero stealth-hero-button ${stealth ? "active" : ""}" type="button" title="${stealth ? `Stealth ${stealth.total}. Click to stop stealthing.` : "Roll Stealth"}" aria-label="${stealth ? "Stop stealthing" : "Roll stealth"}" ${canToggleStealth ? "" : "disabled"}>Stealth</button>
+        <button class="icon-button search-room-button" type="button" title="${escapeAttribute(searchTitle)}" aria-label="Search room" ${canSearchRoom ? "" : "disabled"}>Search</button>
         <button class="icon-button open-inventory" type="button" title="Inventory and equipment" aria-label="Inventory and equipment" ${canFighterReceiveInventory(fighter) ? "" : "disabled"}>I</button>
         <button class="icon-button rename-hero" type="button" title="Rename character" aria-label="Rename character" ${fighter.renameable === false ? "disabled" : ""}>...</button>
       </div>
@@ -1174,6 +1189,7 @@ function renderHeroStatusCard(element, fighter) {
   `;
 
   element.querySelector(".stealth-hero").addEventListener("click", () => beginHeroStealth(fighter));
+  element.querySelector(".search-room-button").addEventListener("click", () => searchRoomForHiddenDoors(fighter));
   element.querySelector(".rename-hero").addEventListener("click", renameHero);
   element.querySelector(".open-inventory").addEventListener("click", showInventoryMenu);
   element.querySelector(".temporary-effects-button").addEventListener("click", () => showTemporaryEffectsInfo(fighter));
@@ -1892,6 +1908,8 @@ function showDungeonObjectInfo(object) {
     ((objectIsTrap(object) && object.detected && object.armed !== false && !object.disarmed) ||
       object.trap?.detected) &&
     !heroTriedDisarm;
+  const canDispelTrap = canDispelMagicTrap(hero, disarmTarget, object);
+  const visibleTrap = object.trap?.detected ? object.trap : objectIsTrap(object) && object.detected ? object : null;
   const canInvestigate = state.mode !== "combat" && objectCanInspect(object) && objectAdjacent && !object.investigated;
   const uniqueInteraction = object.uniqueInteractionClaimed ? null : objectComponent(object, "uniqueInteraction");
   const uniqueInteractionAvailable = Boolean(uniqueInteraction && state.mode !== "combat" && objectAdjacent && canActInCombat);
@@ -1917,6 +1935,13 @@ function showDungeonObjectInfo(object) {
     ${furnitureArtworkMarkup(template, object)}
     <p class="empty-note">${escapeHtml(template.description)}</p>
     ${object.lastResult ? `<p class="object-result">${escapeHtml(object.lastResult)}</p>` : ""}
+    ${
+      visibleTrap
+        ? `<p class="empty-note">${escapeHtml(visibleTrap.description ?? objectTemplate(object.type)?.description ?? "A detected trap.")} Disarm: ${escapeHtml(
+            trapDisarmSummary(visibleTrap, object),
+          )}${trapIsMagical(visibleTrap, object) ? "; Dispel Magic can also suppress it." : ""}</p>`
+        : ""
+    }
     ${
       object.type === "home-bookshelf"
         ? `<div class="object-actions">
@@ -1987,9 +2012,13 @@ function showDungeonObjectInfo(object) {
     ${
       objectLocked
         ? specialLock
-          ? `<p class="empty-note">Locked by ${escapeHtml(specialLock.label)}. Contents hidden until the key is given.</p>
+          ? `<p class="empty-note">Locked by ${escapeHtml(specialLock.label)}. Contents hidden until the key is given.${
+              object.trap ? " A trap must be disarmed first or it will trigger during unlocking." : ""
+            }</p>
              <button type="button" data-action="answer-special-lock" data-object="${escapeAttribute(object.id)}" ${canAnswerSpecialLock ? "" : "disabled"}>Enter Key</button>`
-          : `<p class="empty-note">Locked. Contents hidden until the lock is picked.</p>
+          : `<p class="empty-note">Locked. Contents hidden until the lock is picked.${
+              object.trap ? " A trap must be disarmed first or it will trigger during lockpicking." : ""
+            }</p>
              <button type="button" data-action="pick-lock" data-object="${escapeAttribute(object.id)}" ${canPickLock ? "" : "disabled"}>${
                heroTriedLock ? "Lock Attempt Spent" : `Pick Lock (DC ${object.lockDc ?? 12})`
              }</button>`
@@ -2004,19 +2033,21 @@ function showDungeonObjectInfo(object) {
     }
     ${
       objectIsTrap(object)
-        ? `<button type="button" data-action="disarm-trap" data-object="${escapeAttribute(object.id)}" ${canDisarm ? "" : "disabled"}>Disarm</button>`
+        ? `<button type="button" data-action="disarm-trap" data-object="${escapeAttribute(object.id)}" ${canDisarm ? "" : "disabled"}>Disarm</button>${
+            canDispelTrap ? `<button type="button" data-action="dispel-trap" data-object="${escapeAttribute(object.id)}">Dispel Magic</button>` : ""
+          }`
+        : ""
+    }
+    ${
+      object.trap?.detected
+        ? `<button type="button" data-action="disarm-trap" data-object="${escapeAttribute(object.id)}" ${canDisarm ? "" : "disabled"}>Disarm ${escapeHtml(
+            object.trap.name,
+          )}</button>${canDispelTrap ? `<button type="button" data-action="dispel-trap" data-object="${escapeAttribute(object.id)}">Dispel Magic</button>` : ""}`
         : ""
     }
     ${
       objectHasLoot(object) && !isHomePlacedContainer && !objectLocked
         ? `
-          ${
-            object.trap?.detected
-              ? `<button type="button" data-action="disarm-trap" data-object="${escapeAttribute(object.id)}" ${canDisarm ? "" : "disabled"}>Disarm ${escapeHtml(
-                  object.trap.name,
-                )}</button>`
-              : ""
-          }
           <section class="object-inventory">
             <h3>Contents</h3>
             ${
@@ -2121,6 +2152,7 @@ function showDungeonObjectInfo(object) {
         ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.armed === false ? "Spent" : "Armed"}</b><span>State</span></div>` : ""}
         ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.spotDc ?? 12}</b><span>Spot DC</span></div>` : ""}
         ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.detected ? "Spotted" : "Hidden"}</b><span>Detection</span></div>` : ""}
+        ${visibleTrap ? `<div class="stat-pill"><b>${trapIsMagical(visibleTrap, object) ? "Magical" : "Mechanical"}</b><span>Trap Type</span></div>` : ""}
         ${object.trap?.detected ? `<div class="stat-pill"><b>${object.trap.spotDc ?? 12}</b><span>Trap DC</span></div>` : ""}
         ${object.lockDc || specialLock ? `<div class="stat-pill"><b>${object.locked ? "Locked" : "Open"}</b><span>Lock</span></div>` : ""}
         ${specialLock ? `<div class="stat-pill"><b>${escapeHtml(specialLock.label)}</b><span>Key Lock</span></div>` : object.lockDc ? `<div class="stat-pill"><b>${object.lockDc}</b><span>Lock DC</span></div>` : ""}
@@ -2170,6 +2202,18 @@ function triggerChestTrap(chest, hero = activeHero()) {
     handleHeroDeath();
   }
   delete chest.trap;
+  return true;
+}
+
+function triggerContainerTrapDuringUnlock(object, hero = activeHero()) {
+  if (!object?.trap || !hero) return false;
+  const objectName = objectTemplate(object.type)?.name ?? "the container";
+  const trapName = object.trap.name ?? "the trap";
+  object.lastResult = `${hero.name} disturbs ${trapName} while trying to unlock ${objectName}.`;
+  addLog(object.lastResult, "important");
+  triggerChestTrap(object, hero);
+  render();
+  showDungeonObjectInfo(object);
   return true;
 }
 
@@ -3668,6 +3712,7 @@ function pickObjectLock(objectId) {
     return;
   }
   if (!activeStealthCheckInMonsterRoom(hero, `picks ${objectTemplate(object.type)?.name ?? "a lock"}`)) return;
+  if (triggerContainerTrapDuringUnlock(object, hero)) return;
 
   const rollResult = rollD20ForFighter(hero);
   const roll = reliableTalentRoll(hero, "disarm", rollResult.roll);
@@ -3710,6 +3755,7 @@ async function answerObjectSpecialLock(objectId) {
     return;
   }
   if (!activeStealthCheckInMonsterRoom(hero, `tries ${objectTemplate(object.type)?.name ?? "a keyed lock"}`)) return;
+  if (triggerContainerTrapDuringUnlock(object, hero)) return;
   const answer = await showGameDialog({
     title: specialLock.label,
     message: specialLock.prompt,
@@ -3751,6 +3797,95 @@ function takeAllHomeChestItems(objectId = "home-chest") {
   showDungeonObjectInfo(homeStorageObjectForId(objectId) ?? homeChestObject());
 }
 
+function trapComponentForObject(object) {
+  return objectComponent(object, "trap") ?? objectComponent(object?.type, "trap");
+}
+
+function trapIsMagical(trap, object = null) {
+  return Boolean(trap?.magical || trapComponentForObject(object)?.magical);
+}
+
+function trapDisarmOptions(trap, object = null) {
+  const component = trapComponentForObject(object);
+  const configured = trap?.disarmSkillOptions ?? component?.disarmSkillOptions;
+  if (Array.isArray(configured) && configured.length) {
+    return configured.map((option) => ({
+      skill: option.skill ?? "investigation",
+      ability: option.ability ?? skillDefinitions[option.skill ?? "investigation"]?.ability ?? "int",
+      dc: option.dc,
+    }));
+  }
+  if (trap?.disarmSkill || component?.disarmSkill) {
+    const skill = trap?.disarmSkill ?? component?.disarmSkill;
+    return [{ skill, ability: trap?.disarmAbility ?? component?.disarmAbility ?? skillDefinitions[skill]?.ability ?? "int" }];
+  }
+  if (trapIsMagical(trap, object)) return [{ skill: "arcana", ability: "int" }];
+  if (object?.trap) return [{ skill: "sleight-of-hand", ability: "dex" }, { skill: "investigation", ability: "int", dc: (trap?.spotDc ?? 12) + 2 }];
+  return [{ skill: "investigation", ability: "int" }, { skill: "sleight-of-hand", ability: "dex", dc: (trap?.spotDc ?? object?.spotDc ?? 12) + 2 }];
+}
+
+function bestTrapDisarmOption(hero, trap, object = null) {
+  const baseDc = trap?.spotDc ?? object?.spotDc ?? 12;
+  return trapDisarmOptions(trap, object)
+    .map((option) => ({
+      ...option,
+      dc: option.dc ?? baseDc,
+      bonus: skillCheckBonus(hero, option.ability ?? "int", option.skill ?? "investigation"),
+    }))
+    .sort((a, b) => b.bonus - a.bonus || a.dc - b.dc)[0] ?? { skill: "investigation", ability: "int", dc: baseDc, bonus: skillCheckBonus(hero, "int", "investigation") };
+}
+
+function trapDisarmSummary(trap, object = null) {
+  return trapDisarmOptions(trap, object)
+    .map((option) => `${skillName(option.skill ?? "investigation")} DC ${option.dc ?? trap?.spotDc ?? object?.spotDc ?? 12}`)
+    .join(" or ");
+}
+
+function heroKnowsDispelMagic(hero) {
+  return spellDefinitionsForFighter(hero).some((spell) => canonicalSpellId(spell.id) === "dispel-magic");
+}
+
+function dispelMagicTrapSpell(hero) {
+  const spell = getContentDefinition("spells", "dispel-magic");
+  if (!spell || !heroKnowsDispelMagic(hero)) return null;
+  return spellWithCastLevel(spell, Math.max(3, spellBaseLevel(spell)));
+}
+
+function canDispelMagicTrap(hero, trap, object = null) {
+  const spell = dispelMagicTrapSpell(hero);
+  return Boolean(state.mode !== "combat" && trapIsMagical(trap, object) && spell && canCastSpell(hero, spell));
+}
+
+function clearTrapFromObject(object, trap) {
+  if (object?.trap && trap === object.trap) {
+    delete object.trap;
+    return;
+  }
+  if (trap) {
+    trap.disarmed = true;
+    trap.armed = false;
+    trap.spent = false;
+  }
+}
+
+function dispelMagicTrap(objectId) {
+  const object = dungeonObjectForId(objectId);
+  const hero = activeHero();
+  if (!object || !hero || state.mode === "combat") return;
+  if (!objectCells(object).some((cell) => Math.max(Math.abs(hero.position.x - cell.x), Math.abs(hero.position.y - cell.y)) === 1)) return;
+  const trap = object.trap ?? object;
+  if (!trap || !trap.detected || trap.armed === false || trap.disarmed || !canDispelMagicTrap(hero, trap, object)) return;
+  if (!activeStealthCheckInMonsterRoom(hero, `dispels ${trap.name ?? objectTemplate(object.type)?.name ?? "a magical trap"}`)) return;
+  const spell = dispelMagicTrapSpell(hero);
+  spendSpellResources(hero, spell);
+  clearTrapFromObject(object, trap);
+  object.lastResult = `${hero.name} casts Dispel Magic and unravels ${trap.name ?? objectTemplate(object.type)?.name ?? "the magical trap"}.`;
+  addLog(object.lastResult, "important");
+  awardHeroXp(25, "dispelling a magical trap");
+  render();
+  showDungeonObjectInfo(object);
+}
+
 function disarmTrap(objectId) {
   const object = dungeonObjectForId(objectId);
   const hero = activeHero();
@@ -3766,15 +3901,16 @@ function disarmTrap(objectId) {
   if (trap.disarmAttemptsByHero[hero.id]) return;
   if (!activeStealthCheckInMonsterRoom(hero, `disarms ${objectTemplate(object.type)?.name ?? "a trap"}`)) return;
 
+  const option = bestTrapDisarmOption(hero, trap, object);
   const rollResult = rollD20ForFighter(hero);
-  const roll = reliableTalentRoll(hero, "investigation", rollResult.roll);
-  const bonus = skillCheckBonus(hero, "int", "disarm");
+  const roll = reliableTalentRoll(hero, option.skill, rollResult.roll);
+  const bonus = option.bonus;
   const guidance = guidanceSkillBonus();
   const total = roll + bonus + guidance;
-  const dc = trap.spotDc ?? 12;
+  const dc = option.dc ?? trap.spotDc ?? 12;
   trap.disarmAttemptsByHero[hero.id] = true;
   const guidanceText = guidance ? ` + Guidance ${guidance}` : "";
-  const attemptText = `${hero.name} attempts to disarm the trap: INT ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${dc}.`;
+  const attemptText = `${hero.name} attempts to disarm the trap: ${String(option.ability ?? "int").toUpperCase()} ${skillName(option.skill)} ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${dc}.`;
   object.lastResult = attemptText;
   addLog(attemptText, "important");
   addAdminCheckLog({ actor: hero, label: "Disarm check", target: objectTemplate(object.type)?.name ?? "trap", rollResult, bonus, guidance, total, dc, success: roll !== 1 && total >= dc, note: roll === 1 ? "natural 1 triggers trap" : "" });
@@ -3789,13 +3925,7 @@ function disarmTrap(objectId) {
     }
   } else if (total >= dc) {
     recordD20OutcomeForFighter(hero, true);
-    if (object.trap) {
-      delete object.trap;
-    } else {
-      trap.disarmed = true;
-      trap.armed = false;
-      trap.spent = false;
-    }
+    clearTrapFromObject(object, trap);
     object.lastResult += " The trap is disarmed.";
     addLog("The trap is disarmed.", "important");
     awardHeroXp(25, "disarming a trap");
@@ -5025,7 +5155,7 @@ function adminOpenVisibleDoors() {
   const visibleKeys = activeTileKeys();
   const doors = (state.dungeon?.doors ?? []).filter((door) => {
     const doorKey = positionKey(door);
-    return visibleKeys.has(doorKey) && isKnownTile(door) && !sharedDoorPassagesAreOpen(door);
+    return doorIsVisibleToPlayers(door) && visibleKeys.has(doorKey) && isKnownTile(door) && !sharedDoorPassagesAreOpen(door);
   });
   const uniqueDoors = Array.from(new Map(doors.map((door) => [`${door.roomId}:${positionKey(door)}`, door])).values());
   let opened = 0;
@@ -6477,9 +6607,13 @@ function renderHomeAdventurePanels() {
   const barrowCompleted = state.campaignProgress?.["barrow-crown"] ?? 0;
   const thornwoodCompleted = state.campaignProgress?.["thornwood-pact"] ?? 0;
   const emberveinCompleted = state.campaignProgress?.["embervein-first-claim"] ?? 0;
+  const smithyCompleted = state.campaignProgress?.["dwarven-smithy-ember-oath"] ?? 0;
+  const smithyUnlocked = Boolean(state.questFlags?.["flag.borren.claimHammerReturned"]);
   els.goBarrowCrown?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${barrowCompleted}/7`));
   els.goThornwoodPact?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${thornwoodCompleted}/8`));
   els.goEmberveinFirstClaim?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${emberveinCompleted}/1`));
+  els.goDwarvenSmithyEmberOath?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${smithyCompleted}/8`));
+  els.goDwarvenSmithyEmberOath?.classList.toggle("hidden", !smithyUnlocked);
 
   if (els.homeRandomDungeonActions) {
     const themes = window.DungeonContent
@@ -6823,8 +6957,40 @@ function smithMaterialCommissionMarkup(npc) {
   `;
 }
 
-const borrenClaimHammerItemId = "magic-embervein-claim-hammer";
-const borrenClaimHammerQuestKey = "borrenClaimHammer";
+function borrenClaimHammerText() {
+  return window.DungeonNpcQuestText?.borren?.questChains?.claimHammer ?? {
+    itemId: "magic-embervein-claim-hammer",
+    questKey: "borrenClaimHammer",
+    storeSectionTitle: "Relic Claim",
+    itemName: "Embervein Claim Hammer",
+    rewardText: "quest reward",
+    storeText: {
+      available: "Borren asks to see the hammer.",
+      accepted: "Borren is waiting for the hammer.",
+      completed: "Borren has the hammer.",
+    },
+    buttons: {
+      accept: "Ask Borren",
+      complete: "Give Hammer",
+      incomplete: "Need Hammer",
+      completed: "Returned",
+    },
+    logs: {
+      accept: "Borren asks the party to return the hammer to his forge.",
+      complete: "Borren accepts the hammer.",
+      cancel: "Borren's hammer request is no longer accepted.",
+    },
+    questLog: {
+      giver: "Borren Ashmantle",
+      title: "The First Claim Hammer",
+      description: "Bring Borren the hammer.",
+      objectiveLabel: "Embervein Claim Hammer",
+    },
+  };
+}
+
+const borrenClaimHammerItemId = borrenClaimHammerText().itemId;
+const borrenClaimHammerQuestKey = borrenClaimHammerText().questKey;
 
 function borrenClaimHammerRequirement() {
   return { itemId: borrenClaimHammerItemId };
@@ -6842,6 +7008,7 @@ function borrenClaimHammerCount() {
 
 function borrenClaimHammerMarkup(npc) {
   if (npc?.id !== "armorsmith") return "";
+  const text = borrenClaimHammerText();
   const quest = borrenClaimHammerState();
   const have = borrenClaimHammerCount();
   const accepted = quest.status === "accepted";
@@ -6849,24 +7016,24 @@ function borrenClaimHammerMarkup(npc) {
   if (!completed && !accepted && have <= 0) return "";
   return `
     <section class="store-section">
-      <h3>Relic Claim</h3>
+      <h3>${escapeHtml(text.storeSectionTitle)}</h3>
       <div class="store-row">
         <div>
-          <b>Embervein Claim Hammer</b>
+          <b>${escapeHtml(text.itemName)}</b>
           <span>${
             completed
-              ? "Borren has the hammer and is already studying its maker's marks."
+              ? escapeHtml(text.storeText.completed)
               : accepted
-                ? "Borren wants the Ashmantle hammer before anyone else melts its memory out of it."
-                : "Borren notices the Ashmantle mark beneath the soot and asks to see the hammer."
-          } Satchel and packs: ${escapeHtml(have)}/1 - Reward: 100 gp, 3 Embervein Ore, smith chain started.</span>
+                ? escapeHtml(text.storeText.accepted)
+                : escapeHtml(text.storeText.available)
+          }</span>
         </div>
         ${
           completed
-            ? `<button type="button" disabled>Returned</button>`
+            ? `<button type="button" disabled>${escapeHtml(text.buttons.completed)}</button>`
             : accepted
-              ? `<button type="button" data-action="complete-borren-claim-hammer" ${have >= 1 ? "" : "disabled"}>${have >= 1 ? "Give Hammer" : "Need Hammer"}</button>`
-              : `<button type="button" data-action="accept-borren-claim-hammer">Ask Borren</button>`
+              ? `<button type="button" data-action="complete-borren-claim-hammer" ${have >= 1 ? "" : "disabled"}>${escapeHtml(have >= 1 ? text.buttons.complete : text.buttons.incomplete)}</button>`
+              : `<button type="button" data-action="accept-borren-claim-hammer">${escapeHtml(text.buttons.accept)}</button>`
         }
       </div>
     </section>
@@ -6878,7 +7045,7 @@ function acceptBorrenClaimHammerQuest() {
   if (quest.status === "completed") return;
   quest.status = "accepted";
   quest.acceptedAt = Date.now();
-  addLog("Borren Ashmantle recognizes the Embervein Claim Hammer and asks the party to return it to his forge.", "important");
+  addLog(borrenClaimHammerText().logs.accept, "important");
   renderStoreMenu();
 }
 
@@ -6893,7 +7060,7 @@ function completeBorrenClaimHammerQuest() {
   quest.completedAt = Date.now();
   state.questFlags["flag.borren.claimHammerReturned"] = true;
   state.questFlags["flag.borren.smithChainStarted"] = true;
-  addLog("Borren accepts the First Claim Hammer. The Ashmantle smithing chain has begun.", "important");
+  addLog(borrenClaimHammerText().logs.complete, "important");
   renderStoreMenu();
   renderInventoryMenu();
 }
@@ -7072,19 +7239,20 @@ function materialCommissionQuestLogEntries() {
 function borrenClaimHammerQuestLogEntries() {
   const quest = state?.questFlags?.[borrenClaimHammerQuestKey];
   if (quest?.status !== "accepted") return [];
+  const text = borrenClaimHammerText();
   const have = borrenClaimHammerCount();
   return [
     {
       id: "borren-claim-hammer",
-      giver: "Borren Ashmantle",
-      title: "The First Claim Hammer",
-      description: "Borren recognized the Ashmantle maker's mark on the Embervein Claim Hammer. Bring it back to his forge so he can begin tracing the claim.",
+      giver: text.questLog.giver,
+      title: text.questLog.title,
+      description: text.questLog.description,
       ready: have >= 1,
       cancelable: true,
       cancelType: "borren-claim-hammer",
       objectives: [
         {
-          label: "Embervein Claim Hammer",
+          label: text.questLog.objectiveLabel,
           progress: Math.min(1, have),
           target: 1,
         },
@@ -7200,7 +7368,7 @@ function cancelQuestLogEntry(entry) {
     quest.status = "available";
     quest.cancelledAt = Date.now();
     delete quest.acceptedAt;
-    addLog("Borren's claim hammer request is no longer accepted.", "important");
+    addLog(borrenClaimHammerText().logs.cancel, "important");
     return true;
   }
   return false;

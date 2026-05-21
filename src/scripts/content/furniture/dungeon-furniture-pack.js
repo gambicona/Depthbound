@@ -366,6 +366,7 @@ feature("portal", "Paired Portal", ["portal", "magic", "arcane", "old-guardroom"
 
 feature("trap", "Spike Trap", ["trap", "hazard", "floor", "spike", "piercing", "dungeon", "forest", "old-guardroom"], {
   kind: "trap",
+  floor: true,
   symbol: "!",
   damage: { count: 1, sides: 4, type: "piercing" },
   spotDcs: [
@@ -374,7 +375,105 @@ feature("trap", "Spike Trap", ["trap", "hazard", "floor", "spike", "piercing", "
     { label: "Hard", dc: 15 },
   ],
   description: "A concealed spike trap. It deals 1d4 piercing damage when a creature steps on it.",
-  components: [C.trap({ mode: "floor", damage: { count: 1, sides: 4, type: "piercing" } })],
+  components: [C.trap({ mode: "floor", damage: { count: 1, sides: 4, type: "piercing" }, disarmSkillOptions: [{ skill: "investigation", ability: "int" }, { skill: "sleight-of-hand", ability: "dex", dc: 14 }] })],
+});
+
+[
+  {
+    id: "tripwire-trap",
+    name: "Tripwire Snare",
+    tags: ["trap", "hazard", "floor", "wire", "mechanical", "bludgeoning", "dungeon", "forest", "old-guardroom"],
+    damage: { count: 1, sides: 6, type: "bludgeoning" },
+    description: "A hidden tripwire snaps tight and drops a weighted hook. It deals 1d6 bludgeoning damage.",
+    disarmSkillOptions: [{ skill: "sleight-of-hand", ability: "dex" }, { skill: "investigation", ability: "int", dc: 13 }],
+  },
+  {
+    id: "dart-plate-trap",
+    name: "Dart Plate",
+    tags: ["trap", "hazard", "floor", "dart", "mechanical", "piercing", "poison", "dungeon", "old-guardroom", "desert"],
+    damage: { count: 2, sides: 4, type: "piercing" },
+    spotDcs: [{ label: "Easy", dc: 11 }, { label: "Normal", dc: 13 }, { label: "Hard", dc: 16 }],
+    description: "A pressure plate releases darts from a wall slit. It deals 2d4 piercing damage.",
+    disarmSkillOptions: [{ skill: "investigation", ability: "int" }, { skill: "sleight-of-hand", ability: "dex" }],
+  },
+  {
+    id: "razor-wire-trap",
+    name: "Razor Wire",
+    tags: ["trap", "hazard", "floor", "wire", "mechanical", "slashing", "dungeon", "forest", "old-guardroom"],
+    damage: { count: 1, sides: 8, type: "slashing" },
+    spotDcs: [{ label: "Easy", dc: 12 }, { label: "Normal", dc: 14 }, { label: "Hard", dc: 17 }],
+    description: "Nearly invisible wire is stretched at ankle height. It deals 1d8 slashing damage.",
+    disarmSkillOptions: [{ skill: "sleight-of-hand", ability: "dex" }, { skill: "perception", ability: "wis", dc: 16 }],
+  },
+  {
+    id: "acid-spray-trap",
+    name: "Acid Spray Plate",
+    tags: ["trap", "hazard", "floor", "mechanical", "acid", "underdark", "swamp", "forge"],
+    damage: { count: 2, sides: 6, type: "acid" },
+    spotDcs: [{ label: "Easy", dc: 12 }, { label: "Normal", dc: 15 }, { label: "Hard", dc: 18 }],
+    description: "A plate opens a hidden nozzle that sprays caustic fluid. It deals 2d6 acid damage.",
+    disarmSkillOptions: [{ skill: "investigation", ability: "int" }, { skill: "sleight-of-hand", ability: "dex", dc: 16 }],
+  },
+  {
+    id: "flame-jet-trap",
+    name: "Flame Jet",
+    tags: ["trap", "hazard", "floor", "mechanical", "fire", "desert", "forge", "hell"],
+    damage: { count: 2, sides: 6, type: "fire" },
+    spotDcs: [{ label: "Easy", dc: 12 }, { label: "Normal", dc: 15 }, { label: "Hard", dc: 18 }],
+    description: "A heat-scarred floor plate feeds a sudden burst of flame. It deals 2d6 fire damage.",
+    disarmSkillOptions: [{ skill: "investigation", ability: "int" }, { skill: "sleight-of-hand", ability: "dex", dc: 16 }],
+  },
+  {
+    id: "frost-rune-trap",
+    name: "Frost Rune",
+    tags: ["trap", "hazard", "floor", "magic", "arcane", "cold", "underdark", "temple"],
+    magical: true,
+    damage: { count: 2, sides: 6, type: "cold" },
+    spotDcs: [{ label: "Easy", dc: 13 }, { label: "Normal", dc: 15 }, { label: "Hard", dc: 18 }],
+    description: "A pale rune drinks warmth from the air. It deals 2d6 cold damage unless unraveled or dispelled.",
+    disarmSkillOptions: [{ skill: "arcana", ability: "int" }],
+  },
+  {
+    id: "thunder-glyph-trap",
+    name: "Thunder Glyph",
+    tags: ["trap", "hazard", "floor", "magic", "arcane", "thunder", "storm", "temple"],
+    magical: true,
+    damage: { count: 2, sides: 8, type: "thunder" },
+    spotDcs: [{ label: "Easy", dc: 13 }, { label: "Normal", dc: 16 }, { label: "Hard", dc: 19 }],
+    description: "A hairline glyph stores a concussive clap. It deals 2d8 thunder damage unless unraveled or dispelled.",
+    disarmSkillOptions: [{ skill: "arcana", ability: "int" }],
+  },
+  {
+    id: "necrotic-ward-trap",
+    name: "Necrotic Ward",
+    tags: ["trap", "hazard", "floor", "magic", "necrotic", "crypt", "old-guardroom", "temple"],
+    magical: true,
+    damage: { count: 2, sides: 6, type: "necrotic" },
+    spotDcs: [{ label: "Easy", dc: 13 }, { label: "Normal", dc: 15 }, { label: "Hard", dc: 18 }],
+    description: "A black ward stains the floor with old grave magic. It deals 2d6 necrotic damage unless quieted or dispelled.",
+    disarmSkillOptions: [{ skill: "arcana", ability: "int" }, { skill: "religion", ability: "int", dc: 16 }],
+  },
+].forEach((trap) => {
+  feature(trap.id, trap.name, trap.tags, {
+    kind: "trap",
+    floor: true,
+    symbol: "!",
+    damage: trap.damage,
+    spotDcs: trap.spotDcs ?? [
+      { label: "Easy", dc: 10 },
+      { label: "Normal", dc: 13 },
+      { label: "Hard", dc: 16 },
+    ],
+    description: trap.description,
+    components: [
+      C.trap({
+        mode: "floor",
+        damage: trap.damage,
+        magical: Boolean(trap.magical),
+        disarmSkillOptions: trap.disarmSkillOptions,
+      }),
+    ],
+  });
 });
 
 feature("water-floor", "Water Floor", ["terrain-floor", "water", "flooded", "floor", "dungeon", "cave", "swamp", "custom-placement"], {

@@ -1,11 +1,90 @@
 (() => {
 window.DungeonContent.register("traps", "needleTrap", {
   name: "Needle Trap",
-  tags: ["trap", "chest", "needle", "piercing", "old-guardroom", "forest"],
+  tags: ["trap", "chest", "container", "needle", "mechanical", "piercing", "old-guardroom", "forest"],
   placement: "chest",
   spotDc: 12,
   spotDifficulty: "Normal",
   damage: { count: 1, sides: 4, type: "piercing" },
+  disarmSkillOptions: [{ skill: "sleight-of-hand", ability: "dex" }, { skill: "investigation", ability: "int", dc: 14 }],
   description: "A spring-loaded needle hidden in the chest latch. It deals 1d4 piercing damage.",
+});
+
+[
+  {
+    id: "razorLatchTrap",
+    name: "Razor Latch",
+    tags: ["trap", "chest", "container", "razor", "mechanical", "slashing", "old-guardroom", "desert", "forge"],
+    spotDc: 13,
+    damage: { count: 1, sides: 6, type: "slashing" },
+    disarmSkillOptions: [{ skill: "sleight-of-hand", ability: "dex" }, { skill: "investigation", ability: "int", dc: 15 }],
+    description: "A thin blade snaps across the latch when the lid is lifted. It deals 1d6 slashing damage.",
+  },
+  {
+    id: "poisonNeedleTrap",
+    name: "Poison Needle",
+    tags: ["trap", "chest", "container", "needle", "mechanical", "poison", "forest", "swamp", "underdark"],
+    spotDc: 14,
+    damage: { count: 2, sides: 4, type: "poison" },
+    disarmSkillOptions: [{ skill: "sleight-of-hand", ability: "dex" }, { skill: "medicine", ability: "wis", dc: 15 }],
+    description: "A tiny reservoir feeds venom into a hidden puncture needle. It deals 2d4 poison damage.",
+  },
+  {
+    id: "acidVialTrap",
+    name: "Acid Vial Trap",
+    tags: ["trap", "chest", "container", "vial", "mechanical", "acid", "underdark", "swamp", "forge"],
+    spotDc: 14,
+    damage: { count: 2, sides: 6, type: "acid" },
+    disarmSkillOptions: [{ skill: "sleight-of-hand", ability: "dex" }, { skill: "investigation", ability: "int", dc: 15 }],
+    description: "A glass vial breaks inside the lid hinge and splashes acid outward. It deals 2d6 acid damage.",
+  },
+  {
+    id: "flashpowderTrap",
+    name: "Flashpowder Charge",
+    tags: ["trap", "chest", "container", "powder", "mechanical", "fire", "desert", "forge", "old-guardroom"],
+    spotDc: 15,
+    damage: { count: 2, sides: 6, type: "fire" },
+    disarmSkillOptions: [{ skill: "investigation", ability: "int" }, { skill: "sleight-of-hand", ability: "dex", dc: 16 }],
+    description: "A hidden powder charge flares when the container opens. It deals 2d6 fire damage.",
+  },
+  {
+    id: "frostSigilTrap",
+    name: "Frost Sigil",
+    tags: ["trap", "chest", "container", "magic", "arcane", "cold", "underdark", "temple"],
+    placement: "chest",
+    magical: true,
+    spotDc: 15,
+    damage: { count: 2, sides: 6, type: "cold" },
+    disarmSkillOptions: [{ skill: "arcana", ability: "int" }],
+    description: "A pale sigil seals the latch with stored winter. It deals 2d6 cold damage unless unraveled or dispelled.",
+  },
+  {
+    id: "wardingGlyphTrap",
+    name: "Warding Glyph",
+    tags: ["trap", "chest", "container", "magic", "arcane", "force", "temple", "old-guardroom", "underdark"],
+    placement: "chest",
+    magical: true,
+    spotDc: 16,
+    damage: { count: 2, sides: 8, type: "force" },
+    disarmSkillOptions: [{ skill: "arcana", ability: "int" }],
+    description: "A compact glyph detonates into force when the seal is broken. It deals 2d8 force damage unless unraveled or dispelled.",
+  },
+  {
+    id: "graveHexTrap",
+    name: "Grave Hex",
+    tags: ["trap", "chest", "container", "magic", "necrotic", "crypt", "old-guardroom", "temple"],
+    placement: "chest",
+    magical: true,
+    spotDc: 15,
+    damage: { count: 2, sides: 6, type: "necrotic" },
+    disarmSkillOptions: [{ skill: "arcana", ability: "int" }, { skill: "religion", ability: "int", dc: 16 }],
+    description: "A deathly curse clings to the clasp. It deals 2d6 necrotic damage unless quieted or dispelled.",
+  },
+].forEach((trap) => {
+  window.DungeonContent.register("traps", trap.id, {
+    placement: "chest",
+    spotDifficulty: "Normal",
+    ...trap,
+  });
 });
 })();

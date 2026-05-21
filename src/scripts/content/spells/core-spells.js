@@ -32,6 +32,7 @@ const availability = {
   grease: ["wizard"],
   haste: ["wizard", "sorcerer"],
   fly: ["sorcerer", "warlock", "wizard"],
+  "dispel-magic": ["artificer", "bard", "cleric", "druid", "paladin", "sorcerer", "warlock", "wizard"],
   "hideous-laughter": ["bard"],
   heroism: ["bard", "paladin"],
   "hypnotic-pattern": ["bard"],
@@ -790,6 +791,18 @@ spell("fly", {
   description: "Concentration, 10 minutes. Ally becomes Flying and has at least 60 ft speed. Upcast: +1 target.",
 });
 
+spell("dispel-magic", {
+  name: "Dispel Magic",
+  level: 3,
+  school: "abjuration",
+  resource: action,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  effect: { kind: "status", status: { id: "dispel-magic-focus", label: "Dispel Magic", expiresAtEndOfTurn: true } },
+  aiCategory: "utility",
+  description: "End a magical effect. Outside combat, detected magical traps can be suppressed directly from their trap panel.",
+});
+
 spell("fireball", {
   name: "Fireball",
   level: 3,
@@ -1497,6 +1510,7 @@ const spellAliases = {
   "thunder-clap": "thunderclap",
   eldritch_blast: "eldritch-blast",
   hellish_rebuke: "hellish-rebuke",
+  dispel_magic: "dispel-magic",
 };
 
 for (const [alias, sourceId] of Object.entries(spellAliases)) {

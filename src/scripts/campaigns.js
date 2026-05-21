@@ -1,4 +1,15 @@
 (() => {
+const emberveinFirstClaimText = window.DungeonNpcQuestText?.borren?.questChains?.claimHammer?.campaign ?? {
+  giver: "Borren Ashmantle",
+  initialTitle: "Recover the First Claim",
+  initialDescription: "Enter the Deepworks and recover the Ashmantle relic.",
+  progressTitle: "The First Claim Burns",
+  progressDescription: "Push to the furnace heart and bring the relic home.",
+  completedTitle: "The Hammer Returned",
+  completedDescription: "The relic has been recovered. Borren may know why it matters.",
+  description: "A compact one-dungeon Embervein adventure.",
+};
+
 const campaigns = [
   {
   id: "barrow-crown",
@@ -55,21 +66,35 @@ If the Barrow Crown is not found, the first king will rise — and every oath on
     id: "embervein-first-claim",
     name: "The First Claim of Embervein",
     quest: {
-      giver: "Borren Ashmantle",
-      initialTitle: "Recover the First Claim",
-      initialDescription: "Borren has heard an old Embervein claim bell ringing again. Enter the Deepworks, defeat the thief at the furnace heart, and recover whatever Ashmantle relic remains.",
-      progressTitle: "The First Claim Burns",
-      progressDescription: "The Embervein Deepworks has been reopened by a soot-marked crew. Push to the furnace heart and bring the First Claim Hammer home.",
-      completedTitle: "The Hammer Returned",
-      completedDescription: "The First Claim Hammer has been recovered from the Embervein Deepworks. Borren Ashmantle may know why it matters.",
+      giver: emberveinFirstClaimText.giver,
+      initialTitle: emberveinFirstClaimText.initialTitle,
+      initialDescription: emberveinFirstClaimText.initialDescription,
+      progressTitle: emberveinFirstClaimText.progressTitle,
+      progressDescription: emberveinFirstClaimText.progressDescription,
+      completedTitle: emberveinFirstClaimText.completedTitle,
+      completedDescription: emberveinFirstClaimText.completedDescription,
     },
-    description: `Borren Ashmantle's family claim in the Embervein Deepworks has started ringing from below the hills.
-
-Someone has broken into the old forge-mine, restarted the furnaces, and stolen the First Claim Hammer from its sealed rack.
-
-This is a compact one-dungeon adventure for four level 2 heroes: a cold lift, coal silos, pressure valves, moving chain hoists, and a furnace-heart boss who would rather burn the mine than give the hammer back.`,
+    description: emberveinFirstClaimText.description,
     count: 1,
     folder: "campaigns/the-first-claim-of-embervein",
+  },
+  {
+    id: "dwarven-smithy-ember-oath",
+    name: "The Dwarven Smithy: The Ember Oath",
+    quest: {
+      giver: "Borren Ashmantle",
+      initialTitle: "Reopen the Ember Oath",
+      initialDescription: "With the First Claim Hammer returned, Borren can trace the old Ashmantle forge-road into the Embervein Deepworks.",
+      progressTitle: "The Ember Oath Burns",
+      progressDescription: "Follow Borren's recovered claim through the old smithy road and restore what the Deepworks lost.",
+      completedTitle: "The Ember Oath Reforged",
+      completedDescription: "The Dwarven Smithy path is complete. The restored forge-road can be expanded with its final ending text later.",
+    },
+    description: `Borren Ashmantle has the First Claim Hammer again. Its maker's marks do not point to a single mine, but to an older dwarven forge-road: the Ember Oath.
+
+These are placeholder campaign slots using the same 8-dungeon template lineup as the Forest of the Beasts main story, ready for Smithy dungeons to be pasted into place.`,
+    count: 8,
+    folder: "campaigns/the-dwarven-smithy-ember-oath",
   },
 ];
 
