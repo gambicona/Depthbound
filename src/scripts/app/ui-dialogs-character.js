@@ -9,7 +9,7 @@ function updateSaveStatus(message = "") {
       saveSystem.mode === "file"
         ? `Save folder: ${saveSystem.directoryName}.`
         : saveSystem.mode === "unsupported"
-          ? "Folder-backed saves are not supported here. This does not work in Firefox yet; try Chrome or another Chromium browser on localhost/HTTPS. Legacy browser storage is still available with quota limits."
+          ? "Folder-backed saves are not supported here. This does not work in Firefox, try Chrome. Still, normal browser storage is available within quota limits (normally only relevant for a lot of custom pictures)."
           : saveSystem.mode === "disconnected"
             ? `Reconnect save folder${saveSystem.directoryName ? ` "${saveSystem.directoryName}"` : ""} to save JSON files.`
             : "Choose a save folder to use JSON file saves.";
@@ -505,6 +505,7 @@ function showHeroIdentityDialog({ title, message, nameValue, tokenArt = "", conf
     let cropDrag = null;
 
     const currentName = () => els.gameDialogField.querySelector("[data-hero-identity-name]")?.value ?? nameValue ?? "";
+    const suggestedNames = () => window.DepthboundHeroNames?.names ?? [];
     const updateCropPreviewTransform = () => {
       const image = els.gameDialogField.querySelector("[data-token-crop-preview] img");
       if (image) {
@@ -518,6 +519,7 @@ function showHeroIdentityDialog({ title, message, nameValue, tokenArt = "", conf
 
     const renderField = () => {
       const options = heroTokenArtOptions();
+      const names = suggestedNames();
       if (!options.some((option) => option.value === selectedValue)) selectedValue = noHeroTokenArtValue;
       const resolvedArt = resolveHeroTokenArtSelection(selectedValue);
       let resolvedPreviewArt =
@@ -537,6 +539,13 @@ function showHeroIdentityDialog({ title, message, nameValue, tokenArt = "", conf
         ? `width:${previewMetrics.drawWidth}px;height:${previewMetrics.drawHeight}px;left:${previewMetrics.left}px;top:${previewMetrics.top}px;`
         : "";
       els.gameDialogField.innerHTML = `
+        <label>
+          <span>Suggested name</span>
+          <select data-hero-name-suggestion>
+            <option value="">Choose a name...</option>
+            ${names.map((name) => `<option value="${escapeAttribute(name)}" ${name === nameValue ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+          </select>
+        </label>
         <label>
           <span>Character name</span>
           <input data-hero-identity-name type="text" maxlength="32" value="${escapeAttribute(nameValue ?? "")}" />
@@ -661,6 +670,16 @@ function showHeroIdentityDialog({ title, message, nameValue, tokenArt = "", conf
     };
 
     const handleFieldChange = (event) => {
+      if (event.target.matches("[data-hero-name-suggestion]")) {
+        const suggestion = event.target.value;
+        if (!suggestion) return;
+        nameValue = suggestion;
+        renderField();
+        const input = els.gameDialogField.querySelector("[data-hero-identity-name]");
+        input?.focus();
+        input?.setSelectionRange(input.value.length, input.value.length);
+        return;
+      }
       if (event.target.matches("[data-hero-token-select]")) {
         selectedValue = event.target.value;
         pendingFullDataUrl = "";
@@ -1489,10 +1508,14 @@ function showTutorial() {
   els.gameDialogField.classList.add("hidden");
   els.gameDialogMessage.innerHTML = `
     <ul class="tutorial-list">
-      <li>Pan the dungeon by grabbing and dragging the map. Use the + and - buttons in the top bar to zoom.</li>
-      <li>Right-click enemies and dungeon objects to inspect details and available interactions.</li>
-      <li>Open inventory from the character card button I in the right panel.</li>
-      <li>At home, your chest appears in the upper-right corner and is also shown in the inventory screen.</li>
+      <li>After making your first hero, use the Planning Table to add more heroes or go out solo. Newly created heroes join the active party automatically while there is room.</li>
+      <li>Drag hero tokens to move. Grab empty dungeon space to pan, and use the top-bar zoom controls to change the view.</li>
+      <li>Use Stealth on a hero card before opening dangerous doors. Search checks the current room for hidden doors and secrets.</li>
+      <li>The bottom action bar changes by context. Outside combat it handles rest, return home, items, abilities, and grabbing. In combat it adds attacks, Other actions, and End Turn.</li>
+      <li>Open Other in combat for Dash, Dodge, Disengage, Off-Hand Attack, Grapple/Shove, Medicine, and Get Behind. Get Behind is a special Depthbound bonus action that can let a hero move through monster spaces for one turn.</li>
+      <li>Inventory is the I button on the hero card. Abilities and spells are on the bottom Abilities button when the selected hero has something usable.</li>
+      <li>At home, Move Out opens Village, Build Your Home, and Go on an Adventure. Adventure then branches into Main Story Dungeons, Random Dungeons, and Custom Dungeons when any are saved.</li>
+      <li>For a first real run, try The Barrow Crown under Main Story Dungeons, or choose a Random Dungeon if you want a lighter test run.</li>
     </ul>
   `;
   els.gameDialogActions.innerHTML = `<button type="button" data-tutorial-close>Close</button>`;
@@ -1572,6 +1595,7 @@ function activeRaceFeatureLines(traits, selection = null) {
   if (racialCantrips.length) lines.push(`Racial cantrips: ${uniqueValues(racialCantrips).join(", ")}`);
   if (traits.skillProficiencies?.length) lines.push(`Skill proficiencies: ${traits.skillProficiencies.map(skillName).join(", ")}`);
   if (traits.skillChoiceCount) lines.push(`Skill choices: choose ${traits.skillChoiceCount}`);
+  if (traits.startingFeatChoiceCount) lines.push(`Feat choices: choose ${traits.startingFeatChoiceCount}`);
   if (traits.toolProficiencies?.length) lines.push(`Tool proficiencies: ${traits.toolProficiencies.map(toolName).join(", ")}`);
   if (traits.toolChoiceCount) lines.push(`Tool choices: choose ${traits.toolChoiceCount} from ${(traits.toolChoices ?? []).map(toolName).join(", ")}`);
   if (traits.weaponProficiencies?.length) lines.push(`Weapon proficiencies: ${traits.weaponProficiencies.join(", ")}`);
@@ -1592,6 +1616,7 @@ function activeRaceFeatureLinesForFighter(fighter) {
     skillChoiceCount: traits.skillChoiceCount,
     toolChoiceCount: traits.toolChoiceCount,
     toolChoices: traits.toolChoices,
+    startingFeatChoiceCount: traits.startingFeatChoiceCount,
     hpPerLevel: fighter?.racialHpPerLevel ?? traits.hpPerLevel,
     halflingLucky: Boolean(fighter?.racialTraits?.halflingLucky),
     relentlessEndurance: Boolean(fighter?.racialTraits?.relentlessEndurance),
@@ -1608,11 +1633,12 @@ function showHeroRaceDialog({ selection = defaultRaceSelection, allowBack = true
       const subrace = speciesDefinitions[current.raceId]?.subraces?.[current.subraceId] ?? {};
       const dragonCategory = subrace.dragonCategory;
       const abilityChoiceCount = speciesDefinitions[current.raceId]?.base?.abilityChoiceCount ?? subrace.abilityChoiceCount ?? 0;
+      const abilityChoiceSource = subrace.abilityChoiceCount ? subrace.name : speciesDefinitions[current.raceId]?.name ?? "Race";
       const choiceSelects = Array.from({ length: abilityChoiceCount }, (_, index) => {
         const selectedAbility = current.abilityChoices[index] ?? "";
         return `
           <label>
-            <span>Half-Elf +1 Ability ${index + 1}</span>
+            <span>${escapeHtml(abilityChoiceSource)} +1 Ability ${index + 1}</span>
             <select data-race-ability-choice="${index}">
               <option value="">-</option>
               ${abilities
@@ -1661,7 +1687,7 @@ function showHeroRaceDialog({ selection = defaultRaceSelection, allowBack = true
       if (abilityChoiceCount) {
         const selected = current.abilityChoices.slice(0, abilityChoiceCount);
         if (selected.length !== abilityChoiceCount || selected.some((ability) => !ability) || new Set(selected).size !== selected.length) {
-          renderField("Choose two different Half-Elf ability bonuses.");
+          renderField(`Choose ${abilityChoiceCount} different ${speciesDefinitions[current.raceId]?.name ?? "race"} ability bonuses.`);
           return;
         }
       }
@@ -1739,66 +1765,150 @@ async function showHeroClassDialog({ allowBack = true } = {}) {
 
 const interactiveTutorialSteps = [
   {
-    title: "Welcome To The Table",
-    body: "This tour uses a temporary tutorial party. It does not use a normal save slot, so you can poke around freely.",
+    title: "Start A Real Adventure",
+    body: "In a real game, press Start New Adventure, make your first hero, then choose a save slot. Your first hero is enough to play, but a party of two to four is easier.",
     selector: ".arena",
-    enter: () => switchInteractiveTutorialScene("dungeon"),
+    enter: () => enterTutorialDungeon(),
+  },
+  {
+    title: "After Your First Hero",
+    body: "At home, use the Planning Table to create more heroes, change the active party, or set party roles. New heroes automatically join the active party while there is space.",
+    selector: ".planning-table-token",
+    enter: () => enterTutorialHome(),
   },
   {
     title: "Move A Hero",
     body: "Drag a hero token through adjacent squares to move. Select several heroes with Shift, Ctrl, or Cmd, then drag one selected token to move the group.",
     selector: ".token.hero",
-    enter: () => switchInteractiveTutorialScene("dungeon"),
+    enter: () => enterTutorialDungeon(),
   },
   {
     title: "Move The Map",
     body: "Grab empty map space and drag to pan. The zoom controls in the top bar change how much of the dungeon you can see.",
     selector: ".room-scroll",
-    enter: () => switchInteractiveTutorialScene("dungeon"),
+    enter: () => enterTutorialDungeon(),
+  },
+  {
+    title: "Hero Card Tools",
+    body: "Each hero card has quick buttons. Stealth rolls Dexterity Stealth, Search checks the current room, I opens inventory, and ... renames the hero.",
+    selector: ".card-actions",
+    enter: () => enterTutorialDungeon(),
+  },
+  {
+    title: "Stealth",
+    body: "Use Stealth before opening suspicious doors. Monsters compare your Stealth total to Perception; if you stay hidden, you can avoid starting combat immediately.",
+    selector: ".stealth-hero-button",
+    enter: () => enterTutorialDungeon(),
+  },
+  {
+    title: "Search",
+    body: "Use Search once per hero per room to look for hidden doors and room secrets. Searching near monsters can force a fresh Stealth check.",
+    selector: ".search-room-button",
+    enter: () => enterTutorialDungeon(),
   },
   {
     title: "Open Inventory",
     body: "Use the I button on the hero card, or press I, to open inventory and equipment.",
     selector: ".open-inventory",
+    enter: () => enterTutorialDungeon(),
   },
   {
     title: "Inventory And Equipment",
-    body: "Inventory shows carried items, equipped gear, money, and home chest storage. Items can be inspected and moved from here.",
+    body: "Inventory shows carried items, equipped gear, money, and home chest storage. Items can be inspected, equipped, moved, or stored from here.",
     selector: "#inventory-menu .inventory-panel",
-    enter: () => showInventoryMenu(),
-  },
-  {
-    title: "Home Objects",
-    body: "Now you are at home. Left-click or right-click the chest or planning table to inspect them.",
-    selector: ".chest-token, .planning-table-token, .dungeon-object",
     enter: () => {
-      hideInventoryMenu();
-      switchInteractiveTutorialScene("home");
+      enterTutorialDungeon();
+      showInventoryMenu();
     },
   },
   {
-    title: "Bookshelf Lessons",
-    body: "Inspect the bookshelf at home to open the Monster Compendium and short lessons about home expansion, comfort zones, and comfort levels.",
-    selector: ".dungeon-object.home-bookshelf",
-    enter: () => switchInteractiveTutorialScene("home"),
+    title: "Action Bar: Exploring",
+    body: "Outside combat, the bottom bar is for exploration: use items, abilities or spells, short rest, return home, and grab or release allies and objects.",
+    selector: ".action-dock",
+    placement: "above-target",
+    enter: () => enterTutorialDungeon(),
+  },
+  {
+    title: "Abilities And Spells",
+    body: "The Abilities button opens class features, racial powers, feats, and spells for the selected hero. It is enabled when that hero has something usable.",
+    selector: "#abilities",
+    placement: "above-target",
+    enter: () => enterTutorialDungeon(),
+  },
+  {
+    title: "Action Bar: Combat",
+    body: "In combat, the bar adds Attack, Other, and End Turn. Select a hero, choose a target, spend movement and actions, then end that hero's turn.",
+    selector: ".action-dock",
+    placement: "above-target",
+    enter: () => enterTutorialDungeon(),
+  },
+  {
+    title: "Get Behind",
+    body: "Other [X] holds Dash, Dodge, Disengage, Off-Hand Attack, Medicine, Grapple/Shove, and Get Behind. Get Behind is not normal DnD: it is a Depthbound bonus action, DEX DC 12, to move through monster spaces this turn.",
+    selector: "#action-button",
+    placement: "above-target",
+    enter: () => enterTutorialDungeon(),
   },
   {
     title: "Home Door",
-    body: "March onto the home door space, or click the Move Out button beside it, to open choices for the merchant, Build Your Home, or venturing into another dungeon.",
+    body: "At home, click Move Out beside the door or walk onto the door space. This opens the home hub to leave your home.",
     selector: ".exit-token, .home-move-out-button",
-    enter: () => switchInteractiveTutorialScene("home"),
+    enter: () => enterTutorialHome(),
   },
   {
-    title: "Action Buttons",
-    body: "The bottom bar changes with context. It handles initiative, attacks, other actions, items, abilities, resting, fleeing, and ending turns. If several monsters are in weapon range, press Tab to switch targets.",
-    selector: ".action-dock",
+    title: "Home Menu",
+    body: "The Home Door menu starts with Village, Build Your Home, and Go on an Adventure. Village is for NPCs and shops; Build Your Home opens the house editor.",
+    selector: "#home-main-actions",
+    enter: () => openTutorialHomeMenu("main"),
+  },
+  {
+    title: "Move Out Choices",
+    body: "Go on an Adventure opens the move-out menu. Main Story Dungeons are authored chapters, Random Dungeons are quick procedural runs, and Custom Dungeons appear when local custom maps exist.",
+    selector: "#home-adventure-actions",
+    enter: () => openTutorialHomeMenu("adventure"),
+  },
+  {
+    title: "First Dungeon Pick",
+    body: "For your first real outing, choose Main Story Dungeons and start The Barrow Crown. If you only want to test your build, choose a Random Dungeon instead.",
+    selector: "#home-adventure-actions",
+    enter: () => openTutorialHomeMenu("adventure"),
+  },
+  {
+    title: "Home Objects",
+    body: "Left-click or right-click home objects to inspect them. The chest stores shared items; the bookshelf has the Monster Compendium and guides for stealth, comfort, and home expansion.",
+    selector: ".chest-token, .dungeon-object.home-bookshelf, .planning-table-token",
+    enter: () => enterTutorialHome(),
   },
   {
     title: "Menus And Controls",
-    body: "The top bar has save, main menu, zoom, admin tools, and the text tutorial. Main Menu exits this tour.",
+    body: "The top bar has save, main menu, zoom, admin tools, and the text tutorial. Main Menu exits this temporary tour and returns you to normal play setup.",
     selector: ".top-actions",
+    enter: () => enterTutorialDungeon(),
   },
 ];
+
+function enterTutorialDungeon() {
+  hideInventoryMenu();
+  hideAbilitiesMenu();
+  hideHomeMenu();
+  switchInteractiveTutorialScene("dungeon");
+}
+
+function enterTutorialHome() {
+  hideInventoryMenu();
+  hideAbilitiesMenu();
+  hideHomeMenu();
+  switchInteractiveTutorialScene("home");
+}
+
+function openTutorialHomeMenu(panel = "main") {
+  enterTutorialHome();
+  window.requestAnimationFrame(() => {
+    if (!interactiveTutorialActive || state?.tutorialScene !== "home") return;
+    showHomeMenu();
+    setHomeMenuPanel(panel);
+  });
+}
 
 function createTutorialHero(id, name, token, role, equipment, items, position) {
   const template = getHeroTemplate();
@@ -1938,6 +2048,7 @@ function updateInteractiveTutorial() {
   els.tutorialTourStep.textContent = `Tutorial ${stepIndex + 1} / ${interactiveTutorialSteps.length}`;
   els.tutorialTourTitle.textContent = step.title;
   els.tutorialTourBody.textContent = step.body;
+  els.tutorialTourCard?.removeAttribute("style");
   els.tutorialTourBack.disabled = stepIndex === 0;
   els.tutorialTourNext.textContent = stepIndex === interactiveTutorialSteps.length - 1 ? "Done" : "Next";
 
@@ -1953,6 +2064,11 @@ function updateInteractiveTutorial() {
     els.tutorialHighlight.style.top = `${Math.max(8, rect.top - 8)}px`;
     els.tutorialHighlight.style.width = `${rect.width + 16}px`;
     els.tutorialHighlight.style.height = `${rect.height + 16}px`;
+    if (step.placement === "above-target" && els.tutorialTourCard) {
+      const cardRect = els.tutorialTourCard.getBoundingClientRect();
+      els.tutorialTourCard.style.bottom = "auto";
+      els.tutorialTourCard.style.top = `${Math.max(12, rect.top - cardRect.height - 18)}px`;
+    }
   };
 
   if (interactiveTutorialEnteredStep !== stepIndex) {
@@ -2402,6 +2518,7 @@ async function chooseLevelUpExpertise(hero) {
 }
 
 async function createCharacterOptions(raceSelection = defaultRaceSelection, classId = defaultContent.heroClass) {
+  const raceTraits = raceTraitsForSelection(raceSelection);
   let step = 0;
   let choice = null;
   let abilityScores = null;
@@ -2459,6 +2576,8 @@ async function createCharacterOptions(raceSelection = defaultRaceSelection, clas
         spells: [...cantripChoice.spells, ...spellChoice.spells],
         unusedSpellChoiceCredits: spellChoice.unusedCredits,
         unusedCantripChoiceCredits: cantripChoice.unusedCredits,
+        startingFeatChoiceCount: raceTraits.startingFeatChoiceCount ?? 0,
+        startingFeatSourceName: raceTraits.subraceName || raceTraits.raceName || "Ancestry",
         ...proficiencyOptions,
         ...gearOptions,
       };
@@ -2518,6 +2637,7 @@ async function startNewAdventure() {
   heroOptions.raceSelection = raceSelection;
   showDungeonLayout = false;
   const initialDungeonState = createInitialState(chosenName, null, heroOptions);
+  if (!(await chooseStartingFeatsForHero(initialDungeonState.fighters.hero, heroOptions.startingFeatChoiceCount, heroOptions.startingFeatSourceName))) return;
   state = createHomeState([initialDungeonState.fighters.hero], [], { cp: 0, sp: 0, gp: 0 }, { ...initialDungeonState.party, partyTomes: initialDungeonState.partyTomes ?? [] });
   state.saveSlotId = slotId;
   activeSaveSlot = slotId;

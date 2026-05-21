@@ -2143,6 +2143,19 @@ function fighterFeatSpellIds(fighter = state?.fighters?.hero) {
     .filter((spellId) => getContentDefinition("spells", spellId));
 }
 
+function fighterHasFeatSpell(fighter, spellId) {
+  return fighterFeatSpellIds(fighter).includes(canonicalSpellId(spellId));
+}
+
+function featSpellPointBonus(fighter = state?.fighters?.hero) {
+  return fighterFeatSpellIds(fighter).reduce((sum, spellId) => {
+    const spell = getContentDefinition("spells", spellId);
+    const spellLevel = spellBaseLevel(spell);
+    if (spellLevel <= 0) return sum;
+    return sum + (spell.cost ?? spell.costsByLevel?.[spellLevel] ?? ({ 1: 2, 2: 3, 3: 5 }[spellLevel] ?? 0));
+  }, 0);
+}
+
 function racialSpellAbilityDefinitions(fighter = state?.fighters?.hero) {
   const race = fighter?.raceSelection?.raceId ?? fighter?.race;
   const subrace = fighter?.raceSelection?.subraceId ?? fighter?.subrace;
@@ -2365,11 +2378,11 @@ function canonicalSpellId(spellId) {
 function spellPointMaximum(fighter) {
   const level = fighter?.level ?? 1;
   const progression = fighter?.spellPointProgression ?? {};
-  let points = fighter?.spellPointMax ?? progression[level] ?? 0;
+  let points = Object.keys(progression).length ? (progression[level] ?? 0) : (fighter?.spellPointMax ?? 0);
   for (const [entryLevel, value] of Object.entries(progression)) {
     if (level >= Number(entryLevel)) points = value;
   }
-  return Math.max(0, (Number(points) || 0) + (fighter?.comfortSpellPointBonus ?? 0));
+  return Math.max(0, (Number(points) || 0) + featSpellPointBonus(fighter) + (fighter?.comfortSpellPointBonus ?? 0));
 }
 
 function classSpellListForFighter(fighter = state?.fighters?.hero) {
@@ -2419,6 +2432,7 @@ function maxSpellLevelForFighter(fighter) {
 
 function spellUnlockedForFighter(fighter, spell) {
   if (!fighter || !spell) return false;
+  if (fighterHasFeatSpell(fighter, spell.id)) return true;
   return spellBaseLevel(spell) <= maxSpellLevelForFighter(fighter);
 }
 
@@ -2431,7 +2445,7 @@ function ensureSpellPointState(fighter) {
   fighter.classSpellList = fighter.classSpellList.map(canonicalSpellId);
   fighter.classCantripList = fighter.classCantripList.map(canonicalSpellId);
   const knownSpellList = classKnownSpellListForFighter(fighter).map(canonicalSpellId);
-  fighter.spells = [...(fighter.spells ?? [])].map(canonicalSpellId).filter((spellId) => knownSpellList.includes(spellId));
+  fighter.spells = uniqueValues([...(fighter.spells ?? []), ...fighterFeatSpellIds(fighter)]).map(canonicalSpellId).filter((spellId) => knownSpellList.includes(spellId));
   return fighter;
 }
 
@@ -2594,7 +2608,7 @@ function raceTraitsForSelection(selection = defaultRaceSelection) {
   for (const ability of normalized.abilityChoices.slice(0, choiceCount)) {
     chosenBonuses[ability] = (chosenBonuses[ability] ?? 0) + 1;
   }
-  const abilityBonuses = mergeAbilityBonuses(base.abilityBonuses, subrace.abilityBonuses, chosenBonuses);
+  const abilityBonuses = mergeAbilityBonuses(subrace.replaceBaseAbilityBonuses ? {} : base.abilityBonuses, subrace.abilityBonuses, chosenBonuses);
   const damageResistances = uniqueValues([...(base.damageResistances ?? []), ...(subrace.damageResistances ?? []), ancestry?.damageType]);
   const damageImmunities = uniqueValues([...(base.damageImmunities ?? []), ...(subrace.damageImmunities ?? [])]);
   return {
@@ -2615,6 +2629,7 @@ function raceTraitsForSelection(selection = defaultRaceSelection) {
     skillProficiencies: uniqueValues([...(base.skillProficiencies ?? []), ...(subrace.skillProficiencies ?? [])]),
     skillChoiceCount: (base.skillChoiceCount ?? 0) + (subrace.skillChoiceCount ?? 0),
     skillChoices: uniqueValues([...(base.skillChoices ?? allSkillIds), ...(subrace.skillChoices ?? [])]),
+    startingFeatChoiceCount: (base.startingFeatChoiceCount ?? 0) + (subrace.startingFeatChoiceCount ?? 0),
     toolProficiencies: uniqueValues([...(base.toolProficiencies ?? []), ...(subrace.toolProficiencies ?? [])]),
     toolChoiceCount: (base.toolChoiceCount ?? 0) + (subrace.toolChoiceCount ?? 0),
     toolChoices: uniqueValues([...(base.toolChoices ?? []), ...(subrace.toolChoices ?? [])]),

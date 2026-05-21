@@ -205,6 +205,14 @@ const speciesDefinitions = {
     base: { abilityBonuses: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 }, speedFeet: 30 },
     subraces: {
       "standard-human": { name: "Standard Human", traits: ["Standard Human: +1 to every ability score."] },
+      "variant-human": {
+        name: "Variant Human",
+        replaceBaseAbilityBonuses: true,
+        abilityChoiceCount: 2,
+        skillChoiceCount: 1,
+        startingFeatChoiceCount: 1,
+        traits: ["Variant Human: choose two different +1 ability bonuses, one skill proficiency, and one feat."],
+      },
     },
   },
   dwarf: {
@@ -593,6 +601,7 @@ const els = {
   gameDialogInput: document.querySelector("#game-dialog-input"),
   gameDialogActions: document.querySelector("#game-dialog-actions"),
   tutorialTour: document.querySelector("#tutorial-tour"),
+  tutorialTourCard: document.querySelector(".tutorial-tour-card"),
   tutorialHighlight: document.querySelector("#tutorial-highlight"),
   tutorialTourStep: document.querySelector("#tutorial-tour-step"),
   tutorialTourTitle: document.querySelector("#tutorial-tour-title"),

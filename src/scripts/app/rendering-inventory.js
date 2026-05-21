@@ -1153,7 +1153,7 @@ function renderHeroStatusCard(element, fighter) {
   element.innerHTML = `
     <div class="fighter-top">
       ${combatantArtworkMarkup(fighter, "sidebar-hero-art")}
-      <div>
+      <div class="fighter-summary">
         <div class="fighter-name">${fighter.name}</div>
         <div class="fighter-role">${escapeHtml(combatantRoleLabel(fighter))}</div>
       </div>
@@ -1327,6 +1327,8 @@ function temporaryEffectDetails(effect) {
   if (effect.sneakAttackDiceBonus) parts.push(`${abilityLabel(effect.sneakAttackDiceBonus)} Sneak Attack dice`);
   if (effect.classBonusLines?.length) parts.push(...effect.classBonusLines);
   if (effect.attackAdvantage) parts.push("attack advantage");
+  if (effect.stealthAdvantage) parts.push("Stealth advantage");
+  if (effect.ignoredByMonsters) parts.push("ignored by monsters when targeted");
   if (effect.speedLocked) parts.push("movement locked");
   if (effect.actionLocked) parts.push("action locked");
   if (effect.resistances?.length) parts.push(`resists ${effect.resistances.join(", ")}`);
@@ -3544,6 +3546,10 @@ async function createRosterHero() {
       { ...heroOptions, raceSelection, classId },
     ),
   );
+  if (!(await chooseStartingFeatsForHero(hero, heroOptions.startingFeatChoiceCount, heroOptions.startingFeatSourceName))) {
+    showPlanningTableInfo();
+    return;
+  }
   hero.id = heroId;
   hero.token = tokenFromName(hero.name, hero.token);
   hero.partyRole = defaultPartyRoleForHero(hero);
@@ -3551,8 +3557,13 @@ async function createRosterHero() {
   rosterIds.add(heroId);
   state.party.rosterIds = Array.from(rosterIds);
   state.fighters[heroId] = prepareRestedHero(hero, homeHeroPositions(state.party.rosterIds).find((entry) => entry.id === heroId)?.position ?? { x: 4, y: 6 });
+  const addedToActiveParty = isClassHero(state.fighters[heroId]) && activeClassHeroIds().length < 4;
+  if (addedToActiveParty) {
+    state.party.heroIds = uniqueValues([...(state.party.heroIds ?? ["hero"]), heroId]);
+    state.party.activeHeroId = state.party.activeHeroId ?? heroId;
+  }
   roomIsBuilt = false;
-  addLog(`${hero.name} joins the roster.`, "important");
+  addLog(`${hero.name} joins the roster${addedToActiveParty ? " and active party" : ""}.`, "important");
   window.DepthboundPlaytest?.submitRosterHero?.(state.fighters[heroId]);
   render();
   showPlanningTableInfo();
@@ -6586,8 +6597,12 @@ function hideAbilitiesMenu() {
 
 let homeMenuPanel = "main";
 
+function availableLocalCustomDungeons() {
+  return window.DungeonCustom?.list?.() ?? [];
+}
+
 function setHomeMenuPanel(panel = "main") {
-  homeMenuPanel = panel;
+  homeMenuPanel = panel === "custom-dungeons" && availableLocalCustomDungeons().length === 0 ? "adventure" : panel;
   renderHomeAdventurePanels();
 }
 
@@ -6596,6 +6611,8 @@ function campaignProgressText(campaignId, count) {
 }
 
 function renderHomeAdventurePanels() {
+  const customDungeons = availableLocalCustomDungeons();
+  if (homeMenuPanel === "custom-dungeons" && customDungeons.length === 0) homeMenuPanel = "adventure";
   const panels = {
     main: els.homeMainActions,
     adventure: els.homeAdventureActions,
@@ -6614,6 +6631,7 @@ function renderHomeAdventurePanels() {
   els.goEmberveinFirstClaim?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${emberveinCompleted}/1`));
   els.goDwarvenSmithyEmberOath?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${smithyCompleted}/8`));
   els.goDwarvenSmithyEmberOath?.classList.toggle("hidden", !smithyUnlocked);
+  els.homeAdventureActions?.querySelector('[data-home-menu="custom-dungeons"]')?.classList.toggle("hidden", customDungeons.length === 0);
 
   if (els.homeRandomDungeonActions) {
     const themes = window.DungeonContent
@@ -6637,7 +6655,6 @@ function renderHomeAdventurePanels() {
   }
 
   if (els.homeCustomDungeonActions) {
-    const customDungeons = window.DungeonCustom?.list?.() ?? [];
     els.homeCustomDungeonActions.innerHTML = `
       ${
         customDungeons.length
@@ -7987,17 +8004,21 @@ function selectableFeatDefinitions(hero) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function applyConstitutionMaxHpDelta(hero, oldConMod) {
+  const newConMod = scoreToMod(baseAbilityScore(hero, "con"));
+  const conHpGain = Math.max(0, newConMod - oldConMod) * (hero.level ?? 1);
+  if (conHpGain) {
+    hero.baseMaxHp = (hero.baseMaxHp ?? hero.maxHp ?? 1) + conHpGain;
+    hero.maxHp = hero.baseMaxHp;
+  }
+  return conHpGain;
+}
+
 function applyLevelUpAbilityIncrease(hero, ability, amount, oldConMod) {
   if (!abilities.includes(ability) || !amount) return 0;
   hero.abilityScores = Object.fromEntries(abilities.map((entry) => [entry, baseAbilityScore(hero, entry)]));
   hero.abilityScores[ability] = Math.min(20, hero.abilityScores[ability] + amount);
-  const newConMod = scoreToMod(hero.abilityScores.con);
-  const conHpGain = Math.max(0, newConMod - oldConMod) * (hero.level ?? 1);
-  if (conHpGain) {
-    hero.baseMaxHp += conHpGain;
-    hero.maxHp = hero.baseMaxHp;
-  }
-  return conHpGain;
+  return applyConstitutionMaxHpDelta(hero, oldConMod);
 }
 
 function applyLevelUpAbilityIncreases(hero, increases, oldConMod) {
@@ -8005,11 +8026,7 @@ function applyLevelUpAbilityIncreases(hero, increases, oldConMod) {
   for (const ability of abilities) {
     hero.abilityScores[ability] = Math.min(20, hero.abilityScores[ability] + (increases[ability] ?? 0));
   }
-  const newConMod = scoreToMod(hero.abilityScores.con);
-  const conHpGain = Math.max(0, newConMod - oldConMod) * (hero.level ?? 1);
-  hero.baseMaxHp += conHpGain;
-  hero.maxHp = hero.baseMaxHp;
-  return conHpGain;
+  return applyConstitutionMaxHpDelta(hero, oldConMod);
 }
 
 async function chooseFeatAbilityIncrease(hero, feat, choice, entry, oldConMod) {
@@ -8185,12 +8202,13 @@ function applyFeatStaticBenefits(hero, feat) {
   }
 }
 
-async function chooseAndApplyFeat(hero, oldConMod) {
+async function chooseAndApplyFeat(hero, oldConMod, options = {}) {
   const feats = selectableFeatDefinitions(hero);
   if (!feats.length) return null;
+  const oldSpellPointMax = spellPointMaximum(hero);
   const featId = await showSelectChoiceDialog({
-    title: "Choose a Feat",
-    message: "Choose a feat instead of the Ability Score Improvement.",
+    title: options.title ?? "Choose a Feat",
+    message: options.message ?? "Choose a feat instead of the Ability Score Improvement.",
     actor: hero,
     label: "Feat",
     choices: feats.map((feat) => ({
@@ -8198,8 +8216,8 @@ async function chooseAndApplyFeat(hero, oldConMod) {
       label: feat.name,
       description: [feat.description, featChoiceSummary(feat)].filter(Boolean).join(" "),
     })),
-    confirmText: "Take Feat",
-    cancelText: "Cancel Level Up",
+    confirmText: options.confirmText ?? "Take Feat",
+    cancelText: options.cancelText ?? "Cancel Level Up",
   });
   if (!featId) return null;
   const feat = featDefinition(featId);
@@ -8213,8 +8231,28 @@ async function chooseAndApplyFeat(hero, oldConMod) {
   hero.feats = [...fighterFeatEntries(hero), entry];
   applyFeatStaticBenefits(hero, feat);
   ensureFighterAbilityState(hero);
+  const spellPointGain = Math.max(0, spellPointMaximum(hero) - oldSpellPointMax);
+  if (spellPointGain) hero.spellPoints = Math.min(spellPointMaximum(hero), (hero.spellPoints ?? 0) + spellPointGain);
   refreshDerivedStats(hero);
   return ` Feat gained: ${feat.name}${notes.length ? ` (${notes.join("; ")})` : ""}.`;
+}
+
+async function chooseStartingFeatsForHero(hero, count = 0, sourceName = "Ancestry") {
+  const total = Math.max(0, Math.floor(Number(count) || 0));
+  const notes = [];
+  for (let index = 0; index < total; index += 1) {
+    const oldConMod = scoreToMod(baseAbilityScore(hero, "con"));
+    const note = await chooseAndApplyFeat(hero, oldConMod, {
+      title: `${sourceName} Feat`,
+      message: `${sourceName} grants a starting feat. Choose one eligible feat (${index + 1}/${total}).`,
+      confirmText: "Take Feat",
+      cancelText: "Cancel Character",
+    });
+    if (note === null) return false;
+    notes.push(note.trim());
+  }
+  if (notes.length && state?.log) addLog(`${hero.name} gains ${notes.join(" ")}`, "important");
+  return true;
 }
 
 async function chooseAbilityScoreImprovementOrFeat(hero, oldConMod) {

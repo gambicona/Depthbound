@@ -703,10 +703,10 @@ spell("invisibility", {
   range: { kind: "touch", feet: 5 },
   target: "ally",
   ...concentration3,
-  effect: { kind: "status", status: { id: "invisible", label: "Invisible", acBonus: 2, attackBonus: 2, durationRounds: 3 } },
+  effect: { kind: "status", status: { id: "invisible", label: "Invisible", stealthAdvantage: true, attackAdvantage: true, ignoredByMonsters: true, durationRounds: 3 } },
   upcast: { targetsPerLevel: 1 },
   aiCategory: "escape-mobility",
-  description: "Concentration, 3 rounds. Ally gains better defense and attack openings.",
+  description: "Concentration, 3 rounds. Ally gains advantage on Stealth checks and monsters ignore them while choosing targets.",
 });
 
 spell("shatter", {

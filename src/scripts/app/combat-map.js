@@ -385,6 +385,16 @@ function fighterIsStealthing(fighter) {
   return Boolean(stealthState(fighter));
 }
 
+function fighterIsInvisibleToMonsters(fighter) {
+  return Boolean((fighter?.statusEffects ?? []).some((effect) => effect.ignoredByMonsters || effect.id === "invisible"));
+}
+
+function monsterCanTargetHero(monster, hero) {
+  if (!hero?.alive || hero.dead || (hero.hp ?? 0) <= 0) return false;
+  if (fighterIsInvisibleToMonsters(hero)) return false;
+  return true;
+}
+
 function passivePerception(fighter) {
   return 10 + abilityMod(fighter, "wis");
 }
@@ -402,7 +412,8 @@ function activePerceptionCheck(fighter, options = {}) {
 }
 
 function stealthCheck(hero) {
-  const rollResult = rollD20ForFighter(hero);
+  const hasStealthAdvantage = (hero?.statusEffects ?? []).some((effect) => effect.stealthAdvantage);
+  const rollResult = rollD20ForFighter(hero, { advantage: hasStealthAdvantage });
   const roll = reliableTalentRoll(hero, "stealth", rollResult.roll);
   const bonus = skillCheckBonus(hero, "dex", "stealth");
   const guidance = guidanceSkillBonus();
@@ -2226,7 +2237,7 @@ function visibleMonsters() {
 }
 
 function monsterHasLineOfSightToHero(monster) {
-  return partyHeroes().some((hero) => hasClearLineOfSightBetweenFighters(monster, hero));
+  return partyHeroes().some((hero) => monsterCanTargetHero(monster, hero) && hasClearLineOfSightBetweenFighters(monster, hero));
 }
 
 function monsterThreatensHeroes(monster) {
@@ -2237,6 +2248,7 @@ function monsterThreatensHeroes(monster) {
   const monsterRoom = roomForPosition(monster.position);
   if (!monsterRoom) return true;
   return partyHeroes().some((hero) => {
+    if (!monsterCanTargetHero(monster, hero)) return false;
     const heroRoom = roomForPosition(hero.position);
     if (!heroRoom) return !fighterIsStealthing(hero) || (hero.stealth?.total ?? 0) <= passivePerception(monster);
     if (heroRoom.id !== monsterRoom.id) return false;
@@ -4929,7 +4941,7 @@ function maybeUseMonsterDeathDefiance(monster, damagePackets = []) {
 async function maybeTriggerMonsterDeathBurst(monster) {
   if (!hasMonsterSpecial(monster, /death throes|greater death throes|industrial catastrophe|continental melt|end-breath ash|pebble scatter|iceberg break|split the heavens|worldspring eruption/i)) return false;
   const rangeFeet = hasMonsterSpecial(monster, /greater death throes/i) ? 30 : 20;
-  const targets = monsterTargetableHeroes().filter((hero) => hero.alive && fightersWithinSquares(hero, monster, rangeFeet / feetPerSquare));
+  const targets = monsterTargetableHeroes(monster).filter((hero) => hero.alive && fightersWithinSquares(hero, monster, rangeFeet / feetPerSquare));
   if (!targets.length) return false;
   const label = hasMonsterSpecial(monster, /industrial catastrophe/i) ? "Industrial Catastrophe" : hasMonsterSpecial(monster, /continental melt/i) ? "Continental Melt" : hasMonsterSpecial(monster, /end-breath ash/i) ? "End-Breath Ash" : hasMonsterSpecial(monster, /pebble scatter/i) ? "Pebble Scatter" : hasMonsterSpecial(monster, /iceberg break/i) ? "Iceberg Break" : hasMonsterSpecial(monster, /split the heavens/i) ? "Split the Heavens" : hasMonsterSpecial(monster, /worldspring eruption/i) ? "Worldspring Eruption" : hasMonsterSpecial(monster, /greater death throes/i) ? "Greater Death Throes" : "Death Throes";
   const dc = monsterSpecialDc(monster);
@@ -6637,7 +6649,7 @@ function maybeUseUndeadFortitude(monster, incomingDamage = 0) {
 
 function targetsInMonsterSpecialRange(monster, feet = monsterSpecialAbilityTuning.rangedSpecialFeet) {
   const maxSquares = feet / feetPerSquare;
-  return monsterTargetableHeroes().filter((hero) => hero.alive && attackGridDistanceBetweenFighters(monster, hero) <= maxSquares && hasClearLineOfSightBetweenFighters(monster, hero));
+  return monsterTargetableHeroes(monster).filter((hero) => hero.alive && attackGridDistanceBetweenFighters(monster, hero) <= maxSquares && hasClearLineOfSightBetweenFighters(monster, hero));
 }
 
 function monsterSpecialSaveExplanation(label, damageType, saveAbility, options = {}) {
@@ -6874,14 +6886,14 @@ async function maybeUseMonsterStartSpecial(monster) {
 
   if (hasMonsterSpecial(monster, /rot stench|nauseating bulk|carrion perfume/i)) {
     const label = monsterSpecialNameMatching(monster, /rot stench|nauseating bulk|carrion perfume/i) ?? "Stench";
-    for (const target of monsterTargetableHeroes().filter((hero) => fightersWithinSquares(hero, monster, 1))) {
+    for (const target of monsterTargetableHeroes(monster).filter((hero) => fightersWithinSquares(hero, monster, 1))) {
       const save = await rollSavingThrow(target, "con", monsterSpecialDc(monster), `${monster.name}'s ${label} forces ${target.name} to make a CON save.`);
       if (!save.success) applyStatusEffect(target, { id: "nauseated", label: "Nauseated", attackBonus: -1, expiresAtEndOfTurn: true });
     }
   }
 
   if (hasMonsterSpecial(monster, /furnace aura|hellfire wings|filth aura|crown of thorns|molten trail|bright seam|ignition flood|wake the deepworks|heart of ore and flame/i)) {
-    for (const target of monsterTargetableHeroes().filter((hero) => fightersWithinSquares(hero, monster, 1))) {
+    for (const target of monsterTargetableHeroes(monster).filter((hero) => fightersWithinSquares(hero, monster, 1))) {
       const dice = specialDamageDice(monster, 6);
       const roll = rollDice(dice.count, dice.sides);
       const isFilth = hasMonsterSpecial(monster, /filth aura/i);
@@ -6919,7 +6931,7 @@ async function maybeUseMonsterStartSpecial(monster) {
 
   if (hasMonsterSpecial(monster, /high tempest aura|thin air aura|maelstrom aura|buried city aura/i)) {
     const type = hasMonsterSpecial(monster, /maelstrom/i) ? "cold" : hasMonsterSpecial(monster, /buried city/i) ? "bludgeoning" : "thunder";
-    for (const target of monsterTargetableHeroes().filter((hero) => fightersWithinSquares(hero, monster, 1))) {
+    for (const target of monsterTargetableHeroes(monster).filter((hero) => fightersWithinSquares(hero, monster, 1))) {
       const dice = specialDamageDice(monster, 6);
       const roll = rollDice(dice.count, dice.sides);
       applySpecialDamage(monster, target, Math.max(1, Math.floor((roll.total + dice.bonus) / 2)), type, "Elemental Aura");
@@ -7052,7 +7064,7 @@ async function maybeUseMonsterStartSpecial(monster) {
     expiresAtEndOfTurn: true,
   }), { maxTargets: 3, pullTargets: true })) return true;
   if (await tryMonsterAreaSpecial(monster, /stampede|gravequake|stormhorn burst|root-rending roar|bossroar/i, "Roar", "bludgeoning", "str", monsterSpecialAbilityTuning.burstRangeFeet)) {
-    for (const target of monsterTargetableHeroes()) {
+    for (const target of monsterTargetableHeroes(monster)) {
       if (fightersWithinSquares(monster, target, monsterSpecialAbilityTuning.burstRangeFeet / feetPerSquare)) {
         applyStatusEffect(target, { id: "shaken", label: "Shaken", attackBonus: monsterSpecialAbilityTuning.bossRoarAttackPenalty, expiresAtEndOfTurn: true });
       }
