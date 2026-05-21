@@ -8,17 +8,11 @@ packs to find (Medizin Pack Proviant Pack, etc) that can either be sold to merch
 Factions with quests (Monsterhunter, buying pelts etc, elementalists, Gravebinder etc)
 Arena fighting pit for glory
 
-more floor and chest traps
-
 random racial names.
 
-Variant Human
-
 hidden assassin monsters
+constructs hiding as furniture
 
 Quests:
 stealthing
 find secret rooms
-
-tutorial overhaul
-hide custom dungeon menu point if none exists

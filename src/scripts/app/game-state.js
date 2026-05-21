@@ -668,6 +668,8 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
     customDungeon: {
       id: template.id,
       name: template.name,
+      oneShotDungeon: Boolean(template.oneShotDungeon),
+      oneShotDungeonId: template.oneShotDungeonId ?? (template.oneShotDungeon ? template.id : null),
       goal: template.goal ?? { type: "reachExit" },
       monsterSummary: customDungeonMonsterSummary(monsters),
       intro: template.intro ?? { text: "", images: [] },
@@ -918,9 +920,10 @@ function durationSecondsFromDefinition(source = {}) {
 
 function prepareTimedEffect(effect) {
   if (!effect || effect.expiresAtDungeonTimeSeconds || effect.expiresAtEndOfTurn || effect.expiresAtStartOfTurn) return effect;
+  if (effect.startsOnNextEncounter && state?.mode !== "combat") return { ...effect };
   const durationSeconds = durationSecondsFromDefinition(effect);
   if (durationSeconds <= 0) return effect;
-  const prepared = { ...effect, durationSeconds };
+  const prepared = { ...effect, startsOnNextEncounter: false, durationSeconds };
   prepared.expiresAtDungeonTimeSeconds = dungeonElapsedSeconds({ sync: false }) + durationSeconds;
   return prepared;
 }
@@ -1031,6 +1034,19 @@ function expireTimedDungeonEffects() {
   expiredCount += expireTimedSpellAreas(nowSeconds);
   expiredCount += clearExpiredConcentrations();
   return expiredCount;
+}
+
+function startNextEncounterEffects() {
+  let started = 0;
+  for (const fighter of Object.values(state?.fighters ?? {})) {
+    if (!fighter?.statusEffects?.length) continue;
+    fighter.statusEffects = fighter.statusEffects.map((effect) => {
+      if (!effect?.startsOnNextEncounter || effect.expiresAtDungeonTimeSeconds) return effect;
+      started += 1;
+      return prepareTimedEffect(effect);
+    });
+  }
+  return started;
 }
 
 function normalizeHomeData(home = null) {
@@ -5560,6 +5576,7 @@ function normalizeLoadedState(loadedState) {
     }
     fighter.statusEffects = (fighter.statusEffects ?? []).map((effect) => {
       if (!effect || effect.expiresAtDungeonTimeSeconds || effect.expiresAtEndOfTurn || effect.expiresAtStartOfTurn) return effect;
+      if (effect.startsOnNextEncounter) return effect;
       const durationSeconds = durationSecondsFromDefinition(effect);
       return durationSeconds > 0 ? { ...effect, durationSeconds, expiresAtDungeonTimeSeconds: loadedDungeonTime + durationSeconds } : effect;
     });

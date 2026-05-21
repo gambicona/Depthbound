@@ -1304,6 +1304,7 @@ function temporaryEffectDurationText(effect) {
   if (effect.expiresAtHome) return "";
   if (effect.expiresAtStartOfTurn) return "Until start of turn";
   if (effect.expiresAtEndOfTurn) return "Until end of turn";
+  if (effect.startsOnNextEncounter && !effect.expiresAtDungeonTimeSeconds) return "Next encounter";
   const remainingSeconds = timedEffectRemainingSeconds(effect);
   if (remainingSeconds != null) return formatDuration(remainingSeconds);
   if (effect.durationRounds) return `${effect.durationRounds} round${effect.durationRounds === 1 ? "" : "s"}`;
@@ -4226,6 +4227,7 @@ function addObjectInteractionBlessing(hero, component, total, greatSuccess) {
       ...(component.status ?? { saveBonus: 1 }),
       expiresAtHome: component.expiresAtHome ?? true,
       durationRounds: component.durationRounds,
+      startsOnNextEncounter: Boolean(component.durationRounds),
     });
   }
   return `${targets.map((target) => target.name).join(", ")} gain ${component.statusLabel ?? component.label ?? "a blessing"}.`;
@@ -4263,12 +4265,12 @@ function resolveObjectInteractionSuccess(hero, object, component, total, rollRes
   } else if (effect === "soulCage") {
     const tempHp = Math.max(3, proficiencyBonus(hero) + Math.max(0, abilityMod(hero, "cha")));
     for (const target of partyHeroes().filter((entry) => entry.alive)) {
-      applyStatusEffect(target, { id: "freed-soul", label: "Freed Soul", tempHp, durationRounds: 10 });
+      applyStatusEffect(target, { id: "freed-soul", label: "Freed Soul", tempHp, durationRounds: 10, startsOnNextEncounter: true });
     }
     messages.push(`The freed soul shields the party with ${tempHp} temporary HP.`);
   } else if (effect === "contractLectern") {
     for (const target of partyHeroes().filter((entry) => entry.alive)) {
-      applyStatusEffect(target, { id: "contract-loophole", label: "Contract Loophole", resistances: ["fire"], durationRounds: 10 });
+      applyStatusEffect(target, { id: "contract-loophole", label: "Contract Loophole", resistances: ["fire"], durationRounds: 10, startsOnNextEncounter: true });
     }
     messages.push("The party gains fire resistance for the next encounter.");
     if (greatSuccess) {
@@ -4276,7 +4278,7 @@ function resolveObjectInteractionSuccess(hero, object, component, total, rollRes
       if (name) messages.push(`Found ${name}.`);
     }
   } else if (effect === "futureReflection") {
-    applyStatusEffect(hero, { id: "future-reflection", label: "Future Reflection", saveBonus: 2, initiativeBonus: 2, durationRounds: 10 });
+    applyStatusEffect(hero, { id: "future-reflection", label: "Future Reflection", saveBonus: 2, initiativeBonus: 2, durationRounds: 10, startsOnNextEncounter: true });
     messages.push(`${hero.name} reads a useful future reflection.`);
     if (greatSuccess && revealExitRoomFromFeature()) messages.push("The exit room is revealed.");
   } else if (effect === "spellbookStand") {
@@ -4301,7 +4303,7 @@ function resolveObjectInteractionSuccess(hero, object, component, total, rollRes
     const removed = cleanseCommonBadStatuses(hero);
     if (removed > 0) messages.push(`${hero.name} sheds ${removed} harmful effect${removed === 1 ? "" : "s"}.`);
     else {
-      applyStatusEffect(hero, { id: "confessed", label: "Confessed", saveBonus: 1, durationRounds: 10 });
+      applyStatusEffect(hero, { id: "confessed", label: "Confessed", saveBonus: 1, durationRounds: 10, startsOnNextEncounter: true });
       messages.push(`${hero.name} gains +1 to saves for the next encounter.`);
     }
   } else if (effect === "offeringBlessing") {
@@ -4321,7 +4323,7 @@ function resolveObjectInteractionSuccess(hero, object, component, total, rollRes
   } else if (effect === "mirageCrystal") {
     const revealed = revealNearbyFeatureTraps(object);
     messages.push(revealed ? `${revealed} nearby hidden danger${revealed === 1 ? "" : "s"} revealed.` : "The illusion thins, but reveals no traps nearby.");
-    if (greatSuccess) applyStatusEffect(hero, { id: "mirage-decoy", label: "Mirage Decoy", acBonus: 2, durationRounds: 10 });
+    if (greatSuccess) applyStatusEffect(hero, { id: "mirage-decoy", label: "Mirage Decoy", acBonus: 2, durationRounds: 10, startsOnNextEncounter: true });
   } else if (effect === "eggHarvest") {
     object.investigated = true;
     const name = grantObjectInteractionItem(hero, objectTags(object).includes("web") ? "spider-silk" : "glowspore-dust", "egg-cluster");
@@ -4348,7 +4350,7 @@ function resolveObjectInteractionSuccess(hero, object, component, total, rollRes
     messages.push(`${hero.name}'s gear is tempered for the dungeon.`);
   } else if (effect === "incenseWard") {
     const resistance = objectInteractionResistanceType(object, component);
-    applyStatusEffect(hero, { id: `${resistance}-incense-ward`, label: "Incense Ward", resistances: [resistance], durationRounds: 10 });
+    applyStatusEffect(hero, { id: `${resistance}-incense-ward`, label: "Incense Ward", resistances: [resistance], durationRounds: 10, startsOnNextEncounter: true });
     messages.push(`${hero.name} gains ${resistance} resistance for the next encounter.`);
   } else {
     messages.push(addObjectInteractionBlessing(hero, component, total, greatSuccess));
@@ -4601,6 +4603,7 @@ function statusEffectDetails(status = {}) {
 function statusDurationText(status = {}) {
   if (status.expiresAtHome) return "until home";
   if (status.expiresAtEndOfTurn) return "until end of turn";
+  if (status.startsOnNextEncounter) return "next encounter";
   if (status.durationRounds) return `${status.durationRounds} rounds`;
   return "temporary";
 }
@@ -6601,6 +6604,15 @@ function availableLocalCustomDungeons() {
   return window.DungeonCustom?.list?.() ?? [];
 }
 
+function availableOneShotDungeons() {
+  return window.DungeonOneShots?.list?.() ?? [];
+}
+
+function completedOneShotDungeons() {
+  const completed = state.questFlags?.oneShotDungeonCompletions;
+  return completed && typeof completed === "object" && !Array.isArray(completed) ? completed : {};
+}
+
 function setHomeMenuPanel(panel = "main") {
   homeMenuPanel = panel === "custom-dungeons" && availableLocalCustomDungeons().length === 0 ? "adventure" : panel;
   renderHomeAdventurePanels();
@@ -6612,11 +6624,14 @@ function campaignProgressText(campaignId, count) {
 
 function renderHomeAdventurePanels() {
   const customDungeons = availableLocalCustomDungeons();
+  const oneShotDungeons = availableOneShotDungeons();
+  const oneShotCompletions = completedOneShotDungeons();
   if (homeMenuPanel === "custom-dungeons" && customDungeons.length === 0) homeMenuPanel = "adventure";
   const panels = {
     main: els.homeMainActions,
     adventure: els.homeAdventureActions,
     "main-story": els.homeMainStoryActions,
+    "one-shot-dungeons": els.homeOneShotDungeonActions,
     "random-dungeons": els.homeRandomDungeonActions,
     "custom-dungeons": els.homeCustomDungeonActions,
   };
@@ -6632,6 +6647,19 @@ function renderHomeAdventurePanels() {
   els.goDwarvenSmithyEmberOath?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${smithyCompleted}/8`));
   els.goDwarvenSmithyEmberOath?.classList.toggle("hidden", !smithyUnlocked);
   els.homeAdventureActions?.querySelector('[data-home-menu="custom-dungeons"]')?.classList.toggle("hidden", customDungeons.length === 0);
+
+  if (els.homeOneShotDungeonActions) {
+    els.homeOneShotDungeonActions.innerHTML = `
+      ${oneShotDungeons
+        .map((dungeon) => {
+          const completed = Boolean(oneShotCompletions[dungeon.id]);
+          return `<button type="button" data-one-shot-dungeon-id="${escapeAttribute(dungeon.id)}"><span>${escapeHtml(dungeon.name)}</span>${completed ? "<small>✓</small>" : ""}</button>`;
+        })
+        .join("")}
+      <hr />
+      <button type="button" data-home-menu="adventure">Back</button>
+    `;
+  }
 
   if (els.homeRandomDungeonActions) {
     const themes = window.DungeonContent

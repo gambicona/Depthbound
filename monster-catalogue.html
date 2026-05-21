@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Depthbound Monster Catalogue</title>
+    <link rel="stylesheet" href="src/styles/main.css" />
+    <style>
+      body {
+        background:
+          linear-gradient(rgba(5, 13, 14, 0.82), rgba(5, 13, 14, 0.94)),
+          var(--chrome-body-bg);
+        min-height: 100vh;
+        overflow: hidden;
+        padding-bottom: 0;
+      }
+
+      .monster-page {
+        display: grid;
+        grid-template-columns: 360px minmax(0, 1fr);
+        height: 100vh;
+        min-height: 0;
+      }
+
+      .monster-browser {
+        background: var(--panel);
+        border-right: 1px solid var(--line);
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        min-height: 0;
+      }
+
+      .monster-topbar,
+      .monster-detail-topbar {
+        align-items: center;
+        background: var(--panel-2);
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+        padding: 12px 14px;
+      }
+
+      .monster-topbar h1,
+      .monster-detail-topbar h2 {
+        font-size: 1rem;
+        margin: 0;
+      }
+
+      .monster-topbar-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .monster-controls {
+        border-bottom: 1px solid var(--line);
+        display: grid;
+        gap: 10px;
+        padding: 12px 14px;
+      }
+
+      .monster-controls input,
+      .monster-controls select {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--text);
+        min-height: 36px;
+        padding: 7px 9px;
+        width: 100%;
+      }
+
+      .monster-control-grid {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .monster-controls label {
+        color: var(--muted);
+        display: grid;
+        font-size: 0.76rem;
+        font-weight: 800;
+        gap: 4px;
+      }
+
+      .monster-results-meta {
+        color: var(--muted);
+        font-size: 0.78rem;
+        min-height: 1.2em;
+      }
+
+      .monster-list {
+        display: grid;
+        gap: 7px;
+        min-height: 0;
+        overflow: auto;
+        padding: 12px 14px;
+      }
+
+      .monster-list button {
+        align-items: center;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        color: var(--text);
+        cursor: pointer;
+        display: flex;
+        gap: 9px;
+        min-width: 0;
+        min-height: 50px;
+        padding: 7px 9px;
+        text-align: left;
+      }
+
+      .monster-list button.active,
+      .monster-list button:hover {
+        border-color: var(--chrome-accent);
+      }
+
+      .monster-list-title {
+        align-items: center;
+        display: flex;
+        gap: 8px;
+        min-width: 0;
+        width: 100%;
+      }
+
+      .monster-list-title b {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .monster-list-avatar {
+        align-items: center;
+        background: rgba(0, 0, 0, 0.28);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 7px;
+        color: var(--gold);
+        display: flex;
+        flex: 0 0 auto;
+        font-size: 0.86rem;
+        font-weight: 900;
+        height: 34px;
+        justify-content: center;
+        overflow: hidden;
+        width: 34px;
+      }
+
+      .monster-list-avatar img {
+        height: 100%;
+        object-fit: cover;
+        width: 100%;
+      }
+
+      .category-badge,
+      .spawn-badge {
+        align-items: center;
+        border-radius: 5px;
+        display: inline-flex;
+        font-size: 0.68rem;
+        font-weight: 900;
+        justify-content: center;
+        line-height: 1;
+        padding: 3px 6px;
+        white-space: nowrap;
+      }
+
+      .category-badge {
+        background: rgba(248, 237, 218, 0.12);
+        border: 1px solid rgba(248, 237, 218, 0.34);
+        color: #fff5df;
+      }
+
+      .spawn-badge {
+        background: rgba(115, 218, 205, 0.1);
+        border: 1px solid rgba(115, 218, 205, 0.28);
+        color: #d8fffa;
+      }
+
+      .small-note {
+        color: var(--muted);
+        font-size: 0.78rem;
+        line-height: 1.35;
+      }
+
+      .monster-detail {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-width: 0;
+        min-height: 0;
+      }
+
+      .monster-detail-body {
+        min-height: 0;
+        overflow: auto;
+        padding: 18px;
+      }
+
+      .monster-detail-grid {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+      }
+
+      .detail-panel {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: grid;
+        gap: 10px;
+        padding: 13px;
+      }
+
+      .detail-panel h3 {
+        font-size: 0.9rem;
+        margin: 0;
+      }
+
+      .monster-identity {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: 86px minmax(0, 1fr);
+      }
+
+      .monster-token {
+        align-items: center;
+        background: rgba(0, 0, 0, 0.28);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: flex;
+        font-size: 2rem;
+        font-weight: 900;
+        height: 86px;
+        justify-content: center;
+        overflow: hidden;
+        width: 86px;
+      }
+
+      .monster-token img {
+        height: 100%;
+        object-fit: cover;
+        width: 100%;
+      }
+
+      .monster-name-block {
+        min-width: 0;
+      }
+
+      .monster-name-block h2 {
+        font-size: clamp(1.35rem, 2vw, 2rem);
+        letter-spacing: 0;
+        margin: 0 0 5px;
+      }
+
+      .monster-name-block code {
+        color: var(--gold);
+        overflow-wrap: anywhere;
+      }
+
+      .stat-grid {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .stat-tile {
+        background: rgba(0, 0, 0, 0.16);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 7px;
+        display: grid;
+        gap: 3px;
+        min-width: 0;
+        padding: 9px;
+      }
+
+      .stat-tile span {
+        color: var(--muted);
+        font-size: 0.68rem;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .stat-tile b {
+        font-size: 1rem;
+        overflow-wrap: anywhere;
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .pill {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        color: var(--text);
+        font-size: 0.72rem;
+        font-weight: 800;
+        padding: 4px 8px;
+      }
+
+      .info-table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+
+      .info-table th,
+      .info-table td {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 7px 0;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .info-table th {
+        color: var(--muted);
+        font-size: 0.72rem;
+        padding-right: 12px;
+        width: 34%;
+      }
+
+      .ability-list,
+      .spawn-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .ability-card,
+      .spawn-card {
+        background: rgba(0, 0, 0, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 7px;
+        display: grid;
+        gap: 5px;
+        padding: 9px;
+      }
+
+      .ability-card b,
+      .spawn-card b {
+        font-size: 0.86rem;
+      }
+
+      .ability-card p,
+      .spawn-card p {
+        color: var(--muted);
+        font-size: 0.78rem;
+        line-height: 1.42;
+        margin: 0;
+      }
+
+      .raw-json {
+        background: rgba(0, 0, 0, 0.26);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 7px;
+        color: #f6ead8;
+        font-size: 0.74rem;
+        line-height: 1.45;
+        margin: 0;
+        max-height: 380px;
+        overflow: auto;
+        padding: 10px;
+        white-space: pre-wrap;
+      }
+
+      .empty-state {
+        color: var(--muted);
+        padding: 22px;
+      }
+
+      @media (max-width: 980px) {
+        body {
+          overflow: auto;
+        }
+
+        .monster-page {
+          grid-template-columns: 1fr;
+          height: auto;
+          min-height: 100vh;
+        }
+
+        .monster-browser {
+          border-right: 0;
+          min-height: 460px;
+        }
+
+        .monster-detail-grid,
+        .monster-identity,
+        .stat-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="monster-page">
+      <aside class="monster-browser" aria-label="Monster browser">
+        <div class="monster-topbar">
+          <h1>Monster Catalogue</h1>
+          <div class="monster-topbar-actions">
+            <a class="ghost-button" href="index.html">Game</a>
+            <a class="ghost-button" href="dungeon-creator.html">Creator</a>
+          </div>
+        </div>
+
+        <section class="monster-controls" aria-label="Filters">
+          <input id="monster-search" type="search" placeholder="Search name, id, role, tag, ability" />
+          <div class="monster-control-grid">
+            <label>
+              Category
+              <select id="monster-category-filter"></select>
+            </label>
+            <label>
+              Tag
+              <select id="monster-tag-filter"></select>
+            </label>
+            <label>
+              Theme Spawn
+              <select id="monster-theme-filter"></select>
+            </label>
+            <label>
+              Spawn Type
+              <select id="monster-spawn-filter">
+                <option value="">Any</option>
+                <option value="normal">Normal</option>
+                <option value="boss">Boss</option>
+                <option value="none">Not in a theme</option>
+              </select>
+            </label>
+            <label>
+              Ability
+              <select id="monster-ability-filter"></select>
+            </label>
+            <label>
+              Sort
+              <select id="monster-sort">
+                <option value="name">Name</option>
+                <option value="category">Category</option>
+                <option value="spawn">Spawn Coverage</option>
+                <option value="id">ID</option>
+              </select>
+            </label>
+          </div>
+          <div id="monster-results-meta" class="monster-results-meta">Loading monster packs...</div>
+        </section>
+
+        <section id="monster-list" class="monster-list" aria-label="Monsters"></section>
+      </aside>
+
+      <section class="monster-detail" aria-label="Monster details">
+        <div class="monster-detail-topbar">
+          <h2 id="detail-title">Select a monster</h2>
+          <span id="detail-pack" class="small-note"></span>
+        </div>
+        <div id="monster-detail-body" class="monster-detail-body">
+          <p class="empty-state">Choose a monster from the catalogue to inspect its full definition, spawn themes, and pack-file ability notes.</p>
+        </div>
+      </section>
+    </main>
+
+    <script src="src/scripts/content/registry.js"></script>
+    <script src="src/scripts/monster-catalogue.js"></script>
+  </body>
+</html>

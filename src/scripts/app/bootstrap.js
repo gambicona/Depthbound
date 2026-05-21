@@ -538,6 +538,7 @@ const els = {
   homeAdventureActions: document.querySelector("#home-adventure-actions"),
   homeMainStoryActions: document.querySelector("#home-main-story-actions"),
   homeRandomDungeonActions: document.querySelector("#home-random-dungeon-actions"),
+  homeOneShotDungeonActions: document.querySelector("#home-one-shot-dungeon-actions"),
   homeCustomDungeonActions: document.querySelector("#home-custom-dungeon-actions"),
   goVillage: document.querySelector("#go-village"),
   goAdventure: document.querySelector("#go-adventure"),

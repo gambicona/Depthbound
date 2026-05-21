@@ -2546,6 +2546,9 @@ function opportunityThreatensPosition(attacker, defender, position) {
   const profile = opportunityAttackProfile(attacker);
   const range = profileRangeSquares(profile);
   const movedDefender = { ...defender, position };
+  const attackerCells = new Set(window.DungeonGrid.fighterCells(attacker).map(positionKey));
+  const overlapsAttacker = window.DungeonGrid.fighterCells(movedDefender).some((cell) => attackerCells.has(positionKey(cell)));
+  if (overlapsAttacker) return true;
   const threatened = attackGridDistanceBetweenFighters(attacker, movedDefender) <= range;
   if (!threatened) return false;
   if (range > 1) return true;
@@ -2897,6 +2900,12 @@ function checkDungeonCompletion(hero = activeHero()) {
     const partyResources = normalizePartyResources(state.partyResources ?? {});
     if (state.campaignId && state.campaignIndex) {
       completedCampaign[state.campaignId] = Math.max(completedCampaign[state.campaignId] ?? 0, state.campaignIndex);
+    }
+    if (state.customDungeon?.oneShotDungeonId) {
+      questFlags.oneShotDungeonCompletions = {
+        ...(questFlags.oneShotDungeonCompletions ?? {}),
+        [state.customDungeon.oneShotDungeonId]: Date.now(),
+      };
     }
     state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, {
       ...state.party,
@@ -3269,7 +3278,9 @@ function dropLootForMonster(monster) {
   recordNpcMonsterKill(monster);
   addMonsterMaterialDrops(monster);
   const loot = createLootForMonster(monster);
-  addLootPile(loot);
+  const resolvedLoot = resolveMonsterLootDrop(monster, loot);
+  if (!resolvedLoot) return;
+  addLootPile(resolvedLoot);
 }
 
 function addLootPile(loot) {
@@ -3284,6 +3295,60 @@ function addLootPile(loot) {
   existing.items = [...(existing.items ?? []), ...(loot.items ?? [])];
   existing.thrownByHero = Boolean(existing.thrownByHero || loot.thrownByHero);
   return existing;
+}
+
+function lootHasContents(loot) {
+  return Boolean(moneyToCp(loot?.money ?? {}) > 0 || (loot?.heroTokens ?? 0) > 0 || (loot?.items ?? []).length > 0);
+}
+
+function lootContentsText(loot) {
+  const coinText = moneyToCp(loot?.money ?? {}) ? moneyText(loot.money) : "";
+  const tokenText = loot?.heroTokens ? `${loot.heroTokens} Hero Token${loot.heroTokens === 1 ? "" : "s"}` : "";
+  const itemText = (loot?.items ?? []).map((item) => item.name).join(", ");
+  return [coinText, tokenText, itemText].filter(Boolean).join(" and ") || "nothing";
+}
+
+function groundCollectingHeroes() {
+  return partyHeroes().filter((hero) => heroCanAct(hero) && canFighterReceiveInventory(hero) && !fighterIsFlying(hero));
+}
+
+function lootPositionCanBeCollected(position) {
+  const heroes = groundCollectingHeroes();
+  if (!heroes.length) return false;
+  return heroes.some((hero) => canFighterOccupyPosition(hero, position, currentWalkable(hero)));
+}
+
+function nearbyCollectableLootPosition(position) {
+  if (lootPositionCanBeCollected(position)) return position;
+  return surroundingCells(position)
+    .filter((cell) => positionKey(cell) !== positionKey(position))
+    .find((cell) => lootPositionCanBeCollected(cell)) ?? null;
+}
+
+function mainHeroForLootFallback() {
+  const mainHero = state?.fighters?.hero;
+  if (mainHero && !mainHero.dead && canFighterReceiveInventory(mainHero)) return mainHero;
+  return [activeHero(), ...partyHeroes()].find((hero) => hero && !hero.dead && canFighterReceiveInventory(hero)) ?? null;
+}
+
+function grantLootDirectlyToHero(hero, loot, sourceName = "The loot") {
+  if (!hero || !loot) return false;
+  hero.inventory = normalizeInventory(hero.inventory);
+  addMoney(hero.inventory.money, moneyToCp(loot.money ?? {}));
+  hero.inventory.heroTokens = (hero.inventory.heroTokens ?? 0) + (loot.heroTokens ?? 0);
+  for (const item of loot.items ?? []) addItemToInventory(hero, item, "loot-stack");
+  addLog(`${sourceName}'s loot cannot land in a reachable space, so ${hero.name} receives ${lootContentsText(loot)} directly.`, "important");
+  logTomeStorageForItems(loot.items ?? []);
+  return true;
+}
+
+function resolveMonsterLootDrop(monster, loot) {
+  if (!loot) return null;
+  const position = nearbyCollectableLootPosition(loot.position);
+  if (position) return { ...loot, position: { ...position } };
+  if (!lootHasContents(loot)) return null;
+  const receiver = mainHeroForLootFallback();
+  return grantLootDirectlyToHero(receiver, loot, monster?.name ?? "The monster") ? null : loot;
 }
 
 function thrownWeaponLandingPosition(targetPosition) {
@@ -4091,6 +4156,7 @@ async function rollInitiative() {
 
   state.combatStarted = true;
   state.mode = "combat";
+  startNextEncounterEffects();
   for (const entry of state.initiative) {
     const fighter = state.fighters[entry.fighterId];
     if (!fighter || !heroCanAct(fighter)) continue;

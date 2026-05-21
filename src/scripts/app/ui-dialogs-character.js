@@ -2788,6 +2788,40 @@ async function startCustomDungeonWithHero(customDungeonId = "") {
   return startDungeonChoiceWithHero(`custom:${selectedCustomDungeonId}`);
 }
 
+async function startOneShotDungeonWithHero(oneShotDungeonId = "") {
+  const template = await window.DungeonOneShots?.get?.(oneShotDungeonId);
+  if (!template) return;
+  const partyIds = state.party?.heroIds ?? ["hero"];
+  const partyMembers = partyIds.map((id) => state.fighters[id]).filter((hero) => hero && !hero.dead);
+  const comfortScores = homeComfortScoresForActiveParty(state);
+  if (template.intro?.text || template.intro?.images?.length) {
+    await showDungeonStoryDialog({
+      title: template.name,
+      text: template.intro.text,
+      images: template.intro.images,
+      actionLabel: `Venture into the ${template.name}`,
+      goalText: customGoalStatusForTemplate(template).text,
+    });
+  }
+  const previousState = state;
+  state = createCustomDungeonStateFromTemplate(partyMembers, state, template);
+  if (!state) {
+    state = previousState;
+    return;
+  }
+  applyHomeComfortBonusesToDungeonState(state, comfortScores);
+  try {
+    await saveQuickstart(state);
+  } catch (error) {
+    updateSaveStatus(error?.message ?? "Could not write the dungeon restart save.");
+  }
+  roomIsBuilt = false;
+  hideHomeMenu();
+  render();
+  window.DepthboundPlaytest?.syncNow?.();
+  centerViewOnHero();
+}
+
 async function showCampaignMenu(campaignId) {
   const campaign = window.DungeonCampaigns?.get(campaignId);
   if (!campaign) return;

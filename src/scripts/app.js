@@ -540,6 +540,10 @@ els.homeMenu.addEventListener("click", (event) => {
     void startRandomDungeonWithHero(button.dataset.randomDungeonTheme);
     return;
   }
+  if (button?.dataset.oneShotDungeonId) {
+    void startOneShotDungeonWithHero(button.dataset.oneShotDungeonId);
+    return;
+  }
   if (button?.dataset.customDungeonId) {
     void startCustomDungeonWithHero(button.dataset.customDungeonId);
   }
