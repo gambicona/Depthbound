@@ -460,6 +460,7 @@ button:disabled {
 }
 
 .party-panel .fighter-top {
+  align-items: center;
   grid-template-columns: 48px minmax(0, 1fr);
 }
 
@@ -469,7 +470,37 @@ button:disabled {
   max-width: none;
 }
 
+.party-panel .fighters {
+  align-content: start;
+  align-items: start;
+}
+
+.party-panel .fighter-card {
+  align-self: start;
+  gap: 10px;
+  grid-auto-rows: max-content;
+  padding: 12px;
+}
+
+.party-panel .hp-line {
+  gap: 7px;
+}
+
+.party-panel .loadout-line {
+  gap: 7px;
+}
+
+.party-panel .status-line {
+  margin-top: 0;
+}
+
+.party-panel .temporary-effects-button {
+  margin-top: 0;
+}
+
 .party-panel .wallet-line {
+  font-size: 0.74rem;
+  line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
@@ -891,6 +922,24 @@ h1 {
 
 .topbar-primary-actions > .zoom-controls {
   flex: 0 0 auto;
+}
+
+.top-admin-actions {
+  background: rgba(10, 8, 9, 0.28);
+  border: 1px solid rgba(214, 93, 74, 0.32);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 10px;
+}
+
+.top-admin-actions button {
+  font-size: 0.76rem;
+  min-height: 34px;
+  padding: 5px 8px;
+  width: 100%;
 }
 
 .zoom-controls {
@@ -3249,6 +3298,10 @@ button[data-ui-icon]::before,
   padding: 10px;
 }
 
+.inventory-tab-panel > .admin-catalog {
+  max-height: min(620px, 62vh);
+}
+
 .token-manager-row .hero-token-preview {
   height: 56px;
   width: 56px;
@@ -3714,7 +3767,12 @@ button[data-ui-icon]::before,
 }
 
 [data-slot-icon="slot-armor"] { --slot-icon: url("../../assets/icons/ui/armor.svg"); }
+[data-slot-icon="slot-amulet"] { --slot-icon: url("../../assets/icons/ui/amulet.svg"); }
+[data-slot-icon="slot-boots"] { --slot-icon: url("../../assets/icons/ui/boots.svg"); }
 [data-slot-icon="slot-bow"] { --slot-icon: url("../../assets/icons/ui/bow.svg"); }
+[data-slot-icon="slot-bracers"] { --slot-icon: url("../../assets/icons/ui/bracers.svg"); }
+[data-slot-icon="slot-cloak"] { --slot-icon: url("../../assets/icons/ui/cloak.svg"); }
+[data-slot-icon="slot-gauntlets"] { --slot-icon: url("../../assets/icons/ui/gauntlets.svg"); }
 [data-slot-icon="slot-magic"] { --slot-icon: url("../../assets/icons/ui/magic-item.svg"); }
 [data-slot-icon="slot-pack"] { --slot-icon: url("../../assets/icons/ui/pack.svg"); }
 [data-slot-icon="slot-ring"] { --slot-icon: url("../../assets/icons/ui/ring.svg"); }

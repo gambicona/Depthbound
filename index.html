@@ -87,6 +87,16 @@
                 <button id="new-game" class="ghost-button" type="button">Main Menu</button>
                 <button id="tutorial" class="ghost-button" type="button">Tutorial</button>
                 <button id="toggle-admin-mode" class="ghost-button admin-mode-button" type="button">Admin Tools</button>
+                <div id="top-admin-actions" class="top-admin-actions hidden" aria-label="Admin quick actions">
+                  <button class="admin-toggle" type="button" data-action="toggle-admin-teleport">Teleport Off</button>
+                  <button class="admin-toggle" type="button" data-action="toggle-admin-god">God Mode Off</button>
+                  <button type="button" data-action="admin-heal">Full Heal</button>
+                  <button type="button" data-action="admin-refresh">Refresh Actions</button>
+                  <button type="button" data-action="admin-reveal-current-room">Reveal Room</button>
+                  <button type="button" data-action="admin-open-visible-doors">Open Visible Doors</button>
+                  <button type="button" data-action="admin-collect-visible-loot">Collect Visible Loot</button>
+                  <button type="button" data-action="admin-clear-combat">Clear Combat</button>
+                </div>
                 <button id="toggle-layout" class="ghost-button debug-button" type="button">Show Dungeon Layout</button>
                 <button id="debug-kill" class="ghost-button debug-button" type="button">Kill all visible Monsters</button>
               </div>

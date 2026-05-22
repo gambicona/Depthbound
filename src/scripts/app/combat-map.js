@@ -168,7 +168,12 @@ function applyDamageToFighter(defender, damage) {
     return;
   }
   downHero(defender);
-  addLog(`${defender.name} drops to 0 HP and starts making death saves.`, "important");
+  addLog(
+    partyDefeatedOrDying()
+      ? `${defender.name} drops to 0 HP. With no one left standing, the party is defeated.`
+      : `${defender.name} drops to 0 HP and starts making death saves.`,
+    "important",
+  );
   handleHeroDeath();
 }
 
@@ -4544,22 +4549,23 @@ async function makeAttack(attacker, defender, options = {}) {
   totalDamage = await maybeUseSpiritShield(defender, attacker, totalDamage);
   applyDamageToFighter(defender, totalDamage);
   defender.lastDamagedById = attacker.id;
+  const encounterDefeated = partyDefeatedOrDying();
   const finalNecroticDamage =
     packetTotalDamage > 0 && packetNecroticDamage > 0 ? Math.max(0, Math.floor((packetNecroticDamage * totalDamage) / packetTotalDamage)) : 0;
-  maybeUseMonsterSoulSiphon(attacker, finalNecroticDamage, "necrotic");
-  if (!rangedAttack && warlockKnowsInvocation(attacker, "lifedrinker") && totalDamage > 0) {
+  if (!encounterDefeated) maybeUseMonsterSoulSiphon(attacker, finalNecroticDamage, "necrotic");
+  if (!encounterDefeated && !rangedAttack && warlockKnowsInvocation(attacker, "lifedrinker") && totalDamage > 0) {
     const healed = applyHealingToHero(attacker, Math.max(1, Math.floor(abilityMod(attacker, "cha") / 2)));
     if (healed > 0) addLog(`${attacker.name}'s Lifedrinker restores ${healed} HP.`, "heal");
   }
-  if (!isPartyHeroId(attacker.id)) {
+  if (!encounterDefeated && !isPartyHeroId(attacker.id)) {
     await applyMonsterOnHitSpecials(attacker, defender, totalDamage, doublesDamage);
   }
-  if (!isPartyHeroId(defender.id)) {
+  if (!encounterDefeated && !isPartyHeroId(defender.id)) {
     await applyMonsterReactiveSpecials(defender, attacker, totalDamage, !rangedAttack, attackDamage.type);
   }
-  await maybeUseBarbarianAfterDamage(defender, attacker, totalDamage, !rangedAttack);
-  await maybeUseSubclassAfterDamageReactions(defender, attacker, totalDamage, !rangedAttack);
-  if (options.beastFormAttack === "bite" && totalDamage > 0 && !attacker.beastFormHitThisTurn && (attacker.hp ?? 0) < ((attacker.maxHp ?? 1) / 2)) {
+  if (!encounterDefeated) await maybeUseBarbarianAfterDamage(defender, attacker, totalDamage, !rangedAttack);
+  if (!encounterDefeated) await maybeUseSubclassAfterDamageReactions(defender, attacker, totalDamage, !rangedAttack);
+  if (!encounterDefeated && options.beastFormAttack === "bite" && totalDamage > 0 && !attacker.beastFormHitThisTurn && (attacker.hp ?? 0) < ((attacker.maxHp ?? 1) / 2)) {
     attacker.beastFormHitThisTurn = true;
     const healed = Math.min((attacker.maxHp ?? 0) - (attacker.hp ?? 0), Math.max(1, proficiencyBonus(attacker)));
     if (healed > 0) {

@@ -1167,6 +1167,15 @@ function renderHeroStatusCard(element, fighter) {
       : state.mode !== "exploration"
         ? "Search is available while exploring."
         : "No room to search here.";
+  const statusPills = [
+    fighter.dodging ? '<span class="status-pill status-dodge">Dodging</span>' : "",
+    fighter.disengaged ? '<span class="status-pill status-disengage">Disengaged</span>' : "",
+    stealth ? `<span class="status-pill status-dodge" title="Current Stealth total ${stealth.total}">Stealth ${stealth.total}</span>` : "",
+    ...(fighter.statusEffects ?? []).map((effect) => `<span class="status-pill status-dodge" title="${escapeAttribute(temporaryEffectDetails(effect))}">${escapeHtml(statusEffectPillText(effect))}</span>`),
+    fighter.hp <= 0 && !fighter.dead && heroIsStableAtZero(fighter) ? '<span class="status-pill status-dodge">Stable</span>' : "",
+    fighter.hp <= 0 && !fighter.dead && !heroIsStableAtZero(fighter) ? `<span class="status-pill status-dodge">Death saves ${fighter.deathSaves?.successes ?? 0}/3 | ${fighter.deathSaves?.failures ?? 0}/3</span>` : "",
+    fighter.dead ? '<span class="status-pill status-disengage">Dead</span>' : "",
+  ].filter(Boolean);
   element.innerHTML = `
     <div class="fighter-top">
       ${combatantArtworkMarkup(fighter, "sidebar-hero-art")}
@@ -1189,15 +1198,7 @@ function renderHeroStatusCard(element, fighter) {
       <span>AC ${fighter.ac}</span>
       <span>${loadoutText}</span>
     </div>
-    <div class="status-line">
-      ${fighter.dodging ? '<span class="status-pill status-dodge">Dodging</span>' : ""}
-      ${fighter.disengaged ? '<span class="status-pill status-disengage">Disengaged</span>' : ""}
-      ${stealth ? `<span class="status-pill status-dodge" title="Current Stealth total ${stealth.total}">Stealth ${stealth.total}</span>` : ""}
-      ${(fighter.statusEffects ?? []).map((effect) => `<span class="status-pill status-dodge" title="${escapeAttribute(temporaryEffectDetails(effect))}">${escapeHtml(statusEffectPillText(effect))}</span>`).join("")}
-      ${fighter.hp <= 0 && !fighter.dead && heroIsStableAtZero(fighter) ? '<span class="status-pill status-dodge">Stable</span>' : ""}
-      ${fighter.hp <= 0 && !fighter.dead && !heroIsStableAtZero(fighter) ? `<span class="status-pill status-dodge">Death saves ${fighter.deathSaves?.successes ?? 0}/3 | ${fighter.deathSaves?.failures ?? 0}/3</span>` : ""}
-      ${fighter.dead ? '<span class="status-pill status-disengage">Dead</span>' : ""}
-    </div>
+    ${statusPills.length ? `<div class="status-line">${statusPills.join("")}</div>` : ""}
     <button class="temporary-effects-button" type="button" ${temporaryEffects.length ? "" : "disabled"}>
       Temporary effects <span>${temporaryEffects.length}</span>
     </button>
@@ -4921,31 +4922,6 @@ function renderAdminMonsterCatalog() {
   `;
 }
 
-function renderAdminModeTools() {
-  if (!adminEnabled()) return "";
-
-  return `
-    <section class="admin-catalog" aria-label="Admin controls">
-      <div class="admin-coin-row" aria-label="Admin toggles">
-        <button class="admin-toggle ${adminTeleportEnabled ? "active" : ""}" type="button" data-action="toggle-admin-teleport">
-          ${adminTeleportEnabled ? "Teleport On" : "Teleport Off"}
-        </button>
-        <button class="admin-toggle ${adminGodMode ? "active" : ""}" type="button" data-action="toggle-admin-god">
-          ${adminGodMode ? "God Mode On" : "God Mode Off"}
-        </button>
-        <button type="button" data-action="admin-heal">Full Heal</button>
-        <button type="button" data-action="admin-refresh">Refresh Actions</button>
-        <button type="button" data-action="admin-reveal-current-room">Reveal Room</button>
-        <button type="button" data-action="admin-open-visible-doors">Open Visible Doors</button>
-        <button type="button" data-action="admin-collect-visible-loot">Collect Visible Loot</button>
-        <button type="button" data-action="admin-clear-combat">Clear Combat</button>
-      </div>
-    </section>
-    ${renderAdminMonsterCatalog()}
-    ${renderAdminProgressCatalog()}
-  `;
-}
-
 function renderAdminProgressCatalog() {
   const entries = npcAdminProgressEntries();
   const groups = new Map();
@@ -5471,16 +5447,16 @@ function slotLayoutClass(slotId) {
 function slotIconName(slotId) {
   const icons = {
     head: "slot-armor",
-    cloak: "slot-magic",
-    amulet: "slot-magic",
+    cloak: "slot-cloak",
+    amulet: "slot-amulet",
     mainHand: "slot-weapon",
     torso: "slot-armor",
     offHand: "slot-weapon",
-    bracers: "slot-armor",
-    gauntlets: "slot-tool",
+    bracers: "slot-bracers",
+    gauntlets: "slot-gauntlets",
     ring1: "slot-ring",
     ring2: "slot-ring",
-    boots: "slot-armor",
+    boots: "slot-boots",
     quiver: "slot-bow",
     belt1: "slot-pack",
     belt2: "slot-pack",
@@ -5575,6 +5551,7 @@ function inventoryTabs() {
     { id: "equipment", label: "Equipment" },
     { id: "items", label: "Items" },
     ...(state.mode === "home" ? [{ id: "chest", label: "Chest" }] : []),
+    ...(adminEnabled() && inventoryAdminOpen ? [{ id: "vault", label: "Vault" }] : []),
     { id: "materials", label: "Materials" },
   ];
 }
@@ -5680,9 +5657,10 @@ function renderInventoryMenu() {
     </section>
   `;
   const tabPanels = {
-    equipment: `${renderAdminModeTools()}${renderAdminItemCatalog()}${equipmentMarkup}`,
+    equipment: equipmentMarkup,
     items: itemsMarkup,
     chest: state.mode === "home" ? chestMarkup : itemsMarkup,
+    vault: renderAdminItemCatalog(),
     materials: partyResourceInventoryMarkup(),
   };
 
@@ -11464,6 +11442,19 @@ function renderControls() {
   els.toggleLayout.classList.toggle("hidden", !adminEnabled());
   els.debugKill.classList.toggle("hidden", !adminEnabled());
   els.toggleLayout.disabled = !adminEnabled();
+  if (els.topAdminActions) {
+    els.topAdminActions.classList.toggle("hidden", !adminEnabled());
+    const teleport = els.topAdminActions.querySelector("[data-action='toggle-admin-teleport']");
+    const god = els.topAdminActions.querySelector("[data-action='toggle-admin-god']");
+    if (teleport) {
+      teleport.textContent = adminTeleportEnabled ? "Teleport On" : "Teleport Off";
+      teleport.classList.toggle("active", adminTeleportEnabled);
+    }
+    if (god) {
+      god.textContent = adminGodMode ? "God Mode On" : "God Mode Off";
+      god.classList.toggle("active", adminGodMode);
+    }
+  }
   els.zoomOut.disabled = roomZoom <= 0.5;
   els.zoomIn.disabled = roomZoom >= 2;
   els.zoomLabel.textContent = `${Math.round(roomZoom * 100)}%`;

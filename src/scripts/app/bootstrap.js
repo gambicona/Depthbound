@@ -596,6 +596,7 @@ const els = {
   tutorial: document.querySelector("#tutorial"),
   saveGame: document.querySelector("#save-game"),
   toggleAdminMode: document.querySelector("#toggle-admin-mode"),
+  topAdminActions: document.querySelector("#top-admin-actions"),
   toggleLayout: document.querySelector("#toggle-layout"),
   zoomIn: document.querySelector("#zoom-in"),
   zoomOut: document.querySelector("#zoom-out"),

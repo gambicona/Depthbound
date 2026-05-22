@@ -246,6 +246,53 @@ els.buttonThemeSelect?.addEventListener("change", (event) => {
   renderControls();
 });
 els.manageTokenArt?.addEventListener("click", showTokenArtManager);
+function handleAdminQuickAction(action) {
+  if (!adminEnabled()) return false;
+  if (action === "toggle-admin-teleport") {
+    adminTeleportEnabled = !adminTeleportEnabled;
+    addLog(adminTeleportEnabled ? "Admin teleport enabled." : "Admin teleport disabled.", "important");
+    render();
+    if (!els.inventoryMenu.classList.contains("hidden")) renderInventoryMenu();
+    return true;
+  }
+  if (action === "toggle-admin-god") {
+    adminGodMode = !adminGodMode;
+    addLog(adminGodMode ? "God mode enabled." : "God mode disabled.", "important");
+    render();
+    if (!els.inventoryMenu.classList.contains("hidden")) renderInventoryMenu();
+    return true;
+  }
+  if (action === "admin-heal") {
+    adminFullHeal();
+    return true;
+  }
+  if (action === "admin-refresh") {
+    adminRefreshActions();
+    return true;
+  }
+  if (action === "admin-reveal-current-room") {
+    adminRevealCurrentRoom();
+    return true;
+  }
+  if (action === "admin-open-visible-doors") {
+    adminOpenVisibleDoors();
+    return true;
+  }
+  if (action === "admin-collect-visible-loot") {
+    adminCollectVisibleLoot();
+    return true;
+  }
+  if (action === "admin-clear-combat") {
+    adminClearCombat();
+    return true;
+  }
+  return false;
+}
+els.topAdminActions?.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+  if (handleAdminQuickAction(button.dataset.action)) event.preventDefault();
+});
 els.debugKill.addEventListener("click", debugKillVisibleMonsters);
 els.saveGame.addEventListener("click", () => void saveAdventure(state.saveSlotId ?? activeSaveSlot));
 els.chooseSaveFolder?.addEventListener("click", () => void chooseSaveFolderFromMenu());
@@ -708,20 +755,15 @@ els.inventoryMenu.addEventListener("click", (event) => {
   if (button.dataset.action === "toggle-admin") {
     if (!adminEnabled()) return;
     inventoryAdminOpen = !inventoryAdminOpen;
-    if (inventoryAdminOpen) setInventoryTab("equipment");
+    if (inventoryAdminOpen) setInventoryTab("vault");
+    else if (activeInventoryTab === "vault") setInventoryTab("equipment");
     else renderInventoryMenu();
   }
   if (button.dataset.action === "toggle-admin-teleport") {
-    adminTeleportEnabled = !adminTeleportEnabled;
-    addLog(adminTeleportEnabled ? "Admin teleport enabled." : "Admin teleport disabled.", "important");
-    render();
-    renderInventoryMenu();
+    handleAdminQuickAction(button.dataset.action);
   }
   if (button.dataset.action === "toggle-admin-god") {
-    adminGodMode = !adminGodMode;
-    addLog(adminGodMode ? "God mode enabled." : "God mode disabled.", "important");
-    render();
-    renderInventoryMenu();
+    handleAdminQuickAction(button.dataset.action);
   }
   if (button.dataset.action === "toggle-admin-monsters") {
     adminMonsterCatalogOpen = !adminMonsterCatalogOpen;
@@ -735,22 +777,22 @@ els.inventoryMenu.addEventListener("click", (event) => {
     setNpcAdminProgress(button.dataset.npc, button.dataset.progress);
   }
   if (button.dataset.action === "admin-heal") {
-    adminFullHeal();
+    handleAdminQuickAction(button.dataset.action);
   }
   if (button.dataset.action === "admin-refresh") {
-    adminRefreshActions();
+    handleAdminQuickAction(button.dataset.action);
   }
   if (button.dataset.action === "admin-reveal-current-room") {
-    adminRevealCurrentRoom();
+    handleAdminQuickAction(button.dataset.action);
   }
   if (button.dataset.action === "admin-open-visible-doors") {
-    adminOpenVisibleDoors();
+    handleAdminQuickAction(button.dataset.action);
   }
   if (button.dataset.action === "admin-collect-visible-loot") {
-    adminCollectVisibleLoot();
+    handleAdminQuickAction(button.dataset.action);
   }
   if (button.dataset.action === "admin-clear-combat") {
-    adminClearCombat();
+    handleAdminQuickAction(button.dataset.action);
   }
   if (button.dataset.action === "spawn-admin-monster") {
     spawnAdminMonster(button.dataset.monster);
