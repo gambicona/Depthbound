@@ -9,11 +9,11 @@ function updateSaveStatus(message = "") {
       saveSystem.mode === "file"
         ? `Save folder: ${saveSystem.directoryName}.`
         : saveSystem.mode === "unsupported"
-          ? "Folder-backed saves are not supported here. This does not work in Firefox, try Chrome. Still, normal browser storage is available within quota limits (normally only relevant for a lot of custom pictures)."
+          ? "Browser saves are ready. Folder saves work in Chrome or another Chromium browser."
           : saveSystem.mode === "disconnected"
-            ? `Reconnect save folder${saveSystem.directoryName ? ` "${saveSystem.directoryName}"` : ""} to save JSON files.`
-            : "Choose a save folder to use JSON file saves.";
-    const slotText = savedCount > 0 ? `${savedCount} save slot${savedCount === 1 ? "" : "s"} available.` : "No saved adventure found.";
+            ? `Reconnect${saveSystem.directoryName ? ` "${saveSystem.directoryName}"` : " your save folder"} to keep folder saves active.`
+            : "Ready to start. Browser saves work now; a save folder is optional.";
+    const slotText = savedCount > 0 ? `${savedCount} save slot${savedCount === 1 ? "" : "s"} ready.` : "No adventures saved yet.";
     els.saveStatus.textContent = `${folderText} ${slotText}`;
   }
 }
@@ -50,7 +50,8 @@ async function chooseSaveSlotForAdventure() {
   while (true) {
     const selected = await showChoiceDialog({
       title: "Choose Save Slot",
-      message: "Choose the save slot this game will use. Saves during this game will go to that slot unless you deliberately overwrite another one.",
+      message: "Pick where this adventure should live. You can rename the slot next.",
+      progress: heroCreationProgress.save,
       choices: slots.map((slot) => ({
         value: String(slot.id),
         label: `Slot ${slot.id}: ${slot.hasSave ? slot.name : "Empty"}`,
@@ -63,7 +64,8 @@ async function chooseSaveSlotForAdventure() {
     const defaultName = slot?.hasSave ? slot.name : `Save Slot ${slotId}`;
     const slotName = await showGameDialog({
       title: "Name Save File",
-      message: `Pick a name for Slot ${slotId}.`,
+      message: `Name Slot ${slotId} so it is easy to recognize later.`,
+      progress: heroCreationProgress.save,
       input: { label: "Save name", value: defaultName, maxLength: 32 },
       confirmText: "Use Name",
       cancelText: "Back",
@@ -86,6 +88,30 @@ function escapeHtml(value) {
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
+}
+
+const heroCreationProgress = {
+  save: { current: 1, total: 9, label: "Save" },
+  identity: { current: 2, total: 9, label: "Hero" },
+  class: { current: 3, total: 9, label: "Class" },
+  race: { current: 4, total: 9, label: "Ancestry" },
+  abilities: { current: 5, total: 9, label: "Abilities" },
+  gear: { current: 6, total: 9, label: "Gear" },
+  training: { current: 7, total: 9, label: "Training" },
+  magic: { current: 8, total: 9, label: "Magic" },
+  luck: { current: 9, total: 9, label: "Luck" },
+};
+
+function dialogProgressMarkup(progress = null) {
+  if (!progress) return "";
+  const current = Math.max(1, Number(progress.current) || 1);
+  const total = Math.max(current, Number(progress.total) || current);
+  const label = progress.label ? escapeHtml(progress.label) : "";
+  return `<div class="dialog-progress"><span>Create Hero ${current}/${total}</span>${label ? `<b>${label}</b>` : ""}</div>`;
+}
+
+function dialogPlainMessageMarkup(message = "", progress = null) {
+  return `${dialogProgressMarkup(progress)}${message ? `<p>${escapeHtml(message)}</p>` : ""}`;
 }
 
 function safeExportFilename(name, slotId) {
@@ -241,7 +267,7 @@ async function chooseSaveFolderFromMenu() {
       return false;
     }
     const connected = await window.DungeonSave.chooseSaveFolder();
-    updateSaveStatus(connected ? "Save folder connected. JSON saves will be written there." : "Could not connect the save folder.");
+    updateSaveStatus(connected ? "Save folder connected. Future saves will be written there." : "Could not connect the save folder.");
     return connected;
   } catch (error) {
     updateSaveStatus(error?.message ?? "Could not choose a save folder.");
@@ -357,10 +383,11 @@ async function promptForSaveFolderIfNeeded() {
     title: status.mode === "disconnected" ? "Reconnect Save Folder" : "Choose Save Folder",
     message:
       status.mode === "disconnected"
-        ? `Depthbound needs permission for${status.directoryName ? ` "${status.directoryName}"` : " your save folder"} again before it can write JSON saves.`
-        : "Choose a save folder now to keep your adventures as JSON files. You can continue with browser storage if you prefer.",
+        ? `Depthbound needs permission for${status.directoryName ? ` "${status.directoryName}"` : " your save folder"} again before it can keep saving there.`
+        : "Folder saves are portable and easy to back up. Browser storage is fine if you just want to start.",
+    progress: heroCreationProgress.save,
     primaryText: status.mode === "disconnected" ? "Reconnect Folder" : "Choose Folder",
-    secondaryText: "Use Browser Storage",
+    secondaryText: "Start With Browser Storage",
   });
   if (choice !== "primary") return true;
   return chooseSaveFolderFromMenu();
@@ -408,11 +435,11 @@ function hideMainMenu() {
   renderControls();
 }
 
-function showGameDialog({ title, message = "", input = null, confirmText = "OK", cancelText = "Cancel" }) {
+function showGameDialog({ title, message = "", input = null, confirmText = "OK", cancelText = "Cancel", progress = null }) {
   return new Promise((resolve) => {
     restoreDialogInputField();
     els.gameDialogTitle.textContent = title;
-    els.gameDialogMessage.textContent = message;
+    els.gameDialogMessage.innerHTML = dialogPlainMessageMarkup(message, progress);
     els.gameDialogField.classList.toggle("hidden", !input);
     els.gameDialogActions.innerHTML = `
       <button type="submit" data-dialog-action="confirm">${escapeHtml(confirmText)}</button>
@@ -457,10 +484,10 @@ function showGameDialog({ title, message = "", input = null, confirmText = "OK",
   });
 }
 
-function showTwoChoiceDialog({ title, message, primaryText, secondaryText }) {
+function showTwoChoiceDialog({ title, message, primaryText, secondaryText, progress = null }) {
   return new Promise((resolve) => {
     els.gameDialogTitle.textContent = title;
-    els.gameDialogMessage.textContent = message;
+    els.gameDialogMessage.innerHTML = dialogPlainMessageMarkup(message, progress);
     els.gameDialogField.classList.add("hidden");
     els.gameDialogActions.innerHTML = `
       <button type="button" data-choice="primary">${escapeHtml(primaryText)}</button>
@@ -487,10 +514,10 @@ function showTwoChoiceDialog({ title, message, primaryText, secondaryText }) {
   });
 }
 
-function showHeroIdentityDialog({ title, message, nameValue, tokenArt = "", confirmText = "OK", cancelText = "Cancel" }) {
+function showHeroIdentityDialog({ title, message, nameValue, tokenArt = "", confirmText = "OK", cancelText = "Cancel", progress = null }) {
   return new Promise((resolve) => {
     els.gameDialogTitle.textContent = title;
-    els.gameDialogMessage.textContent = message;
+    els.gameDialogMessage.innerHTML = dialogPlainMessageMarkup(message, progress);
     els.gameDialogField.classList.remove("hidden");
     els.gameDialogActions.innerHTML = `
       <button type="submit" data-dialog-action="confirm">${escapeHtml(confirmText)}</button>
@@ -792,14 +819,14 @@ function dialogActorMarkup(actor) {
   `;
 }
 
-function dialogMessageMarkup(message, actor = null) {
-  return `${dialogActorMarkup(actor)}<p>${escapeHtml(message ?? "")}</p>`;
+function dialogMessageMarkup(message, actor = null, progress = null) {
+  return `${dialogProgressMarkup(progress)}${dialogActorMarkup(actor)}<p>${escapeHtml(message ?? "")}</p>`;
 }
 
-function showChoiceDialog({ title, message, choices, actor = null }) {
+function showChoiceDialog({ title, message, choices, actor = null, progress = null }) {
   return new Promise((resolve) => {
     els.gameDialogTitle.textContent = title;
-    els.gameDialogMessage.innerHTML = actor ? dialogMessageMarkup(message, actor) : escapeHtml(message ?? "");
+    els.gameDialogMessage.innerHTML = actor ? dialogMessageMarkup(message, actor, progress) : dialogPlainMessageMarkup(message, progress);
     els.gameDialogField.classList.add("hidden");
     els.gameDialogActions.innerHTML = choices
       .map(
@@ -843,11 +870,22 @@ function selectChoiceDetailMarkup(choice) {
   `;
 }
 
-function showSelectChoiceDialog({ title, message, choices, actor = null, label = "Choose:", defaultValue = null, confirmText = "Choose", cancelText = "Cancel" }) {
+function showSelectChoiceDialog({
+  title,
+  message,
+  choices,
+  actor = null,
+  label = "Choose:",
+  defaultValue = null,
+  confirmText = "Choose",
+  cancelText = "Cancel",
+  cancelValue = null,
+  progress = null,
+}) {
   return new Promise((resolve) => {
     const initialValue = defaultValue ?? choices[0]?.value ?? "";
     els.gameDialogTitle.textContent = title;
-    els.gameDialogMessage.innerHTML = actor ? dialogMessageMarkup(message, actor) : escapeHtml(message ?? "");
+    els.gameDialogMessage.innerHTML = actor ? dialogMessageMarkup(message, actor, progress) : dialogPlainMessageMarkup(message, progress);
     els.gameDialogField.classList.remove("hidden");
     els.gameDialogField.innerHTML = `
       <span class="select-choice-field">
@@ -886,7 +924,7 @@ function showSelectChoiceDialog({ title, message, choices, actor = null, label =
     };
 
     const handleClick = (event) => {
-      if (event.target.closest("[data-select-cancel]")) cleanup(null);
+      if (event.target.closest("[data-select-cancel]")) cleanup(cancelValue);
       if (event.target.closest("[data-select-confirm]")) cleanup(select?.value ?? null);
     };
     const handleChange = (event) => {
@@ -896,7 +934,7 @@ function showSelectChoiceDialog({ title, message, choices, actor = null, label =
     renderDetails();
     els.gameDialogActions.addEventListener("click", handleClick);
     els.gameDialogField.addEventListener("change", handleChange);
-    activeDialogCancel = () => cleanup(null);
+    activeDialogCancel = () => cleanup(cancelValue);
     els.gameDialog.classList.remove("hidden");
     select?.focus();
   });
@@ -1470,6 +1508,7 @@ async function createHeroGearOptionsFromSteps(classId, startingGear, raceSelecti
     const choiceValue = await showChoiceDialog({
       title: gearStep.title ?? "Starting Gear",
       message: gearStep.message ?? "Choose starting gear.",
+      progress: heroCreationProgress.gear,
       choices: withBackChoice(availableChoices.map((choice) => ({ value: choice.value, label: choice.label }))),
     });
     if (choiceValue === dialogBackValue) {
@@ -1503,6 +1542,61 @@ async function createHeroGearOptionsFromSteps(classId, startingGear, raceSelecti
   };
 }
 
+function resolveQuickStartGearChoice(choice) {
+  const result = {
+    equipment: { ...(choice.equipment ?? {}) },
+    items: [...(choice.inventory ?? [])],
+    quiver: choice.quiver ?? "",
+  };
+  if (choice.select) {
+    const selected = startingGearItemPool(choice.select.pool)[0]?.id;
+    addStartingGearItem(result, selected, choice.select.slot ?? "mainHand");
+  }
+  if (choice.selectTwo) {
+    const options = startingGearItemPool(choice.selectTwo.pool);
+    const first = options[0]?.id;
+    const second = (choice.selectTwo.allowSame ? options[0] : options[1])?.id ?? first;
+    addStartingGearItem(result, first, choice.selectTwo.slots?.[0] ?? "mainHand");
+    addStartingGearItem(result, second, choice.selectTwo.slots?.[1] ?? "offHand");
+  }
+  return result;
+}
+
+function createQuickStartGearOptions(classId = defaultContent.heroClass, raceSelection = defaultRaceSelection) {
+  const heroTemplate = getHeroTemplate(classId);
+  const startingGear = heroTemplate.startingGear;
+  if (startingGear?.fixed || !startingGear?.steps?.length) {
+    if (startingGear?.fixed) {
+      return {
+        equipment: { ...(startingGear.equipment ?? heroTemplate.equipment ?? {}) },
+        inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: starterEquipmentItems(startingGear.inventory ?? heroTemplate.inventory?.items ?? []) },
+      };
+    }
+    return {
+      equipment: { mainHand: "longsword", torso: "chain-mail" },
+      inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: starterEquipmentItems(["chain-mail", "longsword"]) },
+    };
+  }
+
+  const candidateHero = startingGearCandidateHero(classId, raceSelection);
+  const equipment = { ...(startingGear.equipment ?? {}) };
+  const items = [...(startingGear.inventory ?? [])];
+  let quiver = startingGear.quiver ?? null;
+  for (const gearStep of startingGear.steps) {
+    const choice = (gearStep.choices ?? []).find((entry) => startingGearChoiceAvailable(entry, candidateHero));
+    if (!choice) continue;
+    const resolved = resolveQuickStartGearChoice(choice);
+    Object.assign(equipment, resolved.equipment);
+    items.push(...resolved.items);
+    if (resolved.quiver) quiver = resolved.quiver;
+  }
+  if (quiver) equipment.quiver = quiver;
+  return {
+    equipment,
+    inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: starterEquipmentItems(items) },
+  };
+}
+
 function showTutorial() {
   els.gameDialogTitle.textContent = "Tutorial";
   els.gameDialogField.classList.add("hidden");
@@ -1511,10 +1605,10 @@ function showTutorial() {
       <li>After making your first hero, use the Planning Table to add more heroes or go out solo. Newly created heroes join the active party automatically while there is room.</li>
       <li>Drag hero tokens to move. Grab empty dungeon space to pan, and use the top-bar zoom controls to change the view.</li>
       <li>Use Stealth on a hero card before opening dangerous doors. Search checks the current room for hidden doors and secrets.</li>
-      <li>The bottom action bar changes by context. Outside combat it handles rest, return home, items, abilities, and grabbing. In combat it adds attacks, Other actions, and End Turn.</li>
-      <li>Open Other in combat for Dash, Dodge, Disengage, Off-Hand Attack, Grapple/Shove, Medicine, and Get Behind. Get Behind is a special Depthbound bonus action that can let a hero move through monster spaces for one turn.</li>
+      <li>The bottom action bar changes by context. Outside combat it handles rest, return home, items, abilities, and grabbing. In combat it adds attacks, Tactics, and End Turn.</li>
+      <li>Open Tactics in combat for Dash, Dodge, Disengage, Off-Hand Attack, Grapple/Shove, Medicine, and Get Behind. Get Behind is a special Depthbound bonus action that can let a hero move through monster spaces for one turn.</li>
       <li>Inventory is the I button on the hero card. Abilities and spells are on the bottom Abilities button when the selected hero has something usable.</li>
-      <li>At home, Move Out opens Village, Build Your Home, and Go on an Adventure. Adventure then branches into Main Story Dungeons, Random Dungeons, and Custom Dungeons when any are saved.</li>
+      <li>At home, Adventure opens Village, Build Your Home, and dungeon choices. Adventure then branches into Main Story, One-Shot, Random, and Custom dungeons when any are saved.</li>
       <li>For a first real run, try The Barrow Crown under Main Story Dungeons, or choose a Random Dungeon if you want a lighter test run.</li>
     </ul>
   `;
@@ -1538,12 +1632,13 @@ function showTutorial() {
 
 function showD20ModeDialog({ allowBack = true } = {}) {
   return showChoiceDialog({
-    title: "D20 Luck",
-    message: "Choose how friendly d20 rolls behave. This can be changed later at the Planning Table.",
+    title: "Dice Feel",
+    message: "Choose how your heroes' d20 rolls should feel. You can change this later at the Planning Table.",
+    progress: heroCreationProgress.luck,
     choices: [
-      { value: "karmic", label: "Karmic / Mercy Mode" },
-      { value: "random", label: "Truly Random" },
-      { value: "tymora", label: "Tymora's Favorite" },
+      { value: "karmic", label: d20ModeLabels.karmic, description: d20ModeDescriptions.karmic },
+      { value: "random", label: d20ModeLabels.random, description: d20ModeDescriptions.random },
+      { value: "tymora", label: d20ModeLabels.tymora, description: d20ModeDescriptions.tymora },
       ...(allowBack ? [{ value: dialogBackValue, label: "Back" }] : []),
     ],
   });
@@ -1727,7 +1822,10 @@ function showHeroRaceDialog({ selection = defaultRaceSelection, allowBack = true
     };
 
     els.gameDialogTitle.textContent = "Choose Race / Species";
-    els.gameDialogMessage.textContent = "Choose the ancestry traits for this hero. The summary only lists mechanics currently active in this game.";
+    els.gameDialogMessage.innerHTML = dialogPlainMessageMarkup(
+      "Choose the ancestry traits for this hero. The summary only lists mechanics currently active in this game.",
+      heroCreationProgress.race,
+    );
     els.gameDialogField.classList.remove("hidden");
     els.gameDialogActions.innerHTML = `
       <button type="submit" data-dialog-action="confirm">Choose Race</button>
@@ -1759,6 +1857,7 @@ async function showHeroClassDialog({ allowBack = true } = {}) {
   return showChoiceDialog({
     title: "Choose Class",
     message: "Choose this hero's class.",
+    progress: heroCreationProgress.class,
     choices: allowBack ? withBackChoice(choices) : choices,
   });
 }
@@ -1844,14 +1943,14 @@ const interactiveTutorialSteps = [
   },
   {
     title: "Get Behind",
-    body: "Other [X] holds Dash, Dodge, Disengage, Off-Hand Attack, Medicine, Grapple/Shove, and Get Behind. Get Behind is not normal DnD: it is a Depthbound bonus action, DEX DC 12, to move through monster spaces this turn.",
+    body: "Tactics [X] holds Dash, Dodge, Disengage, Off-Hand Attack, Medicine, Grapple/Shove, and Get Behind. Get Behind is not normal DnD: it is a Depthbound bonus action, DEX DC 12, to move through monster spaces this turn.",
     selector: "#action-button",
     placement: "above-target",
     enter: () => enterTutorialDungeon(),
   },
   {
     title: "Home Door",
-    body: "At home, click Move Out beside the door or walk onto the door space. This opens the home hub to leave your home.",
+    body: "At home, click Adventure beside the door or walk onto the door space. This opens the home hub to leave your home.",
     selector: ".exit-token, .home-move-out-button",
     enter: () => enterTutorialHome(),
   },
@@ -1862,8 +1961,8 @@ const interactiveTutorialSteps = [
     enter: () => openTutorialHomeMenu("main"),
   },
   {
-    title: "Move Out Choices",
-    body: "Go on an Adventure opens the move-out menu. Main Story Dungeons are authored chapters, Random Dungeons are quick procedural runs, and Custom Dungeons appear when local custom maps exist.",
+    title: "Adventure Choices",
+    body: "Adventure opens the home hub. Main Story dungeons are authored chapters, Random Runs are quick procedural runs, and Custom Dungeons appear when local custom maps exist.",
     selector: "#home-adventure-actions",
     enter: () => openTutorialHomeMenu("adventure"),
   },
@@ -2171,6 +2270,7 @@ function showAbilityAssignmentDialog(scores, raceSelection = defaultRaceSelectio
     const sortedScores = [...scores].sort((a, b) => b - a);
     els.gameDialogTitle.textContent = "Assign Ability Scores";
     els.gameDialogMessage.innerHTML = `
+      ${dialogProgressMarkup(heroCreationProgress.abilities)}
       Scores: ${sortedScores.map(escapeHtml).join(", ")}
       <br><span class="empty-note">${escapeHtml(raceDisplayName(raceSelection))}: ${escapeHtml(abilityBonusSummary(raceAbilityBonuses(raceSelection)))}</span>
     `;
@@ -2180,8 +2280,8 @@ function showAbilityAssignmentDialog(scores, raceSelection = defaultRaceSelectio
         ${renderAbilityAssignmentFields(sortedScores, raceSelection)}
         <p class="ability-assignment-error" aria-live="polite"></p>
       </div>
-      <button type="submit" data-dialog-action="confirm">Start Adventure</button>
-      <button type="button" class="ghost-button" data-dialog-action="cancel">Back</button>
+      <button type="submit" data-dialog-action="confirm">Continue</button>
+      <button type="button" class="ghost-button" data-dialog-action="back">Back</button>
     `;
 
     const cleanup = (value) => {
@@ -2211,8 +2311,8 @@ function showAbilityAssignmentDialog(scores, raceSelection = defaultRaceSelectio
     };
 
     const handleClick = (event) => {
-      const button = event.target.closest("[data-dialog-action='cancel']");
-      if (button) cleanup(null);
+      const button = event.target.closest("[data-dialog-action='back']");
+      if (button) cleanup(dialogBackValue);
     };
 
     const handleChange = (event) => {
@@ -2284,13 +2384,22 @@ async function chooseClassSpells(classSource, count, chosenSpellIds = [], { canc
     const choice = await showSelectChoiceDialog({
       title: "Choose Spell",
       message: `Choose a ${classSource.className ?? "class"} spell (${index + 1}/${count}).`,
+      progress: heroCreationProgress.magic,
       label: "Choose a spell:",
+      cancelText: "Back",
+      cancelValue: dialogBackValue,
       choices: eligible.map((spell) => ({
         value: spell.id,
         label: `${spell.name} (L${spellBaseLevel(spell)})`,
         description: spellChoiceDescription(spell),
       })),
     });
+    if (choice === dialogBackValue) {
+      if (index === 0) return dialogBackValue;
+      chosen.pop();
+      index -= 2;
+      continue;
+    }
     if (!choice) {
       if (cancelAborts) return { spells: chosen, unusedCredits, cancelled: true };
       unusedCredits += count - index;
@@ -2320,9 +2429,18 @@ async function chooseClassCantrips(classSource, count, chosenSpellIds = [], { ca
     const choice = await showSelectChoiceDialog({
       title: "Choose Cantrip",
       message: `Choose a ${classSource.className ?? "class"} cantrip (${index + 1}/${count}).`,
+      progress: heroCreationProgress.magic,
       label: "Choose a cantrip:",
+      cancelText: "Back",
+      cancelValue: dialogBackValue,
       choices: eligible.map((spell) => ({ value: spell.id, label: spell.name, description: spellChoiceDescription(spell) })),
     });
+    if (choice === dialogBackValue) {
+      if (index === 0) return dialogBackValue;
+      chosen.pop();
+      index -= 2;
+      continue;
+    }
     if (!choice) {
       if (cancelAborts) return { spells: chosen, unusedCredits, cancelled: true };
       unusedCredits += count - index;
@@ -2351,7 +2469,8 @@ async function chooseFightingStyle(classId) {
   return showChoiceDialog({
     title: "Fighting Style",
     message: "Choose a fighting style.",
-    choices,
+    progress: heroCreationProgress.training,
+    choices: withBackChoice(choices),
   });
 }
 
@@ -2369,8 +2488,16 @@ async function chooseUniqueProficiencies({ title, message, count, choices, selec
     const choice = await showChoiceDialog({
       title,
       message: `${message} (${index + 1}/${count})`,
-      choices: available.map((id) => ({ value: `${valuePrefix}${id}`, label: valuePrefix === "tool:" ? toolName(id) : skillName(id) })),
+      progress: heroCreationProgress.training,
+      choices: withBackChoice(available.map((id) => ({ value: `${valuePrefix}${id}`, label: valuePrefix === "tool:" ? toolName(id) : skillName(id) }))),
     });
+    if (choice === dialogBackValue) {
+      if (index === 0) return dialogBackValue;
+      const removed = newlyPicked.pop();
+      if (removed) picked.splice(picked.lastIndexOf(removed), 1);
+      index -= 2;
+      continue;
+    }
     if (!choice) return null;
     const cleanChoice = valuePrefix ? choice.slice(valuePrefix.length) : choice;
     picked.push(cleanChoice);
@@ -2393,7 +2520,16 @@ async function chooseExpertiseProficiencies({ title, message, count, skillProfic
       .map((toolId) => ({ value: `tool:${toolId}`, label: toolName(toolId), description: "Double proficiency bonus for this tool." }));
     const choices = [...skillChoices, ...toolChoices];
     if (!choices.length) break;
-    const choice = await showChoiceDialog({ title, message: `${message} (${index + 1}/${count})`, choices });
+    const choice = await showChoiceDialog({ title, message: `${message} (${index + 1}/${count})`, progress: heroCreationProgress.training, choices: withBackChoice(choices) });
+    if (choice === dialogBackValue) {
+      if (index === 0) return dialogBackValue;
+      const lastSkill = gained.skills.pop();
+      const lastTool = lastSkill ? null : gained.tools.pop();
+      if (lastSkill) expertiseSkills.splice(expertiseSkills.lastIndexOf(lastSkill), 1);
+      if (lastTool) expertiseTools.splice(expertiseTools.lastIndexOf(lastTool), 1);
+      index -= 2;
+      continue;
+    }
     if (!choice) return null;
     const [type, id] = choice.split(":");
     if (type === "tool") {
@@ -2423,6 +2559,7 @@ async function chooseCharacterProficiencies(classId = defaultContent.heroClass, 
       choices: raceTraits.skillChoices?.length ? raceTraits.skillChoices : allSkillIds,
       selected: skillProficiencies,
     });
+    if (picked === dialogBackValue) return dialogBackValue;
     if (!picked) return null;
     skillProficiencies.push(...picked);
   }
@@ -2436,6 +2573,7 @@ async function chooseCharacterProficiencies(classId = defaultContent.heroClass, 
       selected: toolProficiencies,
       valuePrefix: "tool:",
     });
+    if (picked === dialogBackValue) return dialogBackValue;
     if (!picked) return null;
     toolProficiencies.push(...picked);
   }
@@ -2449,6 +2587,7 @@ async function chooseCharacterProficiencies(classId = defaultContent.heroClass, 
       choices: classPlan.skillChoices ?? allSkillIds,
       selected: skillProficiencies,
     });
+    if (picked === dialogBackValue) return dialogBackValue;
     if (!picked) return null;
     skillProficiencies.push(...picked);
   }
@@ -2462,6 +2601,7 @@ async function chooseCharacterProficiencies(classId = defaultContent.heroClass, 
       selected: toolProficiencies,
       valuePrefix: "tool:",
     });
+    if (picked === dialogBackValue) return dialogBackValue;
     if (!picked) return null;
     toolProficiencies.push(...picked);
   }
@@ -2477,6 +2617,7 @@ async function chooseCharacterProficiencies(classId = defaultContent.heroClass, 
       skillsOnly: Boolean(levelOneExpertise.skillsOnly),
       allowedTools: levelOneExpertise.allowedTools ?? null,
     });
+    if (gained === dialogBackValue) return dialogBackValue;
     if (!gained) return null;
     expertiseSkills.push(...gained.skills);
     expertiseTools.push(...gained.tools);
@@ -2487,6 +2628,67 @@ async function chooseCharacterProficiencies(classId = defaultContent.heroClass, 
     toolProficiencies: uniqueValues(toolProficiencies),
     expertiseSkills: uniqueValues(expertiseSkills),
     expertiseTools: uniqueValues(expertiseTools),
+  };
+}
+
+function quickPickUniqueProficiencies({ choices = [], count = 0, selected = [] }) {
+  const picked = [];
+  const existing = new Set(selected);
+  for (const choice of choices) {
+    if (picked.length >= count) break;
+    if (existing.has(choice)) continue;
+    picked.push(choice);
+    existing.add(choice);
+  }
+  return picked;
+}
+
+function quickStartProficiencies(classId = defaultContent.heroClass, raceSelection = defaultRaceSelection) {
+  const raceTraits = raceTraitsForSelection(raceSelection);
+  const classPlan = classProficiencyPlan(classId);
+  const skillProficiencies = [...(raceTraits.skillProficiencies ?? [])];
+  const toolProficiencies = uniqueValues([...(raceTraits.toolProficiencies ?? []), ...classToolProficiencies(classId)]);
+  skillProficiencies.push(
+    ...quickPickUniqueProficiencies({
+      choices: raceTraits.skillChoices?.length ? raceTraits.skillChoices : allSkillIds,
+      count: raceTraits.skillChoiceCount ?? 0,
+      selected: skillProficiencies,
+    }),
+  );
+  toolProficiencies.push(
+    ...quickPickUniqueProficiencies({
+      choices: raceTraits.toolChoices ?? [],
+      count: raceTraits.toolChoiceCount ?? 0,
+      selected: toolProficiencies,
+    }),
+  );
+  skillProficiencies.push(
+    ...quickPickUniqueProficiencies({
+      choices: classPlan.skillChoices ?? allSkillIds,
+      count: classPlan.skillChoiceCount ?? 0,
+      selected: skillProficiencies,
+    }),
+  );
+  toolProficiencies.push(
+    ...quickPickUniqueProficiencies({
+      choices: classPlan.toolChoices ?? [],
+      count: classPlan.toolChoiceCount ?? 0,
+      selected: toolProficiencies,
+    }),
+  );
+  const expertise = expertisePlanForClassLevel(classId, 1);
+  const expertiseSkills = expertise?.count
+    ? quickPickUniqueProficiencies({
+        choices: expertise.skillsOnly ? skillProficiencies : skillProficiencies,
+        count: expertise.count,
+        selected: [],
+      })
+    : [];
+  return {
+    skillProficiencies: uniqueValues(skillProficiencies),
+    toolProficiencies: uniqueValues(toolProficiencies),
+    expertiseSkills: uniqueValues(expertiseSkills),
+    expertiseTools: [],
   };
 }
 
@@ -2507,6 +2709,9 @@ async function chooseLevelUpExpertise(hero) {
     skillsOnly: Boolean(activePlan.skillsOnly),
     allowedTools: activePlan.allowedTools ?? null,
   });
+  if (gained === dialogBackValue) {
+    return null;
+  }
   if (!gained) {
     return null;
   }
@@ -2528,6 +2733,7 @@ async function createCharacterOptions(raceSelection = defaultRaceSelection, clas
         choice = await showChoiceDialog({
           title: "Ability Scores",
           message: "Choose how to create your fighter's STR, DEX, CON, INT, WIS, and CHA.",
+          progress: heroCreationProgress.abilities,
           choices: withBackChoice([
             { value: "pregenerated", label: "Pregenerated" },
             { value: "standard", label: "Standard Array" },
@@ -2541,7 +2747,7 @@ async function createCharacterOptions(raceSelection = defaultRaceSelection, clas
       } else if (step === 1 && choice !== "pregenerated" && !abilityScores) {
         const scores = choice === "roll" ? rollAbilityScoresMinimum(72) : standardArray;
         abilityScores = await showAbilityAssignmentDialog(scores, raceSelection);
-        if (!abilityScores) step -= 1;
+        if (abilityScores === dialogBackValue || !abilityScores) step -= 1;
         else step += 1;
       } else {
         step += 1;
@@ -2557,17 +2763,21 @@ async function createCharacterOptions(raceSelection = defaultRaceSelection, clas
     }
     if (gearOptions) {
       const proficiencyOptions = await chooseCharacterProficiencies(classId, raceSelection);
+      if (proficiencyOptions === dialogBackValue) continue;
       if (!proficiencyOptions) return null;
       const classTemplate = getHeroTemplate(classId);
       const classSpellList = [...(classTemplate.classSpellList ?? classTemplate.spellList ?? classTemplate.spells ?? [])];
       const classCantripList = [...(classTemplate.classCantripList ?? classTemplate.cantripList ?? [])];
       const spellChoiceCount = spellChoiceCountForClassLevel(classId, 1);
       const spellChoice = spellChoiceCount ? await chooseClassSpells({ ...classTemplate, classSpellList, level: 1 }, spellChoiceCount) : { spells: [], unusedCredits: 0 };
+      if (spellChoice === dialogBackValue) continue;
       const cantripChoiceCount = cantripChoiceCountForClassLevel(classId, 1);
       const cantripChoice = cantripChoiceCount
         ? await chooseClassCantrips({ ...classTemplate, classCantripList, level: 1 }, cantripChoiceCount)
         : { spells: [], unusedCredits: 0 };
+      if (cantripChoice === dialogBackValue) continue;
       const fightingStyle = await chooseFightingStyle(classId);
+      if (fightingStyle === dialogBackValue) continue;
       return {
         abilityScores,
         fightingStyle,
@@ -2586,51 +2796,129 @@ async function createCharacterOptions(raceSelection = defaultRaceSelection, clas
   }
 }
 
+function createQuickStartCharacterOptions(raceSelection = defaultRaceSelection, classId = defaultContent.heroClass) {
+  const classTemplate = getHeroTemplate(classId);
+  const classSpellList = [...(classTemplate.classSpellList ?? classTemplate.spellList ?? classTemplate.spells ?? [])];
+  const classCantripList = [...(classTemplate.classCantripList ?? classTemplate.cantripList ?? [])];
+  const spellChoiceCount = spellChoiceCountForClassLevel(classId, 1);
+  const cantripChoiceCount = cantripChoiceCountForClassLevel(classId, 1);
+  const spellChoices = eligibleSpellChoicesFor({ ...classTemplate, classSpellList, level: 1 }).slice(0, spellChoiceCount).map((spell) => spell.id);
+  const cantripChoices = eligibleCantripChoicesFor({ ...classTemplate, classCantripList, level: 1 }).slice(0, cantripChoiceCount).map((spell) => spell.id);
+  const raceTraits = raceTraitsForSelection(raceSelection);
+  return {
+    abilityScores: classPredefinedAbilityScores[classId] ?? pregeneratedAbilityScores,
+    fightingStyle: fightingStyleChoicesForClass(classId)[0]?.value ?? null,
+    classSpellList,
+    classCantripList,
+    spells: [...cantripChoices, ...spellChoices],
+    unusedSpellChoiceCredits: Math.max(0, spellChoiceCount - spellChoices.length),
+    unusedCantripChoiceCredits: Math.max(0, cantripChoiceCount - cantripChoices.length),
+    startingFeatChoiceCount: 0,
+    skippedStartingFeatChoiceCount: raceTraits.startingFeatChoiceCount ?? 0,
+    startingFeatSourceName: raceTraits.subraceName || raceTraits.raceName || "Ancestry",
+    ...quickStartProficiencies(classId, raceSelection),
+    ...createQuickStartGearOptions(classId, raceSelection),
+  };
+}
+
 async function startNewAdventure() {
   window.clearTimeout(monsterTurnTimer);
   if (!(await promptForSaveFolderIfNeeded())) return;
   const saveSlot = await chooseSaveSlotForAdventure();
   if (!saveSlot) return;
   const { slotId, slotName } = saveSlot;
+  const setupMode = await showChoiceDialog({
+    title: "Start Setup",
+    message: "Jump straight into Home with a ready hero, or open the full character builder.",
+    progress: heroCreationProgress.identity,
+    choices: [
+      { value: "quick", label: "Quick Start", description: "Create a ready human fighter with solid starter gear and Gentle Fate dice." },
+      { value: "custom", label: "Customize Hero", description: "Choose name, class, species, scores, gear, skills, magic, and dice feel." },
+    ],
+  });
+  if (!setupMode) return;
   let chosenName = "";
   let heroOptions = null;
   let chosenTokenArt = "";
   let raceSelection = defaultRaceSelection;
   let classId = defaultContent.heroClass;
-  while (!heroOptions) {
-    const identity = await showHeroIdentityDialog({
-      title: "Character Name",
-      message: "Name your adventurer before stepping into the dungeon.",
-      nameValue: chosenName || getHeroTemplate().name,
-      tokenArt: chosenTokenArt,
-      confirmText: "Start Adventure",
-    });
-    if (!identity) return;
-    chosenName = identity.name || getHeroTemplate().name;
-    chosenTokenArt = identity.tokenArt;
-    const chosenClass = await showHeroClassDialog();
-    if (chosenClass === dialogBackValue) {
-      heroOptions = null;
-      continue;
-    }
-    if (!chosenClass) return;
-    classId = chosenClass;
-    const chosenRace = await showHeroRaceDialog({ selection: raceSelection });
-    if (chosenRace === dialogBackValue) {
-      heroOptions = null;
-      continue;
-    }
-    if (!chosenRace) return;
-    raceSelection = chosenRace;
-    heroOptions = await createCharacterOptions(raceSelection, classId);
-    if (heroOptions === dialogBackValue) {
-      heroOptions = null;
-      continue;
-    }
-    if (!heroOptions) return;
+  let d20Mode = null;
+  let creationStep = "identity";
+  if (setupMode === "quick") {
+    const template = getHeroTemplate(classId);
+    chosenName = template.name ?? "Aster";
+    heroOptions = createQuickStartCharacterOptions(raceSelection, classId);
+    d20Mode = defaultD20Mode;
   }
-  const d20Mode = await showD20ModeDialog({ allowBack: false });
-  if (!d20Mode) return;
+  while (setupMode === "custom" && (!heroOptions || !d20Mode)) {
+    if (creationStep === "identity") {
+      const identity = await showHeroIdentityDialog({
+        title: "Character Name",
+        message: "Name your adventurer before stepping into the dungeon.",
+        progress: heroCreationProgress.identity,
+        nameValue: chosenName || getHeroTemplate().name,
+        tokenArt: chosenTokenArt,
+        confirmText: "Continue",
+      });
+      if (!identity) return;
+      chosenName = identity.name || getHeroTemplate().name;
+      chosenTokenArt = identity.tokenArt;
+      creationStep = "class";
+      continue;
+    }
+
+    if (creationStep === "class") {
+      const chosenClass = await showHeroClassDialog();
+      if (chosenClass === dialogBackValue) {
+        creationStep = "identity";
+        continue;
+      }
+      if (!chosenClass) return;
+      classId = chosenClass;
+      heroOptions = null;
+      d20Mode = null;
+      creationStep = "race";
+      continue;
+    }
+
+    if (creationStep === "race") {
+      const chosenRace = await showHeroRaceDialog({ selection: raceSelection });
+      if (chosenRace === dialogBackValue) {
+        creationStep = "class";
+        continue;
+      }
+      if (!chosenRace) return;
+      raceSelection = chosenRace;
+      heroOptions = null;
+      d20Mode = null;
+      creationStep = "options";
+      continue;
+    }
+
+    if (creationStep === "options") {
+      const chosenOptions = await createCharacterOptions(raceSelection, classId);
+      if (chosenOptions === dialogBackValue) {
+        creationStep = "race";
+        continue;
+      }
+      if (!chosenOptions) return;
+      heroOptions = chosenOptions;
+      d20Mode = null;
+      creationStep = "luck";
+      continue;
+    }
+
+    if (creationStep === "luck") {
+      const chosenD20Mode = await showD20ModeDialog({ allowBack: true });
+      if (chosenD20Mode === dialogBackValue) {
+        d20Mode = null;
+        creationStep = "options";
+        continue;
+      }
+      if (!chosenD20Mode) return;
+      d20Mode = chosenD20Mode;
+    }
+  }
   heroOptions.d20Mode = normalizeD20Mode(d20Mode);
   heroOptions.classId = classId;
   heroOptions.tokenArt = chosenTokenArt;
@@ -2638,6 +2926,10 @@ async function startNewAdventure() {
   showDungeonLayout = false;
   const initialDungeonState = createInitialState(chosenName, null, heroOptions);
   if (!(await chooseStartingFeatsForHero(initialDungeonState.fighters.hero, heroOptions.startingFeatChoiceCount, heroOptions.startingFeatSourceName))) return;
+  if (heroOptions.skippedStartingFeatChoiceCount) {
+    initialDungeonState.fighters.hero.unusedFeatChoiceCredits =
+      (initialDungeonState.fighters.hero.unusedFeatChoiceCredits ?? 0) + heroOptions.skippedStartingFeatChoiceCount;
+  }
   state = createHomeState([initialDungeonState.fighters.hero], [], { cp: 0, sp: 0, gp: 0 }, { ...initialDungeonState.party, partyTomes: initialDungeonState.partyTomes ?? [] });
   state.saveSlotId = slotId;
   activeSaveSlot = slotId;
@@ -2684,7 +2976,7 @@ async function chooseRandomDungeonChoice() {
   const themes = availableDungeonThemes();
   if (themes.length <= 1) return themes[0]?.id ?? defaultContent.theme;
   const themeId = await showChoiceDialog({
-    title: "Random Dungeons",
+    title: "Random Runs",
     message: "Choose a dungeon theme.",
     choices: themes.map((theme) => ({ value: theme.id, label: theme.name, description: theme.description })),
   });

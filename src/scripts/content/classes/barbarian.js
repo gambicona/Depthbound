@@ -244,7 +244,7 @@ window.DungeonContent.register("classes", "barbarian", {
   classFeatures: [
     { level: 1, name: "Rage", description: "Enter a battle fury for 10 rounds: resist weapon damage and add scaling melee damage." },
     { level: 1, name: "Unarmored Defense", description: "While not wearing armor, your toughness and reflexes help protect you." },
-    { level: 2, name: "Reckless Attack", description: "Trade defense for offense, striking with abandon to improve your attacks." },
+    { level: 2, name: "Reckless Attack", description: "Attack with advantage on your turn, but enemies attack you with advantage until your next turn." },
     { level: 3, name: "Primal Path", description: "Choose the source and style of your barbarian rage." },
     { level: 5, name: "Extra Attack", description: "Attack more than once when you take the Attack action." },
     { level: 5, name: "Fast Movement", description: "Your speed increases by 10 ft while you are not wearing heavy armor." },
@@ -258,7 +258,7 @@ window.DungeonContent.register("classes", "barbarian", {
   subclasses: barbarianSubclasses,
   abilities: [
     rageAbility,
-    { id: "recklessAttack", name: "Reckless Attack", level: 2, refresh: "turn", uses: 1, resource: "none", description: "Fight recklessly for better offense this turn while leaving yourself easier to hit." },
+    { id: "recklessAttack", name: "Reckless Attack", level: 2, refresh: "turn", uses: 1, resource: "none", description: "Gain advantage on your attack rolls this turn. Attack rolls against you have advantage until your next turn starts." },
   ],
   equipment: { mainHand: "greataxe", torso: null },
   inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: ["greataxe", "javelin", "javelin", "javelin", "javelin"] },

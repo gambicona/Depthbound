@@ -327,7 +327,7 @@ function d20RollDetail(rollResult) {
   const rawRolls = rollResult.rawRolls ?? rolls;
   const rawChanged = rawRolls.length === rolls.length && rawRolls.some((roll, index) => roll !== rolls[index]);
   if (rawChanged) {
-    const label = rollResult.mode === "karmic" ? "Karmic outcome" : "adjusted outcome";
+    const label = rollResult.mode === "karmic" ? d20ModeLabels.karmic : "adjusted outcome";
     return `d20 true ${rawRolls.join(" / ")} -> ${label} ${rolls.join(" / ")}${rolls.length > 1 ? ` -> ${rollResult.roll}` : ""}`;
   }
   return rolls.length > 1 ? `d20 true ${rolls.join(" / ")} -> ${rollResult.roll}` : `d20 true ${rolls.join(" / ")}`;
@@ -356,7 +356,7 @@ function resolveMonsterHeroCritical(attacker, defender, attackRoll) {
       isCritical: false,
       doublesDamage: false,
       forcedHit: true,
-      note: "Karmic outcome: monster natural 20 becomes a natural 19 hit.",
+      note: `${d20ModeLabels.karmic}: monster natural 20 becomes a natural 19 hit.`,
     };
   }
   if (mode === "tymora") {
@@ -365,7 +365,7 @@ function resolveMonsterHeroCritical(attacker, defender, attackRoll) {
       isCritical: true,
       doublesDamage: false,
       forcedHit: false,
-      note: "Tymora's Favorite prevents the monster critical from doubling damage.",
+      note: `${d20ModeLabels.tymora} prevents the monster critical from doubling damage.`,
     };
   }
   return { attackRoll, isCritical: true, doublesDamage: true, forcedHit: false, note: "" };
@@ -2602,11 +2602,18 @@ async function maybeFinishEncounterAfterHeroRecovery() {
   return finishEncounterAfterLastMonsterFalls();
 }
 
+function defenderGrantsAttackAdvantage(defender) {
+  return Boolean((defender?.statusEffects ?? []).some((effect) => effect.incomingAttackAdvantage));
+}
+
 async function opportunityAttack(attacker, defender) {
   if (!consumeReaction(attacker, "an opportunity attack")) return;
   const profile = opportunityAttackProfile(attacker);
   playSoundEffect("meleeAttack");
-  const attackRollResult = rollD20ForFighter(attacker, { disadvantage: defender.dodging });
+  const targetReckless = defenderGrantsAttackAdvantage(defender);
+  const hasDisadvantage = defender.dodging;
+  const hasAdvantage = targetReckless;
+  const attackRollResult = rollD20ForFighter(attacker, { advantage: hasAdvantage && !hasDisadvantage, disadvantage: hasDisadvantage && !hasAdvantage });
   const attackRolls = attackRollResult.rolls;
   const criticalResult = resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll);
   const attackRoll = criticalResult.attackRoll;
@@ -2624,12 +2631,13 @@ async function opportunityAttack(attacker, defender) {
   defenderAc += hitReaction.acBonus ?? 0;
   const shieldBlocked = !hitReaction.blocked && attackRoll !== 1 && totalAttack >= defenderAc ? await maybeUseShieldReaction(defender, attacker, totalAttack, defenderAc) : false;
   const isMiss = attackRoll === 1 || hitReaction.blocked || (!criticalResult.forcedHit && totalAttack < defenderAc) || shieldBlocked;
+  const attackRollText = attackRolls.length > 1 ? `${attackRolls.join(" / ")} -> ${attackRoll}` : attackRoll;
 
   addLog(
-    `${attacker.name} makes an opportunity attack with ${profile.weaponName}${defender.dodging ? " with disadvantage" : ""}: d20 ${defender.dodging ? `${attackRolls.join(" / ")} -> ${attackRoll}` : attackRoll} ${abilityLabel(currentAttackBonus)} = ${totalAttack} vs AC ${defenderAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`,
+    `${attacker.name} makes an opportunity attack with ${profile.weaponName}${hasAdvantage && !hasDisadvantage ? " with advantage because the target attacked recklessly" : ""}${hasDisadvantage && !hasAdvantage ? " with disadvantage" : ""}: d20 ${attackRollText} ${abilityLabel(currentAttackBonus)} = ${totalAttack} vs AC ${defenderAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`,
     "important",
   );
-  addAdminLog(`${attacker.name} opportunity attack breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)}${criticalResult.attackRoll !== attackRollResult.roll ? ` -> Karmic outcome d20 ${attackRoll}` : ""} + attack ${abilityLabel(currentAttackBonus)}${inspiration.used ? ` + inspiration ${inspiration.roll}` : ""} = ${totalAttack}; target AC ${defenderAc}; ${isMiss ? "miss" : isCritical ? "critical hit" : "hit"}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
+  addAdminLog(`${attacker.name} opportunity attack breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)}${criticalResult.attackRoll !== attackRollResult.roll ? ` -> ${d20ModeLabels.karmic} d20 ${attackRoll}` : ""} + attack ${abilityLabel(currentAttackBonus)}${inspiration.used ? ` + inspiration ${inspiration.roll}` : ""} = ${totalAttack}; target AC ${defenderAc}; ${isMiss ? "miss" : isCritical ? "critical hit" : "hit"}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
 
   if (isMiss) {
     addLog(attackRoll === 1 ? "Natural 1. The opportunity attack misses badly." : `${defender.name} slips away.`);
@@ -4268,15 +4276,17 @@ async function attackDestructibleObject(attacker, object, options = {}) {
   const rangedAttack = !thrownAsMelee && (weaponIsRanged(weapon) || ["ranged", "thrown"].includes(attackDamage.range?.kind));
   playSoundEffect(rangedAttack ? "rangedAttack" : "meleeAttack");
 
-  const attackRollResult = rollD20ForFighter(attacker);
+  const attackAdvantage = (attacker.statusEffects ?? []).some((effect) => effect.attackAdvantage);
+  const attackRollResult = rollD20ForFighter(attacker, { advantage: attackAdvantage });
   const attackRoll = attackRollResult.roll;
+  const attackRolls = attackRollResult.rolls;
   const currentAttackBonus = attackBonusForWeapon(attacker, weapon);
   const targetAc = objectArmorClass(object);
   const totalAttack = attackRoll + currentAttackBonus;
   const isCritical = attackRoll === 20;
   const isMiss = attackRoll === 1 || totalAttack < targetAc;
   const targetName = objectTargetName(object);
-  addLog(`${attacker.name} attacks ${targetName}: d20 ${attackRoll} ${abilityLabel(currentAttackBonus)} = ${totalAttack} vs AC ${targetAc}.`);
+  addLog(`${attacker.name} attacks ${targetName}${attackAdvantage ? " with advantage" : ""}: d20 ${attackRolls.length > 1 ? `${attackRolls.join(" / ")} -> ${attackRoll}` : attackRoll} ${abilityLabel(currentAttackBonus)} = ${totalAttack} vs AC ${targetAc}.`);
   addAdminLog(`${attacker.name} object attack breakdown vs ${targetName}: ${d20RollDetail(attackRollResult)} + attack ${abilityLabel(currentAttackBonus)} = ${totalAttack}; target AC ${targetAc}; ${isMiss ? "miss" : isCritical ? "critical hit" : "hit"}.`);
 
   if (isMiss) {
@@ -4359,7 +4369,9 @@ async function makeAttack(attacker, defender, options = {}) {
   playSoundEffect(rangedAttack ? "rangedAttack" : "meleeAttack");
   const adjacentHostiles = hostileFightersAdjacentTo(attacker).length > 0;
   const rangedDisadvantage = rangedAttack && adjacentHostiles && !fighterHasFeat(attacker, "crossbow-expert") && !fighterHasFeat(attacker, "gunner");
+  const targetReckless = defenderGrantsAttackAdvantage(defender);
   const attackAdvantage =
+    targetReckless ||
     (attacker.statusEffects ?? []).some((effect) => effect.attackAdvantage) ||
     (fighterHasFeat(attacker, "grappler") && fighterStatusEffect(defender, "grappled")?.grappledBy === attacker.id) ||
     (warlockKnowsInvocation(attacker, "devilsSight") && targetIsInMagicalDarkness(defender)) ||
@@ -4387,13 +4399,13 @@ async function makeAttack(attacker, defender, options = {}) {
   const isMiss = attackRoll === 1 || hitReaction.blocked || (!criticalResult.forcedHit && totalAttack < defenderAc) || shieldBlocked;
 
   addLog(
-    `${attacker.name} ${options.actionLabel ?? "attacks"}${attackAdvantage && !hasDisadvantage ? " with advantage" : ""}${rangedDisadvantage && !attackAdvantage ? " with disadvantage" : ""}${defenderDodge && !attackAdvantage ? " because the target is dodging" : ""}${defendedBySidekick && !attackAdvantage ? " because of Defender" : ""}: d20 ${
+    `${attacker.name} ${options.actionLabel ?? "attacks"}${attackAdvantage && !hasDisadvantage ? targetReckless ? " with advantage because the target attacked recklessly" : " with advantage" : ""}${rangedDisadvantage && !attackAdvantage ? " with disadvantage" : ""}${defenderDodge && !attackAdvantage ? " because the target is dodging" : ""}${defendedBySidekick && !attackAdvantage ? " because of Defender" : ""}: d20 ${
       attackRolls.length > 1 ? `${attackRolls.join(" / ")} -> ${attackRoll}` : attackRoll
     } ${abilityLabel(currentAttackBonus)}${inspiration.used ? " + inspiration" : ""} = ${totalAttack} vs AC ${
       defenderAc
     }.${criticalResult.note ? ` ${criticalResult.note}` : ""}`,
   );
-  addAdminLog(`${attacker.name} attack breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)}${criticalResult.attackRoll !== attackRollResult.roll ? ` -> Karmic outcome d20 ${attackRoll}` : ""} + attack ${abilityLabel(currentAttackBonus)}${inspiration.used ? ` + inspiration ${inspiration.roll}` : ""} = ${totalAttack}; target AC ${defenderAc}; ${isMiss ? "miss" : isCritical ? "critical hit" : "hit"}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
+  addAdminLog(`${attacker.name} attack breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)}${criticalResult.attackRoll !== attackRollResult.roll ? ` -> ${d20ModeLabels.karmic} d20 ${attackRoll}` : ""} + attack ${abilityLabel(currentAttackBonus)}${inspiration.used ? ` + inspiration ${inspiration.roll}` : ""} = ${totalAttack}; target AC ${defenderAc}; ${isMiss ? "miss" : isCritical ? "critical hit" : "hit"}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
 
   if (isMiss) {
     addLog(attackRoll === 1 ? "Natural 1. The attack misses badly." : shieldBlocked ? `${defender.name} blocks the blow with Shield.` : `${defender.name} avoids the blow.`);
@@ -6107,7 +6119,7 @@ async function applySpellAttack(caster, target, spell) {
   const total = roll + bonus;
   const targetAc = armorClass(target);
   addLog(`${caster.name} casts ${spell.name}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`, "important");
-  addAdminLog(`${caster.name} spell attack breakdown vs ${target.name}: ${d20RollDetail(rollResult)}${criticalResult.attackRoll !== rollResult.roll ? ` -> Karmic outcome d20 ${roll}` : ""} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
+  addAdminLog(`${caster.name} spell attack breakdown vs ${target.name}: ${d20RollDetail(rollResult)}${criticalResult.attackRoll !== rollResult.roll ? ` -> ${d20ModeLabels.karmic} d20 ${roll}` : ""} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
   recordD20OutcomeForFighter(caster, roll !== 1 && (criticalResult.forcedHit || total >= targetAc));
   if (roll === 1 || (!criticalResult.forcedHit && total < targetAc)) {
     addLog(`${spell.name} misses ${target.name}.`);
@@ -6193,7 +6205,7 @@ async function resolveEldritchBlastBeam(caster, target, beamIndex, beamCount) {
   const total = roll + bonus;
   const targetAc = armorClass(target);
   addLog(`${caster.name}'s Eldritch Blast beam ${beamIndex}/${beamCount}${devilSightAdvantage ? " with Devil's Sight" : witchSightAdvantage ? " with Witch Sight" : ""}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`, "important");
-  addAdminLog(`${caster.name} Eldritch Blast beam ${beamIndex}/${beamCount} breakdown: ${d20RollDetail(rollResult)}${criticalResult.attackRoll !== rollResult.roll ? ` -> Karmic outcome d20 ${roll}` : ""} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
+  addAdminLog(`${caster.name} Eldritch Blast beam ${beamIndex}/${beamCount} breakdown: ${d20RollDetail(rollResult)}${criticalResult.attackRoll !== rollResult.roll ? ` -> ${d20ModeLabels.karmic} d20 ${roll}` : ""} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
   recordD20OutcomeForFighter(caster, roll !== 1 && (criticalResult.forcedHit || total >= targetAc));
   if (roll === 1 || (!criticalResult.forcedHit && total < targetAc)) {
     addLog(`Eldritch Blast misses ${target.name}.`);

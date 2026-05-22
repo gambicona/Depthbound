@@ -47,34 +47,57 @@
     </section>
 
     <main class="app-shell">
+      <aside class="party-panel" aria-label="Active party">
+        <div class="party-panel-heading">
+          <h2>Party</h2>
+          <button id="select-party-roster" class="ghost-button" type="button">All</button>
+        </div>
+        <div id="party-roster" class="party-roster"></div>
+        <section class="fighters">
+          <article id="hero-card" class="fighter-card"></article>
+        </section>
+      </aside>
+
       <section class="arena" aria-label="Dungeon room">
         <div class="topbar">
           <div>
             <p class="eyebrow">Depthbound</p>
             <h1 id="room-title">Old Guardroom</h1>
             <div class="title-actions">
-              <a id="bug-report" class="ghost-button button-link bug-report-button" href="https://forms.gle/REPLACE_WITH_YOUR_BUG_REPORT_FORM" target="_blank" rel="noopener">Bug Report</a>
               <button id="show-dungeon-intro" class="ghost-button dungeon-intro-button hidden" type="button">Intro</button>
             </div>
           </div>
-          <div class="top-actions">
+          <div class="topbar-primary-actions">
+            <button id="save-game" class="ghost-button" type="button" data-ui-icon="save">Save</button>
             <div class="zoom-controls" aria-label="Dungeon zoom controls">
               <button id="zoom-out" class="icon-button ghost-button" type="button" title="Zoom out" aria-label="Zoom out">-</button>
               <span id="zoom-label">100%</span>
               <input id="zoom-slider" type="range" min="50" max="200" step="5" value="100" aria-label="Dungeon zoom" />
               <button id="zoom-in" class="icon-button ghost-button" type="button" title="Zoom in" aria-label="Zoom in">+</button>
             </div>
-            <label class="volume-controls dungeon-volume" aria-label="Sound volume">
-              <span class="volume-text">Volume</span>
-              <span class="volume-label">50%</span>
-              <input class="volume-slider" type="range" min="0" max="100" step="1" value="50" />
-            </label>
-            <button id="toggle-admin-mode" class="ghost-button admin-mode-button" type="button">Adminmode</button>
-            <button id="toggle-layout" class="ghost-button debug-button" type="button">Show Dungeon Layout</button>
-            <button id="debug-kill" class="ghost-button debug-button" type="button">Kill all visible Monsters</button>
-            <button id="save-game" class="ghost-button" type="button">Save</button>
-            <button id="new-game" class="ghost-button" type="button">Main Menu</button>
-            <button id="tutorial" class="ghost-button" type="button">Tutorial</button>
+            <details class="top-tools-menu">
+              <summary class="ghost-button top-tools-summary" data-ui-icon="settings">Tools</summary>
+              <div class="top-actions">
+                <label class="volume-controls dungeon-volume" aria-label="Sound volume">
+                  <span class="volume-text">Volume</span>
+                  <span class="volume-label">50%</span>
+                  <input class="volume-slider" type="range" min="0" max="100" step="1" value="50" />
+                </label>
+                <a id="bug-report" class="ghost-button button-link bug-report-button" href="https://forms.gle/REPLACE_WITH_YOUR_BUG_REPORT_FORM" target="_blank" rel="noopener">Report Issue</a>
+                <button id="new-game" class="ghost-button" type="button">Main Menu</button>
+                <button id="tutorial" class="ghost-button" type="button">Tutorial</button>
+                <button id="toggle-admin-mode" class="ghost-button admin-mode-button" type="button">Admin Tools</button>
+                <button id="toggle-layout" class="ghost-button debug-button" type="button">Show Dungeon Layout</button>
+                <button id="debug-kill" class="ghost-button debug-button" type="button">Kill all visible Monsters</button>
+              </div>
+            </details>
+          </div>
+        </div>
+        <div id="home-objective-chip" class="objective-chip hidden" aria-live="polite">
+          <span data-ui-icon="explore"></span>
+          <div>
+            <strong>Plan your next adventure</strong>
+            <small>Use the planning table, then choose Adventure.</small>
           </div>
         </div>
         <div class="room-scroll">
@@ -98,10 +121,6 @@
           <div id="initiative-list" class="initiative-list"></div>
         </section>
 
-        <section class="fighters">
-          <article id="hero-card" class="fighter-card"></article>
-        </section>
-
         <section class="level-panel">
           <button id="level-up" type="button" disabled>Level Up</button>
           <button id="replace-ranger-companion" type="button" class="hidden">Summon New Companion</button>
@@ -109,10 +128,10 @@
 
         <section class="log-panel">
           <div class="panel-heading">
-            <h2>Combat Log</h2>
+            <h2 id="log-title">Combat Log</h2>
             <div class="panel-actions">
-              <button id="expand-log" class="icon-button" type="button" title="Expand log" aria-label="Expand log">+</button>
-              <button id="clear-log" class="icon-button" type="button" title="Clear log" aria-label="Clear log">x</button>
+              <button id="expand-log" class="icon-button" type="button" title="Collapse feed" aria-label="Collapse feed" aria-expanded="true">-</button>
+              <button id="clear-log" class="icon-button" type="button" title="Clear log" aria-label="Clear log" data-ui-icon="close"></button>
             </div>
           </div>
           <ol id="combat-log" class="combat-log" aria-live="polite"></ol>
@@ -121,22 +140,25 @@
     </main>
 
     <nav class="action-dock" aria-label="Combat actions">
-      <button id="roll-initiative" type="button">Roll Initiative [R]</button>
-      <button id="select-party" type="button" disabled>Select Party [Q]</button>
+      <button id="roll-initiative" type="button" data-ui-icon="initiative">Roll Initiative [R]</button>
+      <button id="select-party" type="button" disabled data-ui-icon="party">Select Party [Q]</button>
       <div class="dock-action">
-        <button id="attack" type="button" disabled>
+        <button id="attack" type="button" disabled data-ui-icon="attack">
           <span>Attack [T]</span>
           <small id="attack-note">No target</small>
         </button>
       </div>
       <div class="dock-action">
-        <button id="action-button" type="button" disabled>Other [X]</button>
+        <button id="favorite-actions" type="button" disabled>Favorites [F]</button>
       </div>
-      <button id="use-item" type="button" disabled>Use Item [U]</button>
-      <button id="abilities" type="button" disabled>Abilities [B]</button>
-      <button id="short-rest" type="button" disabled>Short Rest</button>
-      <button id="return-home" type="button" disabled>Return Home [H]</button>
-      <button id="end-turn" type="button" disabled>End Turn [E]</button>
+      <div class="dock-action">
+        <button id="action-button" type="button" disabled data-ui-icon="action">Tactics [X]</button>
+      </div>
+      <button id="use-item" type="button" disabled data-ui-icon="item">Use Item [U]</button>
+      <button id="abilities" type="button" disabled data-ui-icon="abilities">Abilities [B]</button>
+      <button id="short-rest" type="button" disabled data-ui-icon="rest">Short Rest</button>
+      <button id="return-home" type="button" disabled data-ui-icon="home">Return Home [H]</button>
+      <button id="end-turn" type="button" disabled data-ui-icon="end-turn">End Turn [E]</button>
     </nav>
 
     <div id="fighter-info" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="fighter-info-name">
@@ -172,10 +194,20 @@
     <div id="action-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="action-menu-title">
       <div class="fighter-info-panel">
         <div class="panel-heading">
-          <h2 id="action-menu-title">Other</h2>
+          <h2 id="action-menu-title">Tactics</h2>
           <button id="close-action-menu" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
         </div>
         <div id="action-menu-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+
+    <div id="favorite-actions-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="favorite-actions-title">
+      <div class="fighter-info-panel favorite-actions-panel">
+        <div class="panel-heading">
+          <h2 id="favorite-actions-title">Favorites</h2>
+          <button id="close-favorite-actions" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </div>
+        <div id="favorite-actions-body" class="fighter-info-body"></div>
       </div>
     </div>
 
@@ -192,19 +224,19 @@
     <div id="home-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="home-menu-title">
       <div class="fighter-info-panel">
         <div class="panel-heading">
-          <h2 id="home-menu-title">Home Door</h2>
+          <h2 id="home-menu-title">Home</h2>
           <button id="close-home-menu" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
         </div>
         <div class="fighter-info-body home-actions">
           <div id="home-main-actions" class="home-menu-panel">
             <button id="go-village" type="button">Village</button>
             <button id="build-home" type="button">Build Your Home</button>
-            <button id="go-adventure" type="button">Go on an Adventure</button>
+            <button id="go-adventure" type="button" data-ui-icon="explore">Adventure</button>
           </div>
           <div id="home-adventure-actions" class="home-menu-panel hidden">
             <button type="button" data-home-menu="main-story">Main Story Dungeons</button>
-            <button type="button" data-home-menu="one-shot-dungeons">Oneshot Dungeons</button>
-            <button type="button" data-home-menu="random-dungeons">Random Dungeons</button>
+            <button type="button" data-home-menu="one-shot-dungeons">One-Shot Dungeons</button>
+            <button type="button" data-home-menu="random-dungeons">Random Runs</button>
             <button type="button" data-home-menu="custom-dungeons">Custom Dungeons</button>
             <hr />
             <button type="button" data-home-menu="main">Back</button>

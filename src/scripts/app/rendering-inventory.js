@@ -474,7 +474,9 @@ function buildRoom() {
   const homeMoveOutButton = document.createElement("button");
   homeMoveOutButton.className = "home-move-out-button hidden";
   homeMoveOutButton.type = "button";
-  homeMoveOutButton.textContent = "Move Out";
+  homeMoveOutButton.textContent = "Adventure";
+  homeMoveOutButton.title = "Choose an adventure";
+  homeMoveOutButton.setAttribute("aria-label", "Choose an adventure");
   homeMoveOutButton.addEventListener("pointerdown", (event) => {
     event.stopPropagation();
   });
@@ -1137,6 +1139,17 @@ function renderHeroStatusCard(element, fighter) {
   const classResourceText = importantClassResourceText(fighter);
   const stealth = stealthState(fighter);
   const canToggleStealth = gameHasStarted && state.mode === "exploration" && heroCanAct(fighter) && !isAutonomousAlly(fighter);
+  const stealthTitle = stealth
+    ? `Stealth ${stealth.total}. Click to stop stealthing.`
+    : !gameHasStarted
+      ? "Start an adventure before stealthing."
+      : isAutonomousAlly(fighter)
+        ? "Companions follow the party's stealth rhythm."
+        : state.mode !== "exploration"
+          ? "Stealth is available while exploring."
+          : !heroCanAct(fighter)
+            ? "This hero cannot act right now."
+            : "Roll Stealth";
   const searchRoom = roomForPosition(fighter.position);
   const canSearchRoom =
     gameHasStarted &&
@@ -1149,7 +1162,11 @@ function renderHeroStatusCard(element, fighter) {
     ? hiddenDoorSearchAttempted(fighter, searchRoom)
       ? `Already searched ${searchRoom.name ?? "this room"}`
       : `Search ${searchRoom.name ?? "room"}`
-    : "Search room";
+    : !gameHasStarted
+      ? "Start an adventure before searching."
+      : state.mode !== "exploration"
+        ? "Search is available while exploring."
+        : "No room to search here.";
   element.innerHTML = `
     <div class="fighter-top">
       ${combatantArtworkMarkup(fighter, "sidebar-hero-art")}
@@ -1158,10 +1175,10 @@ function renderHeroStatusCard(element, fighter) {
         <div class="fighter-role">${escapeHtml(combatantRoleLabel(fighter))}</div>
       </div>
       <div class="card-actions">
-        <button class="icon-button stealth-hero stealth-hero-button ${stealth ? "active" : ""}" type="button" title="${stealth ? `Stealth ${stealth.total}. Click to stop stealthing.` : "Roll Stealth"}" aria-label="${stealth ? "Stop stealthing" : "Roll stealth"}" ${canToggleStealth ? "" : "disabled"}>Stealth</button>
-        <button class="icon-button search-room-button" type="button" title="${escapeAttribute(searchTitle)}" aria-label="Search room" ${canSearchRoom ? "" : "disabled"}>Search</button>
-        <button class="icon-button open-inventory" type="button" title="Inventory and equipment" aria-label="Inventory and equipment" ${canFighterReceiveInventory(fighter) ? "" : "disabled"}>I</button>
-        <button class="icon-button rename-hero" type="button" title="Rename character" aria-label="Rename character" ${fighter.renameable === false ? "disabled" : ""}>...</button>
+        <button class="icon-button open-inventory" type="button" title="Inventory and equipment" aria-label="Inventory and equipment" data-tooltip="Inventory and equipment" data-ui-icon="inventory" ${canFighterReceiveInventory(fighter) ? "" : "disabled"}></button>
+        <button class="icon-button rename-hero" type="button" title="Rename character" aria-label="Rename character" data-tooltip="Rename character" data-ui-icon="rename" ${fighter.renameable === false ? "disabled" : ""}></button>
+        <button class="icon-button stealth-hero stealth-hero-button ${stealth ? "active" : ""}" type="button" title="${escapeAttribute(stealthTitle)}" aria-label="${stealth ? "Stop stealthing" : "Roll stealth"}" data-tooltip="${escapeAttribute(stealthTitle)}" data-ui-icon="stealth" ${canToggleStealth ? "" : "disabled"}></button>
+        <button class="icon-button search-room-button" type="button" title="${escapeAttribute(searchTitle)}" aria-label="Search room" data-tooltip="${escapeAttribute(searchTitle)}" data-ui-icon="search" ${canSearchRoom ? "" : "disabled"}></button>
       </div>
     </div>
     <div class="hp-line">
@@ -1193,6 +1210,34 @@ function renderHeroStatusCard(element, fighter) {
   element.querySelector(".rename-hero").addEventListener("click", renameHero);
   element.querySelector(".open-inventory").addEventListener("click", showInventoryMenu);
   element.querySelector(".temporary-effects-button").addEventListener("click", () => showTemporaryEffectsInfo(fighter));
+}
+
+function partyRosterEntryMarkup(fighter) {
+  const active = fighter.id === state.party?.activeHeroId;
+  const selected = selectedHeroIds.has(fighter.id);
+  const selectable = selectableHeroIds().has(fighter.id);
+  const ally = isAutonomousAlly(fighter);
+  const hpText = `${Math.max(0, fighter.hp ?? 0)} / ${fighter.maxHp ?? 0}`;
+  return `
+    <button type="button" class="party-roster-entry${active ? " active" : ""}${selected ? " selected" : ""}${ally ? " ally" : ""}" data-party-hero="${escapeAttribute(fighter.id)}" ${selectable ? "" : "disabled"}>
+      ${combatantArtworkMarkup(fighter, "party-roster-art")}
+      <span>
+        <b>${escapeHtml(fighter.name ?? "Hero")}</b>
+        <small>${escapeHtml(ally ? "Companion" : combatantRoleLabel(fighter))}</small>
+      </span>
+      <strong>${escapeHtml(hpText)}</strong>
+    </button>
+  `;
+}
+
+function renderPartyRoster() {
+  if (!els.partyRoster) return;
+  if (!gameHasStarted || state.completed) {
+    els.partyRoster.innerHTML = "";
+    return;
+  }
+  const entries = partyHeroes();
+  els.partyRoster.innerHTML = entries.length ? entries.map(partyRosterEntryMarkup).join("") : `<p class="empty-note">No active party.</p>`;
 }
 
 function statusEffectPillText(effect) {
@@ -1328,6 +1373,7 @@ function temporaryEffectDetails(effect) {
   if (effect.sneakAttackDiceBonus) parts.push(`${abilityLabel(effect.sneakAttackDiceBonus)} Sneak Attack dice`);
   if (effect.classBonusLines?.length) parts.push(...effect.classBonusLines);
   if (effect.attackAdvantage) parts.push("attack advantage");
+  if (effect.incomingAttackAdvantage) parts.push("attackers have advantage");
   if (effect.stealthAdvantage) parts.push("Stealth advantage");
   if (effect.ignoredByMonsters) parts.push("ignored by monsters when targeted");
   if (effect.speedLocked) parts.push("movement locked");
@@ -1504,7 +1550,7 @@ function classFeatureInspectionDescription(hero, feature, abilityDefinitions = [
   const ability = abilityDefinitions.find((entry) => entry.name === name || entry.id === name);
   if (hero?.classId === "barbarian") {
     if (name === "Rage") return `Bonus action. ${abilityMaxUses(hero, ability)} uses per long rest at this level. For 10 rounds, resist bludgeoning, piercing, and slashing damage and add +${rageDamageBonus(hero)} damage to Strength-based melee hits. The damage bonus becomes +3 at level 9 and +4 at level 16.`;
-    if (name === "Reckless Attack") return "Free once per turn. Gain +2 to attack rolls this turn, but your AC is lowered by 2 until the start of your next turn.";
+    if (name === "Reckless Attack") return "Free once per turn. Your attack rolls have advantage until the end of your turn, then attacks against you have advantage until your next turn starts.";
     if (name === "Fast Movement") return classMovementBonusText(hero) || feature.description;
     if (name === "Feral Instinct") return "You roll initiative with advantage, helping you act earlier when combat begins.";
     if (name === "Brutal Critical") return `On a melee critical hit, roll extra weapon damage dice: +${level >= 17 ? 3 : level >= 13 ? 2 : 1} weapon die at this level.`;
@@ -2887,7 +2933,7 @@ const homeLibraryTutorials = {
     steps: [
       {
         title: "Open The Builder",
-        body: "Use the home door or Move Out menu to open Build Your Home. The menu stays on the left while the home map remains clickable.",
+        body: "Use the home door or Adventure menu to open Build Your Home. The menu stays on the left while the home map remains clickable.",
       },
       {
         title: "Paint New Floor",
@@ -3449,11 +3495,12 @@ function showPlanningTableInfo() {
   els.fighterInfoBody.innerHTML = `
     <div class="object-description">Choose the active party and set each hero's role before leaving home.</div>
     <section class="planning-party">
-      <h3>D20 Luck</h3>
+      <h3>Dice Feel</h3>
       <label class="inline-transfer">
-        <span>Friendly d20 rolls</span>
+        <span>Hero roll style</span>
         <select data-action="d20-mode">${d20ModeOptionsMarkup()}</select>
       </label>
+      <p class="planning-helper">${escapeHtml(d20ModeDescriptions[normalizeD20Mode(state.d20Mode)] ?? "")}</p>
     </section>
     <section class="planning-party">
       <h3>Active Class Heroes</h3>
@@ -3654,7 +3701,7 @@ function setD20Mode(mode) {
   const nextMode = normalizeD20Mode(mode);
   state.d20Mode = nextMode;
   state.d20FailureStreak = 0;
-  addLog(`D20 luck set to ${d20ModeLabels[nextMode]}.`, "important");
+  addLog(`Dice feel set to ${d20ModeLabels[nextMode]}.`, "important");
   render();
 }
 
@@ -5421,8 +5468,31 @@ function slotLayoutClass(slotId) {
   return classes[slotId] ?? "";
 }
 
+function slotIconName(slotId) {
+  const icons = {
+    head: "slot-armor",
+    cloak: "slot-magic",
+    amulet: "slot-magic",
+    mainHand: "slot-weapon",
+    torso: "slot-armor",
+    offHand: "slot-weapon",
+    bracers: "slot-armor",
+    gauntlets: "slot-tool",
+    ring1: "slot-ring",
+    ring2: "slot-ring",
+    boots: "slot-armor",
+    quiver: "slot-bow",
+    belt1: "slot-pack",
+    belt2: "slot-pack",
+    belt3: "slot-pack",
+    belt4: "slot-pack",
+    belt5: "slot-pack",
+  };
+  return icons[slotId] ?? "slot-pack";
+}
+
 function draggableItemCard(item, source = "") {
-  if (!item) return `<span class="equipment-empty">Empty</span>`;
+  if (!item) return `<span class="equipment-empty">Drop item</span>`;
 
   return `
     <div class="equipment-item" draggable="true" data-drag-item="${item.id}" data-drag-source="${source}">
@@ -5442,13 +5512,179 @@ function carriedConsumableUseButton(fighter, item) {
   return `<button type="button" class="small-action-button" data-action="use-carried-consumable" data-item="${escapeAttribute(item.id)}">Use</button>`;
 }
 
+function inventoryCategoryForItem(item) {
+  const type = item?.type ?? "";
+  if (type === "weapon") return { id: "weapons", label: "Weapons", order: 10 };
+  if (type === "armor") return { id: "armor", label: "Armor", order: 20 };
+  if (type === "accessory") return { id: "accessories", label: "Accessories", order: 30 };
+  if (type === "consumable") return { id: "consumables", label: "Consumables", order: 40 };
+  if (type === "component") return { id: "materials", label: "Materials", order: 50 };
+  if (item?.category) return { id: `category-${String(item.category).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, label: item.category, order: 60 };
+  return { id: "gear", label: "Gear", order: 90 };
+}
+
+function renderCarriedInventoryItem(fighter, item) {
+  return `
+    <div class="inventory-item">
+      ${draggableItemCard(item, "inventory")}
+      <div class="equip-actions">
+        ${carriedConsumableUseButton(fighter, item)}
+        ${equipActionForItem(fighter, item)}
+        ${transferControlsForItem(fighter, item)}
+      </div>
+    </div>
+  `;
+}
+
+function renderChestInventoryItem(item) {
+  return `
+    <div class="inventory-item">
+      ${draggableItemCard(item, "chest")}
+    </div>
+  `;
+}
+
+function groupedInventoryItemsMarkup(items, { emptyText, renderItem }) {
+  if (!items.length) return `<p class="empty-note">${escapeHtml(emptyText)}</p>`;
+  const groups = new Map();
+  for (const item of items) {
+    const category = inventoryCategoryForItem(item);
+    if (!groups.has(category.id)) groups.set(category.id, { ...category, items: [] });
+    groups.get(category.id).items.push(item);
+  }
+  return Array.from(groups.values())
+    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label))
+    .map((group, index) => {
+      const sortedItems = [...group.items].sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+      return `
+        <details class="inventory-item-group" ${index === 0 ? "open" : ""}>
+          <summary>${escapeHtml(group.label)} <span>${sortedItems.length}</span></summary>
+          <div class="inventory-item-group-body">
+            ${sortedItems.map((item) => renderItem(item)).join("")}
+          </div>
+        </details>
+      `;
+    })
+    .join("");
+}
+
+let activeInventoryTab = "equipment";
+
+function inventoryTabs() {
+  return [
+    { id: "equipment", label: "Equipment" },
+    { id: "items", label: "Items" },
+    ...(state.mode === "home" ? [{ id: "chest", label: "Chest" }] : []),
+    { id: "materials", label: "Materials" },
+  ];
+}
+
+function normalizeInventoryTab(tabId) {
+  const tabs = inventoryTabs();
+  return tabs.some((tab) => tab.id === tabId) ? tabId : tabs[0]?.id ?? "equipment";
+}
+
+function inventoryTabsMarkup(activeTab) {
+  return `
+    <div class="inventory-tabs" role="tablist" aria-label="Inventory sections">
+      ${inventoryTabs()
+        .map(
+          (tab) => `
+            <button type="button" role="tab" data-action="inventory-tab" data-inventory-tab="${tab.id}" aria-selected="${tab.id === activeTab ? "true" : "false"}" class="${
+              tab.id === activeTab ? "active" : ""
+            }">
+              ${escapeHtml(tab.label)}
+            </button>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function setInventoryTab(tabId) {
+  activeInventoryTab = normalizeInventoryTab(tabId);
+  if (activeInventoryTab === "materials") questSatchelOpen = true;
+  renderInventoryMenu();
+}
+
 function renderInventoryMenu() {
   const fighter = activeHero();
   refreshDerivedStats(fighter);
   const equippedIds = new Set(Object.values(fighter.equipment).filter(Boolean));
   const carriedItems = fighter.inventory.items.filter((item) => !equippedIds.has(item.id));
+  const equippedWeapon = equippedItem(fighter, "mainHand");
+  const consumableCount = fighter.inventory.items.filter((item) => item?.type === "consumable").length;
   const chestItems = state.chest ?? [];
   const chestMoney = normalizeMoney(state.chestMoney ?? {});
+  activeInventoryTab = normalizeInventoryTab(activeInventoryTab);
+
+  const equipmentMarkup = `
+    <section class="paper-doll" aria-label="Equipment slots">
+      ${equipmentSlots
+        .map((slot) => {
+          const item = equippedItem(fighter, slot.id);
+          const slotStateClass = item ? "is-equipped" : "is-empty";
+          return `
+            <div class="equipment-slot ${slotStateClass} ${slotLayoutClass(slot.id)}" data-drop-slot="${slot.id}">
+              <div class="slot-label">
+                <b><span class="slot-icon" data-slot-icon="${slotIconName(slot.id)}" aria-hidden="true"></span>${slot.label}</b>
+                ${item ? "" : `<small>Empty</small>`}
+              </div>
+              ${draggableItemCard(item, slot.id)}
+              ${item ? `<button type="button" data-action="unequip" data-slot="${slot.id}">Unequip</button>` : ""}
+            </div>
+          `;
+        })
+        .join("")}
+    </section>
+  `;
+  const itemsMarkup = `
+    <section class="inventory-list" data-drop-inventory="true" aria-label="Carried items">
+      <h3>Carried Items</h3>
+      ${groupedInventoryItemsMarkup(carriedItems, {
+        emptyText: "No carried items outside equipped gear.",
+        renderItem: (item) => renderCarriedInventoryItem(fighter, item),
+      })}
+    </section>
+  `;
+  const chestMarkup = `
+    <section class="inventory-list chest-list" data-drop-chest="true" aria-label="Home chest">
+      <h3>Home Chest</h3>
+      <div class="chest-money">
+        <div>
+          <b>Carried Coins</b>
+          <span>${escapeHtml(moneyText(fighter.inventory.money))}</span>
+        </div>
+        <div>
+          <b>Chest Coins</b>
+          <span>${escapeHtml(moneyText(chestMoney))}</span>
+        </div>
+        <div class="chest-coin-fields" aria-label="Coin amount">
+          <label><span>CP</span><input type="number" inputmode="numeric" min="0" step="1" value="0" data-coin-input="cp" /></label>
+          <label><span>SP</span><input type="number" inputmode="numeric" min="0" step="1" value="0" data-coin-input="sp" /></label>
+          <label><span>GP</span><input type="number" inputmode="numeric" min="0" step="1" value="0" data-coin-input="gp" /></label>
+        </div>
+        <p class="chest-money-error" aria-live="polite"></p>
+        <div class="chest-money-actions" aria-label="Coin transfers">
+          <button type="button" data-action="deposit-custom-coins">Deposit</button>
+          <button type="button" data-action="withdraw-custom-coins">Withdraw</button>
+          <button type="button" data-action="deposit-coins" data-cp="${moneyToCp(fighter.inventory.money)}" ${moneyToCp(fighter.inventory.money) > 0 ? "" : "disabled"}>Store All</button>
+          <button type="button" data-action="withdraw-coins" data-cp="${moneyToCp(chestMoney)}" ${moneyToCp(chestMoney) > 0 ? "" : "disabled"}>Take All</button>
+        </div>
+      </div>
+      ${groupedInventoryItemsMarkup(chestItems, {
+        emptyText: "Drop items here to leave them at home.",
+        renderItem: renderChestInventoryItem,
+      })}
+    </section>
+  `;
+  const tabPanels = {
+    equipment: `${renderAdminModeTools()}${renderAdminItemCatalog()}${equipmentMarkup}`,
+    items: itemsMarkup,
+    chest: state.mode === "home" ? chestMarkup : itemsMarkup,
+    materials: partyResourceInventoryMarkup(),
+  };
 
   els.inventoryBody.innerHTML = `
     <div class="inventory-stats">
@@ -5456,6 +5692,8 @@ function renderInventoryMenu() {
       <div class="stat-pill"><b>${fighter.ac}</b><span>AC</span></div>
       <div class="stat-pill"><b>${abilityLabel(attackBonus(fighter))}</b><span>To Hit</span></div>
       <div class="stat-pill"><b>${escapeHtml(fighter.damage.label)}</b><span>Damage</span></div>
+      <div class="stat-pill inventory-summary-pill"><b>${escapeHtml(equippedWeapon?.name ?? "Unarmed")}</b><span>Main Hand</span></div>
+      <div class="stat-pill"><b>${consumableCount}</b><span>Consumables</span></div>
       ${
         adminEnabled()
           ? `<button class="admin-toggle ${inventoryAdminOpen ? "active" : ""}" type="button" data-action="toggle-admin">
@@ -5465,90 +5703,10 @@ function renderInventoryMenu() {
       }
       <div class="wallet-line">${escapeHtml(moneyText(fighter.inventory.money))} - Hero Tokens: ${fighter.inventory.heroTokens ?? 0}</div>
     </div>
-    ${partyResourceInventoryMarkup()}
-    ${renderAdminModeTools()}
-    ${renderAdminItemCatalog()}
-    <section class="paper-doll" aria-label="Equipment slots">
-      ${equipmentSlots
-        .map((slot) => {
-          const item = equippedItem(fighter, slot.id);
-          return `
-            <div class="equipment-slot ${slotLayoutClass(slot.id)}" data-drop-slot="${slot.id}">
-              <div class="slot-label">
-                <b>${slot.label}</b>
-              </div>
-              ${draggableItemCard(item, slot.id)}
-              <button type="button" data-action="unequip" data-slot="${slot.id}" ${item ? "" : "disabled"}>Unequip</button>
-            </div>
-          `;
-        })
-        .join("")}
-    </section>
-    <section class="inventory-list" data-drop-inventory="true" aria-label="Carried items">
-      <h3>Carried Items</h3>
-      ${
-        carriedItems.length
-          ? carriedItems
-              .map(
-                (item) => `
-                  <div class="inventory-item">
-                    ${draggableItemCard(item, "inventory")}
-                    <div class="equip-actions">
-                      ${carriedConsumableUseButton(fighter, item)}
-                      ${equipActionForItem(fighter, item)}
-                      ${transferControlsForItem(fighter, item)}
-                    </div>
-                  </div>
-                `,
-              )
-              .join("")
-          : `<p class="empty-note">No carried items outside equipped gear.</p>`
-      }
-    </section>
-    ${
-      state.mode === "home"
-        ? `
-          <section class="inventory-list chest-list" data-drop-chest="true" aria-label="Home chest">
-            <h3>Home Chest</h3>
-            <div class="chest-money">
-              <div>
-                <b>Carried Coins</b>
-                <span>${escapeHtml(moneyText(fighter.inventory.money))}</span>
-              </div>
-              <div>
-                <b>Chest Coins</b>
-                <span>${escapeHtml(moneyText(chestMoney))}</span>
-              </div>
-              <div class="chest-coin-fields" aria-label="Coin amount">
-                <label><span>CP</span><input type="number" inputmode="numeric" min="0" step="1" value="0" data-coin-input="cp" /></label>
-                <label><span>SP</span><input type="number" inputmode="numeric" min="0" step="1" value="0" data-coin-input="sp" /></label>
-                <label><span>GP</span><input type="number" inputmode="numeric" min="0" step="1" value="0" data-coin-input="gp" /></label>
-              </div>
-              <p class="chest-money-error" aria-live="polite"></p>
-              <div class="chest-money-actions" aria-label="Coin transfers">
-                <button type="button" data-action="deposit-custom-coins">Deposit</button>
-                <button type="button" data-action="withdraw-custom-coins">Withdraw</button>
-                <button type="button" data-action="deposit-coins" data-cp="${moneyToCp(fighter.inventory.money)}" ${moneyToCp(fighter.inventory.money) > 0 ? "" : "disabled"}>Store All</button>
-                <button type="button" data-action="withdraw-coins" data-cp="${moneyToCp(chestMoney)}" ${moneyToCp(chestMoney) > 0 ? "" : "disabled"}>Take All</button>
-              </div>
-            </div>
-            ${
-              chestItems.length
-                ? chestItems
-                    .map(
-                      (item) => `
-                        <div class="inventory-item">
-                          ${draggableItemCard(item, "chest")}
-                        </div>
-                      `,
-                    )
-                    .join("")
-                : `<p class="empty-note">Drop items here to leave them at home.</p>`
-            }
-          </section>
-        `
-        : ""
-    }
+    ${inventoryTabsMarkup(activeInventoryTab)}
+    <div class="inventory-tab-panel" role="tabpanel">
+      ${tabPanels[activeInventoryTab] ?? tabPanels.equipment}
+    </div>
   `;
 }
 
@@ -5987,7 +6145,7 @@ function medicineTargetsMarkup(fighter) {
   return targets
     .map(
       (target) =>
-        `<button type="button" data-action="combat-action" data-combat-action="medicine" data-target="${target.id}" ${fighter.hasAction ? "" : "disabled"}>Medicine: ${escapeHtml(target.name)}</button>`,
+        `<button type="button" data-action="combat-action" data-combat-action="medicine" data-target="${escapeAttribute(target.id)}" ${fighter.hasAction ? "" : "disabled"}>Stabilize ${escapeHtml(target.name)}</button>`,
     )
     .join("");
 }
@@ -6006,6 +6164,48 @@ function combatManeuverButtonsMarkup(fighter) {
     <button type="button" data-action="combat-action" data-combat-action="grapple" ${disabled ? "disabled" : ""}>Grapple ${targetName}</button>
     <button type="button" data-action="combat-action" data-combat-action="shovePush" ${disabled ? "disabled" : ""}>Shove 5 ft ${targetName}</button>
     <button type="button" data-action="combat-action" data-combat-action="shoveProne" ${disabled ? "disabled" : ""}>Shove Prone ${targetName}</button>
+  `;
+}
+
+function actionOptionMarkup(buttonMarkup, description, favoriteMarkup = "", hotkeyMarkup = "") {
+  return `
+    <div class="action-option-row">
+      ${hotkeyMarkup}
+      <div class="action-option-controls">
+        ${favoriteMarkup}
+        <div class="action-option-buttons">${buttonMarkup}</div>
+      </div>
+      <p>${description}</p>
+    </div>
+  `;
+}
+
+let openActionMenuSections = null;
+
+function actionDetailsOpen(key, defaultOpen = false) {
+  return openActionMenuSections ? openActionMenuSections.has(key) : defaultOpen;
+}
+
+function rememberOpenActionMenuSections() {
+  if (els.actionMenu?.classList.contains("hidden")) return;
+  openActionMenuSections = new Set(
+    Array.from(els.actionMenuBody.querySelectorAll("details[data-action-section][open]"))
+      .map((details) => details.dataset.actionSection)
+      .filter(Boolean),
+  );
+}
+
+function actionMenuSectionMarkup(title, rows, { open = false } = {}) {
+  const content = rows.filter(Boolean).join("");
+  if (!content) return "";
+  const key = title;
+  return `
+    <details class="action-menu-section" data-action-section="${escapeAttribute(key)}" ${actionDetailsOpen(key, open) ? "open" : ""}>
+      <summary>${escapeHtml(title)}</summary>
+      <div class="action-menu-section-body">
+        ${content}
+      </div>
+    </details>
   `;
 }
 
@@ -6065,44 +6265,140 @@ function grabbedEntityName(grab) {
   return objectTemplate(object?.type)?.name ?? object?.type ?? "object";
 }
 
-function renderActionMenu() {
-  const fighter = activeFighter();
+function tacticFavoriteKey(actionId) {
+  return `tactic:${actionId ?? ""}`;
+}
+
+function combatActionButtonMarkup(actionId, label, disabled = false, targetId = null) {
+  return `<button type="button" data-action="combat-action" data-combat-action="${escapeAttribute(actionId)}" ${targetId ? `data-target="${escapeAttribute(targetId)}"` : ""} ${
+    disabled ? "disabled" : ""
+  }>${escapeHtml(label)}</button>`;
+}
+
+function combatTacticDefinitions(fighter) {
   const canUseAttackAction = Boolean(fighter?.hasAction);
+  const maneuverTarget = combatManeuverTarget(fighter);
+  const maneuverDisabled = !fighter?.hasAction || !maneuverTarget;
+  const maneuverName = maneuverTarget ? maneuverTarget.name : "target";
+  const activeGrab = activeGrabForCarrier(fighter);
+  const grabButtons = fighter && !activeGrab ? grabCandidateButtonsMarkup(fighter, state.mode === "combat" && !fighter.hasAction) : "";
+  return [
+    {
+      id: "dash",
+      section: "Movement and defense",
+      open: true,
+      controls: combatActionButtonMarkup("dash", "Dash", !canUseAttackAction),
+      description: "Gain extra movement equal to your base movement. Uses your Attack action.",
+    },
+    {
+      id: "dodge",
+      section: "Movement and defense",
+      open: true,
+      controls: combatActionButtonMarkup("dodge", "Dodge", !canUseAttackAction),
+      description: "Attacks against you have disadvantage until your next turn. Uses your Attack action.",
+    },
+    {
+      id: "disengage",
+      section: "Movement and defense",
+      open: true,
+      controls: combatActionButtonMarkup("disengage", "Disengage", !canUseAttackAction),
+      description: "Move without provoking opportunity attacks this turn. Uses your Attack action.",
+    },
+    {
+      id: "offHandAttack",
+      section: "Bonus actions",
+      controls: combatActionButtonMarkup("offHandAttack", "Off-Hand Attack", !canOffHandAttack(fighter)),
+      description: "Attack with a light off-hand weapon. Uses your Bonus action.",
+    },
+    {
+      id: "getBehind",
+      section: "Bonus actions",
+      controls: combatActionButtonMarkup("getBehind", "Get Behind", !fighter?.hasBonusAction),
+      description: "DEX DC 12. On success, use your Bonus action to move through monsters this turn.",
+    },
+    {
+      id: "grapple",
+      section: "Maneuvers",
+      controls: combatActionButtonMarkup("grapple", `Grapple ${maneuverName}`, maneuverDisabled),
+      description: "Grapple an adjacent enemy with Athletics. Uses one attack from your Attack action.",
+    },
+    {
+      id: "shovePush",
+      section: "Maneuvers",
+      controls: combatActionButtonMarkup("shovePush", `Shove 5 ft ${maneuverName}`, maneuverDisabled),
+      description: "Push an adjacent enemy away with Athletics. Uses one attack from your Attack action.",
+    },
+    {
+      id: "shoveProne",
+      section: "Maneuvers",
+      controls: combatActionButtonMarkup("shoveProne", `Shove Prone ${maneuverName}`, maneuverDisabled),
+      description: "Knock an adjacent enemy prone with Athletics. Uses one attack from your Attack action.",
+    },
+    {
+      id: "medicine",
+      section: "Aid and grab",
+      controls: medicineTargetsMarkup(fighter),
+      description: "WIS DC 10 to stabilize an adjacent dying hero. Uses your Attack action.",
+    },
+    {
+      id: "grab",
+      section: "Aid and grab",
+      controls: grabButtons || `<button type="button" disabled>Grab</button>`,
+      description: "Grab an adjacent ally, companion, or pushable object. Uses your Attack action; movement costs double while dragging.",
+    },
+  ];
+}
+
+function tacticRowMarkup(hero, tactic, favoriteOptions = {}) {
+  const key = tacticFavoriteKey(tactic.id);
+  return actionOptionMarkup(
+    tactic.controls,
+    escapeHtml(tactic.description),
+    `<div class="action-option-favorite">
+      ${favoriteMoveButtonsMarkup(key, favoriteOptions.favoriteIndex ?? null, favoriteOptions.favoriteTotal ?? 0)}
+      ${favoriteButtonMarkup(hero, key)}
+    </div>`,
+    favoriteHotkeyMarkup(favoriteOptions.hotkeyIndex),
+  );
+}
+
+function combatTacticSectionsMarkup(hero, fighter) {
+  const tactics = combatTacticDefinitions(fighter);
+  const sections = [...new Set(tactics.map((entry) => entry.section))];
+  return sections
+    .map((section) => {
+      const rows = tactics.filter((entry) => entry.section === section).map((entry) => tacticRowMarkup(hero, entry));
+      return actionMenuSectionMarkup(section, rows, { open: tactics.some((entry) => entry.section === section && entry.open) });
+    })
+    .join("");
+}
+
+function renderActionMenu() {
+  rememberOpenActionMenuSections();
+  const fighter = activeFighter();
   const actingFighter = state.mode === "combat" ? fighter : activeHero();
   const activeGrab = activeGrabForCarrier(actingFighter);
   const grabButtons = actingFighter && !activeGrab ? grabCandidateButtonsMarkup(actingFighter, state.mode === "combat" && !actingFighter.hasAction) : "";
+  if (els.actionMenuTitle) {
+    els.actionMenuTitle.textContent = activeGrab ? "Release Grab" : state.mode === "combat" ? "Tactics" : "Grab";
+  }
   els.actionMenuBody.innerHTML = actingFighter && heroCanAct(actingFighter) && (state.mode === "combat" || state.mode === "exploration" || state.mode === "home")
     ? activeGrab
       ? `
-      <div class="action-options">
+      <div class="action-options action-options-simple">
         <button type="button" data-action="release-grab">Release ${escapeHtml(grabbedEntityName(activeGrab))}</button>
         <p>Stop dragging the grabbed target.</p>
       </div>
     `
       : state.mode === "combat"
       ? `
-      <div class="action-options">
-        <button type="button" data-action="combat-action" data-combat-action="dash" ${canUseAttackAction ? "" : "disabled"}>Dash</button>
-        <p>Gain extra movement equal to your base movement. Consumes your Attack action.</p>
-        <button type="button" data-action="combat-action" data-combat-action="dodge" ${canUseAttackAction ? "" : "disabled"}>Dodge</button>
-        <p>Attacks against you have disadvantage until your next turn. Consumes your Attack action.</p>
-        <button type="button" data-action="combat-action" data-combat-action="disengage" ${canUseAttackAction ? "" : "disabled"}>Disengage</button>
-        <p>Your movement does not trigger opportunity attacks this turn. Consumes your Attack action.</p>
-        <button type="button" data-action="combat-action" data-combat-action="offHandAttack" ${canOffHandAttack(fighter) ? "" : "disabled"}>Off-Hand Attack</button>
-        <p>Attack with a light off-hand weapon. Consumes your Bonus action and does not add STR or DEX to damage.</p>
-        <button type="button" data-action="combat-action" data-combat-action="getBehind" ${fighter.hasBonusAction ? "" : "disabled"}>Get Behind</button>
-        <p>DEX check DC 12. On success, spend your Bonus action to move through monsters this turn.</p>
-        ${medicineTargetsMarkup(fighter)}
-        <p>WIS check DC 10 to stabilize an adjacent dying hero. Consumes your Attack action.</p>
-        ${combatManeuverButtonsMarkup(fighter)}
-        <p>Grapple or shove an adjacent enemy with Athletics. Each maneuver consumes one attack from your Attack action.</p>
-        ${activeGrab ? `<button type="button" data-action="release-grab">Release ${escapeHtml(grabbedEntityName(activeGrab))}</button><p>Stop dragging the grabbed target.</p>` : ""}
-        ${grabButtons || `<button type="button" disabled>Grab</button>`}
-        <p>Grab an adjacent ally, companion, or pushable object. Consumes your Attack action; movement costs double while dragging.</p>
+      <div class="action-options combat-action-menu">
+        <p class="action-menu-intro">${escapeHtml(actingFighter.name)} can spend actions on movement, defense, control, or rescue.</p>
+        ${combatTacticSectionsMarkup(actingFighter, fighter)}
       </div>
     `
       : `
-      <div class="action-options">
+      <div class="action-options action-options-simple">
         ${activeGrab ? `<button type="button" data-action="release-grab">Release ${escapeHtml(grabbedEntityName(activeGrab))}</button><p>Stop dragging the grabbed target.</p>` : ""}
         ${grabButtons || `<button type="button" disabled>Grab</button>`}
         <p>Grab an adjacent ally, companion, or pushable object. Movement costs double while dragging.</p>
@@ -6112,12 +6408,14 @@ function renderActionMenu() {
 }
 
 function showActionMenu() {
+  openActionMenuSections = null;
   renderActionMenu();
   els.actionMenu.classList.remove("hidden");
 }
 
 function hideActionMenu() {
   els.actionMenu.classList.add("hidden");
+  openActionMenuSections = null;
 }
 
 async function useCombatAction(action, targetId = null) {
@@ -6394,7 +6692,13 @@ function abilityCostLabel(ability) {
   return "Free";
 }
 
-function abilityRowMarkup(hero, ability, { favoriteIndex = null, favoriteTotal = 0 } = {}) {
+function favoriteHotkeyMarkup(index = null) {
+  if (index === null || index < 0 || index > 8) return "";
+  const key = String(index + 1);
+  return `<small class="favorite-hotkey" aria-label="Shortcut ${key}">${key}</small>`;
+}
+
+function abilityRowMarkup(hero, ability, { favoriteIndex = null, favoriteTotal = 0, hotkeyIndex = null } = {}) {
   const used = abilityResourceSpent(hero, ability);
   const maxUses = abilityMaxUses(hero, ability);
   const unavailableReason = fighterAbilityUnavailableReason(hero, ability);
@@ -6410,7 +6714,7 @@ function abilityRowMarkup(hero, ability, { favoriteIndex = null, favoriteTotal =
   return `
     <div class="use-item-row">
       <div>
-        <b>${escapeHtml(ability.name)} <small class="ability-cost">${escapeHtml(abilityCostLabel(ability))}</small></b>
+        <b>${favoriteHotkeyMarkup(hotkeyIndex)}${escapeHtml(ability.name)} <small class="ability-cost">${escapeHtml(abilityCostLabel(ability))}</small></b>
         <span>${escapeHtml(ability.description)} ${escapeHtml(useText)}</span>
         ${unavailableReason ? `<small class="ability-warning">${escapeHtml(unavailableReason)}</small>` : ""}
       </div>
@@ -6423,7 +6727,7 @@ function abilityRowMarkup(hero, ability, { favoriteIndex = null, favoriteTotal =
   `;
 }
 
-function spellRowMarkup(hero, spell, { favoriteIndex = null, favoriteTotal = 0 } = {}) {
+function spellRowMarkup(hero, spell, { favoriteIndex = null, favoriteTotal = 0, hotkeyIndex = null } = {}) {
   const castLevels = spellAvailableCastLevels(hero, spell);
   const favoriteKey = spellFavoriteKey(spell);
   const castButtons = castLevels
@@ -6440,7 +6744,7 @@ function spellRowMarkup(hero, spell, { favoriteIndex = null, favoriteTotal = 0 }
   return `
     <div class="use-item-row">
       <div>
-        <b>${escapeHtml(spell.name)} <small>${escapeHtml(levelText)}</small></b>
+        <b>${favoriteHotkeyMarkup(hotkeyIndex)}${escapeHtml(spell.name)} <small>${escapeHtml(levelText)}</small></b>
         <span>${escapeHtml(spell.description)} ${escapeHtml(spellResourceLabel(spell))}.${concentration} Costs: ${escapeHtml(costText)}.</span>
       </div>
       <div class="use-item-actions">
@@ -6504,13 +6808,57 @@ function favoriteRowsForAbilityMenu(hero, entries, spells) {
   const abilitiesByKey = new Map(entries.map((ability) => [abilityFavoriteKey(ability), ability]));
   const spellsByKey = new Map(spells.map((spell) => [spellFavoriteKey(spell), spell]));
   const validFavorites = heroAbilityFavorites(hero).filter((key) => abilitiesByKey.has(key) || spellsByKey.has(key));
-  hero.abilityFavorites = validFavorites;
   return validFavorites
     .map((key, index) => {
       if (abilitiesByKey.has(key)) return abilityRowMarkup(hero, abilitiesByKey.get(key), { favoriteIndex: index, favoriteTotal: validFavorites.length });
       return spellRowMarkup(hero, spellsByKey.get(key), { favoriteIndex: index, favoriteTotal: validFavorites.length });
     })
     .join("");
+}
+
+function favoriteRowsForActionMenu(hero) {
+  if (!hero) return "";
+  const entries = availableFighterAbilities(hero);
+  const spells = spellDefinitionsForFighter(hero);
+  const abilitiesByKey = new Map(entries.map((ability) => [abilityFavoriteKey(ability), ability]));
+  const spellsByKey = new Map(spells.map((spell) => [spellFavoriteKey(spell), spell]));
+  const tacticsByKey = new Map(state.mode === "combat" ? combatTacticDefinitions(hero).map((tactic) => [tacticFavoriteKey(tactic.id), tactic]) : []);
+  const validFavorites = heroAbilityFavorites(hero).filter((key) => abilitiesByKey.has(key) || spellsByKey.has(key) || tacticsByKey.has(key));
+  return validFavorites
+    .map((key, index) => {
+      const options = { favoriteIndex: index, favoriteTotal: validFavorites.length, hotkeyIndex: index };
+      if (abilitiesByKey.has(key)) return abilityRowMarkup(hero, abilitiesByKey.get(key), options);
+      if (spellsByKey.has(key)) return spellRowMarkup(hero, spellsByKey.get(key), options);
+      return tacticRowMarkup(hero, tacticsByKey.get(key), options);
+    })
+    .join("");
+}
+
+function favoriteActionCount(hero) {
+  if (!hero) return 0;
+  const entries = availableFighterAbilities(hero);
+  const spells = spellDefinitionsForFighter(hero);
+  const validKeys = new Set([
+    ...entries.map(abilityFavoriteKey),
+    ...spells.map(spellFavoriteKey),
+    ...(state.mode === "combat" ? combatTacticDefinitions(hero).map((tactic) => tacticFavoriteKey(tactic.id)) : []),
+  ]);
+  return heroAbilityFavorites(hero).filter((key) => validKeys.has(key)).length;
+}
+
+function useFavoriteActionByIndex(index) {
+  if (!gameHasStarted || !els.favoriteActionsMenu || !els.favoriteActionsBody || index < 0) return false;
+  if (els.favoriteActionsMenu.classList.contains("hidden")) showFavoriteActionsMenu();
+  else renderFavoriteActionsMenu();
+  const rows = Array.from(els.favoriteActionsBody.querySelectorAll(".favorite-action-list > .use-item-row, .favorite-action-list > .action-option-row"));
+  const row = rows[index];
+  if (!row) return false;
+  const actionButton = Array.from(row.querySelectorAll("button")).find((button) =>
+    !button.disabled && ["use-fighter-ability", "cast-spell", "combat-action", "grab-target"].includes(button.dataset.action),
+  );
+  if (!actionButton) return false;
+  actionButton.click();
+  return true;
 }
 
 function abilityMenuHero() {
@@ -6526,6 +6874,8 @@ function renderAbilitiesMenu() {
   const spells = spellDefinitionsForFighter(hero);
   const groups = abilityMenuGroups(hero, entries, spells);
   const favoriteRows = favoriteRowsForAbilityMenu(hero, entries, spells);
+  const abilityFavoriteKeys = new Set([...entries.map(abilityFavoriteKey), ...spells.map(spellFavoriteKey)]);
+  const abilityFavoriteCount = heroAbilityFavorites(hero).filter((key) => abilityFavoriteKeys.has(key)).length;
   const spellbookRows = Array.from(groups.spellGroups.entries())
     .map(
       ([level, levelSpells]) => `
@@ -6539,7 +6889,7 @@ function renderAbilitiesMenu() {
   els.abilitiesBody.innerHTML = entries.length || spells.length
     ? `
       <div class="ability-category-list">
-        ${abilityCategoryMarkup({ title: "Favourites", sectionKey: "favorites", meta: `${heroAbilityFavorites(hero).length}`, rows: favoriteRows, open: true, emptyText: "Heart abilities or spells below to pin them here." })}
+        ${abilityCategoryMarkup({ title: "Favourites", sectionKey: "favorites", meta: `${abilityFavoriteCount}`, rows: favoriteRows, open: true, emptyText: "Heart abilities or spells below to pin them here." })}
         ${abilityCategoryMarkup({ title: "Class Abilities", sectionKey: "class", meta: `${groups.class.length}`, rows: groups.class.map((ability) => abilityRowMarkup(hero, ability)).join("") })}
         ${abilityCategoryMarkup({ title: "Subclass Abilities", sectionKey: "subclass", meta: `${groups.subclass.length}`, rows: groups.subclass.map((ability) => abilityRowMarkup(hero, ability)).join("") })}
         ${abilityCategoryMarkup({ title: "Racial Abilities", sectionKey: "racial", meta: `${groups.racial.length}`, rows: groups.racial.map((ability) => abilityRowMarkup(hero, ability)).join("") })}
@@ -6569,7 +6919,9 @@ function toggleAbilityFavorite(key) {
   hero.abilityFavorites = favorites.includes(key)
     ? favorites.filter((entry) => entry !== key)
     : [...favorites, key];
-  renderAbilitiesMenu();
+  if (!els.abilitiesMenu.classList.contains("hidden")) renderAbilitiesMenu();
+  if (!els.actionMenu.classList.contains("hidden")) renderActionMenu();
+  if (!els.favoriteActionsMenu.classList.contains("hidden")) renderFavoriteActionsMenu();
   render();
 }
 
@@ -6583,7 +6935,9 @@ function moveAbilityFavorite(key, direction) {
   const [entry] = next.splice(from, 1);
   next.splice(to, 0, entry);
   hero.abilityFavorites = next;
-  renderAbilitiesMenu();
+  if (!els.abilitiesMenu.classList.contains("hidden")) renderAbilitiesMenu();
+  if (!els.actionMenu.classList.contains("hidden")) renderActionMenu();
+  if (!els.favoriteActionsMenu.classList.contains("hidden")) renderFavoriteActionsMenu();
   render();
 }
 
@@ -6596,6 +6950,23 @@ function showAbilitiesMenu() {
 function hideAbilitiesMenu() {
   els.abilitiesMenu.classList.add("hidden");
   openAbilityMenuSections = null;
+}
+
+function renderFavoriteActionsMenu() {
+  const hero = abilityMenuHero();
+  const rows = favoriteRowsForActionMenu(hero);
+  els.favoriteActionsBody.innerHTML = rows
+    ? `<div class="ability-category-list favorite-action-list">${rows}</div>`
+    : `<p class="empty-note">Heart abilities, spells, or tactics to pin them here.</p>`;
+}
+
+function showFavoriteActionsMenu() {
+  renderFavoriteActionsMenu();
+  els.favoriteActionsMenu.classList.remove("hidden");
+}
+
+function hideFavoriteActionsMenu() {
+  els.favoriteActionsMenu.classList.add("hidden");
 }
 
 let homeMenuPanel = "main";
@@ -6613,9 +6984,32 @@ function completedOneShotDungeons() {
   return completed && typeof completed === "object" && !Array.isArray(completed) ? completed : {};
 }
 
+function completedDungeonCount() {
+  const campaignCompletions = Object.values(state.campaignProgress ?? {}).reduce(
+    (sum, value) => sum + Math.max(0, Math.floor(Number(value) || 0)),
+    0,
+  );
+  return campaignCompletions + Object.keys(completedOneShotDungeons()).length;
+}
+
+function shouldShowHomeObjectiveChip() {
+  if (!gameHasStarted || state.completed || state.mode !== "home") return false;
+  const highestHeroLevel = Math.max(1, ...partyHeroes().map((hero) => Number(hero.level) || 1));
+  return highestHeroLevel < 2 && completedDungeonCount() < 1;
+}
+
 function setHomeMenuPanel(panel = "main") {
   homeMenuPanel = panel === "custom-dungeons" && availableLocalCustomDungeons().length === 0 ? "adventure" : panel;
   renderHomeAdventurePanels();
+}
+
+function homeMenuTitleForPanel(panel = homeMenuPanel) {
+  if (panel === "adventure") return "Choose Adventure";
+  if (panel === "main-story") return "Main Story";
+  if (panel === "one-shot-dungeons") return "One-Shot Dungeons";
+  if (panel === "random-dungeons") return "Random Runs";
+  if (panel === "custom-dungeons") return "Custom Dungeons";
+  return "Home";
 }
 
 function campaignProgressText(campaignId, count) {
@@ -6636,6 +7030,7 @@ function renderHomeAdventurePanels() {
     "custom-dungeons": els.homeCustomDungeonActions,
   };
   Object.entries(panels).forEach(([key, panel]) => panel?.classList.toggle("hidden", key !== homeMenuPanel));
+  if (els.homeMenuTitle) els.homeMenuTitle.textContent = homeMenuTitleForPanel();
   const barrowCompleted = state.campaignProgress?.["barrow-crown"] ?? 0;
   const thornwoodCompleted = state.campaignProgress?.["thornwood-pact"] ?? 0;
   const emberveinCompleted = state.campaignProgress?.["embervein-first-claim"] ?? 0;
@@ -7445,8 +7840,10 @@ function questLogEntryMarkup(entry) {
 
 function renderQuestLogButton() {
   if (!els.questLogButton) return;
+  const questCount = gameHasStarted ? acceptedQuestLogEntries().length : 0;
   els.questLogButton.disabled = !gameHasStarted;
-  els.questLogButton.textContent = "Quest Log [J]";
+  els.questLogButton.innerHTML = `Quests <span>${questCount}</span>`;
+  els.questLogButton.title = questCount ? `${questCount} accepted quest${questCount === 1 ? "" : "s"}` : "No accepted quests";
 }
 
 function showQuestLog() {
@@ -9910,8 +10307,9 @@ async function useFighterAbility(abilityId) {
   }
 
   if (ability.id === "recklessAttack") {
-    applyStatusEffect(hero, { id: "reckless-attack", label: "Reckless", attackBonus: 2, acBonus: -2, expiresAtStartOfTurn: true });
-    addLog(`${hero.name} attacks recklessly.`, "important");
+    applyStatusEffect(hero, { id: "reckless-attack", label: "Reckless Attack", attackAdvantage: true, expiresAtEndOfTurn: true });
+    applyStatusEffect(hero, { id: "reckless-exposure", label: "Reckless Exposure", incomingAttackAdvantage: true, expiresAtStartOfTurn: true });
+    addLog(`${hero.name} attacks recklessly. Their attacks have advantage this turn, and attacks against them have advantage until their next turn.`, "important");
     if (hero.subclassId === "battlerager" && (hero.level ?? 1) >= 6) {
       const tempHp = Math.max(1, abilityMod(hero, "con"));
       applyStatusEffect(hero, { id: "reckless-abandon", label: "Reckless Abandon", tempHp, expiresAtStartOfTurn: true });
@@ -10925,7 +11323,7 @@ function decorateParentheticalRolls(text) {
 }
 
 function decorateLeadRolls(text) {
-  return text.replace(/\b(d20(?: true)?|STR|DEX|CON|INT|WIS|CHA)\s+((?:\d+(?:\s*\/\s*\d+)*(?:\s*->\s*(?:Karmic outcome|adjusted outcome)?\s*)?)+)/g, (match, label, series) => {
+  return text.replace(/\b(d20(?: true)?|STR|DEX|CON|INT|WIS|CHA)\s+((?:\d+(?:\s*\/\s*\d+)*(?:\s*->\s*(?:Gentle Fate|adjusted outcome)?\s*)?)+)/g, (match, label, series) => {
     if (!/\d/.test(series)) return match;
     return `${label} ${decorateRollSeries(series)}`;
   });
@@ -10939,13 +11337,26 @@ function combatLogTextMarkup(text) {
   return decorateParentheticalRolls(decorateNamedRolls(decorateLeadRolls(escapeHtml(text))));
 }
 
+function scrollSidePanelToFeed() {
+  const sidePanel = els.log?.closest(".side-panel");
+  if (!sidePanel) return;
+  const scrollToBottom = () => {
+    sidePanel.scrollTop = sidePanel.scrollHeight;
+  };
+  scrollToBottom();
+  window.requestAnimationFrame(scrollToBottom);
+}
+
 function renderLog() {
   const panel = els.log?.closest(".log-panel");
+  const inCombat = state.mode === "combat";
+  panel?.classList.toggle("event-feed", !inCombat);
   panel?.classList.toggle("expanded", combatLogExpanded);
+  if (els.logTitle) els.logTitle.textContent = inCombat ? "Combat Log" : "Event Feed";
   if (els.expandLog) {
     els.expandLog.textContent = combatLogExpanded ? "-" : "+";
-    els.expandLog.title = combatLogExpanded ? "Collapse log" : "Expand log";
-    els.expandLog.setAttribute("aria-label", combatLogExpanded ? "Collapse log" : "Expand log");
+    els.expandLog.title = combatLogExpanded ? "Collapse feed" : "Expand feed";
+    els.expandLog.setAttribute("aria-label", combatLogExpanded ? "Collapse feed" : "Expand feed");
     els.expandLog.setAttribute("aria-expanded", String(combatLogExpanded));
   }
   const preserveGuestScroll = window.DepthboundPlaytest?.role === "guest";
@@ -10960,6 +11371,7 @@ function renderLog() {
   } else {
     els.log.scrollTop = Math.max(0, previousScrollTop + els.log.scrollHeight - previousScrollHeight);
   }
+  scrollSidePanelToFeed();
 }
 
 function renderControls() {
@@ -10983,6 +11395,8 @@ function renderControls() {
     heroCanAct(actingHero) &&
     (availableFighterAbilities(actingHero).length > 0 || spellDefinitionsForFighter(actingHero).length > 0) &&
     (state.mode !== "combat" || heroTurn);
+  const heroFavoriteActionCount = favoriteActionCount(actingHero);
+  const heroCanOpenFavoriteActions = gameHasStarted && heroCanAct(actingHero) && heroFavoriteActionCount > 0 && (state.mode !== "combat" || heroTurn);
 
   els.rollInitiative.disabled = !gameHasStarted || state.completed || movementInProgress || state.mode === "combat" || !threatPresent();
   els.attack.disabled = movementInProgress || !heroCanAttack;
@@ -10995,7 +11409,11 @@ function renderControls() {
       : weaponText;
   }
   els.actionButton.disabled = movementInProgress || !(heroCanUseAction || heroCanUseGrabMenu);
-  els.actionButton.textContent = activeGrabForCarrier(actingHero) ? "Release [X]" : state.mode === "combat" ? "Other [X]" : "Grab [X]";
+  els.actionButton.textContent = activeGrabForCarrier(actingHero) ? "Release [X]" : state.mode === "combat" ? "Tactics [X]" : "Grab [X]";
+  if (els.favoriteActions) {
+    els.favoriteActions.disabled = movementInProgress || !heroCanOpenFavoriteActions;
+    els.favoriteActions.textContent = heroFavoriteActionCount > 0 ? `Favorites [F] ${heroFavoriteActionCount}` : "Favorites [F]";
+  }
   els.useItem.disabled = movementInProgress || !heroCanUseItem;
   els.abilities.disabled = movementInProgress || !heroCanOpenAbilities;
   els.shortRest.disabled =
@@ -11014,11 +11432,31 @@ function renderControls() {
   els.returnHome.title = state.mode === "combat" ? fleeStatus.reason : "";
   els.endTurn.disabled = movementInProgress || !heroTurn;
 
-  els.attack.style.display = state.mode === "combat" ? "" : "none";
-  els.actionButton.style.display = state.mode === "combat" || heroCanUseGrabMenu ? "" : "none";
-  els.endTurn.style.display = state.mode === "combat" ? "" : "none";
-  els.shortRest.style.display = state.mode === "combat" ? "none" : "";
-  els.returnHome.style.display = "";
+  const selectableCount = partyHeroes().filter((entry) => heroCanAct(entry) && !isAutonomousAlly(entry)).length;
+  if (els.selectParty) {
+    els.selectParty.disabled = !gameHasStarted || state.mode === "combat" || selectableCount <= 1;
+  }
+
+  const setDockControlVisible = (control, visible) => {
+    if (!control) return;
+    const dockWrapper = control.closest(".dock-action");
+    if (dockWrapper) {
+      dockWrapper.style.display = visible ? "" : "none";
+    } else {
+      control.style.display = visible ? "" : "none";
+    }
+  };
+  setDockControlVisible(els.rollInitiative, !els.rollInitiative.disabled);
+  setDockControlVisible(els.selectParty, Boolean(els.selectParty && !els.selectParty.disabled));
+  setDockControlVisible(els.attack, state.mode === "combat");
+  setDockControlVisible(els.favoriteActions, state.mode === "combat");
+  setDockControlVisible(els.actionButton, state.mode === "combat" || heroCanUseGrabMenu);
+  setDockControlVisible(els.useItem, heroCanUseItem);
+  setDockControlVisible(els.abilities, heroCanOpenAbilities);
+  setDockControlVisible(els.shortRest, !els.shortRest.disabled);
+  setDockControlVisible(els.returnHome, state.mode === "combat" || (gameHasStarted && state.mode !== "home" && partyHeroes().length > 0));
+  setDockControlVisible(els.endTurn, state.mode === "combat");
+
   els.saveGame.disabled = !gameHasStarted || Boolean(state.isTutorial);
   els.toggleLayout.textContent = showDungeonLayout ? "Hide Dungeon Layout" : "Show Dungeon Layout";
   els.toggleAdminMode.classList.toggle("active", adminEnabled());
@@ -11045,11 +11483,8 @@ function renderControls() {
   els.levelUp.disabled = !gameHasStarted || state.mode !== "home" || (!canTrain && !canLevelUp(hero));
   els.replaceRangerCompanion?.classList.toggle("hidden", !canReplaceCompanion);
   if (els.replaceRangerCompanion) els.replaceRangerCompanion.disabled = !canReplaceCompanion;
-  if (els.selectParty) {
-    const selectableCount = partyHeroes().filter((entry) => heroCanAct(entry) && !isAutonomousAlly(entry)).length;
-    els.selectParty.disabled = !gameHasStarted || state.mode === "combat" || selectableCount <= 1;
-  }
   if (els.roomTitle) els.roomTitle.textContent = state.mode === "home" ? "Home" : state.room.name;
+  els.homeObjectiveChip?.classList.toggle("hidden", !shouldShowHomeObjectiveChip());
   els.showDungeonIntro?.classList.toggle("hidden", !state.customDungeon?.intro?.text && !(state.customDungeon?.intro?.images ?? []).length);
   renderDungeonClock();
   renderQuestLogButton();

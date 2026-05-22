@@ -91,6 +91,7 @@ function updatePerfOverlay() {
 function render() {
   const renderStart = performance.now();
   renderRoom();
+  renderPartyRoster();
   renderHeroStatusCard(els.heroCard, activeHero());
   activateFledMonstersWithLineOfSight();
   renderInitiative();
@@ -110,6 +111,16 @@ els.initiativeList?.addEventListener("click", (event) => {
   if (setActiveHero(fighter.id)) render();
 });
 els.selectParty?.addEventListener("click", selectActivePartyForMovement);
+els.selectPartyRoster?.addEventListener("click", selectActivePartyForMovement);
+els.partyRoster?.addEventListener("click", (event) => {
+  const entry = event.target.closest("[data-party-hero]");
+  if (!entry) return;
+  const heroId = entry.dataset.partyHero;
+  const changed = (event.shiftKey || event.ctrlKey || event.metaKey) && state.mode !== "combat"
+    ? toggleHeroSelection(heroId)
+    : setActiveHero(heroId);
+  if (changed) render();
+});
 els.attack.addEventListener("click", () => {
   void performAttackWithPrompt();
 });
@@ -121,6 +132,7 @@ els.actionButton.addEventListener("click", () => {
   }
   showActionMenu();
 });
+els.favoriteActions?.addEventListener("click", showFavoriteActionsMenu);
 els.useItem.addEventListener("click", showUseItemMenu);
 els.abilities.addEventListener("click", showAbilitiesMenu);
 els.shortRest.addEventListener("click", takeShortRest);
@@ -207,7 +219,7 @@ els.tutorialTourClose?.addEventListener("click", finishInteractiveTutorial);
 els.toggleAdminMode.addEventListener("click", () => {
   adminMode = !adminMode;
   if (!adminMode) disableAdminModeOptions();
-  addLog(adminMode ? "Adminmode enabled." : "Adminmode disabled.", "important");
+  addLog(adminMode ? "Admin tools enabled." : "Admin tools disabled.", "important");
   render();
   if (isHomeBuilderOpen()) renderHomeBuilder();
 });
@@ -452,6 +464,7 @@ els.fighterInfo.addEventListener("input", (event) => {
 els.closeInventory.addEventListener("click", hideInventoryMenu);
 els.closeUseItem.addEventListener("click", hideUseItemMenu);
 els.closeActionMenu.addEventListener("click", hideActionMenu);
+els.closeFavoriteActions?.addEventListener("click", hideFavoriteActionsMenu);
 els.closeAbilities.addEventListener("click", hideAbilitiesMenu);
 els.closeHomeMenu.addEventListener("click", hideHomeMenu);
 els.closeVillage?.addEventListener("click", hideVillageMenu);
@@ -609,8 +622,50 @@ els.actionMenu.addEventListener("click", (event) => {
     releaseGrabForFighter();
     return;
   }
+  if (button?.dataset.action === "toggle-ability-favorite") {
+    toggleAbilityFavorite(button.dataset.favoriteKey);
+    return;
+  }
   if (button?.dataset.action === "combat-action") {
     void useCombatAction(button.dataset.combatAction, button.dataset.target ?? null);
+  }
+});
+els.favoriteActionsMenu?.addEventListener("click", (event) => {
+  if (event.target === els.favoriteActionsMenu) {
+    hideFavoriteActionsMenu();
+    return;
+  }
+
+  const button = event.target.closest("button");
+  if (button?.dataset.action === "toggle-ability-favorite") {
+    toggleAbilityFavorite(button.dataset.favoriteKey);
+    return;
+  }
+  if (button?.dataset.action === "move-ability-favorite") {
+    moveAbilityFavorite(button.dataset.favoriteKey, Number(button.dataset.direction) || 0);
+    return;
+  }
+  if (button?.dataset.action === "grab-target") {
+    void useGrabAction(button.dataset.grabKind, button.dataset.grabId);
+    return;
+  }
+  if (button?.dataset.action === "release-grab") {
+    releaseGrabForFighter();
+    return;
+  }
+  if (button?.dataset.action === "combat-action") {
+    hideFavoriteActionsMenu();
+    void useCombatAction(button.dataset.combatAction, button.dataset.target ?? null);
+    return;
+  }
+  if (button?.dataset.action === "use-fighter-ability") {
+    hideFavoriteActionsMenu();
+    void useFighterAbility(button.dataset.ability);
+    return;
+  }
+  if (button?.dataset.action === "cast-spell") {
+    hideFavoriteActionsMenu();
+    void chooseAndCastSpell(button.dataset.spell, button.dataset.castLevel);
   }
 });
 els.abilitiesMenu.addEventListener("click", (event) => {
@@ -646,10 +701,15 @@ els.inventoryMenu.addEventListener("click", (event) => {
 
   const button = event.target.closest("button");
   if (!button) return;
+  if (button.dataset.action === "inventory-tab") {
+    setInventoryTab(button.dataset.inventoryTab);
+    return;
+  }
   if (button.dataset.action === "toggle-admin") {
     if (!adminEnabled()) return;
     inventoryAdminOpen = !inventoryAdminOpen;
-    renderInventoryMenu();
+    if (inventoryAdminOpen) setInventoryTab("equipment");
+    else renderInventoryMenu();
   }
   if (button.dataset.action === "toggle-admin-teleport") {
     adminTeleportEnabled = !adminTeleportEnabled;
@@ -809,18 +869,22 @@ window.addEventListener("keydown", (event) => {
     hideInventoryMenu();
     hideUseItemMenu();
     hideAbilitiesMenu();
+    hideActionMenu();
+    hideFavoriteActionsMenu();
     hideHomeMenu();
     hideStoreMenu();
     return;
   }
 
-  const overlayOpen = [els.mainMenu, els.fighterInfo, els.inventoryMenu, els.useItemMenu, els.abilitiesMenu, els.homeMenu, els.storeMenu].some(
+  const overlayOpen = [els.mainMenu, els.fighterInfo, els.inventoryMenu, els.useItemMenu, els.actionMenu, els.favoriteActionsMenu, els.abilitiesMenu, els.homeMenu, els.storeMenu].some(
     (element) => !element.classList.contains("hidden"),
   );
   const key = event.key.toLowerCase();
+  const target = event.target;
+  const typing = target?.matches?.("input, textarea, select") || target?.isContentEditable;
+  const favoriteMenuOpen = !els.favoriteActionsMenu?.classList.contains("hidden");
   if (key === "i" && gameHasStarted && !activeDialogCancel) {
-    const target = event.target;
-    if (!target?.matches?.("input, textarea, select") && !target?.isContentEditable && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    if (!typing && !event.ctrlKey && !event.altKey && !event.metaKey) {
       if (overlayOpen && els.inventoryMenu.classList.contains("hidden")) return;
       event.preventDefault();
       if (els.inventoryMenu.classList.contains("hidden")) {
@@ -832,8 +896,7 @@ window.addEventListener("keydown", (event) => {
     }
   }
   if (key === "j" && gameHasStarted && !activeDialogCancel) {
-    const target = event.target;
-    if (!target?.matches?.("input, textarea, select") && !target?.isContentEditable && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    if (!typing && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
       toggleQuestLog();
       return;
@@ -844,9 +907,23 @@ window.addEventListener("keydown", (event) => {
     toggleQuestLog();
     return;
   }
+  if (key === "f" && gameHasStarted && !activeDialogCancel && !typing && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    if (overlayOpen && !favoriteMenuOpen) return;
+    if (els.favoriteActions.disabled && !favoriteMenuOpen) return;
+    event.preventDefault();
+    if (favoriteMenuOpen) hideFavoriteActionsMenu();
+    else showFavoriteActionsMenu();
+    return;
+  }
+  if (/^[1-9]$/.test(key) && gameHasStarted && !activeDialogCancel && !typing && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    if (overlayOpen && !favoriteMenuOpen) return;
+    if (els.favoriteActions.disabled && !favoriteMenuOpen) return;
+    event.preventDefault();
+    useFavoriteActionByIndex(Number(key) - 1);
+    return;
+  }
   if (activeDialogCancel || overlayOpen || event.ctrlKey || event.altKey || event.metaKey) return;
-  const target = event.target;
-  if (target?.matches?.("input, textarea, select") || target?.isContentEditable) return;
+  if (typing) return;
 
   const movementDelta = movementDeltaForKey(key);
   if (movementDelta) {

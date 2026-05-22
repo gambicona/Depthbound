@@ -30,7 +30,7 @@ let adminGodMode = false;
 let inventoryAdminOpen = false;
 let adminMonsterCatalogOpen = false;
 let adminProgressOpen = false;
-let combatLogExpanded = false;
+let combatLogExpanded = true;
 let roomScrollAnimation = null;
 let inventoryAdminSearch = "";
 let adminMonsterSearch = "";
@@ -103,9 +103,14 @@ const longMoveFastAfterSteps = 5;
 const longMoveFastMultiplier = 0.45;
 const defaultD20Mode = "karmic";
 const d20ModeLabels = {
-  random: "Truly Random",
-  karmic: "Karmic / Mercy Mode",
-  tymora: "Tymora's Favorite",
+  random: "Classic Dice",
+  karmic: "Gentle Fate",
+  tymora: "Lucky Chaos",
+};
+const d20ModeDescriptions = {
+  random: "Pure d20 rolls with no hidden help.",
+  karmic: "A friendlier mode that nudges long bad streaks back toward hope.",
+  tymora: "Swingier rolls with occasional lucky second chances.",
 };
 const defaultRaceSelection = { raceId: "human", subraceId: "standard-human", dragonAncestryId: "red", abilityChoices: [] };
 const dragonAncestries = {
@@ -515,8 +520,11 @@ const els = {
   roomTitle: document.querySelector("#room-title"),
   bugReport: document.querySelector("#bug-report"),
   showDungeonIntro: document.querySelector("#show-dungeon-intro"),
+  homeObjectiveChip: document.querySelector("#home-objective-chip"),
   room: document.querySelector("#room"),
   roomScroll: document.querySelector(".room-scroll"),
+  partyRoster: document.querySelector("#party-roster"),
+  selectPartyRoster: document.querySelector("#select-party-roster"),
   heroCard: document.querySelector("#hero-card"),
   fighterInfo: document.querySelector("#fighter-info"),
   fighterInfoName: document.querySelector("#fighter-info-name"),
@@ -530,10 +538,16 @@ const els = {
   closeUseItem: document.querySelector("#close-use-item"),
   actionButton: document.querySelector("#action-button"),
   actionMenu: document.querySelector("#action-menu"),
+  actionMenuTitle: document.querySelector("#action-menu-title"),
   actionMenuBody: document.querySelector("#action-menu-body"),
   closeActionMenu: document.querySelector("#close-action-menu"),
+  favoriteActions: document.querySelector("#favorite-actions"),
+  favoriteActionsMenu: document.querySelector("#favorite-actions-menu"),
+  favoriteActionsBody: document.querySelector("#favorite-actions-body"),
+  closeFavoriteActions: document.querySelector("#close-favorite-actions"),
   homeMenu: document.querySelector("#home-menu"),
   closeHomeMenu: document.querySelector("#close-home-menu"),
+  homeMenuTitle: document.querySelector("#home-menu-title"),
   homeMainActions: document.querySelector("#home-main-actions"),
   homeAdventureActions: document.querySelector("#home-adventure-actions"),
   homeMainStoryActions: document.querySelector("#home-main-story-actions"),
@@ -558,6 +572,7 @@ const els = {
   storeBody: document.querySelector("#store-body"),
   closeStore: document.querySelector("#close-store"),
   backStoreVillage: document.querySelector("#back-store-village"),
+  logTitle: document.querySelector("#log-title"),
   log: document.querySelector("#combat-log"),
   roundLabel: document.querySelector("#round-label"),
   turnLabel: document.querySelector("#turn-label"),

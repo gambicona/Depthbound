@@ -547,6 +547,9 @@
     if (els.useItemMenu && !els.useItemMenu.classList.contains("hidden") && typeof renderUseItemMenu === "function") {
       renderUseItemMenu();
     }
+    if (els.favoriteActionsMenu && !els.favoriteActionsMenu.classList.contains("hidden") && typeof renderFavoriteActionsMenu === "function") {
+      renderFavoriteActionsMenu();
+    }
   }
 
   const mirroredMenuTargets = [
@@ -1754,6 +1757,7 @@
           event.stopImmediatePropagation();
           sendGuestIntent(combatAction.dataset.combatAction, { targetId: combatAction.dataset.target ?? guestSelectedTargetId() });
           hideActionMenu();
+          hideFavoriteActionsMenu?.();
           return;
         }
         const useItem = targetElement?.closest("[data-action='use-belt-item']");
@@ -1770,6 +1774,7 @@
           event.stopImmediatePropagation();
           sendGuestIntent("useAbility", { abilityId: useAbility.dataset.ability, targetId: guestSelectedTargetId() });
           hideAbilitiesMenu();
+          hideFavoriteActionsMenu?.();
           return;
         }
         const castSpell = targetElement?.closest("[data-action='cast-spell']");
@@ -1779,6 +1784,7 @@
           sendGuestIntent("castSpell", { spellId: castSpell.dataset.spell, castLevel: castSpell.dataset.castLevel ?? null });
           void chooseAndCastSpell(castSpell.dataset.spell, castSpell.dataset.castLevel ?? null);
           hideAbilitiesMenu();
+          hideFavoriteActionsMenu?.();
           return;
         }
         const toggleFavorite = targetElement?.closest("[data-action='toggle-ability-favorite']");
@@ -1828,6 +1834,13 @@
           switchGuestControlledHero(focusedHeroId);
           return;
         }
+        const rosterHeroId = targetElement?.closest("[data-party-hero]")?.dataset?.partyHero ?? "";
+        if (rosterHeroId) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (guestCanControlHero(rosterHeroId)) switchGuestControlledHero(rosterHeroId);
+          return;
+        }
         const levelUp = targetElement?.closest("#level-up");
         if (levelUp) {
           const hero = selectedGuestHero();
@@ -1850,6 +1863,19 @@
         const inventoryAction = targetElement?.closest("#inventory-menu [data-action], #inventory-menu #close-inventory");
         if (inventoryAction) {
           const action = inventoryAction.dataset.action ?? "";
+          if (action === "inventory-tab") {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            setInventoryTab?.(inventoryAction.dataset.inventoryTab);
+            return;
+          }
+          if (action === "toggle-quest-satchel") {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            questSatchelOpen = !questSatchelOpen;
+            renderInventoryMenu?.();
+            return;
+          }
           if (action === "use-carried-consumable") {
             event.preventDefault();
             event.stopImmediatePropagation();
@@ -1908,7 +1934,7 @@
         }
         if (
           targetElement?.closest(
-            "#roll-initiative, #select-party, #short-rest, #return-home, #save-game, #new-game, #toggle-admin-mode, #toggle-layout, #debug-kill, #replace-ranger-companion, #main-menu button, #main-menu a, #home-menu button, #store-menu button",
+            "#roll-initiative, #select-party, #select-party-roster, #short-rest, #return-home, #save-game, #new-game, #toggle-admin-mode, #toggle-layout, #debug-kill, #replace-ranger-companion, #main-menu button, #main-menu a, #home-menu button, #store-menu button",
           ) &&
           !targetElement.closest("#playtest-overlay")
         ) {
@@ -2020,7 +2046,7 @@
       },
       true,
     );
-    [els.mainMenu, els.homeMenu, els.inventoryMenu, els.useItemMenu, els.actionMenu, els.abilitiesMenu].forEach((element) => {
+    [els.mainMenu, els.homeMenu, els.inventoryMenu, els.useItemMenu, els.actionMenu, els.favoriteActionsMenu, els.abilitiesMenu].forEach((element) => {
       element?.classList.add("playtest-guest-locked");
     });
   }
