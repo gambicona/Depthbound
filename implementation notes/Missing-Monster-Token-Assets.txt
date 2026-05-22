@@ -385,16 +385,16 @@ fiend-demon-pack.js (40 missing)
 - plague-belly-hezrou | Plague-Belly Hezrou | Category 4 demon boss | Gear: weapon: natural attack (3d8 + 5 bludgeoning); armor: none specified
 - prince-spawn-gharazhul | Prince-Spawn Gharazhul | Category 9 demon boss | Gear: weapon: magical/natural attack (7d8 + 9 force); armor: none specified
 
-- quasit-needler | Quasit Needler | Tiny flying poison demon | Gear: weapon: held or conjured weapon (1d8 + 3 piercing); armor: none specified
-- ruin-choir-warlock | Ruin-Choir Warlock | Abyssal chant caster | Gear: weapon: spell or elemental attack (5d8 + 7 necrotic); armor: none specified
-- screaming-vrock-matriarch | Screaming Vrock Matriarch | Category 3 demon boss | Gear: weapon: natural attack (2d8 + 4 slashing); armor: none specified
+- +quasit-needler | Quasit Needler | Tiny flying poison demon | Gear: weapon: held or conjured weapon (1d8 + 3 piercing); armor: none specified
+- +ruin-choir-warlock | Ruin-Choir Warlock | Abyssal chant caster | Gear: weapon: spell or elemental attack (5d8 + 7 necrotic); armor: none specified
+- +screaming-vrock-matriarch | Screaming Vrock Matriarch | Category 3 demon boss | Gear: weapon: natural attack (2d8 + 4 slashing); armor: none specified
 - shadow-rift-demon | Shadow Rift Demon | Necrotic ambusher | Gear: weapon: magical/natural attack (2d6 + 3 necrotic); armor: none specified
-- six-blade-marilith | Six-Blade Marilith | Multiweapon melee master | Gear: weapon: held or conjured weapon (5d8 + 7 slashing); armor: none specified
+- +six-blade-marilith | Six-Blade Marilith | Multiweapon melee master | Gear: weapon: held or conjured weapon (5d8 + 7 slashing); armor: none specified
 - soul-eater-of-the-rift | Soul-Eater of the Rift | Flying life-drain executioner | Gear: weapon: magical/natural attack (6d8 + 9 necrotic); armor: none specified
 - spite-mote | Spite Mote | Floating abyssal nuisance | Gear: weapon: spell or elemental attack (1d6 + 2 psychic); armor: incorporeal form
-- three-mouthed-ruin-judge | Three-Mouthed Ruin Judge | Category 6 demon boss | Gear: weapon: spell or elemental attack (5d8 + 7 psychic); armor: none specified
-- vrock-fledgling | Vrock Fledgling | Flying screeching demon | Gear: weapon: natural attack (2d6 + 4 slashing); armor: none specified
-- wish-rot-deceiver | Wish-Rot Deceiver | Category 5 demon boss | Gear: weapon: spell or elemental attack (4d8 + 6 psychic); armor: none specified
+- +three-mouthed-ruin-judge | Three-Mouthed Ruin Judge | Category 6 demon boss | Gear: weapon: spell or elemental attack (5d8 + 7 psychic); armor: none specified
+- +vrock-fledgling | Vrock Fledgling | Flying screeching demon | Gear: weapon: natural attack (2d6 + 4 slashing); armor: none specified
+- +wish-rot-deceiver | Wish-Rot Deceiver | Category 5 demon boss | Gear: weapon: spell or elemental attack (4d8 + 6 psychic); armor: none specified
 
 fiend-devil-pack.js (40 missing)
 
