@@ -3777,6 +3777,7 @@ button[data-ui-icon]::before,
 [data-slot-icon="slot-pack"] { --slot-icon: url("../../assets/icons/ui/pack.svg"); }
 [data-slot-icon="slot-ring"] { --slot-icon: url("../../assets/icons/ui/ring.svg"); }
 [data-slot-icon="slot-tool"] { --slot-icon: url("../../assets/icons/ui/tool.svg"); }
+[data-slot-icon="slot-torso"] { --slot-icon: url("../../assets/icons/ui/torso.svg"); }
 [data-slot-icon="slot-weapon"] { --slot-icon: url("../../assets/icons/ui/weapon.svg"); }
 
 .equipment-slot.is-empty .slot-icon {

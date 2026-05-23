@@ -5450,7 +5450,7 @@ function slotIconName(slotId) {
     cloak: "slot-cloak",
     amulet: "slot-amulet",
     mainHand: "slot-weapon",
-    torso: "slot-armor",
+    torso: "slot-torso",
     offHand: "slot-weapon",
     bracers: "slot-bracers",
     gauntlets: "slot-gauntlets",
