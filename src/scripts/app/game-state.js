@@ -165,6 +165,7 @@ function normalizePartyTomes(tomes = []) {
       const categories = Array.from(
         new Set([...(entry.categories ?? []), ...(entry.handout?.categories ?? []), ...(entry.journalCategories ?? [])].map((category) => String(category).trim()).filter(Boolean)),
       );
+      const tags = Array.from(new Set([...(entry.tags ?? []), ...(entry.handout?.tags ?? [])].map((tag) => String(tag).trim()).filter(Boolean)));
       if (!title && !text) return null;
       return {
         id: String(entry.id ?? entry.instanceId ?? `tome-${index + 1}`),
@@ -172,10 +173,39 @@ function normalizePartyTomes(tomes = []) {
         title,
         text,
         categories,
+        tags,
+        temporary: Boolean(
+          entry.temporary ||
+            entry.temporaryTome ||
+            entry.expiresOnDungeonExit ||
+            entry.handout?.temporary ||
+            tags.includes("temporary-note") ||
+            entry.baseItemId === "temporary-dungeon-note" ||
+            entry.itemId === "temporary-dungeon-note",
+        ),
         collectedAt: entry.collectedAt ?? Date.now(),
       };
     })
     .filter(Boolean);
+}
+
+function isTemporaryPartyTome(entry) {
+  if (!entry) return false;
+  return Boolean(
+    entry.temporary ||
+      entry.temporaryTome ||
+      entry.expiresOnDungeonExit ||
+      entry.handout?.temporary ||
+      entry.baseItemId === "temporary-dungeon-note" ||
+      entry.itemId === "temporary-dungeon-note" ||
+      entry.id === "temporary-dungeon-note" ||
+      entry.tags?.includes("temporary-note") ||
+      entry.handout?.tags?.includes("temporary-note"),
+  );
+}
+
+function permanentPartyTomes(tomes = []) {
+  return normalizePartyTomes(tomes).filter((entry) => !isTemporaryPartyTome(entry));
 }
 
 function normalizeSpecialLock(lock = null) {
@@ -209,12 +239,16 @@ function tomeEntryFromItem(item) {
   const categories = Array.from(
     new Set([...(item.handout?.categories ?? []), ...(item.journalCategories ?? [])].map((category) => String(category).trim()).filter(Boolean)),
   );
+  const tags = Array.from(new Set((item.tags ?? []).map((tag) => String(tag).trim()).filter(Boolean)));
+  const temporary = Boolean(item.temporaryTome ?? item.expiresOnDungeonExit ?? item.handout?.temporary ?? item.tags?.includes("temporary-note"));
   return {
     id: item.id ?? `${item.baseItemId ?? "handout"}-${Date.now()}`,
     baseItemId: item.baseItemId ?? item.itemId ?? item.id ?? "",
     title,
     text,
     categories,
+    tags,
+    temporary,
     collectedAt: Date.now(),
   };
 }
@@ -223,8 +257,8 @@ function addPartyTomeItem(item) {
   const entry = tomeEntryFromItem(item);
   if (!entry) return null;
   state.partyTomes = normalizePartyTomes(state.partyTomes ?? []);
-  const signature = `${entry.baseItemId}|${entry.title}|${entry.text}|${entry.categories.join(",")}`;
-  const existing = state.partyTomes.find((tome) => `${tome.baseItemId}|${tome.title}|${tome.text}|${(tome.categories ?? []).join(",")}` === signature);
+  const signature = `${entry.baseItemId}|${entry.title}|${entry.text}|${entry.categories.join(",")}|${entry.temporary ? "temporary" : "permanent"}`;
+  const existing = state.partyTomes.find((tome) => `${tome.baseItemId}|${tome.title}|${tome.text}|${(tome.categories ?? []).join(",")}|${tome.temporary ? "temporary" : "permanent"}` === signature);
   if (existing) return existing;
   state.partyTomes.push(entry);
   return entry;
@@ -233,7 +267,7 @@ function addPartyTomeItem(item) {
 function logTomeStorageForItem(item) {
   if (!itemUsesTomeInventory(item) || typeof addLog !== "function") return;
   const entry = tomeEntryFromItem(item);
-  if (entry) addLog(`${entry.title} is stored in the Ancient Tome journal.`, "important");
+  if (entry) addLog(`${entry.title} is stored ${entry.temporary ? "temporarily " : ""}in the Ancient Tome journal.`, "important");
 }
 
 function logTomeStorageForItems(items = []) {
@@ -509,7 +543,7 @@ function createDungeonStateForParty(partyMembers, previousState, themeId = defau
   nextState.campaignProgress = cloneData(previousState?.campaignProgress ?? {});
   nextState.questFlags = cloneData(previousState?.questFlags ?? {});
   nextState.partyResources = normalizePartyResources(previousState?.partyResources ?? {});
-  nextState.partyTomes = normalizePartyTomes(previousState?.partyTomes ?? []);
+  nextState.partyTomes = permanentPartyTomes(previousState?.partyTomes ?? []);
   return nextState;
 }
 
@@ -553,7 +587,7 @@ function createCustomDungeonObject(templateObject, index) {
       : specialLock
         ? true
       : lockComponent
-        ? Math.random() < (lockComponent.chance ?? 0.5)
+        ? false
         : undefined;
   return {
     id: templateObject.id ?? `${templateObject.type}-${index + 1}`,
@@ -711,7 +745,7 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
     campaignProgress: cloneData(previousState?.campaignProgress ?? {}),
     questFlags: cloneData(previousState?.questFlags ?? {}),
     partyResources: normalizePartyResources(previousState?.partyResources ?? {}),
-    partyTomes: normalizePartyTomes(previousState?.partyTomes ?? []),
+    partyTomes: permanentPartyTomes(previousState?.partyTomes ?? []),
     lootPiles: [],
     dungeonObjects: objects,
     party: {
@@ -926,6 +960,238 @@ function prepareTimedEffect(effect) {
   const prepared = { ...effect, startsOnNextEncounter: false, durationSeconds };
   prepared.expiresAtDungeonTimeSeconds = dungeonElapsedSeconds({ sync: false }) + durationSeconds;
   return prepared;
+}
+
+function conditionDefinitions() {
+  return {
+    banished: {
+      label: "Banished",
+      speedLocked: true,
+      actionLocked: true,
+      ignoredByMonsters: true,
+      conditionDescription: "Removed from the fight in this engine: cannot act, move, or be selected by monster targeting.",
+    },
+    blinded: {
+      label: "Blinded",
+      attackBonus: -3,
+      incomingAttackAdvantage: true,
+      conditionDescription: "Cannot see: attacks are penalized and attackers gain advantage.",
+    },
+    charmed: {
+      label: "Charmed",
+      attackBonus: -2,
+      conditionDescription: "Magically influenced. The tabletop target-specific attack restriction is approximated as an attack penalty.",
+    },
+    deafened: {
+      label: "Deafened",
+      conditionDescription: "Cannot hear. No direct combat penalty exists yet in this engine.",
+    },
+    exhaustion: {
+      label: "Exhaustion",
+      attackBonus: -1,
+      saveBonus: -1,
+      skillBonus: -1,
+      conditionDescription: "Fatigued: reduced attacks, saves, and skill checks.",
+    },
+    frightened: {
+      label: "Frightened",
+      attackBonus: -2,
+      skillBonus: -2,
+      conditionDescription: "Afraid: attacks and checks are penalized.",
+    },
+    grappled: {
+      label: "Grappled",
+      speedLocked: true,
+      conditionDescription: "Speed becomes 0 until the grapple ends.",
+    },
+    incapacitated: {
+      label: "Incapacitated",
+      actionLocked: true,
+      conditionDescription: "Cannot take actions, bonus actions, or reactions.",
+    },
+    invisible: {
+      label: "Invisible",
+      attackAdvantage: true,
+      stealthAdvantage: true,
+      ignoredByMonsters: true,
+      conditionDescription: "Unseen: attacks gain advantage, stealth improves, and monsters avoid targeting the creature.",
+    },
+    paralyzed: {
+      label: "Paralyzed",
+      speedLocked: true,
+      actionLocked: true,
+      incomingAttackAdvantage: true,
+      saveBonus: -2,
+      conditionDescription: "Cannot move or act. Attackers gain advantage; save penalties approximate failed STR/DEX saves.",
+    },
+    petrified: {
+      label: "Petrified",
+      speedLocked: true,
+      actionLocked: true,
+      incomingAttackAdvantage: true,
+      acBonus: 2,
+      resistances: ["bludgeoning", "piercing", "slashing"],
+      conditionDescription: "Turned to stone: cannot act or move, harder to damage physically, but attackers gain advantage.",
+    },
+    poisoned: {
+      label: "Poisoned",
+      attackBonus: -2,
+      skillBonus: -2,
+      conditionDescription: "Sickened by poison: attacks and checks are penalized.",
+    },
+    prone: {
+      label: "Prone",
+      prone: true,
+      attackBonus: -2,
+      speedBonusFeet: -10,
+      incomingAttackAdvantage: true,
+      conditionDescription: "On the ground: attacks are penalized, movement is reduced, and nearby attackers gain advantage.",
+    },
+    restrained: {
+      label: "Restrained",
+      speedLocked: true,
+      attackBonus: -2,
+      incomingAttackAdvantage: true,
+      saveBonus: -1,
+      conditionDescription: "Held in place: speed is 0, attacks are penalized, attackers gain advantage, and saves are slightly reduced.",
+    },
+    stunned: {
+      label: "Stunned",
+      speedLocked: true,
+      actionLocked: true,
+      incomingAttackAdvantage: true,
+      saveBonus: -2,
+      conditionDescription: "Cannot move or act. Attackers gain advantage; save penalties approximate failed STR/DEX saves.",
+    },
+    unconscious: {
+      label: "Unconscious",
+      speedLocked: true,
+      actionLocked: true,
+      incomingAttackAdvantage: true,
+      prone: true,
+      conditionDescription: "Helpless and prone: cannot move or act, and attackers gain advantage.",
+    },
+  };
+}
+
+function conditionAliasMap() {
+  return {
+    asleep: "unconscious",
+    banish: "banished",
+    banished: "banished",
+    beguiled: "charmed",
+    blind: "blinded",
+    blinded: "blinded",
+    charm: "charmed",
+    charmed: "charmed",
+    deaf: "deafened",
+    deafened: "deafened",
+    disabled: "incapacitated",
+    dominated: "charmed",
+    dominatedmonster: "charmed",
+    dominatedperson: "charmed",
+    exhaustion: "exhaustion",
+    frightened: "frightened",
+    grapple: "grappled",
+    grappled: "grappled",
+    incapacitated: "incapacitated",
+    invisible: "invisible",
+    invisibility: "invisible",
+    paralysis: "paralyzed",
+    paralyzed: "paralyzed",
+    petrification: "petrified",
+    petrified: "petrified",
+    petrifying: "petrified",
+    poison: "poisoned",
+    poisoned: "poisoned",
+    prone: "prone",
+    restrained: "restrained",
+    stun: "stunned",
+    stunned: "stunned",
+    unconscious: "unconscious",
+  };
+}
+
+function normalizedConditionKey(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function canonicalConditionId(value) {
+  const key = normalizedConditionKey(value);
+  if (!key) return "";
+  return conditionAliasMap()[key] ?? "";
+}
+
+function conditionDefinitionFor(value) {
+  const id = canonicalConditionId(value);
+  return id ? conditionDefinitions()[id] : null;
+}
+
+function conditionValueList(value) {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function fighterConditionImmunities(fighter) {
+  const entries = [
+    ...conditionValueList(fighter?.conditionImmunities),
+    ...conditionValueList(fighter?.conditionImmunity),
+    ...conditionValueList(fighter?.immunities?.conditions),
+  ];
+  return new Set(entries.map(canonicalConditionId).filter(Boolean));
+}
+
+function fighterIsImmuneToCondition(fighter, conditionId) {
+  const canonical = canonicalConditionId(conditionId);
+  return Boolean(canonical && fighterConditionImmunities(fighter).has(canonical));
+}
+
+function mergeConditionLists(current = [], added = []) {
+  return Array.from(new Set([...(current ?? []), ...(added ?? [])].filter(Boolean)));
+}
+
+function inferConditionIdFromEffect(effect = {}) {
+  return canonicalConditionId(effect.condition) || canonicalConditionId(effect.id) || canonicalConditionId(effect.label);
+}
+
+function mergedConditionNumber(current, baseline) {
+  if (baseline == null) return current;
+  if (current == null) return baseline;
+  if (baseline < 0) return Math.min(current, baseline);
+  if (baseline > 0) return Math.max(current, baseline);
+  return current;
+}
+
+function normalizeConditionEffect(effect = {}) {
+  if (!effect || typeof effect !== "object") return effect;
+  const conditionId = inferConditionIdFromEffect(effect);
+  if (!conditionId) return { ...effect };
+  const definition = conditionDefinitions()[conditionId];
+  if (!definition) return { ...effect };
+  const normalized = {
+    ...effect,
+    condition: conditionId,
+    conditionLabel: definition.label,
+    conditionDescription: effect.conditionDescription ?? definition.conditionDescription,
+  };
+  if (!normalized.label) normalized.label = definition.label;
+  for (const key of ["acBonus", "attackBonus", "damageBonus", "saveBonus", "skillBonus", "speedBonusFeet"]) {
+    normalized[key] = mergedConditionNumber(normalized[key], definition[key]);
+  }
+  for (const key of ["actionLocked", "attackAdvantage", "ignoredByMonsters", "incomingAttackAdvantage", "prone", "speedLocked", "stealthAdvantage"]) {
+    if (definition[key] && normalized[key] == null) normalized[key] = true;
+  }
+  if (definition.resistances?.length) normalized.resistances = mergeConditionLists(normalized.resistances, definition.resistances);
+  if (definition.vulnerabilities?.length) normalized.vulnerabilities = mergeConditionLists(normalized.vulnerabilities, definition.vulnerabilities);
+  return normalized;
+}
+
+function normalizeStatusEffectsForFighter(fighter) {
+  if (!fighter?.statusEffects?.length) return [];
+  return fighter.statusEffects.map((effect) => normalizeConditionEffect(effect));
 }
 
 function timedEffectRemainingSeconds(effect) {
@@ -1574,7 +1840,7 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
     campaignProgress: cloneData(normalizedPartyData?.campaignProgress ?? {}),
     questFlags,
     partyResources: normalizePartyResources(partyResources),
-    partyTomes: normalizePartyTomes(partyTomes),
+    partyTomes: permanentPartyTomes(partyTomes),
     lootPiles: [],
     dungeonObjects: home.objects,
     party: {
@@ -2439,7 +2705,7 @@ function maxSpellLevelForFighter(fighter) {
   const level = fighter?.level ?? 1;
   const casterType = casterTypeForFighter(fighter);
   if (casterType === "none") return 0;
-  if (casterType === "pact") return level >= 9 ? 5 : level >= 7 ? 4 : level >= 5 ? 3 : level >= 3 ? 2 : 1;
+  if (casterType === "pact") return level >= 17 ? 9 : level >= 15 ? 8 : level >= 13 ? 7 : level >= 11 ? 6 : level >= 9 ? 5 : level >= 7 ? 4 : level >= 5 ? 3 : level >= 3 ? 2 : 1;
   if (casterType === "sidekick") return level >= 17 ? 5 : level >= 13 ? 4 : level >= 9 ? 3 : level >= 5 ? 2 : 1;
   if (casterType === "half") return level >= 17 ? 5 : level >= 13 ? 4 : level >= 9 ? 3 : level >= 5 ? 2 : 1;
   if (casterType === "third") return level >= 19 ? 4 : level >= 13 ? 3 : level >= 7 ? 2 : level >= 3 ? 1 : 0;
@@ -3305,10 +3571,12 @@ function objectHasLoot(object) {
 function movementCostAtPosition(position, fighter = null) {
   const mover = fighter ?? (typeof activeFighter === "function" ? activeFighter() : null) ?? (typeof activeHero === "function" ? activeHero() : null);
   const objects = objectsAtPosition(position);
+  const persistentDifficultTerrain =
+    typeof persistentAreaDifficultTerrainKeys === "function" && persistentAreaDifficultTerrainKeys().has(positionKey(position));
   const ignoresTerrainCost =
     (fighterIsFlying(mover) && objects.some((object) => objectHasTag(object, "floor"))) ||
     (mover?.subclassId === "circle-land" && (mover.level ?? 1) >= 10);
-  const baseCost = ignoresTerrainCost || !objects.some((object) => objectHasComponent(object, "difficultTerrain")) ? 1 : 2;
+  const baseCost = ignoresTerrainCost || (!persistentDifficultTerrain && !objects.some((object) => objectHasComponent(object, "difficultTerrain"))) ? 1 : 2;
   return fighterIsDraggingEntity(mover) ? baseCost * 2 : baseCost;
 }
 
@@ -5145,6 +5413,7 @@ function classMovementSpeedBonus(fighter) {
 
 function refreshDerivedStats(fighter) {
   fighter.baseMaxHp = fighter.baseMaxHp ?? fighter.maxHp ?? 1;
+  fighter.statusEffects = normalizeStatusEffectsForFighter(fighter);
   syncRangerBeastCompanionStats(fighter);
   const effects = magicEffects(fighter);
   const statusSpeedBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.speedBonusFeet ?? 0), 0);
@@ -5469,6 +5738,7 @@ function syncActiveHeroToTurn() {
 function normalizeLoadedState(loadedState) {
   const freshState = createInitialState();
   dungeonClockRuntimePaused = Boolean(loadedState.dungeonClock?.paused);
+  const loadedMode = loadedState.mode ?? (loadedState.dungeon?.id === "home" || loadedState.room?.id === "home" ? "home" : loadedState.combatStarted ? "combat" : "exploration");
   const loadedFighters =
     loadedState.fighters && Object.keys(loadedState.fighters).length
       ? { ...loadedState.fighters }
@@ -5479,7 +5749,7 @@ function normalizeLoadedState(loadedState) {
     ...loadedState,
     themeId: loadedState.themeId ?? freshState.themeId ?? defaultContent.theme,
     saveSlotId: loadedState.saveSlotId ?? activeSaveSlot,
-    mode: loadedState.mode ?? (loadedState.combatStarted ? "combat" : "exploration"),
+    mode: loadedMode,
     fighters: loadedFighters,
     dungeon: ensureCorridorPassages(loadedState.dungeon ?? freshState.dungeon),
     party: {
@@ -5511,7 +5781,7 @@ function normalizeLoadedState(loadedState) {
     campaignProgress: cloneData(loadedState.campaignProgress ?? freshState.campaignProgress ?? {}),
     questFlags: cloneData(loadedState.questFlags ?? freshState.questFlags ?? {}),
     partyResources: normalizePartyResources(loadedState.partyResources ?? freshState.partyResources ?? {}),
-    partyTomes: normalizePartyTomes(loadedState.partyTomes ?? freshState.partyTomes ?? []),
+    partyTomes: loadedMode === "home" ? permanentPartyTomes(loadedState.partyTomes ?? freshState.partyTomes ?? []) : normalizePartyTomes(loadedState.partyTomes ?? freshState.partyTomes ?? []),
     lootPiles: Array.isArray(loadedState.lootPiles) ? loadedState.lootPiles : [],
     dungeonObjects: Array.isArray(loadedState.dungeonObjects) ? loadedState.dungeonObjects : [],
     log: Array.isArray(loadedState.log) ? loadedState.log : [],

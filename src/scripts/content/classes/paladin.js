@@ -22,7 +22,7 @@ window.DungeonContent.register("classes", "paladin", {
   weaponProficiencies: ["simple", "martial"],
   spellcastingAbility: "cha",
   spellPointProgression: halfCasterSpellPoints,
-  spellList: ["bless", "cure_wounds", "divine_favor", "shield_of_faith", "compelled_duel", "heroism", "thunderous_smite", "wrathful_smite", "aid", "branding_smite", "dispel_magic"],
+  spellList: ["bless", "cure_wounds", "divine_favor", "shield_of_faith", "compelled_duel", "command", "heroism", "thunderous_smite", "wrathful_smite", "searing-smite", "aid", "branding_smite", "find-steed", "magic-weapon", "protection-from-poison", "aura-of-vitality", "blinding-smite", "crusaders-mantle", "elemental-weapon", "aura-of-life", "aura-of-purity", "banishment", "death-ward", "staggering-smite", "banishing-smite", "circle-of-power", "destructive-wave", "dispel-evil-and-good", "dispel_magic"],
   spells: [],
   token: "P",
   classFeatures: [

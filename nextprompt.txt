@@ -8,7 +8,6 @@ packs to find (Medizin Pack Proviant Pack, etc) that can either be sold to merch
 Factions with quests (Monsterhunter, buying pelts etc, elementalists, Gravebinder etc)
 Arena fighting pit for glory
 
-random racial names.
 
 hidden assassin monsters
 constructs hiding as furniture
@@ -16,3 +15,9 @@ constructs hiding as furniture
 Quests:
 stealthing
 find secret rooms
+
+lighitng system
+5. Add vision/light/detection fifth. This justifies un-hiding Light and Dancing Lights and makes Darkness, Daylight, True Seeing, See Invisibility, Sunbeam, Sunburst, and Maddening Darkness much better.
+
+
+WoW Addon: Races, Classes, Monster, Dungeons

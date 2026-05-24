@@ -64,8 +64,11 @@ function normalizeCreatorCustomItem(item, index = 0) {
   if (normalized.treasure) normalized.treasure.description = description;
   if (normalized.type === "handout" || normalized.handout) {
     const categories = parseListInput([...(normalized.handout?.categories ?? []), ...(normalized.journalCategories ?? [])].join(", "));
+    const temporary = Boolean(normalized.temporaryTome ?? normalized.expiresOnDungeonExit ?? normalized.handout?.temporary ?? normalized.tags?.includes("temporary-note"));
     normalized.type = "handout";
     normalized.tomeInventory = "party";
+    normalized.temporaryTome = temporary;
+    normalized.expiresOnDungeonExit = temporary;
     normalized.journalCategories = categories;
     normalized.handout = {
       ...(normalized.handout ?? {}),
@@ -73,6 +76,7 @@ function normalizeCreatorCustomItem(item, index = 0) {
       text: description,
       format: normalized.handout?.format ?? "markdown-lite",
       categories,
+      temporary,
     };
   }
   return normalized;
@@ -134,11 +138,17 @@ function activateCreatorFurnitureImages(root = document) {
 }
 
 const els = {
+  shell: document.querySelector("#creator-shell"),
   name: document.querySelector("#creator-name"),
   theme: document.querySelector("#creator-theme"),
   gridSize: document.querySelector("#creator-grid-size"),
+  gridWrap: document.querySelector(".creator-grid-wrap"),
   grid: document.querySelector("#creator-grid"),
   toolGrid: document.querySelector("#tool-grid"),
+  activeTool: document.querySelector("#creator-active-tool"),
+  mapSummary: document.querySelector("#creator-map-summary"),
+  validation: document.querySelector("#creator-validation"),
+  topSaveDungeon: document.querySelector("#top-save-dungeon"),
   addRoom: document.querySelector("#add-room"),
   roomList: document.querySelector("#room-list"),
   roomX: document.querySelector("#room-x"),
@@ -202,6 +212,7 @@ const els = {
   customItemName: document.querySelector("#custom-item-name"),
   customItemDescription: document.querySelector("#custom-item-description"),
   customItemType: document.querySelector("#custom-item-type"),
+  customItemTemporary: document.querySelector("#custom-item-temporary"),
   customItemTags: document.querySelector("#custom-item-tags"),
   customItemWeight: document.querySelector("#custom-item-weight"),
   customItemValue: document.querySelector("#custom-item-value"),
@@ -212,6 +223,7 @@ const state = {
   id: `custom-${Date.now()}`,
   tool: "select",
   gridSize: 36,
+  gridCellSize: 22,
   rooms: [],
   corridors: [],
   corridorPassages: [],
@@ -309,6 +321,10 @@ function objectCanUseSpecialLock(object) {
     tags.includes("loot") ||
     components.some((component) => ["lock", "loot", "definedLootContainer"].includes(component?.type)),
   );
+}
+
+function objectHasLockComponent(object) {
+  return Boolean(window.DungeonContent.get("furniture", object?.type)?.components?.some((component) => component?.type === "lock"));
 }
 
 function containerTrapTemplates() {
@@ -591,6 +607,24 @@ function syncSelectedStoryTriggerFromForm() {
   state.storyTriggers[index] = trigger;
 }
 
+function exportedCreatorObject(object) {
+  const specialLock = normalizeCreatorSpecialLock(object.specialLock);
+  const hasLock = objectHasLockComponent(object);
+  return {
+    id: object.id,
+    type: object.type,
+    position: { ...object.position },
+    ...(object.width ? { width: object.width } : {}),
+    ...(object.height ? { height: object.height } : {}),
+    ...(object.pairId ? { pairId: object.pairId } : {}),
+    ...(hasLock || typeof object.locked === "boolean" ? { locked: specialLock ? true : Boolean(object.locked) } : {}),
+    ...(specialLock ? { specialLock } : {}),
+    ...(!specialLock && object.lockDc ? { lockDc: object.lockDc } : {}),
+    ...(object.trap ? { trap: clone(object.trap) } : {}),
+    items: [...(object.items ?? [])],
+  };
+}
+
 function templateFromState(options = {}) {
   syncSelectedStoryTriggerFromForm();
   const dungeon = buildDungeon();
@@ -601,19 +635,7 @@ function templateFromState(options = {}) {
     gridSize: state.gridSize,
     dungeon,
     exit: state.exit ?? { roomId: dungeon.rooms.at(-1)?.id ?? dungeon.entranceRoomId, position: dungeon.rooms.at(-1)?.cells?.[0] ?? dungeon.startPosition },
-    objects: state.objects.map((object) => ({
-      id: object.id,
-      type: object.type,
-      position: { ...object.position },
-      ...(object.width ? { width: object.width } : {}),
-      ...(object.height ? { height: object.height } : {}),
-      ...(object.pairId ? { pairId: object.pairId } : {}),
-      ...(typeof object.locked === "boolean" ? { locked: object.locked } : {}),
-      ...(normalizeCreatorSpecialLock(object.specialLock) ? { specialLock: normalizeCreatorSpecialLock(object.specialLock), locked: true } : {}),
-      ...(!normalizeCreatorSpecialLock(object.specialLock) && object.lockDc ? { lockDc: object.lockDc } : {}),
-      ...(object.trap ? { trap: clone(object.trap) } : {}),
-      items: [...(object.items ?? [])],
-    })),
+    objects: state.objects.map(exportedCreatorObject),
     monsters: state.monsters.map((monster) => ({
       id: monster.id,
       monsterId: monster.monsterId,
@@ -688,13 +710,37 @@ function setTool(tool) {
   state.hallwayCells = [];
   ensureSelectedFurnitureForTool(tool);
   renderTools();
-  if (["furniture", "trap"].includes(tool)) renderFurnitureCatalogue();
+  if (["furniture", "trap"].includes(tool)) {
+    activateCreatorAssetTab("furniture");
+    setCreatorPanelOpen("right", true);
+    renderFurnitureCatalogue();
+  }
+  if (tool === "monster") {
+    activateCreatorAssetTab("monsters");
+    setCreatorPanelOpen("right", true);
+  }
+}
+
+function toolLabel(tool = state.tool) {
+  return {
+    select: "Select / Edit",
+    connect: "Connect Rooms",
+    hallway: "Draw Hallway",
+    furniture: "Place Furniture",
+    trap: "Place Trap",
+    monster: "Place Monster",
+    start: "Set Party Start",
+    exit: "Set Exit",
+    portal: "Linked Portals",
+    erase: "Erase",
+  }[tool] ?? "Select / Edit";
 }
 
 function renderTools() {
   els.toolGrid.querySelectorAll("button").forEach((button) => {
     button.classList.toggle("active", button.dataset.tool === state.tool);
   });
+  if (els.activeTool) els.activeTool.textContent = toolLabel();
 }
 
 function renderThemes() {
@@ -889,6 +935,52 @@ function renderItemSelects() {
     .join("") + state.monsters.filter((monster) => monster.customized).map((monster) => `<option value="${monster.id}">${monster.name}</option>`).join("");
 }
 
+function activateCreatorPanelTab(tab) {
+  document.querySelectorAll("[data-panel-tab]").forEach((button) => button.classList.toggle("active", button.dataset.panelTab === tab));
+  document.querySelectorAll("[data-panel-page]").forEach((page) => page.classList.toggle("active", page.dataset.panelPage === tab));
+}
+
+function activateCreatorAssetTab(tab) {
+  document.querySelectorAll("[data-asset-tab]").forEach((button) => button.classList.toggle("active", button.dataset.assetTab === tab));
+  document.querySelectorAll("[data-asset-page]").forEach((page) => page.classList.toggle("active", page.dataset.assetPage === tab));
+}
+
+function setCreatorPanelOpen(side, open) {
+  if (!els.shell) return;
+  els.shell.classList.toggle(`${side}-collapsed`, !open);
+  document.querySelectorAll(`[data-toggle-panel='${side}']`).forEach((button) => button.classList.toggle("active", open));
+  const panel = document.querySelector(`#creator-${side}-panel`);
+  panel?.classList.toggle("hidden-mobile", !open);
+}
+
+function creatorPanelIsOpen(side) {
+  return !els.shell?.classList.contains(`${side}-collapsed`);
+}
+
+function toggleCreatorPanel(side) {
+  setCreatorPanelOpen(side, !creatorPanelIsOpen(side));
+}
+
+function fitCreatorGridToViewport() {
+  if (!els.gridWrap || !state.gridSize) return;
+  const availableWidth = Math.max(240, els.gridWrap.clientWidth - 54);
+  const availableHeight = Math.max(240, els.gridWrap.clientHeight - 54);
+  const fitted = Math.floor((Math.min(availableWidth, availableHeight) - state.gridSize) / state.gridSize);
+  state.gridCellSize = Math.max(12, Math.min(28, fitted || 22));
+  renderGrid();
+}
+
+function adjustCreatorZoom(action) {
+  if (action === "fit") {
+    fitCreatorGridToViewport();
+    return;
+  }
+  if (action === "reset") state.gridCellSize = 22;
+  if (action === "in") state.gridCellSize = Math.min(34, (Number(state.gridCellSize) || 22) + 2);
+  if (action === "out") state.gridCellSize = Math.max(12, (Number(state.gridCellSize) || 22) - 2);
+  renderGrid();
+}
+
 function roomCellMap() {
   const map = new Map();
   for (const room of state.rooms) {
@@ -958,7 +1050,9 @@ function renderGrid() {
   const startKey = state.start ? key(state.start.position) : "";
   const portalKeys = new Set(state.objects.filter((object) => object.type === "portal").map((object) => key(object.position)));
   const hallwayPreviewKeys = new Set(state.hallwayCells.map(key));
-  els.grid.style.gridTemplateColumns = `repeat(${state.gridSize}, 22px)`;
+  const cellSize = Math.max(12, Math.min(34, Number(state.gridCellSize) || 22));
+  els.shell?.style.setProperty("--creator-cell-size", `${cellSize}px`);
+  els.grid.style.gridTemplateColumns = `repeat(${state.gridSize}, var(--creator-cell-size))`;
   const cells = [];
   for (let y = 0; y < state.gridSize; y += 1) {
     for (let x = 0; x < state.gridSize; x += 1) {
@@ -1073,6 +1167,7 @@ function updateObjectSpecialLockFromCard(object, changedField) {
   const enabled = Boolean(enabledInput?.checked);
   if (!enabled) {
     delete object.specialLock;
+    if (objectHasLockComponent(object)) object.locked = false;
     if (changedField === "specialLockEnabled") renderSelected();
     return;
   }
@@ -1371,6 +1466,33 @@ function renderRandomLayoutControls() {
   els.randomLayout.disabled = !canRerollRandomLayout();
 }
 
+function creatorValidationItems() {
+  const goal = goalFromForm();
+  const goalTargetReady =
+    goal.type === "reachExit" ||
+    goal.type === "killBoss" ||
+    goal.type === "escortNpc" ||
+    Boolean(goal.itemId || goal.monsterId);
+  return [
+    { label: "Rooms", ready: state.rooms.length > 0, detail: `${state.rooms.length}` },
+    { label: "Party start", ready: Boolean(state.start), detail: state.start ? `${state.start.position.x}, ${state.start.position.y}` : "missing" },
+    { label: "Exit", ready: Boolean(state.exit), detail: state.exit ? `${state.exit.position.x}, ${state.exit.position.y}` : "missing" },
+    { label: "Goal", ready: goalTargetReady, detail: goal.type },
+    { label: "Monsters", ready: state.monsters.length > 0, detail: `${state.monsters.length}` },
+    { label: "Story triggers", ready: true, detail: `${state.storyTriggers.length}` },
+  ];
+}
+
+function renderCreatorSummary() {
+  if (els.mapSummary) {
+    els.mapSummary.textContent = `${state.rooms.length} room${state.rooms.length === 1 ? "" : "s"} - ${state.objects.length} object${state.objects.length === 1 ? "" : "s"} - ${state.monsters.length} monster${state.monsters.length === 1 ? "" : "s"}`;
+  }
+  if (!els.validation) return;
+  els.validation.innerHTML = creatorValidationItems()
+    .map((item) => `<div class="${item.ready ? "ready" : "warn"}"><span>${escapeHtml(item.label)}</span><b>${escapeHtml(item.detail)}</b></div>`)
+    .join("");
+}
+
 function renderExport() {
   els.exportJson.value = JSON.stringify(templateFromState({ includeCampaignSource: Boolean(state.campaignSource) }), null, 2);
 }
@@ -1388,6 +1510,7 @@ function renderAll() {
   renderSavedDungeons();
   renderCampaignSaveState();
   renderRandomLayoutControls();
+  renderCreatorSummary();
   renderExport();
 }
 
@@ -1648,11 +1771,14 @@ function createCustomItem() {
   if (customItem.treasure) customItem.treasure = { ...customItem.treasure, description };
   if (customItem.type === "handout" || template.type === "handout" || template.handout) {
     const categories = parseListInput(els.customItemTags?.value || (template.handout?.categories ?? []).join(", "));
+    const temporary = Boolean(els.customItemTemporary?.checked);
     customItem.type = "handout";
     customItem.category = "journal";
     customItem.tomeInventory = "party";
+    customItem.temporaryTome = temporary;
+    customItem.expiresOnDungeonExit = temporary;
     customItem.journalCategories = categories;
-    customItem.tags = Array.from(new Set([...(customItem.tags ?? []), "handout", "journal", "ancient-tome", ...categories]));
+    customItem.tags = Array.from(new Set([...(customItem.tags ?? []), "handout", "journal", "ancient-tome", ...(temporary ? ["temporary-note"] : []), ...categories]));
     customItem.handout = {
       ...(template.handout ?? {}),
       ...(customItem.handout ?? {}),
@@ -1660,6 +1786,7 @@ function createCustomItem() {
       text: description,
       format: customItem.handout?.format ?? template.handout?.format ?? "markdown-lite",
       categories,
+      temporary,
     };
   }
   state.customItems.push(customItem);
@@ -1676,6 +1803,7 @@ function placeFurniture(position) {
   if (!furnitureEntryMatchesTool(template, state.tool)) return;
   const id = `${state.selectedFurnitureId}-${state.objects.length + 1}`;
   const object = { id, type: state.selectedFurnitureId, position: { ...position }, items: [], roomId: room.id };
+  if (objectHasLockComponent(object)) object.locked = false;
   if (objectCellsForCreator(object).some((cell) => !roomAt(cell) || roomAt(cell).id !== room.id || occupied(cell, "", object.type))) return;
   state.objects.push(object);
   state.selectedId = id;
@@ -1797,6 +1925,7 @@ function handleGridClick(position) {
     eraseAt(position);
   } else {
     state.selectedId = monsterAt(position)?.id ?? objectAt(position)?.id ?? doorAt(position)?.id ?? room?.id ?? "";
+    if (state.selectedId) setCreatorPanelOpen("right", true);
   }
   renderAll();
 }
@@ -2027,16 +2156,34 @@ function init() {
   newBlankDungeon();
   setTool("select");
   void renderCampaignDungeons();
+  setCreatorPanelOpen("left", true);
+  setCreatorPanelOpen("right", false);
 
   els.toolGrid.addEventListener("click", (event) => {
     const button = event.target.closest("[data-tool]");
     if (button) setTool(button.dataset.tool);
+  });
+  document.querySelectorAll("[data-toggle-panel]").forEach((button) => {
+    button.addEventListener("click", () => toggleCreatorPanel(button.dataset.togglePanel));
+  });
+  document.querySelectorAll("[data-open-panel]").forEach((button) => {
+    button.addEventListener("click", () => setCreatorPanelOpen(button.dataset.openPanel, true));
+  });
+  document.querySelectorAll("[data-panel-tab]").forEach((button) => {
+    button.addEventListener("click", () => activateCreatorPanelTab(button.dataset.panelTab));
+  });
+  document.querySelectorAll("[data-asset-tab]").forEach((button) => {
+    button.addEventListener("click", () => activateCreatorAssetTab(button.dataset.assetTab));
+  });
+  document.querySelectorAll("[data-creator-zoom]").forEach((button) => {
+    button.addEventListener("click", () => adjustCreatorZoom(button.dataset.creatorZoom));
   });
   els.grid.addEventListener("click", (event) => {
     const cell = event.target.closest("[data-x]");
     if (!cell) return;
     if (state.tool === "select" && cell.dataset.doorId) {
       state.selectedId = cell.dataset.doorId;
+      setCreatorPanelOpen("right", true);
       renderAll();
       return;
     }
@@ -2060,6 +2207,7 @@ function init() {
     if (!button) return;
     state.selectedId = button.dataset.roomSelect;
     setTool("select");
+    setCreatorPanelOpen("right", true);
     renderAll();
   });
   els.addRoom.addEventListener("click", addRoom);
@@ -2128,6 +2276,7 @@ function init() {
     els.customItemDescription.value = template.handout?.text ?? template.description ?? template.magic?.description ?? template.treasure?.description ?? "";
     els.customItemType.value = template.type ?? "";
     if (els.customItemTags) els.customItemTags.value = isHandout ? (template.handout?.categories ?? ["Promiscuous"]).join(", ") : "";
+    if (els.customItemTemporary) els.customItemTemporary.checked = Boolean(template.temporaryTome ?? template.expiresOnDungeonExit ?? template.handout?.temporary);
     els.customItemWeight.value = String(template.weightLb ?? 0);
     els.customItemValue.value = String(itemValueCp(template) / 100);
   });
@@ -2206,6 +2355,7 @@ function init() {
     renderExport();
   });
   els.saveDungeon.addEventListener("click", saveDungeon);
+  els.topSaveDungeon?.addEventListener("click", saveDungeon);
   els.saveCampaignOverride?.addEventListener("click", () => {
     void saveCampaignOverride();
   });

@@ -1537,6 +1537,10 @@ async function applyWeaponRiderSecondary(attacker, defender, rider, attackDamage
     applyStatusEffect(defender, { id: "branded", label: "Branded", attackBonus: -1, durationRounds: 3 });
     addLog(`${defender.name} is branded and easier to track.`, "important");
   }
+  if (rider.id === "searing-smite") {
+    applyStatusEffect(defender, { id: "burning", label: "Burning", acBonus: -1, durationRounds: 1 });
+    addLog(`${defender.name} is scorched by Searing Smite.`, "important");
+  }
   if (rider.id === "ensnaring-strike") {
     const dc = 8 + proficiencyBonus(attacker) + abilityMod(attacker, spellcastingAbility(attacker));
     const save = await rollSavingThrow(defender, "str", dc, `${attacker.name}'s Ensnaring Strike wraps around ${defender.name}.`);
@@ -1548,6 +1552,14 @@ async function applyWeaponRiderSecondary(attacker, defender, rider, attackDamage
       const save = await rollSavingThrow(target, "dex", 8 + proficiencyBonus(attacker) + abilityMod(attacker, spellcastingAbility(attacker)), `${attacker.name}'s Hail of Thorns bursts around ${defender.name}.`);
       const damage = Math.max(1, Math.floor((rider.damageBonus ?? 5) / (save.success ? 2 : 1)));
       applySpecialDamage(attacker, target, damage, rider.damageType ?? "piercing", "Hail of Thorns");
+    }
+  }
+  if (rider.id === "lightning-arrow" && attackDamage?.range?.kind !== "melee") {
+    const splashTargets = Object.values(state.fighters).filter((fighter) => fighter.id !== defender.id && hostileTo(attacker, fighter) && fighter.alive && fightersWithinSquares(defender, fighter, 1));
+    for (const target of splashTargets) {
+      const save = await rollSavingThrow(target, "dex", 8 + proficiencyBonus(attacker) + abilityMod(attacker, spellcastingAbility(attacker)), `${attacker.name}'s Lightning Arrow bursts around ${defender.name}.`);
+      const damage = Math.max(1, Math.floor((rider.damageBonus ?? 14) / (save.success ? 2 : 1)));
+      applySpecialDamage(attacker, target, damage, "lightning", "Lightning Arrow");
     }
   }
 }
@@ -1688,9 +1700,10 @@ function renderKeepingGridFocus(point) {
   window.requestAnimationFrame(() => scrollRoomToGridPoint(point));
 }
 
-function currentWalkable(fighter = null) {
+function currentWalkable(fighter = null, options = {}) {
   const walkable = new Set((state.dungeon?.walkable ?? []).map(positionKey));
   blockingObjectKeys(fighter).forEach((tileKey) => walkable.delete(tileKey));
+  if (options.includePersistentBlocks !== false) persistentSpellBlockingTileKeys().forEach((tileKey) => walkable.delete(tileKey));
   return walkable;
 }
 
@@ -2366,6 +2379,9 @@ function hasClearLineOfSight(from, to) {
   const shootable = new Set((state.dungeon?.walkable ?? []).map(positionKey));
 
   lineOfSightBlockingObjectKeys().forEach((tileKey) => {
+    shootable.delete(tileKey);
+  });
+  persistentSpellLineOfSightBlockingTileKeys().forEach((tileKey) => {
     shootable.delete(tileKey);
   });
 
@@ -4522,6 +4538,7 @@ async function makeAttack(attacker, defender, options = {}) {
     if (rider.riderStatus === "distracted") applyStatusEffect(defender, { id: "distracted", label: "Distracted", acBonus: -2, expiresAtEndOfTurn: true });
     if (rider.riderStatus === "frightened") applyStatusEffect(defender, { id: "frightened", label: "Frightened", attackBonus: -2, expiresAtEndOfTurn: true });
     if (rider.riderStatus === "enfeebled") applyStatusEffect(defender, { id: "enfeebled", label: "Enfeebled", damageBonus: -2, expiresAtEndOfTurn: true });
+    if (rider.riderStatus === "blinded") applyStatusEffect(defender, { id: "blinded", label: "Blinded", attackBonus: -3, expiresAtEndOfTurn: true });
     if (rider.riderStatus === "banished") applyStatusEffect(defender, { id: "banished", label: "Banished", speedLocked: true, actionLocked: true, expiresAtEndOfTurn: true });
     if (rider.riderStatus === "charmed") applyStatusEffect(defender, { id: "beguiled", label: "Beguiled", attackBonus: -2, expiresAtEndOfTurn: true });
     if (rider.riderStatus === "stunned") applyStatusEffect(defender, { id: "stunned", label: "Stunned", speedLocked: true, actionLocked: true, durationRounds: 1 });
@@ -5253,6 +5270,12 @@ async function rollSavingThrow(target, ability, dc, message, explanation = null)
 }
 
 function applyStatusEffect(target, effect) {
+  effect = typeof normalizeConditionEffect === "function" ? normalizeConditionEffect(effect) : { ...effect };
+  if (effect.condition && typeof fighterIsImmuneToCondition === "function" && fighterIsImmuneToCondition(target, effect.condition)) {
+    const conditionName = effect.conditionLabel ?? effect.label ?? effect.condition;
+    addLog(`${target.name} is immune to ${conditionName}.`, "important");
+    return false;
+  }
   effect = prepareTimedEffect(effect);
   target.statusEffects = (target.statusEffects ?? []).filter((entry) => entry.id !== effect.id);
   target.statusEffects.push(effect);
@@ -5260,6 +5283,7 @@ function applyStatusEffect(target, effect) {
   if (effect.tempHp) {
     target.temporaryHp = Math.max(target.temporaryHp ?? 0, effect.tempHp);
   }
+  return true;
 }
 
 function specialDamageDice(monster, sides = 6) {
@@ -5654,6 +5678,19 @@ function spellAreaSquares(spell) {
   return Math.max(0, Math.floor(((spell.area?.radiusFeet ?? 0) + extraFeet) / feetPerSquare));
 }
 
+function spellAreaLengthSquares(spell, terrain = spell?.area ?? {}) {
+  return Math.max(1, Math.floor((terrain.lengthFeet ?? spell?.area?.lengthFeet ?? terrain.radiusFeet ?? spell?.area?.radiusFeet ?? 5) / feetPerSquare));
+}
+
+function spellAreaWidthSquares(spell, terrain = spell?.area ?? {}) {
+  return Math.max(1, Math.floor((terrain.widthFeet ?? spell?.area?.widthFeet ?? 5) / feetPerSquare));
+}
+
+function spellAreaOrientation(caster, position) {
+  const direction = caster && position ? directionFromCasterToPosition(caster, position) : null;
+  return direction === "east" || direction === "west" ? "vertical" : "horizontal";
+}
+
 function spellCanTargetPoint(spell) {
   return spell?.target === "point" || (spell?.area && spell?.range?.kind === "ranged" && spell?.effect?.kind !== "healing");
 }
@@ -5665,7 +5702,7 @@ function spellTargetingMode(spell) {
 }
 
 function spellTargetCount(spell) {
-  const baseTargets = { bless: 3, bane: 3, aid: 3, "mass-healing-word": 6 };
+  const baseTargets = { bless: 3, bane: 3, aid: 3, "mass-healing-word": 6, "prayer-of-healing": 6, "aura-of-vitality": 6, "beacon-of-hope": 6, "aura-of-life": 6, "aura-of-purity": 6, "circle-of-power": 6, "mass-cure-wounds": 6, "heroes-feast": 6, "holy-aura": 6, "mass-heal": 6 };
   const base = baseTargets[spell?.id] ?? 1;
   return base + (spell?.metamagic?.extraTarget ?? 0) + Math.max(0, spellCastLevel(spell) - spellBaseLevel(spell)) * (spell?.upcast?.targetsPerLevel ?? 0);
 }
@@ -5757,12 +5794,53 @@ function isValidSpellPointTarget(caster, spell, position) {
   return !casterRoom || targetRoom?.id === casterRoom.id;
 }
 
+function centeredLineCells(originPosition, spell, terrain = spell?.area ?? {}, orientation = terrain.orientation ?? spell?.area?.orientation ?? "horizontal") {
+  if (!originPosition) return [];
+  const length = spellAreaLengthSquares(spell, terrain);
+  const width = spellAreaWidthSquares(spell, terrain);
+  const halfLengthBefore = Math.floor((length - 1) / 2);
+  const halfLengthAfter = length - halfLengthBefore - 1;
+  const halfWidthBefore = Math.floor((width - 1) / 2);
+  const halfWidthAfter = width - halfWidthBefore - 1;
+  const cells = [];
+  const walkable = currentWalkable(null, { includePersistentBlocks: false });
+  for (let lengthOffset = -halfLengthBefore; lengthOffset <= halfLengthAfter; lengthOffset += 1) {
+    for (let widthOffset = -halfWidthBefore; widthOffset <= halfWidthAfter; widthOffset += 1) {
+      const cell =
+        orientation === "vertical"
+          ? { x: originPosition.x + widthOffset, y: originPosition.y + lengthOffset }
+          : { x: originPosition.x + lengthOffset, y: originPosition.y + widthOffset };
+      if (window.DungeonGrid.isInsideGrid(cell, currentGridSize()) && walkable.has(positionKey(cell))) cells.push(cell);
+    }
+  }
+  return cells;
+}
+
+function cagePerimeterCells(originPosition, spell, terrain = spell?.area ?? {}) {
+  if (!originPosition) return [];
+  const radius = Math.max(1, Math.floor((terrain.radiusFeet ?? spell?.area?.radiusFeet ?? 10) / feetPerSquare));
+  const cells = [];
+  const walkable = currentWalkable(null, { includePersistentBlocks: false });
+  for (let y = originPosition.y - radius; y <= originPosition.y + radius; y += 1) {
+    for (let x = originPosition.x - radius; x <= originPosition.x + radius; x += 1) {
+      const cell = { x, y };
+      if (!window.DungeonGrid.isInsideGrid(cell, currentGridSize()) || !walkable.has(positionKey(cell))) continue;
+      if (Math.abs(x - originPosition.x) === radius || Math.abs(y - originPosition.y) === radius) cells.push(cell);
+    }
+  }
+  return cells;
+}
+
 function spellAreaCells(originPosition, spell) {
   if (!originPosition) return [];
   if (!spell.area) return [{ ...originPosition }];
+  if (["line", "wall"].includes(spell.area.shape) && spell.target !== "direction") {
+    return centeredLineCells(originPosition, spell, spell.area, spell.area.orientation ?? spell.orientation);
+  }
+  if (spell.area.shape === "cage") return cagePerimeterCells(originPosition, spell, spell.area);
   const radius = spellAreaSquares(spell);
   const cells = [];
-  const walkable = currentWalkable();
+  const walkable = currentWalkable(null, { includePersistentBlocks: false });
   const grid = currentGridSize();
   for (let y = originPosition.y - radius; y <= originPosition.y + radius; y += 1) {
     for (let x = originPosition.x - radius; x <= originPosition.x + radius; x += 1) {
@@ -5792,7 +5870,7 @@ function areaTargetsForSpell(origin, spell, caster) {
 }
 
 function persistentAreaSpellIds() {
-  return new Set(["moonbeam", "spike-growth", "fog-cloud", "silence", "darkness", "hunger-of-hadar"]);
+  return new Set(["moonbeam", "spike-growth", "fog-cloud", "silence", "darkness", "hunger-of-hadar", "cloud-of-daggers", "dust-devil", "flaming-sphere", "plant-growth", "sleet-storm", "stinking-cloud", "wall-of-sand", "wall-of-water", "wind-wall", "black-tentacles", "grasping-vine", "guardian-of-faith", "sickening-radiance", "storm-sphere", "wall-of-fire", "watery-sphere", "cloudkill", "dawn", "insect-plague", "maelstrom", "transmute-rock", "wrath-of-nature", "blade-barrier", "forbiddance", "wall-of-ice", "wall-of-thorns", "arcane-sword", "forcecage", "reverse-gravity", "symbol", "whirlwind", "earthquake", "incendiary-cloud", "maddening-darkness", "tsunami", "prismatic-wall", "storm-of-vengeance", "weird"]);
 }
 
 function ensureSpellAreas() {
@@ -5800,7 +5878,7 @@ function ensureSpellAreas() {
   return state.spellAreas;
 }
 
-function createPersistentSpellArea(caster, spell, position) {
+function createPersistentSpellArea(caster, spell, position, options = {}) {
   if (!persistentAreaSpellIds().has(spell?.id) || !position) return;
   const durationRounds = spell.duration?.rounds ?? spell.effect?.status?.durationRounds ?? 3;
   const durationSeconds = durationSecondsFromDefinition(spell.duration ?? { durationRounds });
@@ -5811,6 +5889,9 @@ function createPersistentSpellArea(caster, spell, position) {
     casterId: caster.id,
     concentrationId: spell.concentration ? concentrationId(caster) : null,
     position: { ...position },
+    origin: options.origin ? { ...options.origin } : { ...position },
+    direction: options.direction ?? null,
+    orientation: options.orientation ?? spellAreaOrientation(caster, position),
     castLevel: spellCastLevel(spell),
     durationRounds,
     durationSeconds,
@@ -5823,7 +5904,9 @@ function createPersistentSpellArea(caster, spell, position) {
 function persistentAreaCells(area) {
   const spell = getContentDefinition("spells", area.spellId);
   if (!spell) return [];
-  return spellAreaCells(area.position, { ...spell, castLevel: area.castLevel });
+  const areaSpell = { ...spell, castLevel: area.castLevel, orientation: area.orientation };
+  if (area.direction && spell.target === "direction") return spellDirectionCellsFromOrigin(area.origin ?? area.position, area.direction, areaSpell);
+  return spellAreaCells(area.position, areaSpell);
 }
 
 function persistentAreaTileKeys() {
@@ -5832,6 +5915,48 @@ function persistentAreaTileKeys() {
     for (const cell of persistentAreaCells(area)) keys.add(positionKey(cell));
   }
   return keys;
+}
+
+function spellPersistentTerrain(spell) {
+  return spell?.area?.terrain ?? spell?.persistentTerrain ?? null;
+}
+
+function persistentAreaTerrainCells(area) {
+  const spell = getContentDefinition("spells", area.spellId);
+  const terrain = spellPersistentTerrain(spell);
+  if (!spell || !terrain) return [];
+  const areaSpell = { ...spell, castLevel: area.castLevel, orientation: area.orientation };
+  if (terrain.shape === "cage") return cagePerimeterCells(area.position, areaSpell, terrain);
+  if (terrain.shape === "wall" || terrain.shape === "line") return centeredLineCells(area.position, areaSpell, terrain, area.orientation);
+  if (area.direction && spell.target === "direction") return spellDirectionCellsFromOrigin(area.origin ?? area.position, area.direction, { ...areaSpell, area: { ...spell.area, ...terrain } });
+  return spellAreaCells(area.position, { ...areaSpell, area: { ...spell.area, ...terrain } });
+}
+
+function persistentAreaTerrainKeys(predicate) {
+  const keys = new Set();
+  for (const area of ensureSpellAreas()) {
+    const spell = getContentDefinition("spells", area.spellId);
+    const terrain = spellPersistentTerrain(spell);
+    if (!terrain || !predicate(terrain, spell, area)) continue;
+    for (const cell of persistentAreaTerrainCells(area)) keys.add(positionKey(cell));
+  }
+  return keys;
+}
+
+function persistentSpellBlockingTileKeys() {
+  return persistentAreaTerrainKeys((terrain) => terrain.blocksMovement);
+}
+
+function persistentSpellLineOfSightBlockingTileKeys() {
+  return persistentAreaTerrainKeys((terrain) => terrain.blocksLineOfSight);
+}
+
+function persistentAreaDifficultTerrainKeys() {
+  return persistentAreaTerrainKeys((terrain) => terrain.difficultTerrain);
+}
+
+function persistentAreaBlockingTileKeys() {
+  return persistentSpellBlockingTileKeys();
 }
 
 function agePersistentSpellAreasForCaster(caster) {
@@ -5849,7 +5974,7 @@ async function applyPersistentSpellAreasAtTurnStart(fighter) {
     if (!spellAffectsFighter(caster, spell, fighter)) continue;
     const castSpell = { ...spell, castLevel: area.castLevel, casterLevel: caster.level ?? 1 };
     addLog(`${fighter.name} starts their turn in ${area.spellName}.`, "important");
-    if (spell.effect?.kind === "damage") await applySpellDamage(caster, fighter, castSpell);
+    if (spell.effect?.kind === "damage") await applySpellDamage(caster, fighter, castSpell, { origin: area.origin ?? area.position });
     if (spell.effect?.kind === "status") await applySpellStatus(caster, fighter, castSpell);
     if (!fighter.alive && isPartyHeroId(fighter.id)) handleHeroDeath();
   }
@@ -5902,6 +6027,34 @@ function spellDirectionCells(caster, direction, spell) {
     const cell = positionFromKey(tileKey);
     const dx = cell.x - caster.position.x;
     const dy = cell.y - caster.position.y;
+    const forward = delta.x ? dx * delta.x : dy * delta.y;
+    const side = delta.x ? Math.abs(dy) : Math.abs(dx);
+    if (forward <= 0 || forward > length) continue;
+    if (spell.area?.shape === "cone") {
+      if (side <= forward) cells.push(cell);
+    } else if (side < width) {
+      cells.push(cell);
+    }
+  }
+  return cells;
+}
+
+function spellDirectionCellsFromOrigin(origin, direction, spell) {
+  if (!origin || !direction) return [];
+  const length = Math.max(1, Math.floor((spell.area?.lengthFeet ?? spell.range?.feet ?? 15) / feetPerSquare));
+  const width = Math.max(1, Math.floor((spell.area?.widthFeet ?? 5) / feetPerSquare));
+  const deltas = {
+    north: { x: 0, y: -1 },
+    east: { x: 1, y: 0 },
+    south: { x: 0, y: 1 },
+    west: { x: -1, y: 0 },
+  };
+  const delta = deltas[direction] ?? deltas.north;
+  const cells = [];
+  for (const tileKey of currentWalkable(null, { includePersistentBlocks: false })) {
+    const cell = positionFromKey(tileKey);
+    const dx = cell.x - origin.x;
+    const dy = cell.y - origin.y;
     const forward = delta.x ? dx * delta.x : dy * delta.y;
     const side = delta.x ? Math.abs(dy) : Math.abs(dx);
     if (forward <= 0 || forward > length) continue;
@@ -6067,7 +6220,100 @@ function scaledSpellDice(spell) {
   return dice;
 }
 
-async function applySpellDamage(caster, target, spell) {
+function directionDelta(direction) {
+  return {
+    north: { x: 0, y: -1 },
+    east: { x: 1, y: 0 },
+    south: { x: 0, y: 1 },
+    west: { x: -1, y: 0 },
+  }[direction] ?? null;
+}
+
+function forcedMovementStepOptions(source, target, movement = {}, context = {}) {
+  const mode = movement.mode ?? "push";
+  const vector =
+    movement.direction === "spell" && context.direction
+      ? directionDelta(context.direction)
+      : movement.direction && typeof movement.direction === "object"
+        ? movement.direction
+        : null;
+  let dx = 0;
+  let dy = 0;
+  if (vector) {
+    dx = Math.sign(vector.x ?? 0);
+    dy = Math.sign(vector.y ?? 0);
+  } else {
+    const origin = movement.origin ?? context.origin ?? source?.position;
+    if (!origin || !target?.position) return [];
+    dx = Math.sign(target.position.x - origin.x);
+    dy = Math.sign(target.position.y - origin.y);
+    if (mode === "pull") {
+      dx *= -1;
+      dy *= -1;
+    }
+  }
+  if (!dx && !dy) return [];
+  if (Math.abs(dx) + Math.abs(dy) === 1) return [{ x: dx, y: dy }];
+  return [
+    { x: dx, y: dy },
+    { x: dx, y: 0 },
+    { x: 0, y: dy },
+  ];
+}
+
+function forcedMovementDistanceSquares(movement = {}) {
+  return Math.max(1, Math.floor((movement.distanceFeet ?? movement.feet ?? 5) / feetPerSquare));
+}
+
+function forcedMovementLabel(source, target, movement = {}, movedSquares = 0) {
+  const feet = movedSquares * feetPerSquare;
+  const mode = movement.mode ?? "push";
+  if (mode === "pull") return `${source.name}'s ${movement.label ?? "magic"} pulls ${target.name} ${feet} ft.`;
+  if (mode === "flee") return `${target.name} flees ${feet} ft from ${source.name}'s ${movement.label ?? "magic"}.`;
+  return `${source.name}'s ${movement.label ?? "magic"} pushes ${target.name} ${feet} ft.`;
+}
+
+function applyForcedMovement(source, target, movement = {}, context = {}) {
+  if (!source?.position || !target?.position || !target.alive || target.dead) return false;
+  if ((target.statusEffects ?? []).some((effect) => effect.speedLocked && movement.respectsSpeedLock !== false)) {
+    addLog(`${target.name} is held in place and cannot be moved by ${movement.label ?? "the force"}.`, "important");
+    return false;
+  }
+  const steps = forcedMovementDistanceSquares(movement);
+  let moved = 0;
+  for (let index = 0; index < steps; index += 1) {
+    const options = forcedMovementStepOptions(source, target, movement, context);
+    const destination = options
+      .map((delta) => ({ x: target.position.x + delta.x, y: target.position.y + delta.y }))
+      .find((position) => canPushTargetToPosition(source, target, position));
+    if (!destination) break;
+    target.position = destination;
+    moved += 1;
+  }
+  if (!moved) {
+    addLog(`${target.name} cannot be moved by ${movement.label ?? source.name}.`, "important");
+    return false;
+  }
+  triggerTrapAtPosition(target, target.position);
+  addLog(forcedMovementLabel(source, target, movement, moved), "important");
+  return true;
+}
+
+function spellForcedMovement(spell) {
+  const movement = spell?.effect?.forcedMovement ?? spell?.effect?.status?.forcedMovement ?? null;
+  if (!movement) return null;
+  return { label: spell.name, ...movement };
+}
+
+function applySpellForcedMovement(caster, target, spell, save = null, context = {}) {
+  const movement = spellForcedMovement(spell);
+  if (!movement) return false;
+  if (movement.on === "failedSave" && save?.success) return false;
+  if (movement.on === "successfulSave" && !save?.success) return false;
+  return applyForcedMovement(caster, target, movement, context);
+}
+
+async function applySpellDamage(caster, target, spell, context = {}) {
   const dice = scaledSpellDice(spell);
   const roll = rollDice(dice.count, dice.sides);
   let raw = Math.max(1, roll.total + (dice.bonus ?? 0));
@@ -6082,7 +6328,7 @@ async function applySpellDamage(caster, target, spell) {
     save = await rollSavingThrow(target, spell.save.ability, spellSaveDc(caster, spell), `${caster.name}'s ${spell.name} forces ${target.name} to make a ${spell.save.ability.toUpperCase()} save.`);
     if (save.success && spellBaseLevel(spell) === 0 && !spell.save.halfDamage) {
       addLog(`${target.name} avoids ${spell.name}.`);
-      return;
+      return { save, damaged: false };
     }
     if (spell.save.halfDamage) raw = evasionAdjustedDamage(target, save, raw);
   }
@@ -6095,9 +6341,11 @@ async function applySpellDamage(caster, target, spell) {
     caster.blessedStrikeUsedThisTurn = true;
     addLog(`${caster.name}'s Blessed Strike adds ${blessed.total} radiant force.`, "important");
   }
-  if (raw <= 0) return;
+  if (raw <= 0) return { save, damaged: false };
   applySpecialDamage(caster, target, raw, spell.effect.type ?? "force", spell.name);
   if (spell.effect?.status && (!save || !save.success)) await applySpellStatus(caster, target, spell, { skipSave: true });
+  else applySpellForcedMovement(caster, target, spell, save, context);
+  return { save, damaged: true };
 }
 
 function applySpellHealing(caster, target, spell) {
@@ -6115,6 +6363,152 @@ function applySpellHealing(caster, target, spell) {
     if (restored > 0) addLog(`${caster.name}'s Blessed Healer restores ${restored} HP to themself.`, "heal");
   }
   void maybeFinishEncounterAfterHeroRecovery();
+}
+
+function summonActorProfiles() {
+  return {
+    familiar: { monsterId: "thornbackHare", name: "Familiar", behavior: "skirmisher", hpMultiplier: 0.55, damageBonus: -1, followDistanceSquares: 1 },
+    steed: { monsterId: "gloomhornHellsteed", name: "Steed", behavior: "melee", hpMultiplier: 1.15, damageBonus: 1, followDistanceSquares: 1 },
+    skeleton: { monsterId: "skeletonArcher", name: "Skeleton", behavior: "rangedKiter", hpMultiplier: 0.9, followDistanceSquares: 2 },
+    beast: { monsterId: "forestWolf", name: "Conjured Beast", behavior: "melee", hpMultiplier: 0.9, followDistanceSquares: 2 },
+    elemental: { monsterId: "shaleHound", name: "Conjured Elemental", behavior: "melee", hpMultiplier: 1.25, damageBonus: 1, followDistanceSquares: 2 },
+    hound: { monsterId: "blindCaveHound", name: "Faithful Hound", behavior: "guard", hpMultiplier: 1, attackBonus: 1, followDistanceSquares: 1 },
+    arcaneHand: { monsterId: "pitImpScout", name: "Arcane Hand", behavior: "melee", hpMultiplier: 1.2, damageBonus: 2, followDistanceSquares: 1 },
+    object: { monsterId: "skeletalSpearman", name: "Animated Object", behavior: "melee", hpMultiplier: 0.65, damageBonus: -1, followDistanceSquares: 1 },
+  };
+}
+
+function summonOpenPositionsAround(owner, origin, count = 1) {
+  const occupied = new Set(
+    Object.values(state.fighters ?? {})
+      .filter((fighter) => fighter.alive)
+      .flatMap((fighter) => window.DungeonGrid.fighterCells(fighter).map(positionKey)),
+  );
+  const walkable = currentWalkable(owner);
+  const candidates = [origin, ...window.DungeonGrid.neighbors(origin, currentGridSize()), ...surroundingCells(origin)]
+    .filter(Boolean)
+    .filter((position) => window.DungeonGrid.isInsideGrid(position, currentGridSize()))
+    .sort((a, b) => distance(a, origin) - distance(b, origin));
+  const positions = [];
+  for (const position of candidates) {
+    const key = positionKey(position);
+    if (!walkable.has(key) || occupied.has(key) || positions.some((entry) => positionKey(entry) === key)) continue;
+    if (owner?.position && !canTraverseMovementEdge(owner, owner.position, position, [])) {
+      const adjacentToOrigin = Math.abs(position.x - origin.x) + Math.abs(position.y - origin.y) <= 1;
+      if (!adjacentToOrigin) continue;
+    }
+    positions.push({ ...position });
+    if (positions.length >= count) break;
+  }
+  return positions;
+}
+
+function scaleSummonedSpellActor(actor, caster, spell, summon = {}, profile = {}) {
+  const level = caster.level ?? 1;
+  const prof = proficiencyBonus(caster);
+  const durationRounds = summon.durationRounds ?? spell.duration?.rounds ?? 6;
+  const durationSeconds = durationSecondsFromDefinition(summon.duration ?? spell.duration ?? { durationRounds });
+  actor.level = level;
+  actor.maxHp = Math.max(1, Math.floor((actor.maxHp ?? 1) * (profile.hpMultiplier ?? 1)) + level * (summon.hpPerCasterLevel ?? 1));
+  actor.baseMaxHp = actor.maxHp;
+  actor.hp = actor.maxHp;
+  actor.attackBonus = (actor.attackBonus ?? 3) + Math.max(0, prof - 2) + (profile.attackBonus ?? summon.attackBonus ?? 0);
+  actor.damage = {
+    ...(actor.damage ?? { count: 1, sides: 6, bonus: 0, type: "damage" }),
+    bonus: Math.max(0, (actor.damage?.bonus ?? 0) + Math.floor(level / 5) + (profile.damageBonus ?? summon.damageBonus ?? 0)),
+  };
+  actor.baseDamage = { ...actor.damage };
+  actor.summonedByHeroId = caster.id;
+  actor.summonedBySpellId = spell.id;
+  actor.summonDurationRounds = durationRounds;
+  if (durationSeconds > 0) actor.summonExpiresAtDungeonTimeSeconds = dungeonElapsedSeconds({ sync: false }) + durationSeconds;
+  actor.renameable = false;
+  actor.companionControl = "ai";
+  actor.team = "heroes";
+  actor.friendly = true;
+  actor.partyMemberKind = "ally";
+  actor.followHeroId = caster.id;
+  actor.followDistanceSquares = profile.followDistanceSquares ?? summon.followDistanceSquares ?? 2;
+  actor.behavior = profile.behavior ?? summon.behavior ?? "melee";
+  actor.className = summon.className ?? profile.className ?? "Summoned Ally";
+  refreshDerivedStats(actor);
+  actor.hp = actor.maxHp;
+  return actor;
+}
+
+function createSimulacrumActor(caster, spell, position, summon = {}) {
+  const copy = createCombatant({
+    ...cloneData(caster),
+    id: `${spell.id}-${caster.id}-${Date.now()}-simulacrum`,
+    name: summon.name ?? `${caster.name}'s Simulacrum`,
+    position,
+    hp: undefined,
+    maxHp: Math.max(1, Math.floor((caster.maxHp ?? 1) / 2)),
+    baseMaxHp: Math.max(1, Math.floor((caster.maxHp ?? 1) / 2)),
+    partyMemberKind: "ally",
+    companionControl: "ai",
+    team: "heroes",
+    friendly: true,
+    inventory: { money: { cp: 0, sp: 0, gp: 0 }, items: [] },
+    equipment: {},
+  });
+  copy.spells = [...(caster.spells ?? [])];
+  copy.spellPointMax = Math.max(1, Math.floor(spellPointMaximum(caster) / 3));
+  copy.spellPoints = copy.spellPointMax;
+  return scaleSummonedSpellActor(copy, caster, spell, summon, { behavior: "rangedKiter", hpMultiplier: 1, followDistanceSquares: 2 });
+}
+
+function addSummonedSpellActorToCombat(caster, actor) {
+  state.fighters[actor.id] = actor;
+  state.party.heroIds = uniqueValues([...(state.party.heroIds ?? []), actor.id]);
+  state.party.rosterIds = uniqueValues([...(state.party.rosterIds ?? []), actor.id]);
+  if (state.mode === "combat") {
+    const activeIndex = Math.max(0, state.activeIndex ?? 0);
+    state.initiative.splice(activeIndex + 1, 0, { fighterId: actor.id, initiative: state.initiative[activeIndex]?.initiative ?? 10 });
+  }
+}
+
+async function castSummonSpell(caster, spell, originTarget = caster) {
+  const summon = spell.effect?.summon ?? {};
+  const extraCount = Math.max(0, spellCastLevel(spell) - spellBaseLevel(spell)) * (spell.upcast?.targetsPerLevel ?? 0);
+  const count = Math.max(1, (summon.count ?? 1) + extraCount);
+  const origin = originTarget?.position ?? originTarget ?? caster.position;
+  const positions = summonOpenPositionsAround(caster, origin, count);
+  if (!positions.length) {
+    applyStatusEffect(caster, { id: `${spell.id}-summon-fallback`, label: spell.name, tempHp: 6 + proficiencyBonus(caster), durationRounds: 3 });
+    addLog(`${spell.name} cannot find space for a summon, so the magic reinforces ${caster.name}.`, "important");
+    return [];
+  }
+  const profileId = summon.profile ?? "beast";
+  const profile = summonActorProfiles()[profileId] ?? summonActorProfiles().beast;
+  const actors = [];
+  for (let index = 0; index < Math.min(count, positions.length); index += 1) {
+    let actor = null;
+    if (profileId === "simulacrum") {
+      actor = createSimulacrumActor(caster, spell, positions[index], summon);
+    } else {
+      actor = createFriendlyBeastFromMonster(summon.monsterId ?? profile.monsterId, {
+        id: `${spell.id}-${caster.id}-${Date.now()}-${index + 1}`,
+        name: count > 1 ? `${summon.name ?? profile.name} ${index + 1}` : summon.name ?? profile.name ?? spell.name,
+        position: positions[index],
+        kind: "ally",
+        control: "ai",
+        followHeroId: caster.id,
+        followDistanceSquares: profile.followDistanceSquares ?? 2,
+      });
+      if (actor) scaleSummonedSpellActor(actor, caster, spell, summon, profile);
+    }
+    if (!actor) continue;
+    addSummonedSpellActorToCombat(caster, actor);
+    actors.push(actor);
+  }
+  if (!actors.length) {
+    applyStatusEffect(caster, { id: `${spell.id}-summon-fallback`, label: spell.name, tempHp: 6 + proficiencyBonus(caster), durationRounds: 3 });
+    addLog(`${spell.name} cannot shape a summon yet, so the magic reinforces ${caster.name}.`, "important");
+    return [];
+  }
+  addLog(`${caster.name}'s ${spell.name} summons ${actors.map((actor) => actor.name).join(", ")}.`, "important");
+  return actors;
 }
 
 async function applySpellAttack(caster, target, spell) {
@@ -6145,6 +6539,7 @@ async function applySpellAttack(caster, target, spell) {
   }
   applySpecialDamage(caster, target, totalDamage, spell.effect?.type ?? "force", spell.name);
   if (spell.effect?.status) await applySpellStatus(caster, target, spell);
+  else applySpellForcedMovement(caster, target, spell, null, { origin: caster.position });
 }
 
 function eldritchBlastBeamCount(caster) {
@@ -6324,6 +6719,7 @@ async function applySpellStatus(caster, target, spell, options = {}) {
     effect.speedBonusFeet = Math.min(effect.speedBonusFeet ?? 0, -10);
     effect.label = `${effect.label} Resisted`;
   }
+  applySpellForcedMovement(caster, target, spell, null, { origin: caster.position });
   applyStatusEffect(target, effect);
   addLog(`${caster.name}'s ${spell.name} applies ${effect.label} to ${target.name}.`, "important");
 }
@@ -6334,6 +6730,8 @@ async function castSpellAtTarget(caster, spell, target) {
   spendSpellResources(caster, spell);
   if (spell.effect?.kind === "healing") {
     applySpellHealing(caster, target, spell);
+  } else if (spell.effect?.kind === "summon") {
+    await castSummonSpell(caster, spell, target);
   } else if (spell.effect?.kind === "status") {
     await applySpellStatus(caster, target, spell);
   } else if (spell.effect?.kind === "attackDamage") {
@@ -6348,10 +6746,11 @@ async function castSpellAtTarget(caster, spell, target) {
     }
   } else if (spell.effect?.kind === "damage") {
     const targets = spell.area ? areaTargetsForSpell(target, spell, caster) : [target];
+    const spellOrigin = { ...target.position };
     addLog(`${caster.name} casts ${spell.name} at spell level ${spellCastLevel(spell)} for ${spellPointCost(spell)} SP${spell.area ? ` at ${target.name}` : ""}.`, "important");
     for (const entry of targets) {
       const wasAlive = entry.alive;
-      await applySpellDamage(caster, entry, spell);
+      await applySpellDamage(caster, entry, spell, { origin: spellOrigin });
       if (!entry.alive && isPartyHeroId(entry.id)) handleHeroDeath();
       if (wasAlive && !entry.alive && !isPartyHeroId(entry.id)) {
         triggerMonsterDeathStory(entry);
@@ -6375,11 +6774,13 @@ async function castSpellAtTargets(caster, spell, targets) {
   for (const target of targets) {
     if (spell.effect?.kind === "healing") {
       applySpellHealing(caster, target, spell);
+    } else if (spell.effect?.kind === "summon") {
+      await castSummonSpell(caster, spell, target);
     } else if (spell.effect?.kind === "status") {
       await applySpellStatus(caster, target, spell);
     } else if (spell.effect?.kind === "damage") {
       const wasAlive = target.alive;
-      await applySpellDamage(caster, target, spell);
+      await applySpellDamage(caster, target, spell, { origin: caster.position });
       if (wasAlive && !target.alive && !isPartyHeroId(target.id)) {
         triggerMonsterDeathStory(target);
         if (isPartyHeroId(caster.id)) playSoundEffect("enemyDefeated");
@@ -6413,12 +6814,20 @@ async function castSpellAtPoint(caster, spell, position) {
     return;
   }
   spendSpellResources(caster, spell);
-  createPersistentSpellArea(caster, spell, position);
+  createPersistentSpellArea(caster, spell, position, { origin: position, orientation: spellAreaOrientation(caster, position) });
   const targets = spell.area ? areaTargetsForSpell(position, spell, caster) : spellTargetsFromCells([position]);
   addLog(`${caster.name} casts ${spell.name} at spell level ${spellCastLevel(spell)} for ${spellPointCost(spell)} SP at (${position.x + 1}, ${position.y + 1}).`, "important");
+  if (spell.effect?.kind === "summon") {
+    await castSummonSpell(caster, spell, position);
+    refreshDerivedStats(caster);
+    hideAbilitiesMenu();
+    render();
+    return;
+  }
   for (const target of targets) {
     const wasAlive = target.alive;
-    if (spell.effect?.kind === "damage") await applySpellDamage(caster, target, spell);
+    if (spell.effect?.kind === "damage") await applySpellDamage(caster, target, spell, { origin: position });
+    else if (spell.effect?.kind === "summon") await castSummonSpell(caster, spell, position);
     else if (spell.effect?.kind === "status") await applySpellStatus(caster, target, spell);
     if (!target.alive && isPartyHeroId(target.id)) handleHeroDeath();
     if (wasAlive && !target.alive && !isPartyHeroId(target.id)) {
@@ -6439,10 +6848,12 @@ async function castSpellInDirection(caster, spell, direction) {
   spell = { ...spell, casterLevel: caster.level ?? 1 };
   spendSpellResources(caster, spell);
   const targets = breathTemplateTargets(caster, direction, spell);
+  createPersistentSpellArea(caster, spell, caster.position, { origin: caster.position, direction });
   addLog(`${caster.name} casts ${spell.name} at spell level ${spellCastLevel(spell)} for ${spellPointCost(spell)} SP ${direction}.`, "important");
   for (const target of targets) {
     const wasAlive = target.alive;
-    if (spell.effect?.kind === "damage") await applySpellDamage(caster, target, spell);
+    if (spell.effect?.kind === "damage") await applySpellDamage(caster, target, spell, { direction, origin: caster.position });
+    else if (spell.effect?.kind === "summon") await castSummonSpell(caster, spell, caster);
     else if (spell.effect?.kind === "status") await applySpellStatus(caster, target, spell);
     if (wasAlive && !target.alive && !isPartyHeroId(target.id)) {
       triggerMonsterDeathStory(target);
@@ -6480,35 +6891,11 @@ async function chooseAndCastSpell(spellId, castLevel = null) {
 }
 
 function pushTargetAway(source, target) {
-  const destination = shovePushDestination(source, target);
-  if (!canPushTargetToPosition(source, target, destination)) {
-    addLog(`${target.name} cannot be pushed farther away from ${source.name}.`, "important");
-    return false;
-  }
-  target.position = destination;
-  triggerTrapAtPosition(target, destination);
-  addLog(`${source.name} pushes ${target.name} 5 ft away.`, "important");
-  return true;
+  return applyForcedMovement(source, target, { mode: "push", distanceFeet: 5, label: "shove" });
 }
 
 function pullTargetToward(source, target) {
-  const dx = Math.sign(source.position.x - target.position.x);
-  const dy = Math.sign(source.position.y - target.position.y);
-  if (!dx && !dy) return false;
-  const candidates = [
-    { x: target.position.x + dx, y: target.position.y + dy },
-    dx ? { x: target.position.x + dx, y: target.position.y } : null,
-    dy ? { x: target.position.x, y: target.position.y + dy } : null,
-  ].filter(Boolean);
-  const destination = candidates.find((position) => canPushTargetToPosition(source, target, position));
-  if (!destination) {
-    addLog(`${target.name} cannot be pulled closer to ${source.name}.`, "important");
-    return false;
-  }
-  target.position = destination;
-  triggerTrapAtPosition(target, destination);
-  addLog(`${source.name} pulls ${target.name} 5 ft closer.`, "important");
-  return true;
+  return applyForcedMovement(source, target, { mode: "pull", distanceFeet: 5, label: "pull" });
 }
 
 async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) {

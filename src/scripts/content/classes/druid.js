@@ -227,8 +227,8 @@ window.DungeonContent.register("classes", "druid", {
   weaponProficiencies: ["club", "dagger", "dart", "javelin", "mace", "quarterstaff", "scimitar", "sickle", "sling", "spear"],
   spellcastingAbility: "wis",
   spellPointProgression: fullCasterSpellPoints,
-  spellList: ["cure_wounds", "healing_word", "entangle", "faerie_fire", "thunderwave", "barkskin", "heat_metal", "moonbeam", "spike_growth", "call_lightning", "dispel_magic"],
-  cantripList: ["guidance", "produce-flame", "thorn-whip", "thunderclap", "frostbite", "poison-spray", "primal-savagery", "resistance", "shillelagh"],
+  spellList: ["cure_wounds", "healing_word", "entangle", "faerie_fire", "thunderwave", "earth-tremor", "ice-knife", "dust-devil", "earthbind", "enhance-ability", "flame-blade", "flaming-sphere", "gust-of-wind", "protection-from-poison", "warding-wind", "conjure-animals", "erupting-earth", "flame-arrows", "plant-growth", "protection-from-energy", "sleet-storm", "tidal-wave", "wall-of-water", "wind-wall", "blight", "charm-monster", "confusion", "conjure-minor-elementals", "conjure-woodland-beings", "dominate-beast", "elemental-bane", "freedom-of-movement", "grasping-vine", "guardian-of-nature", "ice-storm", "stoneskin", "wall-of-fire", "watery-sphere", "antilife-shell", "conjure-elemental", "contagion", "insect-plague", "maelstrom", "mass-cure-wounds", "transmute-rock", "wrath-of-nature", "heal", "heroes-feast", "primordial-ward", "sunbeam", "wall-of-thorns", "etherealness", "fire-storm", "regenerate", "reverse-gravity", "whirlwind", "earthquake", "feeblemind", "sunburst", "tsunami", "foresight", "storm-of-vengeance", "barkskin", "heat_metal", "moonbeam", "spike_growth", "call_lightning", "dispel_magic"],
+  cantripList: ["guidance", "produce-flame", "thorn-whip", "thunderclap", "frostbite", "poison-spray", "primal-savagery", "resistance", "shillelagh", "druidcraft"],
   spells: [],
   token: "D",
   classFeatures: [

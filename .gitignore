@@ -12,6 +12,8 @@ build/
 # Logs and local env files
 *.log
 .edge-profile/
+.tmp/
+playwright_chromiumdev_profile-*/
 debug-edge.js
 edge-dom.txt
 edge-log.txt

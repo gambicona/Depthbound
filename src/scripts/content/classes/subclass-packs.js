@@ -682,8 +682,8 @@ const redesignedFighterSubclasses = [
     casterType: "third",
     spellcastingAbility: "int",
     spellPointProgression: { 3: 4, 4: 6, 5: 6, 6: 6, 7: 14, 8: 14, 9: 14, 10: 17, 11: 17, 12: 17, 13: 27, 14: 27, 15: 27, 16: 32, 17: 32, 18: 32, 19: 38, 20: 38 },
-    cantripList: ["mage-hand", "blade-ward", "fire-bolt", "mind-sliver", "thunderclap", "chill-touch", "acid-splash", "booming-blade", "frostbite", "green-flame-blade", "ray-of-frost", "shocking-grasp", "toll-the-dead"],
-    spellList: ["magic-missile", "shield", "burning-hands", "sleep", "grease", "scorching-ray", "web", "misty-step", "shatter", "lightning-bolt", "fireball", "haste", "dispel-magic"],
+    cantripList: ["mage-hand", "blade-ward", "fire-bolt", "mind-sliver", "thunderclap", "chill-touch", "acid-splash", "booming-blade", "frostbite", "green-flame-blade", "ray-of-frost", "shocking-grasp", "toll-the-dead", "true-strike"],
+    spellList: ["magic-missile", "shield", "burning-hands", "sleep", "grease", "catapult", "color-spray", "earth-tremor", "expeditious-retreat", "false-life", "ice-knife", "acid-arrow", "aganazzars-scorcher", "alter-self", "blindness-deafness", "blur", "cloud-of-daggers", "crown-of-madness", "earthbind", "enlarge-reduce", "flaming-sphere", "gust-of-wind", "magic-weapon", "maximilians-earthen-grasp", "ray-of-enfeeblement", "shadow-blade", "snillocs-snowball-swarm", "bestow-curse", "blink", "enemies-abound", "erupting-earth", "flame-arrows", "gaseous-form", "melfs-minute-meteors", "plant-growth", "protection-from-energy", "sleet-storm", "slow", "stinking-cloud", "thunder-step", "wall-of-sand", "wall-of-water", "banishment", "black-tentacles", "blight", "charm-monster", "confusion", "dimension-door", "elemental-bane", "fire-shield", "greater-invisibility", "ice-storm", "phantasmal-killer", "resilient-sphere", "sickening-radiance", "stoneskin", "storm-sphere", "vitriolic-sphere", "wall-of-fire", "watery-sphere", "scorching-ray", "web", "misty-step", "shatter", "lightning-bolt", "fireball", "haste", "dispel-magic"],
   }),
 ];
 

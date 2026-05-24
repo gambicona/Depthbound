@@ -22,8 +22,8 @@ window.DungeonContent.register("classes", "bard", {
   weaponProficiencies: ["simple", "crossbow-hand", "longsword", "rapier", "shortsword"],
   spellcastingAbility: "cha",
   spellPointProgression: fullCasterSpellPoints,
-  spellList: ["healing_word", "dissonant_whispers", "faerie_fire", "heroism", "hideous_laughter", "heat_metal", "hold_person", "shatter", "hypnotic_pattern", "dispel_magic", "mass_healing_word"],
-  cantripList: ["vicious-mockery", "mage-hand", "blade-ward", "thunderclap"],
+  spellList: ["healing_word", "dissonant_whispers", "faerie_fire", "heroism", "hideous_laughter", "earth-tremor", "blindness-deafness", "calm-emotions", "cloud-of-daggers", "crown-of-madness", "enhance-ability", "phantasmal-force", "warding-wind", "bestow-curse", "enemies-abound", "fear", "plant-growth", "stinking-cloud", "charm-monster", "compulsion", "confusion", "dimension-door", "freedom-of-movement", "greater-invisibility", "animate-objects", "dominate-person", "hold-monster", "mass-cure-wounds", "skill-empowerment", "synaptic-static", "eyebite", "irresistible-dance", "true-seeing", "arcane-sword", "etherealness", "forcecage", "regenerate", "symbol", "dominate-monster", "feeblemind", "mind-blank", "power-word-stun", "foresight", "power-word-heal", "power-word-kill", "psychic-scream", "heat_metal", "hold_person", "shatter", "hypnotic_pattern", "dispel_magic", "mass_healing_word"],
+  cantripList: ["vicious-mockery", "mage-hand", "blade-ward", "thunderclap", "true-strike"],
   spells: [],
   token: "B",
   classFeatures: [

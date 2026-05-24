@@ -56,8 +56,8 @@ window.DungeonContent.register("classes", "warlock", {
   weaponProficiencies: ["simple"],
   spellcastingAbility: "cha",
   spellPointProgression: pactSpellPoints,
-  spellList: ["armor_of_agathys", "arms_of_hadar", "hex", "hellish_rebuke", "cause_fear", "darkness", "hold_person", "misty_step", "hunger_of_hadar", "vampiric_touch", "fly", "dispel_magic"],
-  cantripList: ["mage-hand", "blade-ward", "mind-sliver", "eldritch-blast", "thunderclap", "chill-touch", "booming-blade", "frostbite", "green-flame-blade", "poison-spray", "toll-the-dead"],
+  spellList: ["armor_of_agathys", "arms_of_hadar", "hex", "hellish_rebuke", "cause_fear", "expeditious-retreat", "cloud-of-daggers", "crown-of-madness", "earthbind", "ray-of-enfeeblement", "shadow-blade", "enemies-abound", "fear", "gaseous-form", "thunder-step", "banishment", "blight", "charm-monster", "elemental-bane", "shadow-of-moil", "sickening-radiance", "cloudkill", "enervation", "hold-monster", "negative-energy-flood", "synaptic-static", "circle-of-death", "eyebite", "flesh-to-stone", "true-seeing", "crown-of-stars", "etherealness", "finger-of-death", "forcecage", "power-word-pain", "horrid-wilting", "dominate-monster", "feeblemind", "maddening-darkness", "power-word-stun", "foresight", "power-word-kill", "psychic-scream", "darkness", "hold_person", "misty_step", "hunger_of_hadar", "vampiric_touch", "fly", "dispel_magic"],
+  cantripList: ["mage-hand", "blade-ward", "mind-sliver", "eldritch-blast", "thunderclap", "chill-touch", "booming-blade", "frostbite", "green-flame-blade", "poison-spray", "toll-the-dead", "true-strike"],
   spells: [],
   token: "Wk",
   classFeatures: [

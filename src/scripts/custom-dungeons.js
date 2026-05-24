@@ -56,8 +56,11 @@ function normalizeCustomItem(item, index) {
   if (normalized.treasure) normalized.treasure.description = description;
   if (normalized.type === "handout" || normalized.handout) {
     const categories = normalizeStringList([...(normalized.handout?.categories ?? []), ...(normalized.journalCategories ?? [])]);
+    const temporary = Boolean(normalized.temporaryTome ?? normalized.expiresOnDungeonExit ?? normalized.handout?.temporary ?? normalized.tags?.includes("temporary-note"));
     normalized.type = "handout";
     normalized.tomeInventory = "party";
+    normalized.temporaryTome = temporary;
+    normalized.expiresOnDungeonExit = temporary;
     normalized.journalCategories = categories;
     normalized.handout = {
       ...(normalized.handout ?? {}),
@@ -65,6 +68,7 @@ function normalizeCustomItem(item, index) {
       text: description,
       format: normalized.handout?.format ?? "markdown-lite",
       categories,
+      temporary,
     };
   }
   return normalized;

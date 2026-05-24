@@ -11,24 +11,163 @@
       }
 
       .creator-shell {
+        --creator-cell-size: 22px;
         background: var(--bg);
         color: var(--text);
         display: grid;
-        grid-template-columns: 320px minmax(0, 1fr) 360px;
+        grid-template-columns: 58px 340px minmax(0, 1fr) 380px;
         height: 100vh;
+        min-width: 0;
+      }
+
+      .creator-shell.left-collapsed {
+        grid-template-columns: 58px 0 minmax(0, 1fr) 380px;
+      }
+
+      .creator-shell.right-collapsed {
+        grid-template-columns: 58px 340px minmax(0, 1fr) 0;
+      }
+
+      .creator-shell.left-collapsed.right-collapsed {
+        grid-template-columns: 58px 0 minmax(0, 1fr) 0;
+      }
+
+      .creator-tool-rail,
+      .creator-panel {
+        background: color-mix(in srgb, var(--panel) 92%, #000 8%);
+        min-height: 0;
+      }
+
+      .creator-tool-rail {
+        border-right: 1px solid var(--line);
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        overflow: hidden;
+        padding: 8px 7px;
+      }
+
+      .creator-rail-mark {
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 900;
+        letter-spacing: 0.04em;
+        padding: 8px 0 10px;
+        text-align: center;
+      }
+
+      .tool-grid {
+        align-content: start;
+        display: grid;
+        gap: 7px;
+      }
+
+      .tool-grid button,
+      .creator-rail-toggle {
+        align-items: center;
+        aspect-ratio: 1;
+        background: rgba(255, 255, 255, 0.055);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--text);
+        display: inline-flex;
+        font-size: 0.68rem;
+        font-weight: 900;
+        justify-content: center;
+        line-height: 1;
+        padding: 0;
+        width: 100%;
+      }
+
+      .tool-grid button.active,
+      .creator-rail-toggle.active {
+        background: rgba(215, 168, 79, 0.16);
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent);
+        color: #fff3d0;
       }
 
       .creator-panel {
-        background: var(--panel);
         border-right: 1px solid var(--line);
-        min-height: 0;
-        overflow: auto;
-        padding: 14px;
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        overflow: hidden;
       }
 
       .creator-panel.right {
         border-left: 1px solid var(--line);
         border-right: 0;
+        grid-template-rows: auto 1fr;
+      }
+
+      .creator-shell.left-collapsed .creator-panel.left,
+      .creator-shell.right-collapsed .creator-panel.right {
+        border: 0;
+        overflow: hidden;
+      }
+
+      .creator-panel-header {
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 8px;
+        justify-content: space-between;
+        min-width: 0;
+        padding: 11px 12px;
+      }
+
+      .creator-panel-header h2 {
+        font-size: 0.9rem;
+        margin: 0;
+      }
+
+      .creator-panel-close {
+        min-height: 30px;
+        padding: 4px 8px;
+      }
+
+      .creator-panel-tabs,
+      .creator-asset-tabs {
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 5px;
+        overflow-x: auto;
+        padding: 8px 10px;
+      }
+
+      .creator-panel-tabs button,
+      .creator-asset-tabs button {
+        background: rgba(255, 255, 255, 0.045);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--muted);
+        flex: 0 0 auto;
+        font-size: 0.74rem;
+        font-weight: 900;
+        min-height: 30px;
+        padding: 5px 9px;
+      }
+
+      .creator-panel-tabs button.active,
+      .creator-asset-tabs button.active {
+        border-color: var(--accent);
+        color: var(--text);
+      }
+
+      .creator-panel-body {
+        min-height: 0;
+        overflow: auto;
+        padding: 12px;
+      }
+
+      .creator-panel-page,
+      .creator-asset-page {
+        display: none;
+      }
+
+      .creator-panel-page.active,
+      .creator-asset-page.active {
+        display: grid;
+        gap: 12px;
       }
 
       .creator-stage {
@@ -42,22 +181,67 @@
         align-items: center;
         background: var(--panel2);
         border-bottom: 1px solid var(--line);
-        display: flex;
+        display: grid;
         gap: 10px;
-        justify-content: space-between;
+        grid-template-columns: minmax(0, 1fr) auto;
         padding: 10px 14px;
       }
 
       .creator-topbar h1 {
-        font-size: 1rem;
+        font-size: 0.98rem;
         margin: 0;
       }
 
+      .creator-command-title {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .creator-command-title h1 {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .creator-chip {
+        align-items: center;
+        background: rgba(255, 255, 255, 0.055);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--muted);
+        display: inline-flex;
+        font-size: 0.72rem;
+        font-weight: 900;
+        gap: 5px;
+        min-height: 28px;
+        padding: 4px 8px;
+      }
+
+      .creator-command-actions {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        justify-content: flex-end;
+      }
+
+      .creator-command-actions button,
+      .creator-command-actions a {
+        min-height: 32px;
+        padding: 5px 9px;
+      }
+
       .creator-grid-wrap {
+        background: radial-gradient(circle at center, rgba(255, 255, 255, 0.025), transparent 55%), #08090b;
         flex: 1;
         min-height: 0;
         overflow: auto;
-        padding: 18px;
+        padding: 20px;
+        position: relative;
       }
 
       .creator-grid {
@@ -68,6 +252,27 @@
         width: max-content;
       }
 
+      .creator-map-controls {
+        display: flex;
+        gap: 6px;
+        position: sticky;
+        left: 0;
+        top: 0;
+        width: max-content;
+        z-index: 5;
+      }
+
+      .creator-map-controls button {
+        background: rgba(10, 12, 15, 0.92);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--text);
+        font-weight: 900;
+        min-height: 30px;
+        min-width: 34px;
+        padding: 4px 8px;
+      }
+
       .creator-cell {
         align-items: center;
         background: #111317;
@@ -76,21 +281,21 @@
         display: flex;
         font-size: 0.58rem;
         font-weight: 900;
-        height: 22px;
+        height: var(--creator-cell-size);
         justify-content: center;
-        min-height: 22px;
+        min-height: var(--creator-cell-size);
         padding: 0;
         position: relative;
-        width: 22px;
+        width: var(--creator-cell-size);
       }
 
       .creator-cell .creator-cell-object-icon {
-        height: 20px;
+        height: calc(var(--creator-cell-size) - 2px);
         inset: 1px;
         object-fit: contain;
         pointer-events: none;
         position: absolute;
-        width: 20px;
+        width: calc(var(--creator-cell-size) - 2px);
       }
 
       .creator-cell.axis-x::before,
@@ -188,7 +393,23 @@
       .creator-section {
         display: grid;
         gap: 8px;
-        margin-bottom: 14px;
+        margin: 0;
+      }
+
+      .creator-section {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        padding-bottom: 12px;
+      }
+
+      .creator-section:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .creator-section h2,
+      .creator-section h3 {
+        font-size: 0.86rem;
+        margin: 0 0 2px;
       }
 
       .creator-form label,
@@ -231,21 +452,10 @@
         grid-template-columns: 1fr 1fr;
       }
 
-      .tool-grid {
-        display: grid;
-        gap: 6px;
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .tool-grid button.active {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 1px var(--accent);
-      }
-
       .catalogue {
         display: grid;
         gap: 6px;
-        max-height: 220px;
+        max-height: min(42vh, 360px);
         overflow: auto;
       }
 
@@ -383,303 +593,445 @@
         font-size: 0.78rem;
         min-height: 1.2em;
       }
+
+      .creator-checklist {
+        display: grid;
+        gap: 6px;
+      }
+
+      .creator-checklist div {
+        align-items: center;
+        background: rgba(255, 255, 255, 0.035);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--muted);
+        display: flex;
+        font-size: 0.76rem;
+        font-weight: 800;
+        justify-content: space-between;
+        min-height: 30px;
+        padding: 5px 8px;
+      }
+
+      .creator-checklist div.ready {
+        border-color: rgba(111, 190, 132, 0.55);
+        color: #d7f4db;
+      }
+
+      .creator-checklist div.warn {
+        border-color: rgba(215, 168, 79, 0.55);
+        color: #ffe4ab;
+      }
+
+      .creator-empty-state {
+        border: 1px dashed var(--line);
+        border-radius: 6px;
+        color: var(--muted);
+        font-size: 0.8rem;
+        line-height: 1.45;
+        padding: 12px;
+      }
+
+      @media (max-width: 1100px) {
+        .creator-shell,
+        .creator-shell.left-collapsed,
+        .creator-shell.right-collapsed,
+        .creator-shell.left-collapsed.right-collapsed {
+          grid-template-columns: 52px minmax(0, 1fr);
+          grid-template-rows: minmax(0, 1fr) auto;
+        }
+
+        .creator-tool-rail {
+          grid-row: 1 / 3;
+        }
+
+        .creator-panel {
+          bottom: 0;
+          box-shadow: 0 -16px 34px rgba(0, 0, 0, 0.32);
+          display: none;
+          grid-column: 2;
+          grid-row: 2;
+          max-height: 58vh;
+          z-index: 20;
+        }
+
+        .creator-panel.left:not(.hidden-mobile),
+        .creator-panel.right:not(.hidden-mobile) {
+          display: grid;
+        }
+
+        .creator-stage {
+          grid-column: 2;
+          grid-row: 1 / 3;
+        }
+
+        .creator-topbar {
+          align-items: start;
+          grid-template-columns: 1fr;
+        }
+
+        .creator-command-actions {
+          justify-content: start;
+        }
+      }
     </style>
   </head>
   <body>
-    <main class="creator-shell">
-      <aside class="creator-panel">
-        <section class="creator-section">
-          <h2>Dungeon</h2>
-          <label>
-            Name
-            <input id="creator-name" value="Custom Dungeon" />
-          </label>
-          <label>
-            Theme
-            <select id="creator-theme"></select>
-          </label>
-          <label>
-            Grid size
-            <input id="creator-grid-size" type="number" min="16" max="72" value="36" />
-          </label>
-          <button id="new-dungeon" type="button">New Blank Dungeon</button>
-          <div id="random-layout-controls" class="creator-section">
-            <div class="creator-row">
+    <main class="creator-shell" id="creator-shell">
+      <nav class="creator-tool-rail" aria-label="Creator tools">
+        <div class="creator-rail-mark">DB</div>
+        <div class="tool-grid" id="tool-grid">
+          <button type="button" data-tool="select" title="Select / Edit" aria-label="Select / Edit">SEL</button>
+          <button type="button" data-tool="connect" title="Connect Rooms" aria-label="Connect Rooms">CON</button>
+          <button type="button" data-tool="hallway" title="Draw Hallway" aria-label="Draw Hallway">HAL</button>
+          <button type="button" data-tool="furniture" title="Place Furniture" aria-label="Place Furniture">FUR</button>
+          <button type="button" data-tool="trap" title="Place Trap" aria-label="Place Trap">TRP</button>
+          <button type="button" data-tool="monster" title="Place Monster" aria-label="Place Monster">MON</button>
+          <button type="button" data-tool="start" title="Set Party Start" aria-label="Set Party Start">STA</button>
+          <button type="button" data-tool="exit" title="Set Exit" aria-label="Set Exit">EXT</button>
+          <button type="button" data-tool="portal" title="Linked Portals" aria-label="Linked Portals">POR</button>
+          <button type="button" data-tool="erase" title="Erase" aria-label="Erase">DEL</button>
+        </div>
+        <div class="tool-grid">
+          <button class="creator-rail-toggle active" type="button" data-toggle-panel="left" title="Toggle build drawer" aria-label="Toggle build drawer">L</button>
+          <button class="creator-rail-toggle active" type="button" data-toggle-panel="right" title="Toggle inspector drawer" aria-label="Toggle inspector drawer">R</button>
+        </div>
+      </nav>
+
+      <aside class="creator-panel left" id="creator-left-panel">
+        <div class="creator-panel-header">
+          <h2>Dungeon Setup</h2>
+          <button class="creator-panel-close ghost-button" type="button" data-toggle-panel="left">Close</button>
+        </div>
+        <div class="creator-panel-tabs" role="tablist" aria-label="Creator sections">
+          <button class="active" type="button" data-panel-tab="build">Build</button>
+          <button type="button" data-panel-tab="story">Story</button>
+          <button type="button" data-panel-tab="goals">Goals</button>
+          <button type="button" data-panel-tab="save">Save</button>
+        </div>
+        <div class="creator-panel-body">
+          <div class="creator-panel-page active" data-panel-page="build">
+            <section class="creator-section">
+              <h2>Dungeon</h2>
               <label>
-                Rooms
-                <input id="random-room-count" type="number" min="1" max="80" value="10" />
+                Name
+                <input id="creator-name" value="Custom Dungeon" />
               </label>
               <label>
-                Hallway width
-                <input id="hallway-width" type="range" min="1" max="3" value="1" />
-                <span id="hallway-width-label" class="small-note">1 square</span>
+                Theme
+                <select id="creator-theme"></select>
               </label>
-            </div>
-            <button id="random-layout" type="button">Random Layout</button>
+              <label>
+                Grid size
+                <input id="creator-grid-size" type="number" min="16" max="72" value="36" />
+              </label>
+              <button id="new-dungeon" type="button">New Blank Dungeon</button>
+              <div id="random-layout-controls" class="creator-section">
+                <h3>Random Layout</h3>
+                <div class="creator-row">
+                  <label>
+                    Rooms
+                    <input id="random-room-count" type="number" min="1" max="80" value="10" />
+                  </label>
+                  <label>
+                    Hallway width
+                    <input id="hallway-width" type="range" min="1" max="3" value="1" />
+                    <span id="hallway-width-label" class="small-note">1 square</span>
+                  </label>
+                </div>
+                <button id="random-layout" type="button">Random Layout</button>
+              </div>
+            </section>
+
+            <section class="creator-section">
+              <h2>Add Room</h2>
+              <div class="creator-row">
+                <label>X <input id="room-x" type="number" value="3" /></label>
+                <label>Y <input id="room-y" type="number" value="3" /></label>
+              </div>
+              <div class="creator-row">
+                <label>Width <input id="room-w" type="number" min="3" value="7" /></label>
+                <label>Height <input id="room-h" type="number" min="3" value="6" /></label>
+              </div>
+              <label>
+                Room name
+                <input id="room-name" value="Dungeon Room" />
+              </label>
+              <button id="add-room" type="button">Add Room</button>
+            </section>
+
+            <section class="creator-section">
+              <h2>Rooms</h2>
+              <div id="room-list" class="creator-list"></div>
+            </section>
           </div>
-        </section>
 
-        <section class="creator-section">
-          <h2>Tools</h2>
-          <div class="tool-grid" id="tool-grid">
-            <button type="button" data-tool="select">Select / Edit</button>
-            <button type="button" data-tool="connect">Connect Rooms</button>
-            <button type="button" data-tool="hallway">Draw Hallway</button>
-            <button type="button" data-tool="furniture">Place Furniture</button>
-            <button type="button" data-tool="trap">Place Trap</button>
-            <button type="button" data-tool="monster">Place Monster</button>
-            <button type="button" data-tool="start">Set Party Start</button>
-            <button type="button" data-tool="exit">Set Exit</button>
-            <button type="button" data-tool="portal">Linked Portals</button>
-            <button type="button" data-tool="erase">Erase</button>
+          <div class="creator-panel-page" data-panel-page="story">
+            <section class="creator-section">
+              <h2>Story</h2>
+              <label>
+                Intro text
+                <textarea id="intro-text" placeholder="What the party sees before entering..."></textarea>
+              </label>
+              <label>
+                Intro image URLs
+                <textarea id="intro-images" placeholder="One image URL per line"></textarea>
+              </label>
+              <label>
+                Outro text
+                <textarea id="outro-text" placeholder="What appears after victory..."></textarea>
+              </label>
+              <label>
+                Outro image URLs
+                <textarea id="outro-images" placeholder="One image URL per line"></textarea>
+              </label>
+            </section>
+
+            <section class="creator-section">
+              <h2>Story Triggers</h2>
+              <label>
+                Trigger
+                <select id="story-trigger-event">
+                  <option value="enterRoom">Walk into room</option>
+                  <option value="inspectObject">Inspect furniture/object</option>
+                  <option value="openObject">Open/loot chest or object</option>
+                  <option value="killMonster">Kill monster</option>
+                </select>
+              </label>
+              <label>
+                Target
+                <select id="story-trigger-target"></select>
+              </label>
+              <label>
+                Title
+                <input id="story-trigger-title" placeholder="Optional scene title" />
+              </label>
+              <label>
+                Text
+                <textarea id="story-trigger-text" placeholder="Narration to show when this trigger fires"></textarea>
+              </label>
+              <label>
+                Image URLs
+                <textarea id="story-trigger-images" placeholder="One image URL per line"></textarea>
+              </label>
+              <label>
+                <input id="story-trigger-once" type="checkbox" checked />
+                Show only once
+              </label>
+              <button id="save-story-trigger" type="button">Add Story Trigger</button>
+              <button id="new-story-trigger" class="ghost-button" type="button">New Trigger</button>
+              <div id="story-trigger-list" class="creator-list"></div>
+            </section>
           </div>
-          <p class="small-note">Rooms are added with coordinates below. Use Draw Hallway to connect rooms or branch from existing corridors. Erase on a corridor tile removes that hallway.</p>
-        </section>
 
-        <section class="creator-section">
-          <h2>Add Room</h2>
-          <div class="creator-row">
-            <label>X <input id="room-x" type="number" value="3" /></label>
-            <label>Y <input id="room-y" type="number" value="3" /></label>
+          <div class="creator-panel-page" data-panel-page="goals">
+            <section class="creator-section">
+              <h2>Goal</h2>
+              <label>
+                Completion condition
+                <select id="goal-type">
+                  <option value="reachExit">Reach the exit</option>
+                  <option value="collectItem">Collect specific item</option>
+                  <option value="collectItemCount">Collect X of a specific item</option>
+                  <option value="killBoss">Kill boss monster</option>
+                  <option value="killMonsterType">Kill X monsters of a type</option>
+                  <option value="escortNpc">Escort NPC to exit (reserved)</option>
+                </select>
+              </label>
+              <label>
+                Goal item
+                <select id="goal-item"></select>
+              </label>
+              <label>
+                Goal monster
+                <select id="goal-monster"></select>
+              </label>
+              <label>
+                Count
+                <input id="goal-count" type="number" min="1" value="1" />
+              </label>
+              <label>
+                <input id="goal-consume-item" type="checkbox" />
+                Remove collected goal item from inventory on completion
+              </label>
+            </section>
           </div>
-          <div class="creator-row">
-            <label>Width <input id="room-w" type="number" min="3" value="7" /></label>
-            <label>Height <input id="room-h" type="number" min="3" value="6" /></label>
+
+          <div class="creator-panel-page" data-panel-page="save">
+            <section class="creator-section">
+              <h2>Saved Custom Dungeons</h2>
+              <div id="saved-dungeons" class="creator-list"></div>
+              <button id="save-dungeon" type="button">Save Dungeon For Game</button>
+              <button id="calc-xp" type="button" class="ghost-button">Calc XP</button>
+              <p id="creator-status" class="creator-status"></p>
+            </section>
+
+            <section class="creator-section">
+              <h2>Campaign Dungeons</h2>
+              <div id="campaign-dungeons" class="creator-list"></div>
+              <button id="save-campaign-override" type="button" class="ghost-button" disabled>Save Campaign Override</button>
+            </section>
+
+            <section class="creator-section">
+              <h2>Import / Export</h2>
+              <textarea id="export-json" spellcheck="false"></textarea>
+              <button id="copy-json" type="button">Refresh Export JSON</button>
+              <button id="import-json" class="ghost-button" type="button">Import JSON</button>
+            </section>
           </div>
-          <label>
-            Room name
-            <input id="room-name" value="Dungeon Room" />
-          </label>
-          <button id="add-room" type="button">Add Room</button>
-        </section>
-
-        <section class="creator-section">
-          <h2>Rooms</h2>
-          <div id="room-list" class="creator-list"></div>
-        </section>
-
-        <section class="creator-section">
-          <h2>Goal</h2>
-          <label>
-            Completion condition
-            <select id="goal-type">
-              <option value="reachExit">Reach the exit</option>
-              <option value="collectItem">Collect specific item</option>
-              <option value="collectItemCount">Collect X of a specific item</option>
-              <option value="killBoss">Kill boss monster</option>
-              <option value="killMonsterType">Kill X monsters of a type</option>
-              <option value="escortNpc">Escort NPC to exit (reserved)</option>
-            </select>
-          </label>
-          <label>
-            Goal item
-            <select id="goal-item"></select>
-          </label>
-          <label>
-            Goal monster
-            <select id="goal-monster"></select>
-          </label>
-          <label>
-            Count
-            <input id="goal-count" type="number" min="1" value="1" />
-          </label>
-          <label>
-            <input id="goal-consume-item" type="checkbox" />
-            Remove collected goal item from inventory on completion
-          </label>
-        </section>
-
-        <section class="creator-section">
-          <h2>Story</h2>
-          <label>
-            Intro text
-            <textarea id="intro-text" placeholder="What the party sees before entering..."></textarea>
-          </label>
-          <label>
-            Intro image URLs
-            <textarea id="intro-images" placeholder="One image URL per line"></textarea>
-          </label>
-          <label>
-            Outro text
-            <textarea id="outro-text" placeholder="What appears after victory..."></textarea>
-          </label>
-          <label>
-            Outro image URLs
-            <textarea id="outro-images" placeholder="One image URL per line"></textarea>
-          </label>
-        </section>
-
-        <section class="creator-section">
-          <h2>Story Triggers</h2>
-          <label>
-            Trigger
-            <select id="story-trigger-event">
-              <option value="enterRoom">Walk into room</option>
-              <option value="inspectObject">Inspect furniture/object</option>
-              <option value="openObject">Open/loot chest or object</option>
-              <option value="killMonster">Kill monster</option>
-            </select>
-          </label>
-          <label>
-            Target
-            <select id="story-trigger-target"></select>
-          </label>
-          <label>
-            Title
-            <input id="story-trigger-title" placeholder="Optional scene title" />
-          </label>
-          <label>
-            Text
-            <textarea id="story-trigger-text" placeholder="Narration to show when this trigger fires"></textarea>
-          </label>
-          <label>
-            Image URLs
-            <textarea id="story-trigger-images" placeholder="One image URL per line"></textarea>
-          </label>
-          <label>
-            <input id="story-trigger-once" type="checkbox" checked />
-            Show only once
-          </label>
-          <button id="save-story-trigger" type="button">Add Story Trigger</button>
-          <button id="new-story-trigger" class="ghost-button" type="button">New Trigger</button>
-          <div id="story-trigger-list" class="creator-list"></div>
-        </section>
+        </div>
       </aside>
 
       <section class="creator-stage">
         <div class="creator-topbar">
-          <h1>Depthbound Dungeon Creator</h1>
-          <div>
+          <div class="creator-command-title">
+            <h1>Depthbound Dungeon Creator</h1>
+            <span class="creator-chip" id="creator-active-tool">Select / Edit</span>
+            <span class="creator-chip" id="creator-map-summary">0 rooms</span>
+          </div>
+          <div class="creator-command-actions">
+            <button type="button" data-open-panel="left">Build</button>
+            <button type="button" data-open-panel="right">Inspector</button>
+            <button id="top-save-dungeon" type="button">Save</button>
             <a class="ghost-button" href="index.html">Open Game</a>
-            <a class="ghost-button" href="Furniture-Feature-Implementation-Notes.txt">Notes</a>
           </div>
         </div>
         <div class="creator-grid-wrap">
+          <div class="creator-map-controls" aria-label="Map zoom">
+            <button type="button" data-creator-zoom="out">-</button>
+            <button type="button" data-creator-zoom="reset">100</button>
+            <button type="button" data-creator-zoom="in">+</button>
+            <button type="button" data-creator-zoom="fit">Fit</button>
+          </div>
           <div id="creator-grid" class="creator-grid" aria-label="Dungeon creator grid"></div>
         </div>
       </section>
 
-      <aside class="creator-panel right">
-        <section class="creator-section">
-          <h2>Furniture Catalogue</h2>
-          <input id="furniture-search" type="search" placeholder="Search furniture" />
-          <div class="creator-filter-grid">
-            <label>
-              Kind
-              <select id="furniture-kind-filter"></select>
-            </label>
-            <label>
-              Tag
-              <select id="furniture-tag-filter"></select>
-            </label>
-            <label>
-              Sort
-              <select id="furniture-sort">
-                <option value="name">Name</option>
-                <option value="kind">Kind</option>
-                <option value="id">ID</option>
-              </select>
-            </label>
-          </div>
-          <div id="furniture-catalogue" class="catalogue"></div>
-        </section>
+      <aside class="creator-panel right hidden-mobile" id="creator-right-panel">
+        <div class="creator-panel-header">
+          <h2>Inspector</h2>
+          <button class="creator-panel-close ghost-button" type="button" data-toggle-panel="right">Close</button>
+        </div>
+        <div class="creator-panel-body">
+          <section class="creator-section">
+            <h2>Selected</h2>
+            <div id="selected-card" class="selected-card small-note">Nothing selected.</div>
+          </section>
 
-        <section class="creator-section">
-          <h2>Monster Catalogue</h2>
-          <input id="monster-search" type="search" placeholder="Search monsters" />
-          <div class="creator-filter-grid">
-            <label>
-              Category
-              <select id="monster-category-filter"></select>
-            </label>
-            <label>
-              Tag
-              <select id="monster-tag-filter"></select>
-            </label>
-            <label>
-              Sort
-              <select id="monster-sort">
-                <option value="name">Name</option>
-                <option value="category">Category</option>
-                <option value="id">ID</option>
-              </select>
-            </label>
-          </div>
-          <label>
-            <input id="monster-is-boss" type="checkbox" />
-            Place as boss
-          </label>
-          <div id="monster-catalogue" class="catalogue"></div>
-        </section>
+          <section class="creator-section">
+            <h2>Readiness</h2>
+            <div id="creator-validation" class="creator-checklist"></div>
+          </section>
 
-        <section class="creator-section">
-          <h2>Selected</h2>
-          <div id="selected-card" class="selected-card small-note">Nothing selected.</div>
-          <input id="item-search" type="search" placeholder="Search items" />
-          <div class="creator-filter-grid">
-            <label>
-              Type
-              <select id="item-type-filter"></select>
-            </label>
-            <label>
-              Tag
-              <select id="item-tag-filter"></select>
-            </label>
-            <label>
-              Sort
-              <select id="item-sort">
-                <option value="name">Name</option>
-                <option value="value">Value</option>
-                <option value="type">Type</option>
-                <option value="id">ID</option>
-              </select>
-            </label>
-          </div>
-          <label>
-            Add loot item
-            <select id="loot-item"></select>
-          </label>
-          <button id="add-loot" type="button">Add Loot To Selected</button>
-          <button id="delete-selected" class="ghost-button" type="button">Delete Selected</button>
-        </section>
+          <section class="creator-section">
+            <h2>Assets</h2>
+            <div class="creator-asset-tabs" role="tablist" aria-label="Asset browser">
+              <button class="active" type="button" data-asset-tab="furniture">Furniture</button>
+              <button type="button" data-asset-tab="monsters">Monsters</button>
+              <button type="button" data-asset-tab="items">Items</button>
+              <button type="button" data-asset-tab="create">Create</button>
+            </div>
 
-        <section class="creator-section">
-          <h2>Create Dungeon Item</h2>
-          <label>
-            Template item
-            <select id="custom-item-template"></select>
-          </label>
-          <label>Name / Title <input id="custom-item-name" /></label>
-          <label>Description / Formatted Text <textarea id="custom-item-description"></textarea></label>
-          <label>Journal categories <input id="custom-item-tags" placeholder="Promiscuous" /></label>
-          <div class="creator-row">
-            <label>Type <input id="custom-item-type" /></label>
-            <label>Weight lb <input id="custom-item-weight" type="number" step="0.1" /></label>
-          </div>
-          <label>Gold value <input id="custom-item-value" type="number" min="0" step="0.01" /></label>
-          <button id="create-custom-item" type="button">Create Local Item</button>
-        </section>
+            <div class="creator-asset-page active" data-asset-page="furniture">
+              <input id="furniture-search" type="search" placeholder="Search furniture" />
+              <div class="creator-filter-grid">
+                <label>
+                  Kind
+                  <select id="furniture-kind-filter"></select>
+                </label>
+                <label>
+                  Tag
+                  <select id="furniture-tag-filter"></select>
+                </label>
+                <label>
+                  Sort
+                  <select id="furniture-sort">
+                    <option value="name">Name</option>
+                    <option value="kind">Kind</option>
+                    <option value="id">ID</option>
+                  </select>
+                </label>
+              </div>
+              <div id="furniture-catalogue" class="catalogue"></div>
+            </div>
 
-        <section class="creator-section">
-          <h2>Saved Custom Dungeons</h2>
-          <div id="saved-dungeons" class="creator-list"></div>
-          <button id="save-dungeon" type="button">Save Dungeon For Game</button>
-          <button id="calc-xp" type="button" class="ghost-button">Calc XP</button>
-          <p id="creator-status" class="creator-status"></p>
-        </section>
+            <div class="creator-asset-page" data-asset-page="monsters">
+              <input id="monster-search" type="search" placeholder="Search monsters" />
+              <div class="creator-filter-grid">
+                <label>
+                  Category
+                  <select id="monster-category-filter"></select>
+                </label>
+                <label>
+                  Tag
+                  <select id="monster-tag-filter"></select>
+                </label>
+                <label>
+                  Sort
+                  <select id="monster-sort">
+                    <option value="name">Name</option>
+                    <option value="category">Category</option>
+                    <option value="id">ID</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                <input id="monster-is-boss" type="checkbox" />
+                Place as boss
+              </label>
+              <div id="monster-catalogue" class="catalogue"></div>
+            </div>
 
-        <section class="creator-section">
-          <h2>Campaign Dungeons</h2>
-          <div id="campaign-dungeons" class="creator-list"></div>
-          <button id="save-campaign-override" type="button" class="ghost-button" disabled>Save Campaign Override</button>
-        </section>
+            <div class="creator-asset-page" data-asset-page="items">
+              <input id="item-search" type="search" placeholder="Search items" />
+              <div class="creator-filter-grid">
+                <label>
+                  Type
+                  <select id="item-type-filter"></select>
+                </label>
+                <label>
+                  Tag
+                  <select id="item-tag-filter"></select>
+                </label>
+                <label>
+                  Sort
+                  <select id="item-sort">
+                    <option value="name">Name</option>
+                    <option value="value">Value</option>
+                    <option value="type">Type</option>
+                    <option value="id">ID</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                Add loot item
+                <select id="loot-item"></select>
+              </label>
+              <button id="add-loot" type="button">Add Loot To Selected</button>
+              <button id="delete-selected" class="ghost-button" type="button">Delete Selected</button>
+            </div>
 
-        <section class="creator-section">
-          <h2>Import / Export</h2>
-          <textarea id="export-json" spellcheck="false"></textarea>
-          <button id="copy-json" type="button">Refresh Export JSON</button>
-          <button id="import-json" class="ghost-button" type="button">Import JSON</button>
-        </section>
+            <div class="creator-asset-page" data-asset-page="create">
+              <label>
+                Template item
+                <select id="custom-item-template"></select>
+              </label>
+              <label>Name / Title <input id="custom-item-name" /></label>
+              <label>Description / Formatted Text <textarea id="custom-item-description"></textarea></label>
+              <label>Journal categories <input id="custom-item-tags" placeholder="Promiscuous" /></label>
+              <label>
+                <input id="custom-item-temporary" type="checkbox" />
+                Temporary dungeon note
+              </label>
+              <div class="creator-row">
+                <label>Type <input id="custom-item-type" /></label>
+                <label>Weight lb <input id="custom-item-weight" type="number" step="0.1" /></label>
+              </div>
+              <label>Gold value <input id="custom-item-value" type="number" min="0" step="0.01" /></label>
+              <button id="create-custom-item" type="button">Create Local Item</button>
+            </div>
+          </section>
+        </div>
       </aside>
     </main>
 

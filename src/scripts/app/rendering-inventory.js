@@ -1003,6 +1003,8 @@ function renderRoom() {
   const spellTargeting = currentPendingSpellTargeting();
   const spellPreview = spellPreviewCells(spellTargeting);
   const persistentAreas = persistentAreaTileKeys();
+  const persistentBlockingAreas = typeof persistentAreaBlockingTileKeys === "function" ? persistentAreaBlockingTileKeys() : new Set();
+  const persistentDifficultAreas = typeof persistentAreaDifficultTerrainKeys === "function" ? persistentAreaDifficultTerrainKeys() : new Set();
   const shouldShowReachable = !movementInProgress && heroTurn;
   const reachable = !shouldShowReachable
     ? new Map()
@@ -1039,6 +1041,8 @@ function renderRoom() {
     const isSpellAffected = spellPreview.has(key);
     const isHomeBuildTarget = isHomeBuilderOpen();
     const isPersistentSpellArea = persistentAreas.has(key);
+    const isPersistentSpellBlocker = persistentBlockingAreas.has(key);
+    const isPersistentDifficult = persistentDifficultAreas.has(key);
     const isSpellOrigin = spellTargeting?.hoverPosition && positionKey(spellTargeting.hoverPosition) === key;
     const isSpellTargetable =
       spellTargeting?.mode === "point"
@@ -1063,6 +1067,8 @@ function renderRoom() {
     tile.classList.toggle("spell-origin", Boolean(isSpellOrigin));
     tile.classList.toggle("spell-aoe-preview", isSpellAffected);
     tile.classList.toggle("persistent-spell-area", isPersistentSpellArea);
+    tile.classList.toggle("persistent-spell-blocker", isPersistentSpellBlocker);
+    tile.classList.toggle("persistent-spell-difficult", isPersistentDifficult);
     tile.classList.toggle("spell-affected-occupied", isSpellAffected && Boolean(spellTargetAtTile));
     tile.classList.toggle("home-comfort-range", state.mode === "home" && homeComfortRangePreviewKeys.has(key));
     const homeFloorColor = state.mode === "home" ? state.home?.floorColors?.[key] : null;
@@ -1242,7 +1248,7 @@ function renderPartyRoster() {
 }
 
 function statusEffectPillText(effect) {
-  const label = effect.label ?? effect.id ?? "Effect";
+  const label = effect.label ?? effect.conditionLabel ?? effect.id ?? "Effect";
   const duration = temporaryEffectDurationText(effect);
   return duration && duration !== "Temporary" ? `${label} (${duration})` : label;
 }
@@ -1294,11 +1300,11 @@ function subclassGameplayGuideMarkup(subclass) {
   `;
 }
 
-function inspectDetailsMarkup({ title, meta = "", body = "", emptyText = "" }) {
+function inspectDetailsMarkup({ title, meta = "", body = "", emptyText = "", open = false }) {
   const content = body || (emptyText ? `<p class="empty-note">${escapeHtml(emptyText)}</p>` : "");
   if (!content) return "";
   return `
-    <details class="inspect-collapse">
+    <details class="inspect-collapse" ${open ? "open" : ""}>
       <summary>
         <span>${escapeHtml(title)}</span>
         ${meta ? `<small>${escapeHtml(meta)}</small>` : ""}
@@ -1382,6 +1388,7 @@ function temporaryEffectDetails(effect) {
   if (effect.resistances?.length) parts.push(`resists ${effect.resistances.join(", ")}`);
   if (effect.vulnerabilities?.length) parts.push(`vulnerable to ${effect.vulnerabilities.join(", ")}`);
   if (effect.tempHp) parts.push(`${effect.tempHp} temporary HP`);
+  if (effect.conditionDescription) parts.push(effect.conditionDescription);
   return parts.join("; ");
 }
 
@@ -1668,6 +1675,7 @@ function temporaryEffectsMarkup(fighter) {
 
 function showTemporaryEffectsInfo(fighter = activeHero()) {
   if (!fighter) return;
+  els.fighterInfo.classList.remove("home-builder-dock");
   els.fighterInfoName.textContent = `${fighter.name} - Temporary Effects`;
   els.fighterInfoBody.innerHTML = temporaryEffectsMarkup(fighter);
   els.fighterInfo.classList.remove("hidden");
@@ -1750,6 +1758,7 @@ async function renameHero() {
 }
 
 function showCombatantInfo(fighter) {
+  els.fighterInfo.classList.remove("home-builder-dock");
   refreshDerivedStats(fighter);
   const heroView = (isClassHero(fighter) || isSidekickWarrior(fighter)) && (isPartyHeroId(fighter.id) || isRosterHeroId(fighter.id));
   const hpPercent = Math.max(0, Math.round((fighter.hp / fighter.maxHp) * 100));
@@ -1829,6 +1838,7 @@ function showCombatantInfo(fighter) {
             title: "Racial Features",
             meta: racialTraits.length ? `${racialTraits.length}` : "",
             body: racialTraits.map(featureLineMarkup).join(""),
+            open: true,
           })}
           ${inspectDetailsMarkup({
             title: "Proficiencies",
@@ -1844,12 +1854,14 @@ function showCombatantInfo(fighter) {
                 return `<p><b>${escapeHtml(feature.name)}</b>${description ? ` ${escapeHtml(description)}` : ""}</p>`;
               })
               .join(""),
+            open: true,
           })}
           ${
             subclass
               ? inspectDetailsMarkup({
                   title: `Subclass Features: ${fullSubclassName(subclass)}`,
                   meta: `${subclassFeatures.length}`,
+                  open: true,
                   body: `
                     ${subclassGameplayGuideMarkup(subclass)}
                     ${
@@ -1874,6 +1886,7 @@ function showCombatantInfo(fighter) {
             body: fighterFeatDefinitions(fighter)
               .map(({ definition }) => `<p><b>${escapeHtml(definition.name)}</b>${definition.description ? ` ${escapeHtml(definition.description)}` : ""}</p>`)
               .join(""),
+            open: true,
           })}
           ${inspectDetailsMarkup({
             title: "Spellbook",
@@ -7725,7 +7738,9 @@ function acceptedQuestLogEntries() {
 }
 
 function ancientTomeEntries() {
-  return normalizePartyTomes(state?.partyTomes ?? []).sort((a, b) => (a.collectedAt ?? 0) - (b.collectedAt ?? 0) || a.title.localeCompare(b.title));
+  const entries = state?.mode === "home" ? permanentPartyTomes(state?.partyTomes ?? []) : normalizePartyTomes(state?.partyTomes ?? []);
+  if (state?.mode === "home" && (state?.partyTomes ?? []).length !== entries.length) state.partyTomes = entries;
+  return entries.sort((a, b) => (a.collectedAt ?? 0) - (b.collectedAt ?? 0) || a.title.localeCompare(b.title));
 }
 
 function ancientTomeCategoryGroups(entries = ancientTomeEntries()) {
@@ -7745,7 +7760,7 @@ function ancientTomeEntryMarkup(entry) {
     <details class="quest-log-entry ancient-tome-entry">
       <summary>
         <b>${escapeHtml(entry.title)}</b>
-        <span>${escapeHtml((entry.categories?.length ? entry.categories : ["Uncategorized"]).join(", "))}</span>
+        <span>${escapeHtml([entry.temporary ? "Temporary" : "", ...(entry.categories?.length ? entry.categories : ["Uncategorized"])].filter(Boolean).join(", "))}</span>
       </summary>
       <div class="ancient-tome-text">${handoutTextMarkup(entry.text)}</div>
     </details>
@@ -8729,6 +8744,10 @@ function isLevelUpCancelled(value) {
   return value === levelUpCancelled || value?.cancelled === true;
 }
 
+function isSpellChoiceCancelled(value) {
+  return value === dialogBackValue || value?.cancelled === true;
+}
+
 function restoreHeroSnapshot(hero, snapshot) {
   for (const key of Object.keys(hero)) delete hero[key];
   Object.assign(hero, cloneData(snapshot));
@@ -9322,22 +9341,22 @@ async function chooseClassSubclass(hero) {
   }
   if (hero.classId === "fighter" && subclass.id === "eldritch-knight") {
     const cantrips = await chooseClassCantrips(hero, 2, hero.spells ?? [], { cancelAborts: true });
-    if (cantrips.cancelled) return levelUpCancelled;
+    if (isSpellChoiceCancelled(cantrips)) return levelUpCancelled;
     hero.spells = cantrips.spells;
     hero.unusedCantripChoiceCredits = cantrips.unusedCredits;
     const spells = await chooseClassSpells(hero, 3, hero.spells ?? [], { cancelAborts: true });
-    if (spells.cancelled) return levelUpCancelled;
+    if (isSpellChoiceCancelled(spells)) return levelUpCancelled;
     hero.spells = spells.spells;
     hero.unusedSpellChoiceCredits = spells.unusedCredits;
     gained.push("wizard spellcasting");
   }
   if (subclass.casterType === "third" && !(hero.classId === "fighter" && subclass.id === "eldritch-knight")) {
     const cantrips = await chooseClassCantrips(hero, 2, hero.spells ?? [], { cancelAborts: true });
-    if (cantrips.cancelled) return levelUpCancelled;
+    if (isSpellChoiceCancelled(cantrips)) return levelUpCancelled;
     hero.spells = cantrips.spells;
     hero.unusedCantripChoiceCredits = cantrips.unusedCredits;
     const spells = await chooseClassSpells(hero, 3, hero.spells ?? [], { cancelAborts: true });
-    if (spells.cancelled) return levelUpCancelled;
+    if (isSpellChoiceCancelled(spells)) return levelUpCancelled;
     hero.spells = spells.spells;
     hero.unusedSpellChoiceCredits = spells.unusedCredits;
     gained.push("subclass spellcasting");
@@ -9378,7 +9397,7 @@ async function applyClassSubclassLevelChoices(hero) {
     const cantripChoices = ((hero.level ?? 1) === 10 ? 1 : 0) + (hero.unusedCantripChoiceCredits ?? 0);
     if (cantripChoices > 0) {
       const result = await chooseClassCantrips(hero, cantripChoices, hero.spells ?? [], { cancelAborts: true });
-      if (result.cancelled) return levelUpCancelled;
+      if (isSpellChoiceCancelled(result)) return levelUpCancelled;
       const gained = result.spells.filter((spellId) => !(hero.spells ?? []).includes(spellId));
       hero.spells = result.spells;
       hero.unusedCantripChoiceCredits = result.unusedCredits;
@@ -9390,7 +9409,7 @@ async function applyClassSubclassLevelChoices(hero) {
     const spellChoices = (spellChoiceLevels.has(hero.level ?? 1) ? 1 : 0) + (hero.unusedSpellChoiceCredits ?? 0);
     if (spellChoices > 0) {
       const result = await chooseClassSpells(hero, spellChoices, hero.spells ?? [], { cancelAborts: true });
-      if (result.cancelled) return levelUpCancelled;
+      if (isSpellChoiceCancelled(result)) return levelUpCancelled;
       const gained = result.spells.filter((spellId) => !(hero.spells ?? []).includes(spellId));
       hero.spells = result.spells;
       hero.unusedSpellChoiceCredits = result.unusedCredits;
@@ -9402,7 +9421,7 @@ async function applyClassSubclassLevelChoices(hero) {
     const cantripChoices = ((hero.level ?? 1) === 10 ? 1 : 0) + (hero.unusedCantripChoiceCredits ?? 0);
     if (cantripChoices > 0) {
       const result = await chooseClassCantrips(hero, cantripChoices, hero.spells ?? [], { cancelAborts: true });
-      if (result.cancelled) return levelUpCancelled;
+      if (isSpellChoiceCancelled(result)) return levelUpCancelled;
       const gained = result.spells.filter((spellId) => !(hero.spells ?? []).includes(spellId));
       hero.spells = result.spells;
       hero.unusedCantripChoiceCredits = result.unusedCredits;
@@ -9412,7 +9431,7 @@ async function applyClassSubclassLevelChoices(hero) {
     const spellChoices = (spellChoiceLevels.has(hero.level ?? 1) ? 1 : 0) + (hero.unusedSpellChoiceCredits ?? 0);
     if (spellChoices > 0) {
       const result = await chooseClassSpells(hero, spellChoices, hero.spells ?? [], { cancelAborts: true });
-      if (result.cancelled) return levelUpCancelled;
+      if (isSpellChoiceCancelled(result)) return levelUpCancelled;
       const gained = result.spells.filter((spellId) => !(hero.spells ?? []).includes(spellId));
       hero.spells = result.spells;
       hero.unusedSpellChoiceCredits = result.unusedCredits;
@@ -9497,7 +9516,7 @@ async function levelUpHero() {
     (hero.unusedCantripChoiceCredits ?? 0);
   if (cantripChoices > 0) {
     const result = await chooseClassCantrips(hero, cantripChoices, hero.spells ?? [], { cancelAborts: true });
-    if (result.cancelled) {
+    if (isSpellChoiceCancelled(result)) {
       cancelLevelUp();
       return;
     }
@@ -9511,7 +9530,7 @@ async function levelUpHero() {
     (hero.unusedSpellChoiceCredits ?? 0);
   if (spellChoices > 0) {
     const result = await chooseClassSpells(hero, spellChoices, hero.spells ?? [], { cancelAborts: true });
-    if (result.cancelled) {
+    if (isSpellChoiceCancelled(result)) {
       cancelLevelUp();
       return;
     }

@@ -894,7 +894,7 @@ function showSelectChoiceDialog({
           ${choices
             .map(
               (choice) =>
-                `<option value="${escapeAttribute(choice.value)}" ${String(choice.value) === String(initialValue) ? "selected" : ""}>${escapeHtml(choice.label)}</option>`,
+                `<option value="${escapeAttribute(choice.value)}" ${choice.optionClass ? `class="${escapeAttribute(choice.optionClass)}"` : ""} ${String(choice.value) === String(initialValue) ? "selected" : ""}>${escapeHtml(choice.label)}</option>`,
             )
             .join("")}
         </select>
@@ -910,7 +910,9 @@ function showSelectChoiceDialog({
     const details = els.gameDialogField.querySelector("[data-select-choice-details]");
     const selectedChoice = () => choices.find((choice) => String(choice.value) === String(select?.value)) ?? choices[0] ?? null;
     const renderDetails = () => {
-      details.innerHTML = selectChoiceDetailMarkup(selectedChoice());
+      const choice = selectedChoice();
+      details.className = ["select-choice-details", choice?.detailClass].filter(Boolean).join(" ");
+      details.innerHTML = selectChoiceDetailMarkup(choice);
     };
 
     const cleanup = (value) => {
@@ -2360,6 +2362,32 @@ function eligibleSpellChoicesFor(classSource, chosenSpellIds = []) {
     .filter((spell) => spell && !chosen.has(spell.id) && spellBaseLevel(spell) > 0 && spellBaseLevel(spell) <= maxLevel);
 }
 
+function subclassSpellSourceDefinition(classSource) {
+  if (!classSource?.classId || !classSource?.subclassId) return null;
+  const template = getHeroTemplate(classSource.classId);
+  const normal = (template.subclasses ?? []).find((subclass) => subclass.id === classSource.subclassId) ?? null;
+  const admin = (template.adminSubclasses ?? []).find((subclass) => subclass.id === classSource.subclassId) ?? null;
+  return classSource.subclassVariant === "full" ? admin ?? normal : normal ?? admin;
+}
+
+function canonicalSpellIdSet(spellIds = []) {
+  return new Set(spellIds.map((spellId) => canonicalSpellId(spellId)));
+}
+
+function subclassOnlyChoiceSpellIds(classSource, kind = "spell") {
+  const subclass = subclassSpellSourceDefinition(classSource);
+  if (!subclass) return new Set();
+  const template = getHeroTemplate(classSource.classId);
+  const baseIds = kind === "cantrip"
+    ? (template.classCantripList ?? template.cantripList ?? [])
+    : (template.classSpellList ?? template.spellList ?? template.spells ?? []);
+  const sourceIds = kind === "cantrip"
+    ? [...(subclass.cantripList ?? []), ...(subclass.expandedCantripList ?? [])]
+    : [...(subclass.spellList ?? []), ...(subclass.expandedSpellList ?? [])];
+  const base = canonicalSpellIdSet(baseIds);
+  return new Set(sourceIds.map((spellId) => canonicalSpellId(spellId)).filter((spellId) => !base.has(spellId)));
+}
+
 function spellChoiceDescription(spell) {
   const parts = [];
   if (spell.description) parts.push(spell.description);
@@ -2377,6 +2405,7 @@ async function chooseClassSpells(classSource, count, chosenSpellIds = [], { canc
   let unusedCredits = 0;
   for (let index = 0; index < count; index += 1) {
     const eligible = eligibleSpellChoicesFor(classSource, chosen);
+    const subclassOnlySpellIds = subclassOnlyChoiceSpellIds(classSource, "spell");
     if (!eligible.length) {
       unusedCredits += 1;
       continue;
@@ -2388,14 +2417,22 @@ async function chooseClassSpells(classSource, count, chosenSpellIds = [], { canc
       label: "Choose a spell:",
       cancelText: "Back",
       cancelValue: dialogBackValue,
-      choices: eligible.map((spell) => ({
-        value: spell.id,
-        label: `${spell.name} (L${spellBaseLevel(spell)})`,
-        description: spellChoiceDescription(spell),
-      })),
+      choices: eligible.map((spell) => {
+        const subclassOnly = subclassOnlySpellIds.has(canonicalSpellId(spell.id));
+        return {
+          value: spell.id,
+          label: `${spell.name} (L${spellBaseLevel(spell)})${subclassOnly ? " - subclass" : ""}`,
+          description: spellChoiceDescription(spell),
+          detailClass: subclassOnly ? "subclass-only-spell-choice" : "",
+          optionClass: subclassOnly ? "subclass-only-spell-option" : "",
+        };
+      }),
     });
     if (choice === dialogBackValue) {
-      if (index === 0) return dialogBackValue;
+      if (index === 0) {
+        if (cancelAborts) return { spells: chosen, unusedCredits, cancelled: true };
+        return dialogBackValue;
+      }
       chosen.pop();
       index -= 2;
       continue;
@@ -2422,6 +2459,7 @@ async function chooseClassCantrips(classSource, count, chosenSpellIds = [], { ca
   let unusedCredits = 0;
   for (let index = 0; index < count; index += 1) {
     const eligible = eligibleCantripChoicesFor(classSource, chosen);
+    const subclassOnlyCantripIds = subclassOnlyChoiceSpellIds(classSource, "cantrip");
     if (!eligible.length) {
       unusedCredits += 1;
       continue;
@@ -2433,10 +2471,22 @@ async function chooseClassCantrips(classSource, count, chosenSpellIds = [], { ca
       label: "Choose a cantrip:",
       cancelText: "Back",
       cancelValue: dialogBackValue,
-      choices: eligible.map((spell) => ({ value: spell.id, label: spell.name, description: spellChoiceDescription(spell) })),
+      choices: eligible.map((spell) => {
+        const subclassOnly = subclassOnlyCantripIds.has(canonicalSpellId(spell.id));
+        return {
+          value: spell.id,
+          label: `${spell.name}${subclassOnly ? " - subclass" : ""}`,
+          description: spellChoiceDescription(spell),
+          detailClass: subclassOnly ? "subclass-only-spell-choice" : "",
+          optionClass: subclassOnly ? "subclass-only-spell-option" : "",
+        };
+      }),
     });
     if (choice === dialogBackValue) {
-      if (index === 0) return dialogBackValue;
+      if (index === 0) {
+        if (cancelAborts) return { spells: chosen, unusedCredits, cancelled: true };
+        return dialogBackValue;
+      }
       chosen.pop();
       index -= 2;
       continue;
