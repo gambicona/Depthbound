@@ -1748,6 +1748,7 @@ function handleMapPanPointerDown(event) {
     }
     return;
   }
+  if (event.pointerType === "touch") return;
   if (adminEnabled() && adminTeleportEnabled && event.target.closest(".tile")) return;
   if (isHomeBuilderOpen() && event.target.closest(".tile")) return;
   if (event.target.closest(".token, .chest-token, .topbar, button:not(.tile)")) return;

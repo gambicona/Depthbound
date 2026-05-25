@@ -5840,18 +5840,50 @@ button[data-ui-icon]::before,
 
 @media (max-width: 620px) {
   :root {
-    --dock-height: 88px;
+    --dock-height: 76px;
   }
 
   .app-shell {
-    gap: 10px;
+    gap: 12px;
+    padding: 10px 10px max(12px, env(safe-area-inset-bottom));
+  }
+
+  .arena {
+    min-height: min(620px, 72dvh);
+  }
+
+  .party-panel,
+  .side-panel {
     padding: 10px;
+  }
+
+  .party-panel {
+    max-height: none;
+  }
+
+  .party-roster {
+    grid-template-columns: 1fr;
+  }
+
+  .party-roster-entry {
+    min-height: 54px;
   }
 
   .topbar {
     align-items: stretch;
     flex-direction: column;
-    padding: 18px 16px 10px;
+    gap: 12px;
+    padding: 14px 12px 10px;
+  }
+
+  .eyebrow {
+    font-size: 0.66rem;
+    margin-bottom: 4px;
+  }
+
+  h1 {
+    font-size: 1.55rem;
+    line-height: 1.08;
   }
 
   .topbar-primary-actions {
@@ -5866,7 +5898,26 @@ button[data-ui-icon]::before,
 
   .topbar-primary-actions > .zoom-controls {
     grid-column: 1 / -1;
-    justify-content: center;
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .zoom-controls {
+    display: grid;
+    gap: 7px;
+    grid-template-columns: 44px 42px minmax(0, 1fr) 44px;
+    min-height: 48px;
+    padding: 5px 6px;
+  }
+
+  .zoom-controls .icon-button {
+    height: 38px;
+    min-height: 38px;
+    width: 100%;
+  }
+
+  .zoom-controls input[type="range"] {
+    min-width: 0;
     width: 100%;
   }
 
@@ -5894,16 +5945,80 @@ button[data-ui-icon]::before,
     padding: 12px;
   }
 
+  .room-scroll {
+    -webkit-overflow-scrolling: touch;
+    cursor: default;
+    height: min(430px, 50dvh);
+    overscroll-behavior: auto;
+    scroll-padding: 16px;
+    touch-action: pan-x pan-y;
+  }
+
+  .side-panel {
+    gap: 8px;
+    grid-template-rows: auto auto minmax(260px, 44dvh);
+  }
+
+  .status-panel {
+    gap: 8px;
+  }
+
+  .dungeon-timer {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr auto;
+  }
+
+  .quest-log-button,
+  .level-panel button,
+  .dungeon-timer button {
+    min-height: 44px;
+  }
+
+  .initiative-item {
+    min-height: 48px;
+  }
+
+  .log-panel,
+  .log-panel.expanded {
+    height: min(420px, 48dvh);
+  }
+
+  .log-panel.event-feed:not(.expanded) {
+    height: 164px;
+  }
+
+  .combat-log {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: 10px 12px 14px;
+  }
+
+  .combat-log li {
+    font-size: 0.92rem;
+    line-height: 1.45;
+    padding-left: 9px;
+  }
+
   .action-dock {
     gap: 6px;
-    grid-template-columns: repeat(auto-fit, minmax(48px, 56px));
-    padding: 10px 8px;
+    grid-auto-flow: column;
+    grid-auto-columns: 56px;
+    grid-template-columns: none;
+    justify-content: start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 8px max(8px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
   }
 
   .action-dock button {
-    font-size: 0.68rem;
-    min-height: 48px;
+    font-size: 0.66rem;
+    height: 100%;
+    min-height: 52px;
     padding: 0 4px;
+    scroll-snap-align: start;
     white-space: normal;
   }
 
@@ -5917,6 +6032,10 @@ button[data-ui-icon]::before,
     display: inline-block;
     height: 20px;
     width: 20px;
+  }
+
+  .dock-action {
+    min-width: 54px;
   }
 
   .action-dock .dock-action small,
@@ -5976,6 +6095,13 @@ button[data-ui-icon]::before,
 
 .log-panel.expanded {
   height: min(620px, 70vh);
+}
+
+@media (max-width: 620px) {
+  .log-panel,
+  .log-panel.expanded {
+    height: min(420px, 48dvh);
+  }
 }
 
 .story-dialog-content {
