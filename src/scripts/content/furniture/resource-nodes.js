@@ -38,6 +38,7 @@ function resourceNode(id, name, tags, options = {}) {
         failText: options.failText,
         successText: options.successText,
       },
+      ...(options.components ?? []),
     ],
   });
 }
@@ -101,6 +102,7 @@ resourceNode("glowcap-cluster-node", "Glowcap Cluster", ["fungus", "mushroom", "
   maxQuantity: 4,
   blocksMovement: false,
   symbol: "g",
+  components: [{ type: "lightSource", brightRadius: 0, dimRadius: 3, color: "#b78cff", lightTone: "violet-fungal" }],
   description: "A luminous cluster of cave mushrooms grows along a damp wall. Careful cutting keeps the useful glow intact.",
 });
 

@@ -26,7 +26,7 @@ const hazardMove = (damage, options = {}) => ({ type: "hazardOnMovement", damage
 const difficult = { type: "difficultTerrain", label: "difficult terrain" };
 const cover = (amount = "half") => ({ type: "cover", amount, label: `${amount} cover` });
 const concealment = (amount = "partial") => ({ type: "concealment", amount, label: `${amount} concealment` });
-const light = (radius = 3) => ({ type: "lightSource", radius });
+const light = (dimRadius = 3, color = "#77f7cf", brightRadius = 0, lightTone = "fungal") => ({ type: "lightSource", brightRadius, dimRadius, color, lightTone });
 const destructible = (hp = 10, ac = 12) => ({ type: "destructibleObject", hp, ac });
 const inspectEvent = (options = {}) => ({ type: "inspectEvent", dc: options.dc ?? 13, chance: options.chance ?? 1, spawnChance: options.spawnChance ?? 0.5, ...options });
 const unique = (options = {}) => ({ type: "uniqueInteraction", dc: options.dc ?? 13, timeSeconds: options.timeSeconds ?? 600, ...options });
@@ -36,8 +36,8 @@ feature("glowcap-grove", "Glowcap Grove", ["fungus", "mushroom", "plant", "light
   inspectable: true,
   symbol: "g",
   spawnChance: 0.085,
-  description: "A grove of blue-green glowcaps lights the stone in soft pulses.",
-  components: [light(4), difficult, hiddenLoot({ dc: 12, item: "glowcap", chance: 0.58 }), hazardEnter({ count: 1, sides: 4, type: "poison" }, { chance: 0.14 })],
+  description: "A grove of purple glowcaps lights the stone in soft pulses.",
+  components: [light(4, "#b78cff", 0, "violet-fungal"), difficult, hiddenLoot({ dc: 12, item: "glowcap", chance: 0.58 }), hazardEnter({ count: 1, sides: 4, type: "poison" }, { chance: 0.14 })],
 });
 
 feature("mycelium-nest", "Mycelium Nest", ["fungus", "spore", "nest", "plant"], {

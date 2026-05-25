@@ -948,8 +948,68 @@ function durationSecondsFromDefinition(source = {}) {
   if (duration.seconds || source.durationSeconds) return Number(duration.seconds ?? source.durationSeconds) || 0;
   if (duration.minutes || source.durationMinutes) return (Number(duration.minutes ?? source.durationMinutes) || 0) * 60;
   if (duration.hours || source.durationHours) return (Number(duration.hours ?? source.durationHours) || 0) * 3600;
+  if (duration.days || source.durationDays) return (Number(duration.days ?? source.durationDays) || 0) * 24 * 3600;
   if (duration.rounds || source.durationRounds) return (Number(duration.rounds ?? source.durationRounds) || 0) * combatRoundSeconds();
   return 0;
+}
+
+const corpseRevivifyWindowSeconds = 60;
+const corpseRaiseDeadWindowSeconds = 10 * 24 * 60 * 60;
+const corpseGentleReposeSeconds = 10 * 24 * 60 * 60;
+
+function ensureHeroCorpseState(hero, options = {}) {
+  if (!hero?.dead) return null;
+  const nowSeconds = dungeonElapsedSeconds({ sync: false });
+  const previous = hero.corpse && typeof hero.corpse === "object" ? hero.corpse : {};
+  hero.corpse = {
+    diedAtDungeonTimeSeconds: Math.max(0, Math.floor(Number(previous.diedAtDungeonTimeSeconds ?? options.diedAtDungeonTimeSeconds ?? nowSeconds) || 0)),
+    location: options.location ?? previous.location ?? (previous.sentHome || hero.corpseAtBase ? "base" : "dungeon"),
+    preservedUntilDungeonTimeSeconds: Math.max(0, Math.floor(Number(previous.preservedUntilDungeonTimeSeconds ?? 0) || 0)),
+    transportedAtDungeonTimeSeconds: previous.transportedAtDungeonTimeSeconds ?? null,
+    revivedAtDungeonTimeSeconds: previous.revivedAtDungeonTimeSeconds ?? null,
+  };
+  hero.corpseAtBase = hero.corpse.location === "base";
+  return hero.corpse;
+}
+
+function heroCorpseLocation(hero) {
+  if (!hero?.dead) return null;
+  return ensureHeroCorpseState(hero)?.location ?? "dungeon";
+}
+
+function corpsePreserved(hero, nowSeconds = dungeonElapsedSeconds({ sync: false })) {
+  const corpse = ensureHeroCorpseState(hero);
+  return Boolean(corpse && (corpse.preservedUntilDungeonTimeSeconds ?? 0) > nowSeconds);
+}
+
+function corpseAgeSeconds(hero, nowSeconds = dungeonElapsedSeconds({ sync: false })) {
+  const corpse = ensureHeroCorpseState(hero);
+  if (!corpse) return 0;
+  return Math.max(0, nowSeconds - (corpse.diedAtDungeonTimeSeconds ?? nowSeconds));
+}
+
+function corpseEffectiveAgeSeconds(hero, nowSeconds = dungeonElapsedSeconds({ sync: false })) {
+  if (corpsePreserved(hero, nowSeconds)) return 0;
+  return corpseAgeSeconds(hero, nowSeconds);
+}
+
+function corpseDecompositionStatus(hero, nowSeconds = dungeonElapsedSeconds({ sync: false })) {
+  const corpse = ensureHeroCorpseState(hero);
+  if (!corpse) return { label: "Alive", detail: "" };
+  if (corpsePreserved(hero, nowSeconds)) {
+    return {
+      label: "Preserved",
+      detail: `Gentle Repose holds decay for ${formatDuration((corpse.preservedUntilDungeonTimeSeconds ?? nowSeconds) - nowSeconds)}.`,
+    };
+  }
+  const age = corpseAgeSeconds(hero, nowSeconds);
+  if (age <= corpseRevivifyWindowSeconds) return { label: "Fresh", detail: `${formatDuration(age)} since death. Revivify is still viable.` };
+  if (age <= corpseRaiseDeadWindowSeconds) return { label: "Decaying", detail: `${formatDuration(age)} since death. Raise Dead remains viable.` };
+  return { label: "Decomposed", detail: `${formatDuration(age)} since death. Strong resurrection magic is required.` };
+}
+
+function deadRosterHeroes() {
+  return rosterHeroes().filter((hero) => isClassHero(hero) && hero.dead);
 }
 
 function prepareTimedEffect(effect) {
@@ -1231,6 +1291,16 @@ function expireTimedEffectsForFighter(fighter, nowSeconds = dungeonElapsedSecond
     fighter.team = undefined;
     fighter.friendly = false;
     addLog(`${fighter.name} shakes off domination and turns hostile again.`, "important");
+  }
+  for (const effect of expiredEffects) {
+    if (!effect.consumeLightItemOnExpire || !effect.lightItemId) continue;
+    const item = itemForId(fighter, effect.lightItemId);
+    if (!item) continue;
+    fighter.inventory.items = (fighter.inventory.items ?? []).filter((entry) => entry.id !== effect.lightItemId);
+    for (const slot of equipmentSlots) {
+      if (fighter.equipment?.[slot.id] === effect.lightItemId) fighter.equipment[slot.id] = null;
+    }
+    addLog(`${fighter.name}'s ${item.name} burns out.`, "important");
   }
   if (expired.length) {
     refreshDerivedStats(fighter);
@@ -1965,9 +2035,7 @@ function toggleHeroSelection(heroId) {
 }
 
 function selectActivePartyForMovement() {
-  const ids = partyHeroes()
-    .filter((hero) => heroCanAct(hero))
-    .map((hero) => hero.id);
+  const ids = Array.from(selectableHeroIds());
   if (ids.length === 0) return false;
   selectedHeroIds = new Set(ids);
   if (!selectedHeroIds.has(state.party.activeHeroId)) state.party.activeHeroId = ids[0];
@@ -2832,6 +2900,151 @@ function normalizeRaceSelection(selection = defaultRaceSelection) {
   };
 }
 
+function legacyRaceTextKey(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function legacyRaceTextValues(fighter = {}) {
+  return uniqueValues([
+    fighter.race,
+    fighter.subrace,
+    fighter.raceId,
+    fighter.subraceId,
+    fighter.raceName,
+    fighter.speciesName,
+    fighter.subraceName,
+    fighter.species,
+    fighter.ancestryName,
+    fighter.dragonAncestryId,
+    fighter.raceSelection?.raceId,
+    fighter.raceSelection?.subraceId,
+    fighter.raceSelection?.dragonAncestryId,
+  ])
+    .map(legacyRaceTextKey)
+    .filter(Boolean);
+}
+
+function legacyDefaultSubraceId(raceId) {
+  const safeDefaults = {
+    dwarf: "hill-dwarf",
+    elf: "high-elf",
+    gnome: "forest-gnome",
+    "half-elf": "high-half-elf",
+    halfling: "lightfoot",
+  };
+  const preferred = safeDefaults[raceId];
+  return speciesDefinitions[raceId]?.subraces?.[preferred] ? preferred : firstSubraceId(raceId);
+}
+
+function dragonAncestryIdFromLegacyText(category, texts = [], fallback = "") {
+  const ancestries = dragonAncestries[category] ?? {};
+  const textSet = new Set(texts);
+  for (const [ancestryId, ancestry] of Object.entries(ancestries)) {
+    if (textSet.has(legacyRaceTextKey(ancestryId)) || textSet.has(legacyRaceTextKey(ancestry.name))) return ancestryId;
+  }
+  return fallback;
+}
+
+function raceSelectionFromLegacyHero(fighter = {}) {
+  const explicitRaceId = speciesDefinitions[fighter.raceSelection?.raceId]
+    ? fighter.raceSelection.raceId
+    : speciesDefinitions[fighter.race]
+      ? fighter.race
+      : speciesDefinitions[fighter.raceId]
+        ? fighter.raceId
+        : "";
+  if (explicitRaceId) {
+    const subraces = speciesDefinitions[explicitRaceId]?.subraces ?? {};
+    const explicitSubraceId = subraces[fighter.raceSelection?.subraceId]
+      ? fighter.raceSelection.subraceId
+      : subraces[fighter.subrace]
+        ? fighter.subrace
+        : subraces[fighter.subraceId]
+          ? fighter.subraceId
+          : legacyDefaultSubraceId(explicitRaceId);
+    return {
+      ...fighter.raceSelection,
+      raceId: explicitRaceId,
+      subraceId: explicitSubraceId,
+      dragonAncestryId: fighter.raceSelection?.dragonAncestryId ?? fighter.dragonAncestryId,
+    };
+  }
+
+  const texts = legacyRaceTextValues(fighter);
+  const textSet = new Set(texts);
+  const haystack = ` ${texts.join(" ")} `;
+  const hasPhrase = (value) => {
+    const key = legacyRaceTextKey(value);
+    return Boolean(key && haystack.includes(` ${key} `));
+  };
+  const subraceCandidates = Object.entries(speciesDefinitions).flatMap(([raceId, race]) =>
+    Object.entries(race.subraces ?? {}).map(([subraceId, subrace]) => ({
+      raceId,
+      subraceId,
+      subrace,
+      keys: [subraceId, subrace.name].map(legacyRaceTextKey).filter(Boolean),
+    }))
+  );
+
+  const exactSubrace = subraceCandidates
+    .sort((a, b) => Math.max(...b.keys.map((key) => key.length)) - Math.max(...a.keys.map((key) => key.length)))
+    .find((candidate) => candidate.keys.some((key) => textSet.has(key)));
+  if (exactSubrace) {
+    const subrace = speciesDefinitions[exactSubrace.raceId]?.subraces?.[exactSubrace.subraceId] ?? {};
+    return {
+      ...fighter.raceSelection,
+      raceId: exactSubrace.raceId,
+      subraceId: exactSubrace.subraceId,
+      dragonAncestryId: dragonAncestryIdFromLegacyText(subrace.dragonCategory, texts, fighter.dragonAncestryId ?? fighter.raceSelection?.dragonAncestryId),
+    };
+  }
+
+  const exactRace = Object.entries(speciesDefinitions)
+    .sort(([, a], [, b]) => legacyRaceTextKey(b.name).length - legacyRaceTextKey(a.name).length)
+    .find(([raceId, race]) => textSet.has(legacyRaceTextKey(raceId)) || textSet.has(legacyRaceTextKey(race.name)));
+  if (exactRace) {
+    return {
+      ...fighter.raceSelection,
+      raceId: exactRace[0],
+      subraceId: legacyDefaultSubraceId(exactRace[0]),
+      dragonAncestryId: fighter.dragonAncestryId ?? fighter.raceSelection?.dragonAncestryId,
+    };
+  }
+
+  const phraseSubrace = subraceCandidates.find((candidate) => candidate.keys.some(hasPhrase));
+  if (phraseSubrace) {
+    const subrace = speciesDefinitions[phraseSubrace.raceId]?.subraces?.[phraseSubrace.subraceId] ?? {};
+    return {
+      ...fighter.raceSelection,
+      raceId: phraseSubrace.raceId,
+      subraceId: phraseSubrace.subraceId,
+      dragonAncestryId: dragonAncestryIdFromLegacyText(subrace.dragonCategory, texts, fighter.dragonAncestryId ?? fighter.raceSelection?.dragonAncestryId),
+    };
+  }
+
+  const phraseRace = Object.entries(speciesDefinitions)
+    .sort(([, a], [, b]) => legacyRaceTextKey(b.name).length - legacyRaceTextKey(a.name).length)
+    .find(([raceId, race]) => hasPhrase(raceId) || hasPhrase(race.name));
+  if (phraseRace) {
+    return {
+      ...fighter.raceSelection,
+      raceId: phraseRace[0],
+      subraceId: legacyDefaultSubraceId(phraseRace[0]),
+      dragonAncestryId: fighter.dragonAncestryId ?? fighter.raceSelection?.dragonAncestryId,
+    };
+  }
+
+  return fighter.raceSelection ?? { raceId: fighter.race, subraceId: fighter.subrace, dragonAncestryId: fighter.dragonAncestryId };
+}
+
+function normalizeHeroRaceSelection(fighter = {}) {
+  return normalizeRaceSelection(raceSelectionFromLegacyHero(fighter));
+}
+
 function mergeAbilityBonuses(...bonuses) {
   const merged = {};
   for (const bonus of bonuses) {
@@ -2879,6 +3092,75 @@ function toolName(toolId) {
   return toolDefinitions[toolId]?.name ?? String(toolId).replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function normalizeSenses(senses = {}) {
+  if (!senses || typeof senses !== "object") return {};
+  const normalized = {};
+  for (const [sense, value] of Object.entries(senses)) {
+    if (value === true) {
+      normalized[sense] = true;
+      continue;
+    }
+    const range = Number(value);
+    normalized[sense] = Number.isFinite(range) ? Math.max(0, Math.floor(range)) : value;
+  }
+  return normalized;
+}
+
+function mergeSenses(...senseSources) {
+  const merged = {};
+  for (const senses of senseSources) {
+    const normalized = normalizeSenses(senses);
+    for (const [sense, value] of Object.entries(normalized)) {
+      if (value === true || merged[sense] === true) {
+        merged[sense] = true;
+        continue;
+      }
+      const current = Number(merged[sense] ?? 0);
+      const next = Number(value ?? 0);
+      merged[sense] = Number.isFinite(next) ? Math.max(Number.isFinite(current) ? current : 0, next) : value;
+    }
+  }
+  return merged;
+}
+
+function fighterEffectiveSenses(fighter) {
+  if (!fighter) return {};
+  const statusSenses = (fighter.statusEffects ?? []).map((effect) => effect.senses ?? effect.grantsSenses).filter(Boolean);
+  const itemSenses = [
+    ...(Array.isArray(fighter.inventory) ? fighter.inventory : fighter.inventory?.items ?? []),
+    ...Object.values(fighter.equipment ?? {}).filter(Boolean),
+  ].map((item) => item.senses ?? item.grantsSenses).filter(Boolean);
+  return mergeSenses(fighter.racialSenses, fighter.senses, ...statusSenses, ...itemSenses);
+}
+
+function inferredCreatureSenses(fighter = {}) {
+  const tags = new Set((fighter.tags ?? []).map((tag) => String(tag).toLowerCase()));
+  const haystack = [fighter.id, fighter.baseMonsterId, fighter.templateId, fighter.name, ...(fighter.tags ?? [])].join(" ").toLowerCase();
+  const senses = {};
+  const addDarkvision = (feet) => {
+    senses.darkvision = Math.max(Number(senses.darkvision ?? 0) || 0, feet);
+  };
+  if (tags.has("fiend") || tags.has("devil") || tags.has("demon")) addDarkvision(120);
+  if (tags.has("drow") || tags.has("duergar") || tags.has("underdark") || tags.has("deep")) addDarkvision(120);
+  if (tags.has("undead") || tags.has("ghost") || tags.has("phantom") || tags.has("wraith") || tags.has("zombie") || tags.has("skeletal")) addDarkvision(60);
+  if (tags.has("aberration") || tags.has("monstrosity") || tags.has("elemental") || tags.has("fey")) addDarkvision(60);
+  if (tags.has("ooze")) senses.blindsight = Math.max(Number(senses.blindsight ?? 0) || 0, 60);
+  if (tags.has("construct") && /horror|guardian|sentinel|golem|engine|gear|forge|arcane/.test(haystack)) addDarkvision(60);
+  if (tags.has("beast") && /bat|rat|spider|cave|underdark|night|nocturnal|deep|shadow|wolf spider|blind/.test(haystack)) addDarkvision(60);
+  if (/bat/.test(haystack)) senses.blindsight = Math.max(Number(senses.blindsight ?? 0) || 0, 60);
+  return senses;
+}
+
+function normalizeCreatureSenses(fighter = {}) {
+  fighter.senses = mergeSenses(inferredCreatureSenses(fighter), fighter.senses);
+  return fighter.senses;
+}
+
+function fighterDarkvisionRange(fighter) {
+  const range = fighterEffectiveSenses(fighter).darkvision;
+  return range === true ? Number.POSITIVE_INFINITY : Math.max(0, Number(range) || 0);
+}
+
 function raceTraitsForSelection(selection = defaultRaceSelection) {
   const normalized = normalizeRaceSelection(selection);
   const race = speciesDefinitions[normalized.raceId];
@@ -2893,6 +3175,7 @@ function raceTraitsForSelection(selection = defaultRaceSelection) {
   const abilityBonuses = mergeAbilityBonuses(subrace.replaceBaseAbilityBonuses ? {} : base.abilityBonuses, subrace.abilityBonuses, chosenBonuses);
   const damageResistances = uniqueValues([...(base.damageResistances ?? []), ...(subrace.damageResistances ?? []), ancestry?.damageType]);
   const damageImmunities = uniqueValues([...(base.damageImmunities ?? []), ...(subrace.damageImmunities ?? [])]);
+  const senses = mergeSenses(base.senses, subrace.senses);
   return {
     raceId: normalized.raceId,
     subraceId: normalized.subraceId,
@@ -2906,6 +3189,7 @@ function raceTraitsForSelection(selection = defaultRaceSelection) {
     hpPerLevel: (base.hpPerLevel ?? 0) + (subrace.hpPerLevel ?? 0),
     damageResistances,
     damageImmunities,
+    senses,
     weaponProficiencies: proficiencyEntries([...(base.weaponProficiencies ?? []), ...(subrace.weaponProficiencies ?? [])]),
     armorProficiencies: proficiencyEntries([...(base.armorProficiencies ?? []), ...(subrace.armorProficiencies ?? [])]),
     skillProficiencies: uniqueValues([...(base.skillProficiencies ?? []), ...(subrace.skillProficiencies ?? [])]),
@@ -2925,6 +3209,23 @@ function raceTraitsForSelection(selection = defaultRaceSelection) {
     dragonDamageType: ancestry?.damageType ?? "",
     dragonBreathSaveAbility: ancestry?.saveAbility ?? "dex",
   };
+}
+
+function normalizeHeroRacialSenses(fighter = {}) {
+  if (!isClassHero(fighter)) return fighter.racialSenses ?? {};
+  fighter.raceSelection = normalizeHeroRaceSelection(fighter);
+  const raceTraits = raceTraitsForSelection(fighter.raceSelection);
+  fighter.race = raceTraits.raceId;
+  fighter.subrace = raceTraits.subraceId;
+  fighter.speciesName = fighter.speciesName ?? raceTraits.raceName;
+  fighter.subraceName = fighter.subraceName ?? raceTraits.subraceName;
+  fighter.racialTraits = {
+    ...(fighter.racialTraits ?? {}),
+    senses: mergeSenses(raceTraits.senses, fighter.racialTraits?.senses),
+  };
+  fighter.racialSenses = mergeSenses(raceTraits.senses, fighter.racialTraits?.senses, fighter.racialSenses);
+  if (!isWildShaped(fighter)) fighter.senses = mergeSenses(fighter.senses, fighter.racialSenses);
+  return fighter.racialSenses;
 }
 
 function raceAbilityBonuses(selection = defaultRaceSelection) {
@@ -2976,9 +3277,12 @@ function applyHeroCreationOptions(template, options = {}) {
       dragonBreathSaveAbility: raceTraits.dragonBreathSaveAbility,
       traits: raceTraits.traits,
       spellTraits: raceTraits.spellTraits,
+      senses: raceTraits.senses,
       flying: raceTraits.flying,
       powerfulBuild: raceTraits.powerfulBuild,
     },
+    racialSenses: raceTraits.senses,
+    senses: mergeSenses(settings.senses, raceTraits.senses),
     flying: Boolean(settings.flying || raceTraits.flying),
     size: raceTraits.size,
     baseSpeedFeet: raceTraits.speedFeet,
@@ -4469,7 +4773,10 @@ function starterEquipmentItem(itemId) {
 }
 
 function starterEquipmentItems(itemIds = []) {
-  return itemIds.map((itemId) => (typeof itemId === "string" ? starterEquipmentItem(itemId) : { ...itemId, starterEquipment: true, sell: { ...(itemId.sell ?? {}), valueCp: 0, rate: 0 } }));
+  return [
+    ...itemIds.map((itemId) => (typeof itemId === "string" ? starterEquipmentItem(itemId) : { ...itemId, starterEquipment: true, sell: { ...(itemId.sell ?? {}), valueCp: 0, rate: 0 } })),
+    ...Array.from({ length: 10 }, () => starterEquipmentItem("torch")),
+  ];
 }
 
 function normalizeEquipment(equipment = {}) {
@@ -5413,6 +5720,7 @@ function classMovementSpeedBonus(fighter) {
 
 function refreshDerivedStats(fighter) {
   fighter.baseMaxHp = fighter.baseMaxHp ?? fighter.maxHp ?? 1;
+  if (fighter?.classId && isClassHero(fighter)) normalizeHeroRacialSenses(fighter);
   fighter.statusEffects = normalizeStatusEffectsForFighter(fighter);
   syncRangerBeastCompanionStats(fighter);
   const effects = magicEffects(fighter);
@@ -5575,6 +5883,7 @@ function createMonsterForRoom(monsterTemplate, room, position, id, name, hero) {
     id,
     name,
   });
+  normalizeCreatureSenses(monster);
   applyMonsterCategoryScaling(monster, hero);
   monster.roomId = room.id;
   monster.position = { ...position };
@@ -5834,6 +6143,7 @@ function normalizeLoadedState(loadedState) {
       fighter.alive = false;
       fighter.stableAtZero = false;
       fighter.deathSaves = fighter.deathSaves ?? { successes: 0, failures: 3 };
+      ensureHeroCorpseState(fighter);
     } else if (normalized.party.rosterIds.includes(fighter.id)) {
       if (fighter.hp > 0) fighter.stableAtZero = false;
       else fighter.stableAtZero = Boolean(fighter.stableAtZero || (fighter.deathSaves?.successes ?? 0) >= 3);
@@ -5897,13 +6207,14 @@ function normalizeLoadedState(loadedState) {
       fighter.disengaged = fighter.disengaged ?? false;
       fighter.canMoveThroughMonsters = fighter.canMoveThroughMonsters ?? false;
       fighter.flying = Boolean(fighter.flying);
+      normalizeCreatureSenses(fighter);
       refreshDerivedStats(fighter);
       return;
     }
-    fighter.raceSelection = normalizeRaceSelection(fighter.raceSelection ?? { raceId: fighter.race, subraceId: fighter.subrace, dragonAncestryId: fighter.dragonAncestryId });
+    fighter.raceSelection = normalizeHeroRaceSelection(fighter);
     const raceTraits = raceTraitsForSelection(fighter.raceSelection);
-    fighter.race = fighter.race ?? raceTraits.raceId;
-    fighter.subrace = fighter.subrace ?? raceTraits.subraceId;
+    fighter.race = raceTraits.raceId;
+    fighter.subrace = raceTraits.subraceId;
     fighter.speciesName = fighter.speciesName ?? raceTraits.raceName;
     fighter.subraceName = fighter.subraceName ?? raceTraits.subraceName;
     fighter.racialAbilityBonuses = fighter.racialAbilityBonuses ?? raceTraits.abilityBonuses;
@@ -5916,9 +6227,12 @@ function normalizeLoadedState(loadedState) {
       dragonBreathSaveAbility: fighter.racialTraits?.dragonBreathSaveAbility ?? raceTraits.dragonBreathSaveAbility,
       traits: uniqueValues([...(raceTraits.traits ?? []), ...(fighter.racialTraits?.traits ?? [])]),
       spellTraits: fighter.racialTraits?.spellTraits ?? raceTraits.spellTraits,
+      senses: mergeSenses(raceTraits.senses, fighter.racialTraits?.senses),
       flying: Boolean(fighter.racialTraits?.flying || raceTraits.flying),
       powerfulBuild: Boolean(fighter.racialTraits?.powerfulBuild || raceTraits.powerfulBuild),
     };
+    fighter.racialSenses = mergeSenses(raceTraits.senses, fighter.racialSenses);
+    if (!isWildShaped(fighter)) fighter.senses = mergeSenses(fighter.senses, fighter.racialSenses);
     fighter.flying = Boolean(fighter.flying || raceTraits.flying);
     fighter.damageResistances = uniqueValues([...(fighter.damageResistances ?? []), ...(raceTraits.damageResistances ?? [])]);
     fighter.damageImmunities = uniqueValues([...(fighter.damageImmunities ?? []), ...(raceTraits.damageImmunities ?? [])]);

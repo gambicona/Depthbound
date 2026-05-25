@@ -726,14 +726,14 @@ function partyHeroes() {
 function monsterTargetableHeroes(monster = null) {
   return partyHeroes().filter((fighter) => {
     if ((fighter.hp ?? 0) <= 0) return false;
-    return typeof monsterCanTargetHero === "function" ? monsterCanTargetHero(monster, fighter) : true;
+    return true;
   });
 }
 
 function aiTargetableEnemiesFor(fighter) {
   return Object.values(state.fighters).filter((candidate) => {
     if (!candidate?.alive || candidate.dead || (candidate.hp ?? 0) <= 0 || !hostileTo(fighter, candidate)) return false;
-    if (!isPartyHeroId(fighter?.id) && typeof monsterCanTargetHero === "function" && isPartyHeroId(candidate.id)) return monsterCanTargetHero(fighter, candidate);
+    if (!isPartyHeroId(fighter?.id) && isPartyHeroId(candidate.id)) return true;
     return true;
   });
 }

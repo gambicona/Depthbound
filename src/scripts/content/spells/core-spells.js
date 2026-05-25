@@ -26,6 +26,7 @@ const availability = {
   "scorching-ray": ["wizard", "sorcerer"],
   "misty-step": ["wizard", "sorcerer"],
   invisibility: ["bard", "sorcerer", "warlock", "wizard"],
+  "see-invisibility": ["bard", "sorcerer", "wizard"],
   shatter: ["wizard", "bard"],
   web: ["wizard"],
   "lightning-bolt": ["wizard", "sorcerer"],
@@ -113,6 +114,8 @@ const availability = {
   "maximilians-earthen-grasp": ["sorcerer", "wizard"],
   "phantasmal-force": ["bard"],
   "prayer-of-healing": ["cleric"],
+  "gentle-repose": ["cleric", "wizard"],
+  "lesser-restoration": ["bard", "cleric", "druid", "paladin", "ranger"],
   "protection-from-poison": ["cleric", "druid", "paladin", "ranger"],
   "ray-of-enfeeblement": ["warlock", "wizard"],
   "shadow-blade": ["sorcerer", "warlock", "wizard"],
@@ -145,6 +148,7 @@ const availability = {
   "tidal-wave": ["druid", "sorcerer", "wizard"],
   "wall-of-sand": ["wizard"],
   "wall-of-water": ["druid", "sorcerer", "wizard"],
+  daylight: ["cleric", "druid", "paladin", "ranger", "sorcerer"],
   "wind-wall": ["druid", "ranger"],
   "aura-of-life": ["paladin"],
   "aura-of-purity": ["paladin"],
@@ -200,7 +204,10 @@ const availability = {
   "insect-plague": ["cleric", "druid", "sorcerer"],
   maelstrom: ["druid"],
   "mass-cure-wounds": ["bard", "cleric", "druid"],
+  "greater-restoration": ["bard", "cleric", "druid"],
   "negative-energy-flood": ["warlock", "wizard"],
+  "raise-dead": ["bard", "cleric", "paladin"],
+  revivify: ["cleric", "paladin"],
   "skill-empowerment": ["bard", "sorcerer", "wizard"],
   "steel-wind-strike": ["ranger", "wizard"],
   "swift-quiver": ["ranger"],
@@ -242,6 +249,7 @@ const availability = {
   "power-word-pain": ["warlock", "wizard"],
   "prismatic-spray": ["sorcerer", "wizard"],
   regenerate: ["bard", "cleric", "druid"],
+  resurrection: ["bard", "cleric"],
   "reverse-gravity": ["druid", "sorcerer", "wizard"],
   symbol: ["bard", "cleric", "wizard"],
   whirlwind: ["druid", "sorcerer", "wizard"],
@@ -267,6 +275,7 @@ const availability = {
   "psychic-scream": ["bard", "sorcerer", "warlock", "wizard"],
   "storm-of-vengeance": ["druid"],
   simulacrum: ["wizard"],
+  "true-resurrection": ["cleric", "druid"],
   weird: ["wizard"],
 };
 
@@ -898,6 +907,18 @@ spell("invisibility", {
   upcast: { targetsPerLevel: 1 },
   aiCategory: "escape-mobility",
   description: "Concentration, 3 rounds. Ally gains advantage on Stealth checks and monsters ignore them while choosing targets.",
+});
+
+spell("see-invisibility", {
+  name: "See Invisibility",
+  level: 2,
+  resource: action,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  duration: { kind: "hours", hours: 1 },
+  effect: { kind: "status", status: { id: "see-invisibility", label: "See Invisibility", senses: { seeInvisible: true }, skillBonus: 2, durationHours: 1 } },
+  aiCategory: "buff-opener",
+  description: "One-hour sight magic. The caster can perceive invisible creatures and gains a modest sight-based check bonus.",
 });
 
 spell("shatter", {
@@ -1634,6 +1655,29 @@ spell("prayer-of-healing", {
   description: "Area prayer restores 2d8 + spell stat HP to nearby allies. Upcast: +1d8.",
 });
 
+spell("gentle-repose", {
+  name: "Gentle Repose",
+  level: 2,
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "corpse",
+  duration: { kind: "days", days: 10 },
+  effect: { kind: "preserveCorpse", durationSeconds: 10 * 24 * 60 * 60 },
+  aiCategory: "utility",
+  description: "Preserve a dead companion's body for 10 days, stopping decomposition and keeping revival windows open.",
+});
+
+spell("lesser-restoration", {
+  name: "Lesser Restoration",
+  level: 2,
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "ally",
+  effect: { kind: "restoration", removeAll: false },
+  aiCategory: "cleanse",
+  description: "Remove one harmful status effect or condition from an adjacent ally.",
+});
+
 spell("protection-from-poison", {
   name: "Protection from Poison",
   level: 2,
@@ -1730,6 +1774,17 @@ spell("beacon-of-hope", {
   effect: { kind: "status", status: { id: "beacon-of-hope", label: "Beacon of Hope", saveBonus: 2, tempHp: 8, durationRounds: 3 } },
   aiCategory: "buff-opener",
   description: "Concentration, 3 rounds. Nearby allies gain save support and temporary HP.",
+});
+
+spell("revivify", {
+  name: "Revivify",
+  level: 3,
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "corpse",
+  effect: { kind: "revive", hp: 1 },
+  aiCategory: "revive",
+  description: "Restore a companion who died within the last minute, or whose body is held fresh by Gentle Repose, to 1 HP.",
 });
 
 spell("bestow-curse", {
@@ -2664,6 +2719,28 @@ spell("mass-cure-wounds", {
   description: "Area heal restores 3d8 + spell stat HP to up to six nearby allies. Upcast: +1d8.",
 });
 
+spell("greater-restoration", {
+  name: "Greater Restoration",
+  level: 5,
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "ally",
+  effect: { kind: "restoration", removeAll: true, healDice: { count: 2, sides: 8 } },
+  aiCategory: "cleanse",
+  description: "Remove all harmful status effects from an adjacent ally and restore a small amount of HP.",
+});
+
+spell("raise-dead", {
+  name: "Raise Dead",
+  level: 5,
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "corpse",
+  effect: { kind: "revive", hpFraction: 0.5 },
+  aiCategory: "revive",
+  description: "At the graveyard or a reachable corpse, restore a companion whose body has not decomposed beyond 10 days.",
+});
+
 spell("negative-energy-flood", {
   name: "Negative Energy Flood",
   level: 5,
@@ -3018,8 +3095,9 @@ spell("sunbeam", {
   save: { ability: "con", halfDamage: true },
   ...concentration3,
   effect: { kind: "damage", dice: { count: 6, sides: 8 }, type: "radiant", status: { id: "blinded", label: "Blinded", attackBonus: -3, expiresAtEndOfTurn: true } },
+  lightSource: { brightRadiusFeet: 30, dimRadiusFeet: 60, magical: true, color: "#fff1a8" },
   aiCategory: "control-cluster",
-  description: "Sustained radiant line. CON save half and failed saves are blinded briefly.",
+  description: "Sustained radiant line. CON save half and failed saves are blinded briefly; the caster also sheds bright sunlight while concentrating.",
 });
 
 spell("true-seeing", {
@@ -3029,9 +3107,9 @@ spell("true-seeing", {
   range: { kind: "touch", feet: 5 },
   target: "ally",
   duration: { kind: "hours", hours: 1 },
-  effect: { kind: "status", status: { id: "true-seeing", label: "True Seeing", attackBonus: 2, skillBonus: 4, durationHours: 1 } },
+  effect: { kind: "status", status: { id: "true-seeing", label: "True Seeing", attackBonus: 2, skillBonus: 4, senses: { truesight: 120, seeInvisible: true }, durationHours: 1 } },
   aiCategory: "buff-opener",
-  description: "One-hour truesight modeled as strong perception and accuracy against hidden or distorted foes.",
+  description: "One-hour truesight modeled as strong perception, accuracy, invisibility detection, and immunity to poor-light penalties.",
 });
 
 spell("wall-of-ice", {
@@ -3196,9 +3274,20 @@ spell("regenerate", {
   range: { kind: "touch", feet: 5 },
   target: "ally",
   duration: { kind: "rounds", rounds: 3 },
-  effect: { kind: "healing", dice: { count: 8, sides: 8 }, abilityBonus: "spellcasting" },
+  effect: { kind: "restoration", removeAll: true, healDice: { count: 8, sides: 8 } },
   aiCategory: "efficient-heal",
-  description: "Powerful regeneration simplified as an immediate 8d8 + spell stat heal.",
+  description: "Powerful regeneration restores 8d8 HP and removes harmful body conditions in the slim model.",
+});
+
+spell("resurrection", {
+  name: "Resurrection",
+  level: 7,
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "corpse",
+  effect: { kind: "revive", hpFraction: 1 },
+  aiCategory: "revive",
+  description: "At the graveyard, restore a dead companion even after ordinary decay has made Raise Dead insufficient.",
 });
 
 spell("reverse-gravity", {
@@ -3351,7 +3440,7 @@ spell("maddening-darkness", {
   ...concentration3,
   effect: { kind: "damage", dice: { count: 8, sides: 8 }, type: "psychic", status: { id: "maddening-darkness", label: "Maddened", attackBonus: -3, expiresAtEndOfTurn: true } },
   aiCategory: "control-cluster",
-  description: "Persistent psychic darkness. WIS save half and failed saves suffer a strong attack penalty.",
+  description: "Persistent magical darkness. WIS save half for psychic damage and failed saves suffer a strong attack penalty.",
 });
 
 spell("maze", {
@@ -3398,9 +3487,9 @@ spell("sunburst", {
   target: "point",
   area: { shape: "circle", radiusFeet: 30 },
   save: { ability: "con", halfDamage: true },
-  effect: { kind: "damage", dice: { count: 12, sides: 6 }, type: "radiant", status: { id: "blinded", label: "Blinded", attackBonus: -3, expiresAtEndOfTurn: true } },
+  effect: { kind: "damage", dice: { count: 12, sides: 6 }, type: "radiant", status: { id: "blinded", label: "Blinded", attackBonus: -3, expiresAtEndOfTurn: true }, dispelsMagicalDarkness: true, dispelMaxSpellLevel: 3 },
   aiCategory: "aoe-damage",
-  description: "Brilliant radiant burst for 12d6 radiant, CON save half; failed saves are blinded briefly.",
+  description: "Brilliant radiant burst for 12d6 radiant, CON save half; failed saves are blinded briefly and lower-level magical darkness is burned away.",
 });
 
 spell("tsunami", {
@@ -3445,6 +3534,17 @@ spell("mass-heal", {
   effect: { kind: "healing", dice: { count: 12, sides: 8 }, abilityBonus: "spellcasting" },
   aiCategory: "efficient-heal",
   description: "Massive group heal for up to six allies, restoring 12d8 + spell stat HP each.",
+});
+
+spell("true-resurrection", {
+  name: "True Resurrection",
+  level: 9,
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "corpse",
+  effect: { kind: "revive", hpFraction: 1 },
+  aiCategory: "revive",
+  description: "At the graveyard, fully restore a dead companion regardless of decomposition in the current campaign model.",
 });
 
 spell("meteor-swarm", {
@@ -3800,7 +3900,21 @@ spell("darkness", {
   effect: { kind: "status", status: { id: "darkness", label: "Darkness", attackBonus: -3, durationRounds: 3 } },
   upcast: { areaRadiusFeetPerLevel: 5 },
   aiCategory: "control-cluster",
-  description: "Magical darkness creates heavy obscurement for 3 rounds.",
+  description: "Magical darkness creates heavy obscurement for 3 rounds. Daylight and similar bright magic can suppress lower-level darkness.",
+});
+
+spell("daylight", {
+  name: "Daylight",
+  level: 3,
+  resource: action,
+  range: { kind: "ranged", feet: 60 },
+  target: "point",
+  area: { shape: "circle", radiusFeet: 60 },
+  duration: { kind: "hours", hours: 1 },
+  effect: { kind: "light", dispelsMagicalDarkness: true, dispelMaxSpellLevel: 3 },
+  lightSource: { brightRadiusFeet: 60, dimRadiusFeet: 120, magical: true, color: "#fff6c7", suppressesMagicalDarkness: true, dispelsMagicalDarkness: true, dispelMaxSpellLevel: 3 },
+  aiCategory: "buff-opener",
+  description: "Creates a 60 ft bright magical light that extends another 60 ft as dim light and suppresses lower-level magical darkness.",
 });
 
 spell("hunger_of_hadar", {
@@ -3987,8 +4101,10 @@ spell("dancing-lights", {
   range: { kind: "ranged", feet: 120 },
   target: "point",
   area: { shape: "circle", radiusFeet: 10 },
-  effect: { kind: "status", status: { id: "dancing-lights", label: "Dancing Lights", acBonus: -1, durationRounds: 2 } },
-  description: "Cantrip. Create dim moving lights in a small area; enemies caught in the glow are easier to hit briefly.",
+  ...concentration3,
+  effect: { kind: "light" },
+  lightSource: { brightRadiusFeet: 0, dimRadiusFeet: 10, magical: true, color: "#9ee7ff", cellsFromArea: true },
+  description: "Cantrip. Create small moving lights that shed dim light in a nearby area while you concentrate.",
 });
 
 spell("druidcraft", {
@@ -4056,8 +4172,9 @@ spell("light", {
   resource: action,
   range: { kind: "touch", feet: 5 },
   target: "ally",
-  effect: { kind: "status", status: { id: "light", label: "Light", skillBonus: 2, durationRounds: 10 } },
-  description: "Cantrip. Enchant an ally's carried object with bright light, improving exploration checks in dark rooms.",
+  duration: { kind: "hours", hours: 1 },
+  effect: { kind: "status", status: { id: "light", label: "Light", dismissible: true, lightSource: { brightRadiusFeet: 20, dimRadiusFeet: 40, magical: true, color: "#ffe8a3" }, durationHours: 1 } },
+  description: "Cantrip. Enchant an ally's carried object with bright light for 20 ft and dim light for another 20 ft.",
 });
 
 spell("poison-spray", {
@@ -4214,6 +4331,8 @@ const spellAliases = {
   maximilians_earthen_grasp: "maximilians-earthen-grasp",
   phantasmal_force: "phantasmal-force",
   prayer_of_healing: "prayer-of-healing",
+  gentle_repose: "gentle-repose",
+  lesser_restoration: "lesser-restoration",
   protection_from_poison: "protection-from-poison",
   ray_of_enfeeblement: "ray-of-enfeeblement",
   shadow_blade: "shadow-blade",
@@ -4244,6 +4363,7 @@ const spellAliases = {
   wind_wall: "wind-wall",
   animate_dead: "animate-dead",
   conjure_animals: "conjure-animals",
+  raise_dead: "raise-dead",
   aura_of_life: "aura-of-life",
   aura_of_purity: "aura-of-purity",
   black_tentacles: "black-tentacles",
@@ -4287,6 +4407,7 @@ const spellAliases = {
   hold_monster: "hold-monster",
   insect_plague: "insect-plague",
   mass_cure_wounds: "mass-cure-wounds",
+  greater_restoration: "greater-restoration",
   negative_energy_flood: "negative-energy-flood",
   skill_empowerment: "skill-empowerment",
   steel_wind_strike: "steel-wind-strike",
@@ -4308,6 +4429,7 @@ const spellAliases = {
   irresistible_dance: "irresistible-dance",
   mental_prison: "mental-prison",
   primordial_ward: "primordial-ward",
+  see_invisibility: "see-invisibility",
   true_seeing: "true-seeing",
   wall_of_ice: "wall-of-ice",
   wall_of_thorns: "wall-of-thorns",
@@ -4319,6 +4441,7 @@ const spellAliases = {
   fire_storm: "fire-storm",
   power_word_pain: "power-word-pain",
   prismatic_spray: "prismatic-spray",
+  true_resurrection: "true-resurrection",
   reverse_gravity: "reverse-gravity",
   horrid_wilting: "horrid-wilting",
   antimagic_field: "antimagic-field",

@@ -47,6 +47,7 @@ function killHero(hero) {
   hero.dead = true;
   hero.stableAtZero = false;
   hero.deathSaves = { successes: 0, failures: 3 };
+  ensureHeroCorpseState(hero, { location: "dungeon" });
   dropLootForHero(hero);
   state.party.heroIds = livingPartyHeroIds();
   if (state.party.activeHeroId === hero.id) {
@@ -390,29 +391,162 @@ function fighterIsStealthing(fighter) {
   return Boolean(stealthState(fighter));
 }
 
-function fighterIsInvisibleToMonsters(fighter) {
+function fighterInvisibleEffects(fighter) {
+  return (fighter?.statusEffects ?? []).filter((effect) => effect.id === "invisible" || effect.id === "greater-invisibility" || effect.invisible);
+}
+
+function fighterCanSeeInvisible(observer, target = null) {
+  const senses = typeof fighterEffectiveSenses === "function" ? fighterEffectiveSenses(observer) : observer?.senses ?? {};
+  return Boolean(
+    senses.seeInvisible ||
+      senses.truesight === true ||
+      senses.blindsight === true ||
+      (Number(senses.truesight) > 0 && (!target?.position || senseRangeCoversPosition(observer, "truesight", target.position))) ||
+      (Number(senses.blindsight) > 0 && (!target?.position || senseRangeCoversPosition(observer, "blindsight", target.position))),
+  );
+}
+
+function fighterIsInvisibleToMonsters(fighter, observer = null) {
+  if (observer && fighterInvisibleEffects(fighter).length && fighterCanSeeInvisible(observer, fighter)) {
+    return (fighter?.statusEffects ?? []).some((effect) => effect.ignoredByMonsters && !fighterInvisibleEffects(fighter).includes(effect));
+  }
   return Boolean((fighter?.statusEffects ?? []).some((effect) => effect.ignoredByMonsters || effect.id === "invisible"));
 }
 
 function monsterCanTargetHero(monster, hero) {
   if (!hero?.alive || hero.dead || (hero.hp ?? 0) <= 0) return false;
-  if (fighterIsInvisibleToMonsters(hero)) return false;
+  if (fighterIsInvisibleToMonsters(hero, monster)) return false;
   return true;
 }
 
-function passivePerception(fighter) {
-  return 10 + abilityMod(fighter, "wis");
+const sightBasedSkillIds = new Set(["perception", "investigation"]);
+
+function senseRangeCoversPosition(fighter, senseId, position) {
+  if (!fighter || !position) return false;
+  const senses = typeof fighterEffectiveSenses === "function" ? fighterEffectiveSenses(fighter) : fighter.senses ?? {};
+  const range = senses[senseId];
+  if (range === true) return true;
+  const feet = Number(range) || 0;
+  if (feet <= 0) return false;
+  return distance(fighter.position ?? position, position) * feetPerSquare <= feet;
 }
 
-function activePerceptionCheck(fighter, options = {}) {
-  const rollResult = rollD20ForFighter(fighter, { advantage: Boolean(options.advantage) });
-  const bonus = abilityMod(fighter, "wis");
+function fighterSeesThroughLightLevel(fighter, lighting, position = fighter?.position) {
+  if (!lighting || lighting.level === lightLevels.bright) return true;
+  if (lighting.magicalDarkness) return senseRangeCoversPosition(fighter, "truesight", position) || senseRangeCoversPosition(fighter, "blindsight", position);
+  return senseRangeCoversPosition(fighter, "truesight", position) || senseRangeCoversPosition(fighter, "blindsight", position) || senseRangeCoversPosition(fighter, "darkvision", position);
+}
+
+function fighterCanSeeInLightLevel(fighter, lighting, position = fighter?.position) {
+  if (!lighting || lighting.level === lightLevels.bright || lighting.level === lightLevels.dim) return true;
+  if (lighting.magicalDarkness) return senseRangeCoversPosition(fighter, "truesight", position) || senseRangeCoversPosition(fighter, "blindsight", position);
+  return senseRangeCoversPosition(fighter, "truesight", position) || senseRangeCoversPosition(fighter, "blindsight", position) || senseRangeCoversPosition(fighter, "darkvision", position);
+}
+
+function canSeeFighter(observer, target, options = {}) {
+  if (!observer || !target || !observer.alive || observer.dead || !target.alive || target.dead) return false;
+  if (observer.id === target.id && options.allowSelf !== false) return true;
+  if (options.requireLineOfSight !== false && !hasClearLineOfSightBetweenFighters(observer, target)) return false;
+  if (fighterInvisibleEffects(target).length && !fighterCanSeeInvisible(observer, target)) return false;
+
+  const lightingMap = options.lightingMap ?? (typeof currentLightingMap === "function" ? currentLightingMap() : null);
+  const targetCells = typeof window.DungeonGrid?.fighterCells === "function" ? window.DungeonGrid.fighterCells(target) : [target.position];
+  const hasVisibleCell = targetCells.some((cell) => {
+    const lighting = lightingAtPosition(cell, lightingMap);
+    return fighterCanSeeInLightLevel(observer, lighting, cell);
+  });
+  if (!hasVisibleCell) return false;
+
+  if (!options.ignoreStealth && fighterIsStealthing(target) && (target.stealth?.total ?? 0) > passivePerception(observer, target.position)) return false;
+  return true;
+}
+
+function lightingCheckContext(fighter, skillId, position = fighter?.position, options = {}) {
+  if (!fighter || !position || !sightBasedSkillIds.has(skillId) || options.sightBased === false || typeof lightingAtPosition !== "function") {
+    return { disadvantage: false, passivePenalty: 0, note: "" };
+  }
+  const notes = [];
+  let disadvantage = false;
+  let passivePenalty = 0;
+  const lighting = lightingAtPosition(position, options.lightingMap);
+  if (lighting && !fighterSeesThroughLightLevel(fighter, lighting, position)) {
+    const label = lighting.magicalDarkness ? "magical darkness" : lighting.level === lightLevels.dim ? "dim light" : "darkness";
+    disadvantage = true;
+    passivePenalty -= 5;
+    notes.push(`sight impaired by ${label}`);
+  }
+  if (options.target && fighterInvisibleEffects(options.target).length && !fighterCanSeeInvisible(fighter, options.target)) {
+    disadvantage = true;
+    passivePenalty -= 5;
+    notes.push(`${options.target.name ?? "target"} is invisible`);
+  }
+  return {
+    disadvantage,
+    passivePenalty,
+    note: notes.join("; "),
+    lighting,
+  };
+}
+
+function attackLightContext(attacker, target, options = {}) {
+  if (!attacker || !target || !target.position || typeof lightingAtPosition !== "function") {
+    return { disadvantage: false, note: "" };
+  }
+  const lightingMap = options.lightingMap ?? (typeof currentLightingMap === "function" ? currentLightingMap() : null);
+  const targetCells = typeof window.DungeonGrid?.fighterCells === "function" ? window.DungeonGrid.fighterCells(target) : [target.position];
+  const visibleCell = targetCells.some((cell) => {
+    const lighting = lightingAtPosition(cell, lightingMap);
+    if (lighting?.magicalDarkness && typeof warlockKnowsInvocation === "function" && warlockKnowsInvocation(attacker, "devilsSight")) return true;
+    return fighterCanSeeInLightLevel(attacker, lighting, cell);
+  });
+  if (visibleCell) return { disadvantage: false, note: "" };
+  const lighting = lightingAtPosition(target.position, lightingMap);
+  const label = lighting?.magicalDarkness ? "magical darkness" : "darkness";
+  return { disadvantage: true, note: `${target.name ?? "target"} is in ${label}` };
+}
+
+function attackLightDisadvantageText(context) {
+  return context?.disadvantage ? ` because ${context.note}` : "";
+}
+
+function rollSkillCheck(fighter, ability, skillId, options = {}) {
+  const lightContext = options.sightBased ? lightingCheckContext(fighter, skillId, options.position ?? fighter?.position, options) : { disadvantage: false, note: "" };
+  const rollResult = rollD20ForFighter(fighter, {
+    advantage: Boolean(options.advantage),
+    disadvantage: Boolean(options.disadvantage || lightContext.disadvantage),
+  });
+  const roll = options.reliableTalent === false ? rollResult.roll : reliableTalentRoll(fighter, skillId, rollResult.roll);
+  const bonus = skillCheckBonus(fighter, ability, skillId);
+  const guidance = options.guidance ? guidanceSkillBonus() : 0;
   return {
     fighter,
     rollResult,
-    roll: rollResult.roll,
+    roll,
     bonus,
-    total: rollResult.roll + bonus,
+    guidance,
+    lightContext,
+    total: roll + bonus + guidance,
+  };
+}
+
+function passiveSkillScore(fighter, ability, skillId, options = {}) {
+  const lightContext = options.sightBased ? lightingCheckContext(fighter, skillId, options.position ?? fighter?.position, options) : { passivePenalty: 0, note: "" };
+  return 10 + skillCheckBonus(fighter, ability, skillId) + (lightContext.passivePenalty ?? 0);
+}
+
+function lightContextNote(lightContext, prefix = "") {
+  return lightContext?.note ? `${prefix}${lightContext.note}` : "";
+}
+
+function passivePerception(fighter, position = fighter?.position, options = {}) {
+  return passiveSkillScore(fighter, "wis", "perception", { ...options, sightBased: true, position });
+}
+
+function activePerceptionCheck(fighter, options = {}) {
+  const check = rollSkillCheck(fighter, "wis", "perception", { ...options, sightBased: true, reliableTalent: false });
+  return {
+    fighter,
+    ...check,
   };
 }
 
@@ -493,11 +627,11 @@ function beginHeroStealth(hero = activeHero()) {
 function stealthBeatsPassivePerceptionForRoom(hero, monsters = roomMonstersForHero(hero)) {
   const stealth = stealthState(hero);
   if (!stealth) return false;
-  return monsters.every((monster) => stealth.total > passivePerception(monster));
+  return monsters.every((monster) => stealth.total > passivePerception(monster, hero.position, { target: hero }));
 }
 
 function revealStealthedHero(hero, monsters, reason = "is spotted") {
-  const watcher = [...monsters].sort((a, b) => passivePerception(b) - passivePerception(a))[0];
+  const watcher = [...monsters].sort((a, b) => passivePerception(b, hero.position, { target: hero }) - passivePerception(a, hero.position, { target: hero }))[0];
   clearHeroStealth(hero);
   syncAutonomousAllyStealthWithLeader(hero);
   if (typeof hideFighterInfo === "function") hideFighterInfo();
@@ -516,7 +650,7 @@ function checkStealthAgainstPassiveForRooms(hero, rooms = []) {
   for (const room of rooms) {
     const monsters = monstersInRoom(room.id);
     if (!monsters.length) continue;
-    const highestPassive = Math.max(...monsters.map(passivePerception));
+    const highestPassive = Math.max(...monsters.map((monster) => passivePerception(monster, hero.position, { target: hero })));
     const success = hero.stealth.total > highestPassive;
     addLog(`${hero.name}'s stealth ${hero.stealth.total} ${success ? "beats" : "fails against"} passive Perception ${highestPassive} in ${room.name}.`, success ? "" : "important");
     if (!success) {
@@ -533,16 +667,17 @@ function activeStealthCheckInMonsterRoom(hero = activeHero(), reason = "acts", o
   if (!monsters.length) return true;
   const check = stealthCheck(hero);
   setHeroStealth(hero, check, reason);
-  const monsterChecks = monsters.map((monster) => activePerceptionCheck(monster, { advantage: options.perceptionAdvantage }));
+  const monsterChecks = monsters.map((monster) => activePerceptionCheck(monster, { advantage: options.perceptionAdvantage, position: hero.position, target: hero }));
   const best = monsterChecks.sort((a, b) => b.total - a.total)[0];
   const guidanceText = check.guidance ? ` + Guidance ${check.guidance}` : "";
-  const advantageText = options.perceptionAdvantage ? " with advantage" : "";
+  const advantageText = options.perceptionAdvantage ? " with advantage" : best?.lightContext?.disadvantage ? " with disadvantage" : "";
+  const lightNote = lightContextNote(best?.lightContext, "; ");
   const success = check.total > (best?.total ?? 0);
   addLog(
-    `${hero.name} ${reason} while stealthing: Stealth ${check.roll} ${abilityLabel(check.bonus)}${guidanceText} = ${check.total} vs ${best?.fighter?.name ?? "monster"} Perception${advantageText} ${best?.roll ?? "?"} ${abilityLabel(best?.bonus ?? 0)} = ${best?.total ?? "?"}.`,
+    `${hero.name} ${reason} while stealthing: Stealth ${check.roll} ${abilityLabel(check.bonus)}${guidanceText} = ${check.total} vs ${best?.fighter?.name ?? "monster"} Perception${advantageText} ${best?.roll ?? "?"} ${abilityLabel(best?.bonus ?? 0)} = ${best?.total ?? "?"}${lightNote}.`,
     success ? "" : "important",
   );
-  addAdminCheckLog({ actor: hero, label: "Active stealth check", rollResult: check.rollResult, bonus: check.bonus, guidance: check.guidance, total: check.total, dc: best?.total ?? 0, target: best?.fighter?.name ?? "monsters", success, note: reason });
+  addAdminCheckLog({ actor: hero, label: "Active stealth check", rollResult: check.rollResult, bonus: check.bonus, guidance: check.guidance, total: check.total, dc: best?.total ?? 0, target: best?.fighter?.name ?? "monsters", success, note: [reason, best?.lightContext?.note].filter(Boolean).join("; ") });
   recordD20OutcomeForFighter(hero, success);
   if (!success) {
     revealStealthedHero(hero, monsters, "is heard");
@@ -802,14 +937,15 @@ function reactionCandidates(id, target, rangeSquares = 12, includeTarget = true)
 function reactionWeaponAttackDamage(attacker, defender, label, extraDamage = 0, extraType = null) {
   if (!attacker?.alive || !defender?.alive || !hasMeleeAccess(attacker, defender)) return false;
   const profile = opportunityAttackProfile(attacker);
-  const attackRollResult = rollD20ForFighter(attacker);
+  const lightContext = attackLightContext(attacker, defender);
+  const attackRollResult = rollD20ForFighter(attacker, { disadvantage: lightContext.disadvantage });
   const criticalResult = resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll);
   const attackRoll = criticalResult.attackRoll;
   const bonus = profile.weapon ? attackBonusForWeapon(attacker, profile.weapon) : attackBonusForAbility(attacker, profile.attackAbility ?? "str");
   const total = attackRoll + bonus;
   const targetAc = armorClass(defender);
-  addLog(`${attacker.name}'s ${label}: d20 ${attackRoll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`, "important");
-  addAdminLog(`${attacker.name} ${label} breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)}${criticalResult.attackRoll !== attackRollResult.roll ? ` -> d20 ${attackRoll}` : ""} + attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}.`);
+  addLog(`${attacker.name}'s ${label}${attackLightDisadvantageText(lightContext)}: d20 ${attackRoll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`, "important");
+  addAdminLog(`${attacker.name} ${label} breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)}${criticalResult.attackRoll !== attackRollResult.roll ? ` -> d20 ${attackRoll}` : ""} + attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}${lightContext.note ? `; ${lightContext.note}` : ""}.`);
   if (attackRoll === 1 || (!criticalResult.forcedHit && total < targetAc)) {
     addLog(`${attacker.name}'s ${label} misses.`);
     return false;
@@ -1903,8 +2039,8 @@ function revealHiddenDoor(door, finder = null, source = "search") {
   return true;
 }
 
-function passiveInvestigationScore(hero) {
-  return 10 + skillCheckBonus(hero, "int", "investigation");
+function passiveInvestigationScore(hero, position = hero?.position) {
+  return passiveSkillScore(hero, "int", "investigation", { sightBased: true, position });
 }
 
 function checkPassiveHiddenDoorsForRoom(room) {
@@ -1915,10 +2051,11 @@ function checkPassiveHiddenDoorsForRoom(room) {
     const dc = Math.max(1, Number(door.spotDc) || 15);
     const finder = partyHeroes()
       .filter((hero) => heroCanAct(hero))
-      .find((hero) => passiveInvestigationScore(hero) >= dc);
+      .find((hero) => passiveInvestigationScore(hero, door) >= dc);
     if (finder) {
       revealed = revealHiddenDoor(door, finder, "passive") || revealed;
-      addAdminLog(`${finder.name} passive Investigation ${passiveInvestigationScore(finder)} spots hidden door at ${door.x},${door.y} vs DC ${dc}.`);
+      const lightContext = lightingCheckContext(finder, "investigation", door);
+      addAdminLog(`${finder.name} passive Investigation ${passiveInvestigationScore(finder, door)} spots hidden door at ${door.x},${door.y} vs DC ${dc}${lightContext.note ? ` (${lightContext.note})` : ""}.`);
     }
   }
   if (revealed) render();
@@ -1942,12 +2079,11 @@ function searchRoomForHiddenDoors(hero = activeHero()) {
 
   markHiddenDoorSearchAttempted(hero, room);
   const doors = hiddenDoorsInRoom(room);
-  const rollResult = rollD20ForFighter(hero);
-  const roll = reliableTalentRoll(hero, "investigation", rollResult.roll);
-  const bonus = skillCheckBonus(hero, "int", "investigation");
-  const guidance = guidanceSkillBonus();
-  const total = roll + bonus + guidance;
+  const check = rollSkillCheck(hero, "int", "investigation", { sightBased: true, position: hero.position, guidance: true });
+  const { rollResult, roll, bonus, guidance, total, lightContext } = check;
   const guidanceText = guidance ? ` + Guidance ${guidance}` : "";
+  const disadvantageText = lightContext.disadvantage ? " with disadvantage" : "";
+  const lightNote = lightContextNote(lightContext, "; ");
   let revealed = 0;
   let hardestDc = 0;
   for (const door of doors) {
@@ -1958,9 +2094,9 @@ function searchRoomForHiddenDoors(hero = activeHero()) {
   const targetDc = doors.length ? hardestDc : 15;
   recordD20OutcomeForFighter(hero, revealed > 0);
   addLog(
-    `${hero.name} searches ${room.name ?? "the room"}: INT ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total}${
+    `${hero.name} searches ${room.name ?? "the room"}${disadvantageText}: INT ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total}${
       doors.length ? ` vs hidden door DC up to ${hardestDc}` : ""
-    }. ${revealed ? `${revealed} hidden door${revealed === 1 ? "" : "s"} found.` : "No hidden door found."}`,
+    }${lightNote}. ${revealed ? `${revealed} hidden door${revealed === 1 ? "" : "s"} found.` : "No hidden door found."}`,
     revealed ? "important" : undefined,
   );
   addAdminCheckLog({
@@ -1973,7 +2109,7 @@ function searchRoomForHiddenDoors(hero = activeHero()) {
     total,
     dc: targetDc,
     success: revealed > 0,
-    note: doors.length ? `${doors.length} hidden door candidate${doors.length === 1 ? "" : "s"}` : "no hidden doors in room",
+    note: [doors.length ? `${doors.length} hidden door candidate${doors.length === 1 ? "" : "s"}` : "no hidden doors in room", lightContext.note].filter(Boolean).join("; "),
   });
   advanceDungeonTime(600, `${hero.name} searching ${room.name ?? "the room"}`, { force: true });
   render();
@@ -2093,6 +2229,440 @@ function isKnownTile(position) {
     return adjacentCells(position).some((cell) => currentOpenedKeys().has(positionKey(cell)));
   }
   return (state.dungeon?.rooms ?? []).some((room) => currentDiscoveredRoomIds().has(room.id) && roomHasCell(room, position));
+}
+
+const lightLevels = Object.freeze({
+  darkness: "darkness",
+  dim: "dim",
+  bright: "bright",
+});
+
+const lightLevelRank = Object.freeze({
+  [lightLevels.darkness]: 0,
+  [lightLevels.dim]: 1,
+  [lightLevels.bright]: 2,
+});
+
+const magicalDarknessSpellIds = new Set(["darkness", "maddening-darkness", "hunger-of-hadar"]);
+
+function normalizeLightLevel(value, fallback = lightLevels.darkness) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === lightLevels.bright || normalized === "bright-light") return lightLevels.bright;
+  if (normalized === lightLevels.dim || normalized === "dim-light") return lightLevels.dim;
+  if (normalized === lightLevels.darkness || normalized === "dark" || normalized === "magical-darkness") return lightLevels.darkness;
+  return fallback;
+}
+
+function lightRadiusSquares(value, fallback = 0) {
+  const radius = Number(value);
+  return Number.isFinite(radius) ? Math.max(0, Math.floor(radius)) : fallback;
+}
+
+function lightRadiusFeetToSquares(value, fallback = 0) {
+  const radius = Number(value);
+  return Number.isFinite(radius) ? Math.max(0, Math.floor(radius / feetPerSquare)) : fallback;
+}
+
+function normalizedLightSource(rawSource = {}, fallback = {}) {
+  const raw = rawSource.lightSource ?? rawSource.emitsLight ?? rawSource;
+  const legacyRadius = lightRadiusSquares(raw.radius, 0);
+  const brightRadius = lightRadiusSquares(
+    raw.brightRadius ?? raw.brightRadiusSquares,
+    lightRadiusFeetToSquares(raw.brightRadiusFeet, lightRadiusFeetToSquares(raw.brightFeet, 0)),
+  );
+  const dimRadius = lightRadiusSquares(
+    raw.dimRadius ?? raw.dimRadiusSquares,
+    lightRadiusFeetToSquares(raw.dimRadiusFeet, lightRadiusFeetToSquares(raw.dimFeet, legacyRadius || brightRadius)),
+  );
+  const origin = raw.origin ?? raw.position ?? fallback.origin ?? fallback.position;
+  if (!origin && !Array.isArray(raw.cells) && !Array.isArray(fallback.cells)) return null;
+  const source = {
+    id: raw.id ?? fallback.id ?? `light-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    origin: origin ? { x: origin.x, y: origin.y } : null,
+    cells: Array.isArray(raw.cells) ? raw.cells.map((cell) => ({ x: cell.x, y: cell.y })) : Array.isArray(fallback.cells) ? fallback.cells.map((cell) => ({ x: cell.x, y: cell.y })) : null,
+    brightRadius,
+    dimRadius: Math.max(dimRadius, brightRadius),
+    color: raw.color ?? fallback.color ?? "#f6d47a",
+    sourceType: raw.sourceType ?? raw.type ?? fallback.sourceType ?? "light",
+    magical: Boolean(raw.magical ?? fallback.magical),
+    suppressible: raw.suppressible ?? fallback.suppressible ?? true,
+    suppressesMagicalDarkness: Boolean(raw.suppressesMagicalDarkness ?? raw.dispelsMagicalDarkness ?? fallback.suppressesMagicalDarkness),
+    dispelsMagicalDarkness: Boolean(raw.dispelsMagicalDarkness ?? fallback.dispelsMagicalDarkness),
+    magicalDarkness: Boolean(raw.magicalDarkness ?? fallback.magicalDarkness),
+    ownerId: raw.ownerId ?? fallback.ownerId ?? null,
+    areaId: raw.areaId ?? fallback.areaId ?? null,
+    label: raw.label ?? fallback.label ?? raw.name ?? fallback.name ?? null,
+  };
+  if (!source.magicalDarkness && source.brightRadius <= 0 && source.dimRadius <= 0 && !source.cells) return null;
+  return source;
+}
+
+function lightSourceFromStatusEffect(fighter, effect) {
+  const explicit = effect?.emitsLight ?? effect?.lightSource;
+  if (explicit) {
+    if (effect.lightItemId) {
+      const requiredSlots = Array.isArray(effect.requiredSlots) ? effect.requiredSlots : [];
+      const equipped = requiredSlots.length
+        ? requiredSlots.some((slotId) => fighter.equipment?.[slotId] === effect.lightItemId)
+        : Object.values(fighter.equipment ?? {}).includes(effect.lightItemId);
+      if (!equipped) return null;
+    }
+    return normalizedLightSource(explicit, {
+      id: `${fighter.id}:${effect.id ?? effect.label ?? "status-light"}`,
+      origin: fighter.position,
+      sourceType: "actor",
+      ownerId: fighter.id,
+      magical: Boolean(effect.magical),
+      label: effect.label,
+    });
+  }
+
+  if (effect?.id === "light") {
+    return normalizedLightSource(
+      { brightRadiusFeet: 20, dimRadiusFeet: 40, magical: true, color: "#ffe8a3", label: effect.label ?? "Light" },
+      { id: `${fighter.id}:light`, origin: fighter.position, sourceType: "spell", ownerId: fighter.id },
+    );
+  }
+  if (effect?.id === "dancing-lights") {
+    return normalizedLightSource(
+      { brightRadiusFeet: 0, dimRadiusFeet: 10, magical: true, color: "#9ee7ff", label: effect.label ?? "Dancing Lights" },
+      { id: `${fighter.id}:dancing-lights`, origin: fighter.position, sourceType: "spell", ownerId: fighter.id },
+    );
+  }
+  if (effect?.id === "daylight") {
+    return normalizedLightSource(
+      { brightRadiusFeet: 60, dimRadiusFeet: 120, magical: true, color: "#fff6c7", label: effect.label ?? "Daylight", suppressesMagicalDarkness: true },
+      { id: `${fighter.id}:daylight`, origin: fighter.position, sourceType: "spell", ownerId: fighter.id },
+    );
+  }
+  return null;
+}
+
+function lightSourceFromItem(fighter, item, index, location) {
+  const explicit = item?.emitsLight ?? item?.lightSource ?? item?.light;
+  if (!explicit || explicit.lit === false || item.lit === false || item.active === false) return null;
+  return normalizedLightSource(explicit, {
+    id: `${fighter.id}:${location}:${item.id ?? item.itemId ?? item.name ?? index}`,
+    origin: fighter.position,
+    sourceType: "item",
+    ownerId: fighter.id,
+    label: item.name,
+  });
+}
+
+function actorLightSources() {
+  const sources = [];
+  for (const fighter of Object.values(state.fighters ?? {})) {
+    if (!fighter?.position || !fighter.alive || fighter.dead) continue;
+    for (const effect of fighter.statusEffects ?? []) {
+      const source = lightSourceFromStatusEffect(fighter, effect);
+      if (source) sources.push(source);
+    }
+    const inventoryItems = Array.isArray(fighter.inventory) ? fighter.inventory : fighter.inventory?.items ?? [];
+    const carriedItems = [
+      ...Object.entries(fighter.equipment ?? {}).map(([slot, itemId], index) => ({ item: inventoryItems.find((item) => item.id === itemId), index, location: `equipment:${slot}` })),
+    ].filter((entry) => entry.item);
+    for (const { item, index, location } of carriedItems) {
+      const source = lightSourceFromItem(fighter, item, index, location);
+      if (source) sources.push(source);
+    }
+  }
+  return sources;
+}
+
+function objectLightSources() {
+  const sources = [];
+  for (const object of state.dungeonObjects ?? []) {
+    if (!object || object.destroyed || object.spent) continue;
+    const cells = objectCells(object);
+    if (!cells.length) continue;
+    const origin = cells[Math.floor(cells.length / 2)];
+    for (const component of objectComponents(object).filter((entry) => entry.type === "lightSource")) {
+      const source = normalizedLightSource(component, {
+        id: `${object.id ?? object.type}:light`,
+        origin,
+        cells,
+        sourceType: "furniture",
+        label: objectTemplate(object.type)?.name ?? object.type,
+        color: component.color ?? "#7dd3fc",
+      });
+      if (source) sources.push(source);
+    }
+  }
+  return sources;
+}
+
+function persistentSpellLightSources() {
+  const sources = [];
+  for (const area of ensureSpellAreas()) {
+    const spell = getContentDefinition("spells", area.spellId);
+    if (!spell) continue;
+    const areaCells = persistentAreaCells(area);
+    if (magicalDarknessSpellIds.has(area.spellId)) {
+      const source = normalizedLightSource(
+        {
+          cells: areaCells,
+          magicalDarkness: true,
+          magical: true,
+          color: area.spellId === "maddening-darkness" ? "#5b1b8d" : "#15111f",
+          label: area.spellName ?? spell.name,
+        },
+        { id: area.id, origin: area.position, sourceType: "darkness", areaId: area.id },
+      );
+      if (source) sources.push(source);
+      continue;
+    }
+
+    const explicit = spell.lightSource ?? spell.emitsLight ?? spell.effect?.lightSource ?? spell.effect?.emitsLight;
+    if (explicit) {
+      const source = normalizedLightSource(explicit, {
+        id: area.id,
+        origin: area.position,
+        cells: explicit.cellsFromArea ? areaCells : null,
+        sourceType: "spell",
+        areaId: area.id,
+        magical: true,
+        label: area.spellName ?? spell.name,
+      });
+      if (source) sources.push(source);
+    }
+  }
+  return sources;
+}
+
+function ambientLightSources() {
+  if (state.mode === "home") {
+    return [{ id: "ambient:home", sourceType: "ambient", level: lightLevels.bright, label: "Home light" }];
+  }
+  const theme = getContentDefinition("themes", state?.themeId ?? defaultContent.theme);
+  const sources = [];
+  const dungeonLevel = state.dungeon?.ambientLight ?? theme?.ambientLight;
+  if (dungeonLevel) {
+    sources.push({ id: "ambient:dungeon", sourceType: "ambient", level: normalizeLightLevel(dungeonLevel), label: "Dungeon ambient light" });
+  }
+  for (const room of state.dungeon?.rooms ?? []) {
+    if (!room.ambientLight) continue;
+    sources.push({ id: `ambient:room:${room.id}`, sourceType: "ambient", level: normalizeLightLevel(room.ambientLight), roomId: room.id, label: room.name ?? room.id });
+  }
+  if (!sources.length) sources.push({ id: "ambient:default-darkness", sourceType: "ambient", level: lightLevels.darkness, label: "Default darkness" });
+  return sources;
+}
+
+function currentAmbientLightForPosition(position) {
+  if (state.mode === "home") return lightLevels.bright;
+  const room = roomForPosition(position);
+  const theme = getContentDefinition("themes", state?.themeId ?? defaultContent.theme);
+  return normalizeLightLevel(room?.ambientLight ?? state.dungeon?.ambientLight ?? theme?.ambientLight, lightLevels.darkness);
+}
+
+function lightingCandidateTileKeys() {
+  if (state.mode === "home") {
+    const size = currentGridSize();
+    return new Set(Array.from({ length: size * size }, (_, index) => positionKey({ x: index % size, y: Math.floor(index / size) })));
+  }
+  const keys = new Set((state.dungeon?.walkable ?? []).map(positionKey));
+  for (const door of state.dungeon?.doors ?? []) {
+    if (doorIsVisibleToPlayers(door)) keys.add(positionKey(door));
+    if (door.corridor) keys.add(positionKey(door.corridor));
+  }
+  return keys;
+}
+
+function defaultLightingEntry(position) {
+  const level = currentAmbientLightForPosition(position);
+  return {
+    key: positionKey(position),
+    position: { ...position },
+    level,
+    ambientLevel: level,
+    magicalDarkness: false,
+    brightSources: [],
+    dimSources: [],
+    darknessSources: [],
+  };
+}
+
+function lightEntryHasDarknessSuppressor(entry, sourceLookup) {
+  return [...(entry?.brightSources ?? []), ...(entry?.dimSources ?? [])]
+    .some((sourceId) => sourceLookup?.get(sourceId)?.suppressesMagicalDarkness);
+}
+
+function hasClearLightPath(from, to) {
+  if (positionKey(from) === positionKey(to)) return true;
+  const shootable = new Set((state.dungeon?.walkable ?? []).map(positionKey));
+
+  lineOfSightBlockingObjectKeys().forEach((tileKey) => {
+    shootable.delete(tileKey);
+  });
+  persistentSpellLineOfSightBlockingTileKeys().forEach((tileKey) => {
+    shootable.delete(tileKey);
+  });
+  shootable.add(positionKey(from));
+  shootable.add(positionKey(to));
+
+  const cells = lineCellsBetween(from, to);
+  if (cells.length === 0) return false;
+
+  for (const cell of cells) {
+    if (!shootable.has(positionKey(cell))) return false;
+  }
+
+  for (let index = 1; index < cells.length; index += 1) {
+    const previous = cells[index - 1];
+    const current = cells[index];
+    const dx = Math.abs(current.x - previous.x);
+    const dy = Math.abs(current.y - previous.y);
+
+    if (dx + dy === 1) {
+      if (!canSeeThroughDungeonEdge(previous, current)) return false;
+      continue;
+    }
+
+    if (dx === 1 && dy === 1) {
+      const cornerA = { x: current.x, y: previous.y };
+      const cornerB = { x: previous.x, y: current.y };
+      const pathA =
+        shootable.has(positionKey(cornerA)) &&
+        canSeeThroughDungeonEdge(previous, cornerA) &&
+        canSeeThroughDungeonEdge(cornerA, current);
+      const pathB =
+        shootable.has(positionKey(cornerB)) &&
+        canSeeThroughDungeonEdge(previous, cornerB) &&
+        canSeeThroughDungeonEdge(cornerB, current);
+      if (!pathA && !pathB) return false;
+    }
+  }
+
+  return true;
+}
+
+function applyLightSourceToLightingMap(tiles, source, sourceLookup = null, floorKeys = null) {
+  if (!source) return;
+  const sourceId = source.id;
+  if (source.magicalDarkness) {
+    const cells = source.cells?.length ? source.cells : source.origin ? spellAreaCells(source.origin, { area: { shape: "circle", radiusFeet: source.dimRadius * feetPerSquare } }) : [];
+    for (const cell of cells) {
+      const key = positionKey(cell);
+      const entry = tiles.get(key);
+      if (!entry) continue;
+      if (lightEntryHasDarknessSuppressor(entry, sourceLookup)) continue;
+      entry.level = lightLevels.darkness;
+      entry.magicalDarkness = true;
+      entry.darknessSources.push(sourceId);
+    }
+    return;
+  }
+
+  if (source.cells?.length) {
+    for (const cell of source.cells) {
+      const key = positionKey(cell);
+      const entry = tiles.get(key);
+      if (!entry) continue;
+      if (source.brightRadius > 0 || source.dimRadius <= 0) {
+        if (lightLevelRank[entry.level] < lightLevelRank[lightLevels.bright]) entry.level = lightLevels.bright;
+        entry.brightSources.push(sourceId);
+      } else {
+        if (lightLevelRank[entry.level] < lightLevelRank[lightLevels.dim]) entry.level = lightLevels.dim;
+        entry.dimSources.push(sourceId);
+      }
+    }
+  }
+
+  if (!source.origin) return;
+  const maxRadius = Math.max(source.brightRadius, source.dimRadius);
+  if (maxRadius <= 0) return;
+  const grid = currentGridSize();
+  const candidateKeys = floorKeys ?? lightingCandidateTileKeys();
+  for (let y = source.origin.y - maxRadius; y <= source.origin.y + maxRadius; y += 1) {
+    for (let x = source.origin.x - maxRadius; x <= source.origin.x + maxRadius; x += 1) {
+      const cell = { x, y };
+      const key = positionKey(cell);
+      if (!window.DungeonGrid.isInsideGrid(cell, grid) || !candidateKeys.has(key) || !tiles.has(key)) continue;
+      const radius = distance(cell, source.origin);
+      if (radius > maxRadius || !hasClearLightPath(source.origin, cell)) continue;
+      const entry = tiles.get(key);
+      if (radius <= source.brightRadius) {
+        if (lightLevelRank[entry.level] < lightLevelRank[lightLevels.bright]) entry.level = lightLevels.bright;
+        entry.brightSources.push(sourceId);
+      } else if (radius <= source.dimRadius) {
+        if (lightLevelRank[entry.level] < lightLevelRank[lightLevels.dim]) entry.level = lightLevels.dim;
+        entry.dimSources.push(sourceId);
+      }
+    }
+  }
+}
+
+function collectLightSources() {
+  return [
+    ...ambientLightSources(),
+    ...objectLightSources(),
+    ...actorLightSources(),
+    ...persistentSpellLightSources(),
+  ];
+}
+
+let cachedLightingMapSignature = "";
+let cachedLightingMap = null;
+
+function lightSourceSignature(source) {
+  const origin = source.origin ? `${source.origin.x},${source.origin.y}` : "";
+  const cells = source.cells?.length ? source.cells.map((cell) => `${cell.x},${cell.y}`).join(";") : "";
+  return [
+    source.id,
+    source.sourceType,
+    origin,
+    cells,
+    source.brightRadius,
+    source.dimRadius,
+    source.color,
+    source.magicalDarkness ? 1 : 0,
+    source.suppressesMagicalDarkness ? 1 : 0,
+  ].join(":");
+}
+
+function lightingMapSignature(sources, candidateKeys) {
+  const doorSignature = (state.dungeon?.doors ?? []).map((door) => `${door.x},${door.y}:${door.open ? 1 : 0}:${door.locked ? 1 : 0}:${door.hidden ? 1 : 0}:${door.discovered ? 1 : 0}`).sort().join(";");
+  const blockerSignature = [
+    ...lineOfSightBlockingObjectKeys(),
+    ...persistentSpellLineOfSightBlockingTileKeys(),
+  ].sort().join(";");
+  return [
+    state.mode,
+    state.themeId ?? "",
+    state.dungeon?.id ?? "",
+    state.room?.id ?? "",
+    currentGridSize(),
+    [...candidateKeys].sort().join(";"),
+    doorSignature,
+    blockerSignature,
+    sources.map(lightSourceSignature).sort().join("|"),
+  ].join("||");
+}
+
+function currentLightingMap() {
+  const candidateKeys = lightingCandidateTileKeys();
+  const sources = collectLightSources();
+  const signature = lightingMapSignature(sources, candidateKeys);
+  if (cachedLightingMap && cachedLightingMapSignature === signature) return cachedLightingMap;
+
+  const tiles = new Map();
+  for (const tileKey of candidateKeys) {
+    const position = positionFromKey(tileKey);
+    tiles.set(tileKey, defaultLightingEntry(position));
+  }
+
+  const sourceLookup = new Map(sources.map((source) => [source.id, source]));
+  sources.filter((source) => source.sourceType !== "ambient" && !source.magicalDarkness).forEach((source) => applyLightSourceToLightingMap(tiles, source, sourceLookup, candidateKeys));
+  sources.filter((source) => source.magicalDarkness).forEach((source) => applyLightSourceToLightingMap(tiles, source, sourceLookup, candidateKeys));
+
+  cachedLightingMapSignature = signature;
+  cachedLightingMap = { tiles, sources };
+  return cachedLightingMap;
+}
+
+function lightingAtPosition(position, lightingMap = currentLightingMap()) {
+  if (!position) return null;
+  return lightingMap.tiles.get(positionKey(position)) ?? defaultLightingEntry(position);
 }
 
 function adjacentCells(position) {
@@ -2254,13 +2824,28 @@ function visibleMonsters() {
   );
 }
 
+function encounterRelevantMonsters() {
+  const activeTiles = activeTileKeys();
+  const activeInitiativeIds = new Set((state.initiative ?? []).map((entry) => entry.fighterId));
+  return aliveMonsters().filter((monster) =>
+    (activeInitiativeIds.has(monster.id) || window.DungeonGrid.fighterCells(monster).some((cell) => activeTiles.has(positionKey(cell)))) &&
+      window.DungeonGrid.fighterCells(monster).some(isKnownTile),
+  );
+}
+
 function monsterHasLineOfSightToHero(monster) {
-  return partyHeroes().some((hero) => monsterCanTargetHero(monster, hero) && hasClearLineOfSightBetweenFighters(monster, hero));
+  return partyHeroes().some((hero) => monsterCanTargetHero(monster, hero));
+}
+
+function partyHeroInMonsterRoom(monster) {
+  const monsterRoom = roomForPosition(monster?.position);
+  if (!monsterRoom) return true;
+  return partyHeroes().some((hero) => roomForPosition(hero.position)?.id === monsterRoom.id);
 }
 
 function monsterThreatensHeroes(monster) {
   if (fledMonsterIds.has(monster.id)) {
-    return monsterHasLineOfSightToHero(monster);
+    return partyHeroInMonsterRoom(monster);
   }
 
   const monsterRoom = roomForPosition(monster.position);
@@ -2268,14 +2853,19 @@ function monsterThreatensHeroes(monster) {
   return partyHeroes().some((hero) => {
     if (!monsterCanTargetHero(monster, hero)) return false;
     const heroRoom = roomForPosition(hero.position);
-    if (!heroRoom) return !fighterIsStealthing(hero) || (hero.stealth?.total ?? 0) <= passivePerception(monster);
+    if (!heroRoom) return !fighterIsStealthing(hero) || (hero.stealth?.total ?? 0) <= passivePerception(monster, hero.position);
     if (heroRoom.id !== monsterRoom.id) return false;
-    return !fighterIsStealthing(hero) || (hero.stealth?.total ?? 0) <= passivePerception(monster);
+    return !fighterIsStealthing(hero) || (hero.stealth?.total ?? 0) <= passivePerception(monster, hero.position);
   });
 }
 
 function threateningMonsters() {
-  return visibleMonsters().filter(monsterThreatensHeroes);
+  const monsters = encounterRelevantMonsters();
+  if (fledMonsterIds.size === 0) return monsters;
+  return monsters.filter((monster) => {
+    if (!fledMonsterIds.has(monster.id)) return true;
+    return partyHeroInMonsterRoom(monster);
+  });
 }
 
 function combatMonsters() {
@@ -2632,7 +3222,8 @@ async function opportunityAttack(attacker, defender) {
   const profile = opportunityAttackProfile(attacker);
   playSoundEffect("meleeAttack");
   const targetReckless = defenderGrantsAttackAdvantage(defender);
-  const hasDisadvantage = defender.dodging;
+  const lightContext = attackLightContext(attacker, defender);
+  const hasDisadvantage = defender.dodging || lightContext.disadvantage;
   const hasAdvantage = targetReckless;
   const attackRollResult = rollD20ForFighter(attacker, { advantage: hasAdvantage && !hasDisadvantage, disadvantage: hasDisadvantage && !hasAdvantage });
   const attackRolls = attackRollResult.rolls;
@@ -2655,10 +3246,10 @@ async function opportunityAttack(attacker, defender) {
   const attackRollText = attackRolls.length > 1 ? `${attackRolls.join(" / ")} -> ${attackRoll}` : attackRoll;
 
   addLog(
-    `${attacker.name} makes an opportunity attack with ${profile.weaponName}${hasAdvantage && !hasDisadvantage ? " with advantage because the target attacked recklessly" : ""}${hasDisadvantage && !hasAdvantage ? " with disadvantage" : ""}: d20 ${attackRollText} ${abilityLabel(currentAttackBonus)} = ${totalAttack} vs AC ${defenderAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`,
+    `${attacker.name} makes an opportunity attack with ${profile.weaponName}${hasAdvantage && !hasDisadvantage ? " with advantage because the target attacked recklessly" : ""}${hasDisadvantage && !hasAdvantage ? " with disadvantage" : ""}${lightContext.disadvantage && !hasAdvantage ? attackLightDisadvantageText(lightContext) : ""}: d20 ${attackRollText} ${abilityLabel(currentAttackBonus)} = ${totalAttack} vs AC ${defenderAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`,
     "important",
   );
-  addAdminLog(`${attacker.name} opportunity attack breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)}${criticalResult.attackRoll !== attackRollResult.roll ? ` -> ${d20ModeLabels.karmic} d20 ${attackRoll}` : ""} + attack ${abilityLabel(currentAttackBonus)}${inspiration.used ? ` + inspiration ${inspiration.roll}` : ""} = ${totalAttack}; target AC ${defenderAc}; ${isMiss ? "miss" : isCritical ? "critical hit" : "hit"}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
+  addAdminLog(`${attacker.name} opportunity attack breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)}${criticalResult.attackRoll !== attackRollResult.roll ? ` -> ${d20ModeLabels.karmic} d20 ${attackRoll}` : ""} + attack ${abilityLabel(currentAttackBonus)}${inspiration.used ? ` + inspiration ${inspiration.roll}` : ""} = ${totalAttack}; target AC ${defenderAc}; ${isMiss ? "miss" : isCritical ? "critical hit" : "hit"}${criticalResult.note ? `; ${criticalResult.note}` : ""}${lightContext.note ? `; ${lightContext.note}` : ""}.`);
 
   if (isMiss) {
     addLog(attackRoll === 1 ? "Natural 1. The opportunity attack misses badly." : `${defender.name} slips away.`);
@@ -3425,30 +4016,9 @@ function createLootForHero(hero) {
 
 function dropLootForHero(hero) {
   if (!hero || hero.deathLootDropped) return;
-  const loot = createLootForHero(hero);
-  const hasCoins = moneyToCp(loot.money) > 0;
-  const hasHeroTokens = (loot.heroTokens ?? 0) > 0;
-  const hasItems = (loot.items ?? []).length > 0;
-  if (hasCoins || hasHeroTokens || hasItems) {
-    addLootPile(loot);
-    const lootText = [
-      hasCoins ? moneyText(loot.money) : "",
-      hasHeroTokens ? `${loot.heroTokens} Hero Token${loot.heroTokens === 1 ? "" : "s"}` : "",
-      hasItems ? `${loot.items.length} item${loot.items.length === 1 ? "" : "s"}` : "",
-    ]
-      .filter(Boolean)
-      .join(" and ");
-    addLog(`${hero.name}'s belongings drop as a loot pile (${lootText}).`, "important");
-  }
+  ensureHeroCorpseState(hero, { location: hero.corpse?.location ?? "dungeon" });
   hero.deathLootDropped = true;
-  hero.inventory = {
-    ...(hero.inventory ?? normalizeInventory()),
-    money: normalizeMoney(),
-    heroTokens: 0,
-    items: [],
-  };
-  hero.equipment = normalizeEquipment();
-  refreshDerivedStats(hero);
+  addLog(`${hero.name}'s body remains where they fell. Their belongings can be looted from the corpse.`, "important");
 }
 
 function awardMonsterXp(monster) {
@@ -3719,19 +4289,17 @@ function checkTrapDetectionOnReveal() {
     if (!objectIsTrap(trap) || trap.detected || !objectCells(trap).some((cell) => activeTiles.has(positionKey(cell)) && isKnownTile(cell))) continue;
 
     trap.spotCheckedBy = trap.spotCheckedBy ?? [];
+    const trapPosition = objectCells(trap)[0] ?? trap.position;
     for (const hero of heroes.filter((entry) => !trap.spotCheckedBy.includes(entry.id))) {
       trap.spotCheckedBy.push(hero.id);
-      const rollResult = rollD20ForFighter(hero);
-      const roll = reliableTalentRoll(hero, "perception", rollResult.roll);
-      const bonus = skillCheckBonus(hero, "wis", "perception");
-      const guidance = guidanceSkillBonus();
-      const total = roll + bonus + guidance;
+      const check = rollSkillCheck(hero, "wis", "perception", { sightBased: true, position: trapPosition, guidance: true });
+      const { rollResult, roll, bonus, guidance, total, lightContext } = check;
       const dc = trap.spotDc ?? 12;
       trap.detected = total >= dc;
       recordD20OutcomeForFighter(hero, trap.detected);
-      addAdminCheckLog({ actor: hero, label: "Perception check to spot hidden trap", rollResult, bonus, guidance, total, dc, success: trap.detected, note: `trap id ${trap.id ?? "unknown"}` });
+      addAdminCheckLog({ actor: hero, label: "Perception check to spot hidden trap", rollResult, bonus, guidance, total, dc, success: trap.detected, note: [`trap id ${trap.id ?? "unknown"}`, lightContext.note].filter(Boolean).join("; ") });
       if (trap.detected) {
-        addLog(`${hero.name} spots a hidden trap.`, "important");
+        addLog(`${hero.name} spots a hidden trap${lightContext.disadvantage ? " despite poor light" : ""}.`, "important");
         break;
       }
     }
@@ -3741,19 +4309,17 @@ function checkTrapDetectionOnReveal() {
     if (!chest.trap || chest.trap.detected || !objectCells(chest).some((cell) => activeTiles.has(positionKey(cell)) && isKnownTile(cell))) continue;
 
     chest.trap.spotCheckedBy = chest.trap.spotCheckedBy ?? [];
+    const chestPosition = objectCells(chest)[0] ?? chest.position;
     for (const hero of heroes.filter((entry) => !chest.trap.spotCheckedBy.includes(entry.id))) {
       chest.trap.spotCheckedBy.push(hero.id);
-      const rollResult = rollD20ForFighter(hero);
-      const roll = reliableTalentRoll(hero, "perception", rollResult.roll);
-      const bonus = skillCheckBonus(hero, "wis", "perception");
-      const guidance = guidanceSkillBonus();
-      const total = roll + bonus + guidance;
+      const check = rollSkillCheck(hero, "wis", "perception", { sightBased: true, position: chestPosition, guidance: true });
+      const { rollResult, roll, bonus, guidance, total, lightContext } = check;
       const dc = chest.trap.spotDc ?? 12;
       chest.trap.detected = total >= dc;
       recordD20OutcomeForFighter(hero, chest.trap.detected);
-      addAdminCheckLog({ actor: hero, label: "Perception check to spot hidden trap", target: objectTemplate(chest.type)?.name ?? "a feature", rollResult, bonus, guidance, total, dc, success: chest.trap.detected, note: `object id ${chest.id ?? "unknown"}` });
+      addAdminCheckLog({ actor: hero, label: "Perception check to spot hidden trap", target: objectTemplate(chest.type)?.name ?? "a feature", rollResult, bonus, guidance, total, dc, success: chest.trap.detected, note: [`object id ${chest.id ?? "unknown"}`, lightContext.note].filter(Boolean).join("; ") });
       if (chest.trap.detected) {
-        addLog(`${hero.name} spots a hidden trap on ${objectTemplate(chest.type)?.name ?? "a feature"}.`, "important");
+        addLog(`${hero.name} spots a hidden trap on ${objectTemplate(chest.type)?.name ?? "a feature"}${lightContext.disadvantage ? " despite poor light" : ""}.`, "important");
         break;
       }
     }
@@ -4041,7 +4607,7 @@ function activateFledMonstersWithLineOfSight() {
   if (state.mode !== "combat" || !state.combatStarted || fledMonsterIds.size === 0) return;
   const activeIds = new Set(state.initiative.map((entry) => entry.fighterId));
   const joining = visibleMonsters().filter(
-    (monster) => fledMonsterIds.has(monster.id) && !activeIds.has(monster.id) && monsterHasLineOfSightToHero(monster),
+    (monster) => fledMonsterIds.has(monster.id) && !activeIds.has(monster.id) && partyHeroInMonsterRoom(monster),
   );
   for (const monster of joining) {
     fledMonsterIds.delete(monster.id);
@@ -4390,6 +4956,7 @@ async function makeAttack(attacker, defender, options = {}) {
   playSoundEffect(rangedAttack ? "rangedAttack" : "meleeAttack");
   const adjacentHostiles = hostileFightersAdjacentTo(attacker).length > 0;
   const rangedDisadvantage = rangedAttack && adjacentHostiles && !fighterHasFeat(attacker, "crossbow-expert") && !fighterHasFeat(attacker, "gunner");
+  const lightContext = attackLightContext(attacker, defender);
   const targetReckless = defenderGrantsAttackAdvantage(defender);
   const attackAdvantage =
     targetReckless ||
@@ -4399,7 +4966,7 @@ async function makeAttack(attacker, defender, options = {}) {
     (warlockKnowsInvocation(attacker, "witchSight") && targetIsCursedOrObscured(defender));
   const defenderDodge = defender.dodging;
   const defendedBySidekick = await maybeUseWarriorDefender(attacker, defender);
-  const hasDisadvantage = rangedDisadvantage || defenderDodge || defendedBySidekick;
+  const hasDisadvantage = rangedDisadvantage || defenderDodge || defendedBySidekick || lightContext.disadvantage;
   const attackRollResult = rollD20ForFighter(attacker, { advantage: attackAdvantage && !hasDisadvantage, disadvantage: hasDisadvantage && !attackAdvantage });
   const attackRolls = attackRollResult.rolls;
   const criticalResult = resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll);
@@ -4420,13 +4987,13 @@ async function makeAttack(attacker, defender, options = {}) {
   const isMiss = attackRoll === 1 || hitReaction.blocked || (!criticalResult.forcedHit && totalAttack < defenderAc) || shieldBlocked;
 
   addLog(
-    `${attacker.name} ${options.actionLabel ?? "attacks"}${attackAdvantage && !hasDisadvantage ? targetReckless ? " with advantage because the target attacked recklessly" : " with advantage" : ""}${rangedDisadvantage && !attackAdvantage ? " with disadvantage" : ""}${defenderDodge && !attackAdvantage ? " because the target is dodging" : ""}${defendedBySidekick && !attackAdvantage ? " because of Defender" : ""}: d20 ${
+    `${attacker.name} ${options.actionLabel ?? "attacks"}${attackAdvantage && !hasDisadvantage ? targetReckless ? " with advantage because the target attacked recklessly" : " with advantage" : ""}${rangedDisadvantage && !attackAdvantage ? " with disadvantage" : ""}${defenderDodge && !attackAdvantage ? " because the target is dodging" : ""}${defendedBySidekick && !attackAdvantage ? " because of Defender" : ""}${lightContext.disadvantage && !attackAdvantage ? attackLightDisadvantageText(lightContext) : ""}: d20 ${
       attackRolls.length > 1 ? `${attackRolls.join(" / ")} -> ${attackRoll}` : attackRoll
     } ${abilityLabel(currentAttackBonus)}${inspiration.used ? " + inspiration" : ""} = ${totalAttack} vs AC ${
       defenderAc
     }.${criticalResult.note ? ` ${criticalResult.note}` : ""}`,
   );
-  addAdminLog(`${attacker.name} attack breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)}${criticalResult.attackRoll !== attackRollResult.roll ? ` -> ${d20ModeLabels.karmic} d20 ${attackRoll}` : ""} + attack ${abilityLabel(currentAttackBonus)}${inspiration.used ? ` + inspiration ${inspiration.roll}` : ""} = ${totalAttack}; target AC ${defenderAc}; ${isMiss ? "miss" : isCritical ? "critical hit" : "hit"}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
+  addAdminLog(`${attacker.name} attack breakdown vs ${defender.name}: ${d20RollDetail(attackRollResult)}${criticalResult.attackRoll !== attackRollResult.roll ? ` -> ${d20ModeLabels.karmic} d20 ${attackRoll}` : ""} + attack ${abilityLabel(currentAttackBonus)}${inspiration.used ? ` + inspiration ${inspiration.roll}` : ""} = ${totalAttack}; target AC ${defenderAc}; ${isMiss ? "miss" : isCritical ? "critical hit" : "hit"}${criticalResult.note ? `; ${criticalResult.note}` : ""}${lightContext.note ? `; ${lightContext.note}` : ""}.`);
 
   if (isMiss) {
     addLog(attackRoll === 1 ? "Natural 1. The attack misses badly." : shieldBlocked ? `${defender.name} blocks the blow with Shield.` : `${defender.name} avoids the blow.`);
@@ -5539,6 +6106,79 @@ function startConcentration(caster, spell) {
   addLog(`${caster.name} concentrates on ${spell.name}.`, "important");
 }
 
+function spellDismissibleStatusId(spell) {
+  const status = spell?.effect?.status;
+  if (!status?.id) return "";
+  if (status.dismissible || status.lightSource || spell.concentration) return status.id;
+  return "";
+}
+
+function statusEffectMatchesDismissibleSpell(effect, caster, spell) {
+  if (!effect || !caster || !spell) return false;
+  const statusId = spellDismissibleStatusId(spell);
+  if (!statusId || effect.id !== statusId) return false;
+  if (effect.sourceSpellId === spell.id && effect.sourceId === caster.id) return true;
+  return !effect.sourceSpellId && effect.dismissible && effect.sourceId === caster.id;
+}
+
+function activeDismissibleSpellEffect(caster, spell) {
+  if (!caster || !spell) return null;
+  if (spell.concentration && caster.concentration?.spellId === spell.id) return { type: "concentration" };
+  const statusId = spellDismissibleStatusId(spell);
+  if (!statusId) return null;
+  for (const fighter of Object.values(state.fighters ?? {})) {
+    if ((fighter.statusEffects ?? []).some((effect) => statusEffectMatchesDismissibleSpell(effect, caster, spell))) {
+      return { type: "status", id: statusId };
+    }
+  }
+  if ((caster.statusEffects ?? []).some((effect) => effect.id === statusId && !effect.sourceSpellId && (effect.dismissible || effect.lightSource))) {
+    return { type: "status", id: statusId, legacySelf: true };
+  }
+  return null;
+}
+
+function dismissSpellEffect(spellId) {
+  const caster = state.mode === "combat" ? activeFighter() : activeHero();
+  const spell = spellDefinitionsForFighter(caster).find((entry) => entry.id === spellId);
+  if (!caster || !spell) return false;
+  const active = activeDismissibleSpellEffect(caster, spell);
+  if (!active) {
+    addLog(`${caster.name} has no active ${spell.name} effect to end.`, "important");
+    renderLog();
+    return false;
+  }
+
+  let removed = 0;
+  const statusId = spellDismissibleStatusId(spell);
+  if (statusId) {
+    for (const fighter of Object.values(state.fighters ?? {})) {
+      const before = fighter.statusEffects?.length ?? 0;
+      fighter.statusEffects = (fighter.statusEffects ?? []).filter((effect) => !statusEffectMatchesDismissibleSpell(effect, caster, spell));
+      if (fighter.statusEffects.length !== before) {
+        removed += before - fighter.statusEffects.length;
+        refreshDerivedStats(fighter);
+      }
+    }
+    const beforeSelf = caster.statusEffects?.length ?? 0;
+    caster.statusEffects = (caster.statusEffects ?? []).filter((effect) =>
+      !(effect.id === statusId && !effect.sourceSpellId && (effect.dismissible || effect.lightSource)),
+    );
+    if (caster.statusEffects.length !== beforeSelf) {
+      removed += beforeSelf - caster.statusEffects.length;
+      refreshDerivedStats(caster);
+    }
+  }
+  if (spell.concentration && caster.concentration?.spellId === spell.id) {
+    endConcentration(caster, "dismissed");
+  } else if (removed > 0) {
+    addLog(`${caster.name} ends ${spell.name}.`, "important");
+  }
+  renderAbilitiesMenu();
+  renderFavoriteActionsMenu();
+  render();
+  return true;
+}
+
 function favoredFoeDamageDie(fighter) {
   const level = fighter?.level ?? 1;
   return level >= 14 ? 8 : level >= 6 ? 6 : 4;
@@ -5742,8 +6382,19 @@ function fighterAtPosition(position) {
   ) ?? null;
 }
 
-function fighterInRangeAndSight(source, target, range) {
-  return attackGridDistanceBetweenFighters(source, target) <= range && hasClearLineOfSightBetweenFighters(source, target);
+function spellRequiresPhysicalLineOfSight(spell) {
+  if (!spell || spell.requiresLineOfSight === false) return false;
+  if (spell.range?.kind === "self" || spell.range?.kind === "touch" || spell.target === "self") return false;
+  if (spell.requiresLineOfSight === true) return true;
+  if (spell.effect?.kind === "attack" || spell.effect?.spellAttack || spell.effect?.spellAttackBonus) return true;
+  if (spell.target === "enemy" || spell.target === "creature" || spell.target === "point") return spell.range?.kind === "ranged";
+  return false;
+}
+
+function fighterInSpellRange(source, target, spell, range = spellRangeSquares(spell)) {
+  if (attackGridDistanceBetweenFighters(source, target) > range) return false;
+  if (!spellRequiresPhysicalLineOfSight(spell)) return true;
+  return hasClearLineOfSightBetweenFighters(source, target);
 }
 
 function fightersWithinSquares(a, b, range) {
@@ -5762,15 +6413,15 @@ function spellTargetsFor(caster, spell) {
     return partyHeroes().filter((hero) => hero.alive && fightersWithinSquares(caster, hero, range));
   }
   if (spell.target === "enemy") {
-    return visibleMonsters().filter((monster) => monster.alive && fighterInRangeAndSight(caster, monster, range));
+    return visibleMonsters().filter((monster) => monster.alive && fighterInSpellRange(caster, monster, spell, range));
   }
   if (spell.target === "creature") {
     return Object.values(state.fighters).filter(
-      (fighter) => fighter.alive && !fighter.dead && window.DungeonGrid.fighterCells(fighter).some(isKnownTile) && fighterInRangeAndSight(caster, fighter, range),
+      (fighter) => fighter.alive && !fighter.dead && window.DungeonGrid.fighterCells(fighter).some(isKnownTile) && fighterInSpellRange(caster, fighter, spell, range),
     );
   }
   if (spell.target === "point") {
-    return visibleMonsters().filter((monster) => monster.alive && fighterInRangeAndSight(caster, monster, range));
+    return visibleMonsters().filter((monster) => monster.alive && fighterInSpellRange(caster, monster, spell, range));
   }
   return [];
 }
@@ -5870,12 +6521,26 @@ function areaTargetsForSpell(origin, spell, caster) {
 }
 
 function persistentAreaSpellIds() {
-  return new Set(["moonbeam", "spike-growth", "fog-cloud", "silence", "darkness", "hunger-of-hadar", "cloud-of-daggers", "dust-devil", "flaming-sphere", "plant-growth", "sleet-storm", "stinking-cloud", "wall-of-sand", "wall-of-water", "wind-wall", "black-tentacles", "grasping-vine", "guardian-of-faith", "sickening-radiance", "storm-sphere", "wall-of-fire", "watery-sphere", "cloudkill", "dawn", "insect-plague", "maelstrom", "transmute-rock", "wrath-of-nature", "blade-barrier", "forbiddance", "wall-of-ice", "wall-of-thorns", "arcane-sword", "forcecage", "reverse-gravity", "symbol", "whirlwind", "earthquake", "incendiary-cloud", "maddening-darkness", "tsunami", "prismatic-wall", "storm-of-vengeance", "weird"]);
+  return new Set(["moonbeam", "spike-growth", "fog-cloud", "silence", "darkness", "daylight", "dancing-lights", "hunger-of-hadar", "cloud-of-daggers", "dust-devil", "flaming-sphere", "plant-growth", "sleet-storm", "stinking-cloud", "wall-of-sand", "wall-of-water", "wind-wall", "black-tentacles", "grasping-vine", "guardian-of-faith", "sickening-radiance", "storm-sphere", "wall-of-fire", "watery-sphere", "cloudkill", "dawn", "insect-plague", "maelstrom", "transmute-rock", "wrath-of-nature", "blade-barrier", "forbiddance", "sunbeam", "wall-of-ice", "wall-of-thorns", "arcane-sword", "forcecage", "reverse-gravity", "symbol", "whirlwind", "earthquake", "incendiary-cloud", "maddening-darkness", "tsunami", "prismatic-wall", "storm-of-vengeance", "weird"]);
 }
 
 function ensureSpellAreas() {
   state.spellAreas = Array.isArray(state.spellAreas) ? state.spellAreas : [];
   return state.spellAreas;
+}
+
+function removeMagicalDarknessInCells(cells, maxSpellLevel = 3) {
+  if (!cells?.length || !state?.spellAreas?.length) return 0;
+  const affectedKeys = new Set(cells.map(positionKey));
+  const before = state.spellAreas.length;
+  state.spellAreas = state.spellAreas.filter((area) => {
+    if (!magicalDarknessSpellIds.has(area.spellId)) return true;
+    const spell = getContentDefinition("spells", area.spellId);
+    const castLevel = area.castLevel ?? spell?.level ?? 0;
+    if (castLevel > maxSpellLevel) return true;
+    return !persistentAreaCells(area).some((cell) => affectedKeys.has(positionKey(cell)));
+  });
+  return before - state.spellAreas.length;
 }
 
 function createPersistentSpellArea(caster, spell, position, options = {}) {
@@ -5898,7 +6563,12 @@ function createPersistentSpellArea(caster, spell, position, options = {}) {
     expiresAtDungeonTimeSeconds: dungeonElapsedSeconds({ sync: false }) + durationSeconds,
   };
   ensureSpellAreas().push(area);
-  addLog(`${spell.name} persists in the area for ${durationRounds} rounds.`, "important");
+  if (spell.lightSource?.dispelsMagicalDarkness || spell.effect?.dispelsMagicalDarkness) {
+    const removed = removeMagicalDarknessInCells(persistentAreaCells(area), spell.effect?.dispelMaxSpellLevel ?? spell.lightSource?.dispelMaxSpellLevel ?? 3);
+    if (removed) addLog(`${spell.name} burns away ${removed} magical darkness ${removed === 1 ? "area" : "areas"}.`, "important");
+  }
+  const durationText = spell.duration?.hours ? `${spell.duration.hours} ${spell.duration.hours === 1 ? "hour" : "hours"}` : `${durationRounds} rounds`;
+  addLog(`${spell.name} persists in the area for ${durationText}.`, "important");
 }
 
 function persistentAreaCells(area) {
@@ -6365,6 +7035,94 @@ function applySpellHealing(caster, target, spell) {
   void maybeFinishEncounterAfterHeroRecovery();
 }
 
+function restorationEffectIsNegative(effect) {
+  if (!effect) return false;
+  if (effect.condition && !["blessed", "invisible"].includes(effect.condition)) return true;
+  return Boolean(
+    (effect.attackBonus ?? 0) < 0 ||
+      (effect.saveBonus ?? 0) < 0 ||
+      (effect.skillBonus ?? 0) < 0 ||
+      (effect.acBonus ?? 0) < 0 ||
+      (effect.speedBonusFeet ?? 0) < 0 ||
+      effect.speedLocked ||
+      effect.actionLocked ||
+      effect.poisoned ||
+      effect.disease,
+  );
+}
+
+function applySpellRestoration(caster, target, spell) {
+  const before = target.statusEffects ?? [];
+  const removeAll = spell.effect?.removeAll !== false;
+  const removed = [];
+  target.statusEffects = before.filter((effect) => {
+    if (!restorationEffectIsNegative(effect)) return true;
+    if (!removeAll && removed.length >= 1) return true;
+    removed.push(effect);
+    return false;
+  });
+  if (spell.effect?.healDice) {
+    const roll = rollDice(spell.effect.healDice.count, spell.effect.healDice.sides);
+    const healed = applyHealingToHero(target, roll.total + (spell.effect.healBonus ?? 0));
+    if (healed > 0) addLog(`${caster.name}'s ${spell.name} restores ${healed} HP to ${target.name}.`, "heal");
+  } else {
+    refreshDerivedStats(target);
+  }
+  if (removed.length) addLog(`${caster.name}'s ${spell.name} removes ${removed.map((effect) => effect.label ?? effect.id).join(", ")} from ${target.name}.`, "important");
+  else addLog(`${caster.name}'s ${spell.name} finds no harmful effect on ${target.name}.`, "important");
+}
+
+function spellRevivalWindowSeconds(spell) {
+  if (spell?.id === "revivify") return corpseRevivifyWindowSeconds;
+  if (spell?.id === "raise-dead") return corpseRaiseDeadWindowSeconds;
+  return Number.POSITIVE_INFINITY;
+}
+
+function canSpellReviveCorpse(caster, spell, corpseHero) {
+  if (!caster || !spell || !corpseHero?.dead) return false;
+  if (!heroCanAct(caster)) return false;
+  if (spell.effect?.kind !== "revive") return false;
+  if (!canPaySpellCost(caster, spell)) return false;
+  const windowSeconds = spellRevivalWindowSeconds(spell);
+  return corpseEffectiveAgeSeconds(corpseHero) <= windowSeconds;
+}
+
+function reviveCorpseWithSpell(caster, corpseHero, spell) {
+  if (!canSpellReviveCorpse(caster, spell, corpseHero)) {
+    addLog(`${spell?.name ?? "The spell"} cannot restore ${corpseHero?.name ?? "that corpse"} in its current state.`, "important");
+    return false;
+  }
+  spendSpellResources(caster, spell);
+  const reviveHp = Math.max(1, Math.floor(corpseHero.maxHp * (spell.effect?.hpFraction ?? 0)) || (spell.effect?.hp ?? 1));
+  corpseHero.dead = false;
+  corpseHero.alive = true;
+  corpseHero.hp = Math.min(corpseHero.maxHp, reviveHp);
+  corpseHero.temporaryHp = 0;
+  corpseHero.stableAtZero = false;
+  corpseHero.deathSaves = { successes: 0, failures: 0 };
+  corpseHero.deathLootDropped = false;
+  corpseHero.corpse = { ...(corpseHero.corpse ?? {}), revivedAtDungeonTimeSeconds: dungeonElapsedSeconds({ sync: false }), location: null };
+  corpseHero.corpseAtBase = false;
+  if (state.mode !== "home" && caster.position) corpseHero.position = { ...caster.position };
+  state.party.rosterIds = uniqueValues([...(state.party.rosterIds ?? []), corpseHero.id]);
+  if (state.mode !== "home") state.party.heroIds = uniqueValues([...(state.party.heroIds ?? []), corpseHero.id]);
+  if (!state.party.activeHeroId || state.fighters[state.party.activeHeroId]?.dead) state.party.activeHeroId = corpseHero.id;
+  refreshDerivedStats(corpseHero);
+  addLog(`${caster.name} casts ${spell.name}. ${corpseHero.name} returns to life with ${corpseHero.hp} HP.`, "important");
+  void maybeFinishEncounterAfterHeroRecovery();
+  return true;
+}
+
+function preserveCorpseWithSpell(caster, corpseHero, spell) {
+  if (!caster || !spell || !corpseHero?.dead || !heroCanAct(caster) || spell.effect?.kind !== "preserveCorpse" || !canPaySpellCost(caster, spell)) return false;
+  spendSpellResources(caster, spell);
+  const corpse = ensureHeroCorpseState(corpseHero);
+  const nowSeconds = dungeonElapsedSeconds({ sync: false });
+  corpse.preservedUntilDungeonTimeSeconds = Math.max(corpse.preservedUntilDungeonTimeSeconds ?? 0, nowSeconds + (spell.effect?.durationSeconds ?? corpseGentleReposeSeconds));
+  addLog(`${caster.name} casts ${spell.name}. ${corpseHero.name}'s body will not decay for ${formatDuration(corpse.preservedUntilDungeonTimeSeconds - nowSeconds)}.`, "important");
+  return true;
+}
+
 function summonActorProfiles() {
   return {
     familiar: { monsterId: "thornbackHare", name: "Familiar", behavior: "skirmisher", hpMultiplier: 0.55, damageBonus: -1, followDistanceSquares: 1 },
@@ -6512,14 +7270,15 @@ async function castSummonSpell(caster, spell, originTarget = caster) {
 }
 
 async function applySpellAttack(caster, target, spell) {
-  const rollResult = rollD20ForFighter(caster);
+  const lightContext = attackLightContext(caster, target);
+  const rollResult = rollD20ForFighter(caster, { disadvantage: lightContext.disadvantage });
   const criticalResult = resolveMonsterHeroCritical(caster, target, rollResult.roll);
   const roll = criticalResult.attackRoll;
   const bonus = spellAttackBonus(caster, spell);
   const total = roll + bonus;
   const targetAc = armorClass(target);
-  addLog(`${caster.name} casts ${spell.name}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`, "important");
-  addAdminLog(`${caster.name} spell attack breakdown vs ${target.name}: ${d20RollDetail(rollResult)}${criticalResult.attackRoll !== rollResult.roll ? ` -> ${d20ModeLabels.karmic} d20 ${roll}` : ""} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
+  addLog(`${caster.name} casts ${spell.name}${attackLightDisadvantageText(lightContext)}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`, "important");
+  addAdminLog(`${caster.name} spell attack breakdown vs ${target.name}: ${d20RollDetail(rollResult)}${criticalResult.attackRoll !== rollResult.roll ? ` -> ${d20ModeLabels.karmic} d20 ${roll}` : ""} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}${criticalResult.note ? `; ${criticalResult.note}` : ""}${lightContext.note ? `; ${lightContext.note}` : ""}.`);
   recordD20OutcomeForFighter(caster, roll !== 1 && (criticalResult.forcedHit || total >= targetAc));
   if (roll === 1 || (!criticalResult.forcedHit && total < targetAc)) {
     addLog(`${spell.name} misses ${target.name}.`);
@@ -6599,14 +7358,16 @@ async function resolveEldritchBlastBeam(caster, target, beamIndex, beamCount) {
   }
   const devilSightAdvantage = warlockKnowsInvocation(caster, "devilsSight") && targetIsInMagicalDarkness(target);
   const witchSightAdvantage = warlockKnowsInvocation(caster, "witchSight") && targetIsCursedOrObscured(target);
-  const rollResult = rollD20ForFighter(caster, { advantage: devilSightAdvantage || witchSightAdvantage });
+  const lightContext = attackLightContext(caster, target);
+  const sightAdvantage = devilSightAdvantage || witchSightAdvantage;
+  const rollResult = rollD20ForFighter(caster, { advantage: sightAdvantage && !lightContext.disadvantage, disadvantage: lightContext.disadvantage && !sightAdvantage });
   const criticalResult = resolveMonsterHeroCritical(caster, target, rollResult.roll);
   const roll = criticalResult.attackRoll;
   const bonus = spellAttackBonus(caster);
   const total = roll + bonus;
   const targetAc = armorClass(target);
-  addLog(`${caster.name}'s Eldritch Blast beam ${beamIndex}/${beamCount}${devilSightAdvantage ? " with Devil's Sight" : witchSightAdvantage ? " with Witch Sight" : ""}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`, "important");
-  addAdminLog(`${caster.name} Eldritch Blast beam ${beamIndex}/${beamCount} breakdown: ${d20RollDetail(rollResult)}${criticalResult.attackRoll !== rollResult.roll ? ` -> ${d20ModeLabels.karmic} d20 ${roll}` : ""} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}${criticalResult.note ? `; ${criticalResult.note}` : ""}.`);
+  addLog(`${caster.name}'s Eldritch Blast beam ${beamIndex}/${beamCount}${devilSightAdvantage ? " with Devil's Sight" : witchSightAdvantage ? " with Witch Sight" : ""}${lightContext.disadvantage && !sightAdvantage ? attackLightDisadvantageText(lightContext) : ""}: spell attack ${roll} ${abilityLabel(bonus)} = ${total} vs AC ${targetAc}.${criticalResult.note ? ` ${criticalResult.note}` : ""}`, "important");
+  addAdminLog(`${caster.name} Eldritch Blast beam ${beamIndex}/${beamCount} breakdown: ${d20RollDetail(rollResult)}${criticalResult.attackRoll !== rollResult.roll ? ` -> ${d20ModeLabels.karmic} d20 ${roll}` : ""} + spell attack ${abilityLabel(bonus)} = ${total}; target AC ${targetAc}${criticalResult.note ? `; ${criticalResult.note}` : ""}${lightContext.note ? `; ${lightContext.note}` : ""}.`);
   recordD20OutcomeForFighter(caster, roll !== 1 && (criticalResult.forcedHit || total >= targetAc));
   if (roll === 1 || (!criticalResult.forcedHit && total < targetAc)) {
     addLog(`Eldritch Blast misses ${target.name}.`);
@@ -6695,6 +7456,11 @@ async function applySpellStatus(caster, target, spell, options = {}) {
     id: spell.effect?.status?.id ?? spell.id,
     label: spell.effect?.status?.label ?? spell.name,
   };
+  if (spellDismissibleStatusId(spell)) {
+    effect.dismissible = true;
+    effect.sourceId = caster.id;
+    effect.sourceSpellId = spell.id;
+  }
   if (spell.duration?.rounds && !effect.durationRounds && !effect.expiresAtEndOfTurn && !effect.expiresAtStartOfTurn) effect.durationRounds = spell.duration.rounds;
   if (spell.duration?.minutes && !effect.durationMinutes && !effect.expiresAtEndOfTurn && !effect.expiresAtStartOfTurn) effect.durationMinutes = spell.duration.minutes;
   if (spell.duration?.hours && !effect.durationHours && !effect.expiresAtEndOfTurn && !effect.expiresAtStartOfTurn) effect.durationHours = spell.duration.hours;
@@ -6730,6 +7496,8 @@ async function castSpellAtTarget(caster, spell, target) {
   spendSpellResources(caster, spell);
   if (spell.effect?.kind === "healing") {
     applySpellHealing(caster, target, spell);
+  } else if (spell.effect?.kind === "restoration") {
+    applySpellRestoration(caster, target, spell);
   } else if (spell.effect?.kind === "summon") {
     await castSummonSpell(caster, spell, target);
   } else if (spell.effect?.kind === "status") {
@@ -6774,6 +7542,8 @@ async function castSpellAtTargets(caster, spell, targets) {
   for (const target of targets) {
     if (spell.effect?.kind === "healing") {
       applySpellHealing(caster, target, spell);
+    } else if (spell.effect?.kind === "restoration") {
+      applySpellRestoration(caster, target, spell);
     } else if (spell.effect?.kind === "summon") {
       await castSummonSpell(caster, spell, target);
     } else if (spell.effect?.kind === "status") {
@@ -6815,6 +7585,10 @@ async function castSpellAtPoint(caster, spell, position) {
   }
   spendSpellResources(caster, spell);
   createPersistentSpellArea(caster, spell, position, { origin: position, orientation: spellAreaOrientation(caster, position) });
+  if (spell.effect?.dispelsMagicalDarkness || spell.lightSource?.dispelsMagicalDarkness) {
+    const removed = removeMagicalDarknessInCells(spellAreaCells(position, spell), spell.effect?.dispelMaxSpellLevel ?? spell.lightSource?.dispelMaxSpellLevel ?? 3);
+    if (removed) addLog(`${spell.name} burns away ${removed} magical darkness ${removed === 1 ? "area" : "areas"}.`, "important");
+  }
   const targets = spell.area ? areaTargetsForSpell(position, spell, caster) : spellTargetsFromCells([position]);
   addLog(`${caster.name} casts ${spell.name} at spell level ${spellCastLevel(spell)} for ${spellPointCost(spell)} SP at (${position.x + 1}, ${position.y + 1}).`, "important");
   if (spell.effect?.kind === "summon") {

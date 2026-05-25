@@ -225,6 +225,7 @@ const speciesDefinitions = {
     base: {
       abilityBonuses: { con: 2 },
       speedFeet: 25,
+      senses: { darkvision: 60 },
       damageResistances: ["poison"],
       weaponProficiencies: ["battleaxe", "handaxe", "light-hammer", "warhammer"],
       toolChoiceCount: 1,
@@ -235,6 +236,7 @@ const speciesDefinitions = {
       duergar: {
         name: "Duergar",
         abilityBonuses: { str: 1 },
+        senses: { darkvision: 120 },
         spellTraits: ["Duergar Enlarge active at level 3"],
       },
       "hill-dwarf": {
@@ -256,6 +258,7 @@ const speciesDefinitions = {
     base: {
       abilityBonuses: { dex: 2 },
       speedFeet: 30,
+      senses: { darkvision: 60 },
       skillProficiencies: ["perception"],
       traits: ["Keen Senses: Perception proficiency."],
     },
@@ -263,6 +266,7 @@ const speciesDefinitions = {
       drow: {
         name: "Drow",
         abilityBonuses: { cha: 1 },
+        senses: { darkvision: 120 },
         weaponProficiencies: ["rapier", "shortsword", "crossbow-hand"],
         spellTraits: ["Faerie Fire active at level 3"],
       },
@@ -308,9 +312,9 @@ const speciesDefinitions = {
   },
   gnome: {
     name: "Gnome",
-    base: { abilityBonuses: { int: 2 }, speedFeet: 25, size: "small", traits: ["Gnome Cunning stored for future magic-save context."] },
+    base: { abilityBonuses: { int: 2 }, speedFeet: 25, size: "small", senses: { darkvision: 60 }, traits: ["Gnome Cunning stored for future magic-save context."] },
     subraces: {
-      "deep-gnome": { name: "Deep Gnome", abilityBonuses: { dex: 1 }, traits: ["Stone Camouflage stored for future stealth rules."] },
+      "deep-gnome": { name: "Deep Gnome", abilityBonuses: { dex: 1 }, senses: { darkvision: 120 }, traits: ["Stone Camouflage stored for future stealth rules."] },
       "forest-gnome": { name: "Forest Gnome", abilityBonuses: { dex: 1 }, spellTraits: ["Minor Illusion cantrip"], traits: ["Speak with Small Beasts: +2 to Animal Handling checks."] },
       "rock-gnome": { name: "Rock Gnome", abilityBonuses: { con: 1 }, toolProficiencies: ["tinkers-tools"] },
     },
@@ -320,6 +324,7 @@ const speciesDefinitions = {
     base: {
       abilityBonuses: { cha: 2 },
       speedFeet: 30,
+      senses: { darkvision: 60 },
       abilityChoiceCount: 2,
       skillChoiceCount: 2,
       traits: ["Skill Versatility: choose two skill proficiencies."],
@@ -350,6 +355,7 @@ const speciesDefinitions = {
     base: {
       abilityBonuses: { str: 2, con: 1 },
       speedFeet: 30,
+      senses: { darkvision: 60 },
       relentlessEndurance: true,
       savageAttacks: true,
       skillProficiencies: ["intimidation"],
@@ -364,6 +370,7 @@ const speciesDefinitions = {
     base: {
       abilityBonuses: { cha: 2 },
       speedFeet: 30,
+      senses: { darkvision: 60 },
       damageResistances: ["necrotic", "radiant"],
       traits: ["Celestial Resistance: necrotic and radiant damage resistance.", "Healing Hands: heal a nearby hero once per long rest."],
     },
@@ -422,13 +429,13 @@ const speciesDefinitions = {
     subraces: {
       air: { name: "Air", abilityBonuses: { dex: 1 }, speedFeet: 30, spellTraits: ["Levitate active at level 3 as a flying defensive lift"] },
       earth: { name: "Earth", abilityBonuses: { str: 1 }, spellTraits: ["Blade Ward cantrip", "Pass without Trace stored for future stealth rules"] },
-      fire: { name: "Fire", abilityBonuses: { int: 1 }, damageResistances: ["fire"], traits: ["Fire Resistance: fire damage resistance."], spellTraits: ["Produce Flame cantrip", "Burning Hands active at level 3"] },
+      fire: { name: "Fire", abilityBonuses: { int: 1 }, senses: { darkvision: 60 }, damageResistances: ["fire"], traits: ["Fire Resistance: fire damage resistance."], spellTraits: ["Produce Flame cantrip", "Burning Hands active at level 3"] },
       water: { name: "Water", abilityBonuses: { wis: 1 }, damageResistances: ["acid"], traits: ["Acid Resistance: acid damage resistance."], spellTraits: ["Acid Splash cantrip"] },
     },
   },
   tiefling: {
     name: "Tiefling",
-    base: { speedFeet: 30, damageResistances: ["fire"], traits: ["Hellish Resistance: fire damage resistance."] },
+    base: { speedFeet: 30, senses: { darkvision: 60 }, damageResistances: ["fire"], traits: ["Hellish Resistance: fire damage resistance."] },
     subraces: {
       baalzebul: { name: "Baalzebul", abilityBonuses: { cha: 2, int: 1 }, spellTraits: ["Ray of Sickness active at level 3"] },
       dispater: { name: "Dispater", abilityBonuses: { cha: 2, dex: 1 } },

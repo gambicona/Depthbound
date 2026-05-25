@@ -26,7 +26,7 @@ const hazardMove = (damage, options = {}) => ({ type: "hazardOnMove", damage, ..
 const difficult = { type: "difficultTerrain", label: "difficult terrain" };
 const cover = (amount = "half") => ({ type: "cover", amount, label: `${amount} cover` });
 const concealment = (amount = "partial") => ({ type: "concealment", amount, label: `${amount} concealment` });
-const light = (radius = 3) => ({ type: "lightSource", radius });
+const light = (dimRadius = 3, color = "#ffd36a", brightRadius = Math.max(1, Math.floor(dimRadius / 2)), lightTone = "sun-gold") => ({ type: "lightSource", brightRadius, dimRadius, color, lightTone });
 const destructible = (hp = 10, ac = 12) => ({ type: "destructibleObject", hp, ac });
 const inspectEvent = (options = {}) => ({ type: "inspectEvent", dc: options.dc ?? 12, chance: options.chance ?? 1, spawnChance: options.spawnChance ?? 0.5, ...options });
 const unique = (options = {}) => ({ type: "uniqueInteraction", dc: options.dc ?? 13, timeSeconds: options.timeSeconds ?? 600, ...options });
@@ -102,7 +102,7 @@ feature("sun-brazier", "Sun Brazier", ["sun-temple", "fire", "light"], {
   weight: 120,
   spawnChance: 0.05,
   description: "A bronze brazier burns with a low, stubborn heat.",
-  components: [light(4), hazardEnter({ count: 1, sides: 4, type: "fire" }), unique({ label: "Set Sun Ward", effect: "incenseWard", dc: 13, skills: ["religion", "arcana", "medicine"], resistance: "radiant", timeSeconds: 300, tooltip: "Religion, Arcana, or Medicine DC 13; takes 5 minutes. Gain radiant resistance for the next encounter.", failureDamage: { count: 1, sides: 4, type: "fire" } })],
+  components: [light(4, "#ffd36a", 2, "sun-gold"), hazardEnter({ count: 1, sides: 4, type: "fire" }), unique({ label: "Set Sun Ward", effect: "incenseWard", dc: 13, skills: ["religion", "arcana", "medicine"], resistance: "radiant", timeSeconds: 300, tooltip: "Religion, Arcana, or Medicine DC 13; takes 5 minutes. Gain radiant resistance for the next encounter.", failureDamage: { count: 1, sides: 4, type: "fire" } })],
 });
 
 feature("fallen-sandstone-block", "Fallen Sandstone Block", ["stone", "sandstone", "obstacle"], {

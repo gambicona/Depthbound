@@ -1199,6 +1199,7 @@ button[data-ui-icon]::before,
 }
 
 .tile-layer,
+.lighting-layer,
 .wall-edge-layer,
 .token-layer {
   inset: 0;
@@ -1207,6 +1208,38 @@ button[data-ui-icon]::before,
 
 .tile-layer {
   position: absolute;
+}
+
+.lighting-layer {
+  contain: paint;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.lighting-layer.hidden {
+  display: none;
+}
+
+.lighting-darkness,
+.lighting-glow {
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.lighting-darkness {
+  background:
+    var(--darkness-gradients, none),
+    rgba(0, 0, 0, 0.34);
+  mix-blend-mode: multiply;
+}
+
+.lighting-glow {
+  background: var(--lighting-gradients, none);
+  filter: saturate(1.14);
+  mix-blend-mode: screen;
+  opacity: 0.9;
 }
 
 .tile {
@@ -1496,8 +1529,10 @@ button[data-ui-icon]::before,
 }
 
 .token-layer {
+  isolation: isolate;
+  mix-blend-mode: normal;
   pointer-events: none;
-  z-index: 2;
+  z-index: 5;
 }
 
 .loot-layer {
@@ -1695,8 +1730,167 @@ button[data-ui-icon]::before,
   opacity: 0.72;
 }
 
-.dungeon-object.feature-light-source {
-  box-shadow: 0 0 12px rgba(255, 213, 108, 0.42);
+.dungeon-object.feature-light-source,
+.dungeon-object.active-light-source {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--object-light-color, #f3d28b) 42%, rgba(255, 255, 255, 0.08)),
+    0 0 14px color-mix(in srgb, var(--object-light-color, #f3d28b) 42%, transparent),
+    0 8px 18px rgba(0, 0, 0, 0.38);
+}
+
+.dungeon-object.active-light-source::before {
+  background: radial-gradient(circle, color-mix(in srgb, var(--object-light-color, #f3d28b) 30%, transparent), transparent 70%);
+  border-radius: 50%;
+  content: "";
+  inset: -82%;
+  opacity: 0.62;
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+
+.dungeon-object.standing-lantern,
+.dungeon-object.crypt-standing-lantern,
+.dungeon-object.arcane-standing-lantern,
+.dungeon-object.forge-standing-lantern {
+  background:
+    radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--object-light-color, #f3d28b) 32%, transparent), transparent 35%),
+    linear-gradient(145deg, rgba(72, 58, 38, 0.92), rgba(23, 22, 20, 0.94));
+  border-color: color-mix(in srgb, var(--object-light-color, #f3d28b) 45%, rgba(84, 67, 47, 0.7));
+}
+
+.dungeon-object.wall-torch,
+.dungeon-object.crypt-wall-candle,
+.dungeon-object.arcane-wall-sconce,
+.dungeon-object.forge-wall-lamp,
+.dungeon-object.ceiling-light,
+.dungeon-object.crypt-ceiling-light,
+.dungeon-object.arcane-ceiling-orb,
+.dungeon-object.forge-ceiling-cage {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: transparent;
+  overflow: visible;
+}
+
+.dungeon-object.wall-torch.active-light-source,
+.dungeon-object.crypt-wall-candle.active-light-source,
+.dungeon-object.arcane-wall-sconce.active-light-source,
+.dungeon-object.forge-wall-lamp.active-light-source,
+.dungeon-object.ceiling-light.active-light-source,
+.dungeon-object.crypt-ceiling-light.active-light-source,
+.dungeon-object.arcane-ceiling-orb.active-light-source,
+.dungeon-object.forge-ceiling-cage.active-light-source {
+  box-shadow: none;
+}
+
+.dungeon-object.wall-torch.active-light-source::before,
+.dungeon-object.crypt-wall-candle.active-light-source::before,
+.dungeon-object.arcane-wall-sconce.active-light-source::before,
+.dungeon-object.forge-wall-lamp.active-light-source::before,
+.dungeon-object.ceiling-light.active-light-source::before,
+.dungeon-object.crypt-ceiling-light.active-light-source::before,
+.dungeon-object.arcane-ceiling-orb.active-light-source::before,
+.dungeon-object.forge-ceiling-cage.active-light-source::before {
+  background: radial-gradient(circle, color-mix(in srgb, var(--object-light-color, #f3d28b) 20%, transparent), transparent 66%);
+  inset: -44%;
+  opacity: 0.42;
+}
+
+.dungeon-object.wall-torch::after,
+.dungeon-object.crypt-wall-candle::after,
+.dungeon-object.arcane-wall-sconce::after,
+.dungeon-object.forge-wall-lamp::after,
+.dungeon-object.ceiling-light::after,
+.dungeon-object.crypt-ceiling-light::after,
+.dungeon-object.arcane-ceiling-orb::after,
+.dungeon-object.forge-ceiling-cage::after {
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--object-light-color, #f3d28b) 78%, white) 0 22%, transparent 24%),
+    radial-gradient(circle, color-mix(in srgb, var(--object-light-color, #f3d28b) 42%, transparent), transparent 64%);
+  border: 1px solid color-mix(in srgb, var(--object-light-color, #f3d28b) 54%, rgba(255, 255, 255, 0.08));
+  border-radius: 50%;
+  content: "";
+  height: 34%;
+  min-height: 10px;
+  min-width: 10px;
+  pointer-events: none;
+  position: absolute;
+  width: 34%;
+}
+
+.dungeon-object.wall-torch::after,
+.dungeon-object.crypt-wall-candle::after,
+.dungeon-object.arcane-wall-sconce::after,
+.dungeon-object.forge-wall-lamp::after {
+  right: 6%;
+  top: 18%;
+}
+
+.dungeon-object.wall-torch .dungeon-object-icon,
+.dungeon-object.crypt-wall-candle .dungeon-object-icon,
+.dungeon-object.arcane-wall-sconce .dungeon-object-icon,
+.dungeon-object.forge-wall-lamp .dungeon-object-icon {
+  height: 38%;
+  max-height: 18px;
+  max-width: 18px;
+  min-height: 10px;
+  min-width: 10px;
+  object-fit: contain;
+  position: absolute;
+  right: 4%;
+  top: 14%;
+  width: 38%;
+}
+
+.dungeon-object.wall-torch .dungeon-object-label,
+.dungeon-object.crypt-wall-candle .dungeon-object-label,
+.dungeon-object.arcane-wall-sconce .dungeon-object-label,
+.dungeon-object.forge-wall-lamp .dungeon-object-label {
+  display: none;
+}
+
+.dungeon-object.wall-light-north::after,
+.dungeon-object.wall-light-north .dungeon-object-icon {
+  left: 50%;
+  right: auto;
+  top: 4%;
+  transform: translateX(-50%);
+}
+
+.dungeon-object.wall-light-south::after,
+.dungeon-object.wall-light-south .dungeon-object-icon {
+  bottom: 4%;
+  left: 50%;
+  right: auto;
+  top: auto;
+  transform: translateX(-50%);
+}
+
+.dungeon-object.wall-light-west::after,
+.dungeon-object.wall-light-west .dungeon-object-icon {
+  left: 4%;
+  right: auto;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.dungeon-object.wall-light-east::after,
+.dungeon-object.wall-light-east .dungeon-object-icon {
+  left: auto;
+  right: 4%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.dungeon-object.ceiling-light::after,
+.dungeon-object.crypt-ceiling-light::after,
+.dungeon-object.arcane-ceiling-orb::after,
+.dungeon-object.forge-ceiling-cage::after {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .dungeon-object.feature-cover,
@@ -1731,6 +1925,25 @@ button[data-ui-icon]::before,
   -webkit-user-select: none;
   user-select: none;
   z-index: 2;
+}
+
+.token.emits-light {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--token-light-color, #f3d28b) 44%, rgba(255, 255, 255, 0.08)),
+    0 0 18px color-mix(in srgb, var(--token-light-color, #f3d28b) 48%, transparent),
+    0 8px 18px rgba(0, 0, 0, 0.45),
+    inset 0 2px 6px rgba(255, 255, 255, 0.14);
+}
+
+.token.emits-light::before {
+  background: radial-gradient(circle, color-mix(in srgb, var(--token-light-color, #f3d28b) 28%, transparent), transparent 70%);
+  border-radius: 50%;
+  content: "";
+  inset: -82%;
+  opacity: 0.64;
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
 }
 
 @keyframes token-hover-float {
@@ -1881,6 +2094,30 @@ button[data-ui-icon]::before,
   white-space: nowrap;
 }
 
+.graveyard-list,
+.corpse-inspect-section {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.graveyard-entry {
+  border: 1px solid rgba(216, 177, 116, 0.28);
+  border-radius: 6px;
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem;
+}
+
+.graveyard-entry b,
+.graveyard-entry span,
+.graveyard-entry small {
+  display: block;
+}
+
+.graveyard-entry small {
+  color: var(--muted);
+}
+
 @media (max-width: 720px) {
   .planning-slot {
     align-items: stretch;
@@ -1921,6 +2158,17 @@ button[data-ui-icon]::before,
   opacity: 0.42;
   pointer-events: none;
   z-index: 1;
+}
+
+.token.hero,
+.token.hero.defeated,
+.token.hero.corpse-token {
+  filter: none;
+  opacity: 1;
+}
+
+.token.hero.corpse-token::after {
+  display: none;
 }
 
 .exit-token {
@@ -2460,6 +2708,11 @@ button[data-ui-icon]::before,
 .status-disengage {
   color: #a6f3b3;
   border-color: rgba(112, 173, 102, 0.4);
+}
+
+.status-light {
+  color: #f3d28b;
+  border-color: rgba(243, 210, 139, 0.44);
 }
 
 .temporary-effects-button {

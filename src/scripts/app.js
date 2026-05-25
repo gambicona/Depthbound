@@ -345,6 +345,18 @@ els.fighterInfo.addEventListener("click", (event) => {
   if (button.dataset.action === "take-object-item") {
     takeObjectItem(button.dataset.object, button.dataset.item);
   }
+  if (button.dataset.action === "loot-corpse-item") {
+    lootCorpseItem(button.dataset.corpse, button.dataset.item);
+  }
+  if (button.dataset.action === "loot-corpse-money") {
+    lootCorpseMoney(button.dataset.corpse);
+  }
+  if (button.dataset.action === "transport-corpse-base") {
+    transportCorpseToBase(button.dataset.corpse);
+  }
+  if (button.dataset.action === "cast-corpse-spell") {
+    castCorpseSpell(button.dataset.corpse, button.dataset.caster, button.dataset.spell);
+  }
   if (button.dataset.action === "pick-lock") {
     pickObjectLock(button.dataset.object);
   }
@@ -617,6 +629,9 @@ els.villageMenu?.addEventListener("click", (event) => {
   if (button?.dataset.action === "visit-village-npc") {
     visitVillageNpc(button.dataset.npc);
   }
+  if (button?.dataset.action === "open-graveyard") {
+    renderGraveyardMenu();
+  }
   if (button?.dataset.action === "inspect-npc") {
     showNpcInspection(button.dataset.npc);
   }
@@ -641,6 +656,15 @@ els.villageMenu?.addEventListener("click", (event) => {
   if (button?.dataset.action === "close-village") {
     hideVillageMenu();
     showHomeMenu();
+  }
+  if (button?.dataset.action === "loot-corpse-item") {
+    lootCorpseItem(button.dataset.corpse, button.dataset.item);
+  }
+  if (button?.dataset.action === "loot-corpse-money") {
+    lootCorpseMoney(button.dataset.corpse);
+  }
+  if (button?.dataset.action === "cast-corpse-spell") {
+    castCorpseSpell(button.dataset.corpse, button.dataset.caster, button.dataset.spell);
   }
 });
 els.useItemMenu.addEventListener("click", (event) => {
@@ -713,6 +737,11 @@ els.favoriteActionsMenu?.addEventListener("click", (event) => {
   if (button?.dataset.action === "cast-spell") {
     hideFavoriteActionsMenu();
     void chooseAndCastSpell(button.dataset.spell, button.dataset.castLevel);
+    return;
+  }
+  if (button?.dataset.action === "dismiss-spell-effect") {
+    hideFavoriteActionsMenu();
+    dismissSpellEffect(button.dataset.spell);
   }
 });
 els.abilitiesMenu.addEventListener("click", (event) => {
@@ -738,6 +767,10 @@ els.abilitiesMenu.addEventListener("click", (event) => {
   }
   if (button?.dataset.action === "cast-spell") {
     void chooseAndCastSpell(button.dataset.spell, button.dataset.castLevel);
+    return;
+  }
+  if (button?.dataset.action === "dismiss-spell-effect") {
+    dismissSpellEffect(button.dataset.spell);
   }
 });
 els.inventoryMenu.addEventListener("click", (event) => {

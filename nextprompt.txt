@@ -20,4 +20,6 @@ lighitng system
 5. Add vision/light/detection fifth. This justifies un-hiding Light and Dancing Lights and makes Darkness, Daylight, True Seeing, See Invisibility, Sunbeam, Sunburst, and Maddening Darkness much better.
 
 
+poisons, diseases, curses
+
 WoW Addon: Races, Classes, Monster, Dungeons

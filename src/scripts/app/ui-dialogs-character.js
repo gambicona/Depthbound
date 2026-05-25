@@ -1670,11 +1670,20 @@ function raceFeatureSummaryMarkup(selection) {
   return `<p class="empty-note">${details.map(escapeHtml).join("<br>")}</p>`;
 }
 
+function senseSummary(senses = {}) {
+  return Object.entries(senses)
+    .filter(([, value]) => value || value === true)
+    .map(([sense, value]) => `${String(sense).replace(/-/g, " ")}${value === true ? "" : ` ${value} ft`}`)
+    .join(", ");
+}
+
 function activeRaceFeatureLines(traits, selection = null) {
   const lines = [
     `Ability bonuses: ${abilityBonusSummary(traits.abilityBonuses)}`,
     `Speed: ${traits.speedFeet} ft`,
   ];
+  const sensesText = senseSummary(traits.senses);
+  if (sensesText) lines.push(`Senses: ${sensesText}`);
   if (traits.damageResistances?.length) lines.push(`Resistances: ${traits.damageResistances.join(", ")}`);
   if (traits.damageImmunities?.length) lines.push(`Immunities: ${traits.damageImmunities.join(", ")}`);
   if (traits.hpPerLevel) lines.push(`Dwarven Toughness: +${traits.hpPerLevel} max HP per level`);
@@ -1713,6 +1722,7 @@ function activeRaceFeatureLinesForFighter(fighter) {
     skillChoiceCount: traits.skillChoiceCount,
     toolChoiceCount: traits.toolChoiceCount,
     toolChoices: traits.toolChoices,
+    senses: typeof fighterEffectiveSenses === "function" ? fighterEffectiveSenses(fighter) : fighter?.senses ?? traits.senses,
     startingFeatChoiceCount: traits.startingFeatChoiceCount,
     hpPerLevel: fighter?.racialHpPerLevel ?? traits.hpPerLevel,
     halflingLucky: Boolean(fighter?.racialTraits?.halflingLucky),

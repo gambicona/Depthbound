@@ -130,6 +130,8 @@ const walkableSoftDecor = new Set([
   "aristocratic-silk-wall-panels",
 ]);
 
+const light = (dimRadius = 3, color = "#f2c46d", brightRadius = Math.max(1, Math.floor(dimRadius / 2)), lightTone = "home-warm") => ({ type: "lightSource", brightRadius, dimRadius, color, lightTone });
+
 function decor(id, name, livingClass, tags, options = {}) {
   const tier = livingClasses[livingClass];
   const adjustment = decorAdjustments[id] ?? {};
@@ -158,6 +160,7 @@ function decor(id, name, livingClass, tags, options = {}) {
         priceCp: adjustment.priceCp ?? tier.priceCp,
         comfort: adjustment.comfort ?? tier.comfort,
       },
+      ...(options.components ?? []),
     ],
   });
 }
@@ -171,7 +174,7 @@ function decor(id, name, livingClass, tags, options = {}) {
   ["squalid-ash-bucket", "Ash Bucket", ["hearth", "bucket", "ash"], { weight: 18, description: "A scorched bucket for ash, coal ends, and other unlovely necessities." }],
   ["squalid-splinter-crate-seat", "Splinter Crate Seat", ["seat", "crate", "wood"], { weight: 18, description: "A splintering crate turned upside down and called a chair by optimism." }],
   ["squalid-rope-line", "Rope Drying Line", ["rope", "laundry", "utility"], { blocksMovement: false, description: "A rope line stretched between hooks for drying damp clothes and wraps." }],
-  ["squalid-chipped-oil-lamp", "Chipped Oil Lamp", ["lamp", "light", "oil"], { weight: 4, description: "A chipped lamp that still gives off a stubborn little light." }],
+  ["squalid-chipped-oil-lamp", "Chipped Oil Lamp", ["lamp", "light", "oil"], { weight: 4, components: [light(3, "#dca85d", 1, "smoky-oil")], description: "A chipped lamp that still gives off a stubborn little light." }],
   ["squalid-burlap-bundle", "Burlap Bundle", ["cloth", "storage", "bundle"], { weight: 25, description: "A tied bundle of burlap and spare rags, lumpy but useful." }],
 ].forEach(([id, name, tags, options]) => decor(id, name, "squalid", tags, options));
 
@@ -180,7 +183,7 @@ function decor(id, name, livingClass, tags, options = {}) {
   ["poor-wool-blanket", "Threadbare Wool Blanket", ["bedding", "cloth", "wool"], { blocksMovement: false, description: "A thin wool blanket that has survived many cold nights." }],
   ["poor-small-washstand", "Small Washstand", ["wash", "stand", "wood"], { weight: 55, description: "A small washstand with a cloudy pitcher and a shallow bowl." }],
   ["poor-peg-rack", "Simple Peg Rack", ["rack", "clothing", "wood"], { weight: 25, description: "A row of wooden pegs for cloaks, packs, and the day's worries." }],
-  ["poor-candle-box", "Candle Box", ["light", "candle", "box"], { weight: 8, description: "A small box with candles and stubs sorted carefully by length." }],
+  ["poor-candle-box", "Candle Box", ["light", "candle", "box"], { weight: 8, components: [light(3, "#f0c37a", 1, "candle-amber")], description: "A small box with candles and stubs sorted carefully by length." }],
   ["poor-rush-rug", "Rush Rug", ["rug", "floor", "woven"], { width: 2, blocksMovement: false, description: "A woven rush rug that softens footsteps and hides cracked floor." }],
   ["poor-plain-nightstand", "Plain Nightstand", ["table", "bedside", "wood"], { weight: 30, description: "A plain little table just large enough for a cup, a knife, and a candle." }],
   ["poor-clothes-trunk", "Poor Clothes Trunk", ["trunk", "clothing", "storage"], { weight: 70, description: "A battered trunk for clothing and personal scraps." }],
@@ -193,7 +196,7 @@ function decor(id, name, livingClass, tags, options = {}) {
   ["modest-woven-rug", "Modest Woven Rug", ["rug", "floor", "woven"], { width: 2, height: 2, blocksMovement: false, description: "A woven rug with a simple border pattern and warm colors." }],
   ["modest-writing-desk", "Modest Writing Desk", ["desk", "writing", "wood"], { width: 2, description: "A useful writing desk with a drawer for ink, wax, and folded notes." }],
   ["modest-linen-chest", "Linen Chest", ["chest", "linen", "storage"], { weight: 85, description: "A clean chest for folded linens and spare blankets." }],
-  ["modest-brass-lantern", "Brass Lantern", ["lamp", "light", "brass"], { weight: 10, description: "A brass lantern with polished panes and a steady handle." }],
+  ["modest-brass-lantern", "Brass Lantern", ["lamp", "light", "brass"], { weight: 10, components: [light(4, "#f2c46d", 2, "lantern-amber")], description: "A brass lantern with polished panes and a steady handle." }],
   ["modest-wall-shelf", "Modest Wall Shelf", ["shelf", "display", "wood"], { weight: 35, description: "A neat wall shelf for small trophies, tools, and keepsakes." }],
   ["modest-breakfast-table", "Small Breakfast Table", ["table", "kitchen", "wood"], { width: 2, description: "A small table suited for breakfast, maps, or quiet card games." }],
   ["modest-ceramic-vase", "Ceramic Flower Vase", ["vase", "flowers", "ceramic"], { weight: 18, description: "A glazed vase ready for fresh flowers or dried herbs." }],
@@ -206,7 +209,7 @@ function decor(id, name, livingClass, tags, options = {}) {
   ["comfortable-thick-rug", "Thick Hearth Rug", ["rug", "floor", "hearth"], { width: 2, height: 2, blocksMovement: false, description: "A thick rug that makes cold floors kinder to bare feet." }],
   ["comfortable-carved-wardrobe", "Carved Wardrobe", ["wardrobe", "clothing", "wood"], { blocksLineOfSight: true, weight: 260, description: "A carved wardrobe with room for proper clothes and hidden letters." }],
   ["comfortable-bedside-cabinet", "Bedside Cabinet", ["cabinet", "bedside", "wood"], { weight: 70, description: "A polished bedside cabinet with a small lock and brass pull." }],
-  ["comfortable-reading-lamp", "Reading Lamp", ["lamp", "light", "brass"], { weight: 12, description: "A focused lamp with a warm shade, perfect for late-night notes." }],
+  ["comfortable-reading-lamp", "Reading Lamp", ["lamp", "light", "brass"], { weight: 12, components: [light(4, "#f4d28a", 2, "reading-warm")], description: "A focused lamp with a warm shade, perfect for late-night notes." }],
   ["comfortable-tea-table", "Tea Table", ["table", "tea", "social"], { width: 2, description: "A low table for tea, bread, cards, and quiet conversations." }],
   ["comfortable-cushion-pile", "Cushion Pile", ["cushion", "cloth", "rest"], { blocksMovement: false, description: "A pile of soft cushions in complementary colors." }],
   ["comfortable-wall-mirror", "Framed Wall Mirror", ["mirror", "wall", "glass"], { weight: 45, description: "A clear mirror in a tasteful frame, useful before formal trouble." }],
@@ -220,7 +223,7 @@ function decor(id, name, livingClass, tags, options = {}) {
   ["wealthy-mahogany-desk", "Mahogany Desk", ["desk", "writing", "mahogany"], { width: 2, description: "A dark mahogany desk with fine grain and discreet compartments." }],
   ["wealthy-gilded-mirror", "Gilded Mirror", ["mirror", "gold", "wall"], { weight: 95, description: "A tall mirror in a gilded frame, too fine to ignore." }],
   ["wealthy-porcelain-washset", "Porcelain Washset", ["wash", "porcelain", "basin"], { weight: 35, description: "A porcelain pitcher and basin painted with delicate blue leaves." }],
-  ["wealthy-glass-lamp", "Stained Glass Lamp", ["lamp", "light", "glass"], { weight: 18, description: "A stained glass lamp that scatters color across nearby stone." }],
+  ["wealthy-glass-lamp", "Stained Glass Lamp", ["lamp", "light", "glass"], { weight: 18, components: [light(4, "#9ee7ff", 2, "stained-glass-blue")], description: "A stained glass lamp that scatters color across nearby stone." }],
   ["wealthy-display-cabinet", "Display Cabinet", ["cabinet", "display", "glass"], { blocksLineOfSight: true, weight: 180, description: "A glass-front cabinet for trophies, curios, and expensive restraint." }],
   ["wealthy-tapestry", "Fine Tapestry", ["wall", "tapestry", "cloth"], { width: 2, blocksMovement: false, description: "A fine tapestry showing a pastoral hunt in patient thread." }],
   ["wealthy-marble-bust", "Marble Bust", ["statue", "marble", "art"], { weight: 140, description: "A marble bust with a noble expression and an excellent jawline." }],
@@ -230,11 +233,11 @@ function decor(id, name, livingClass, tags, options = {}) {
 [
   ["aristocratic-canopy-dais", "Canopy Dais", ["dais", "canopy", "silk"], { width: 2, description: "A raised canopy dais hung with rich fabric and impossible confidence." }],
   ["aristocratic-golden-screen", "Golden Privacy Screen", ["screen", "gold", "privacy"], { width: 2, blocksLineOfSight: true, description: "A golden privacy screen worked with delicate leaves and tiny gemstones." }],
-  ["aristocratic-crystal-chandelier", "Crystal Chandelier", ["light", "crystal", "ceiling"], { blocksMovement: false, description: "A crystal chandelier that turns torchlight into a little weather system." }],
+  ["aristocratic-crystal-chandelier", "Crystal Chandelier", ["light", "crystal", "ceiling"], { blocksMovement: false, components: [light(5, "#d8efff", 3, "crystal-white-blue")], description: "A crystal chandelier that turns torchlight into a little weather system." }],
   ["aristocratic-inlaid-cabinet", "Inlaid Curio Cabinet", ["cabinet", "curio", "inlaid"], { blocksLineOfSight: true, weight: 240, description: "An inlaid cabinet of rare woods, bone, and shining shell." }],
   ["aristocratic-silk-wall-panels", "Silk Wall Panels", ["wall", "silk", "panel"], { width: 2, blocksMovement: false, description: "Silk wall panels that make even dungeon stone look deliberate." }],
   ["aristocratic-marble-statue", "Marble Hero Statue", ["statue", "marble", "art"], { weight: 4000, description: "A marble statue of a heroic figure with tasteful exaggerations." }],
-  ["aristocratic-jeweled-lamp", "Jeweled Oil Lamp", ["lamp", "jewel", "light"], { weight: 25, description: "A jeweled lamp whose fittings cost more than many horses." }],
+  ["aristocratic-jeweled-lamp", "Jeweled Oil Lamp", ["lamp", "jewel", "light"], { weight: 25, components: [light(4, "#ffd1f0", 2, "jeweled-rose")], description: "A jeweled lamp whose fittings cost more than many horses." }],
   ["aristocratic-grand-piano", "Grand Piano", ["instrument", "music", "luxury"], { width: 2, description: "A grand piano with dark polish and a voice fit for noble halls." }],
   ["aristocratic-velvet-throne", "Velvet Throne Chair", ["seat", "throne", "velvet"], { weight: 120, description: "A throne-like chair for someone with either authority or excellent posture." }],
   ["aristocratic-fountain-basin", "Indoor Fountain Basin", ["fountain", "water", "marble"], { width: 2, description: "A marble basin with a quiet fountain, extravagant and soothing." }],

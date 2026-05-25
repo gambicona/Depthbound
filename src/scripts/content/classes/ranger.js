@@ -22,7 +22,7 @@ window.DungeonContent.register("classes", "ranger", {
   weaponProficiencies: ["simple", "martial"],
   spellcastingAbility: "wis",
   spellPointProgression: halfCasterSpellPoints,
-  spellList: ["hunters_mark", "cure_wounds", "ensnaring_strike", "hail_of_thorns", "fog_cloud", "longstrider", "zephyr-strike", "barkskin", "spike_growth", "silence", "cordon_of_arrows", "protection-from-poison", "conjure-animals", "conjure-barrage", "flame-arrows", "lightning-arrow", "plant-growth", "protection-from-energy", "wind-wall", "conjure-woodland-beings", "freedom-of-movement", "grasping-vine", "guardian-of-nature", "stoneskin", "conjure-volley", "swift-quiver", "wrath-of-nature"],
+  spellList: ["hunters_mark", "cure_wounds", "ensnaring_strike", "hail_of_thorns", "fog_cloud", "longstrider", "zephyr-strike", "barkskin", "lesser-restoration", "spike_growth", "silence", "cordon_of_arrows", "protection-from-poison", "conjure-animals", "conjure-barrage", "daylight", "flame-arrows", "lightning-arrow", "plant-growth", "protection-from-energy", "wind-wall", "conjure-woodland-beings", "freedom-of-movement", "grasping-vine", "guardian-of-nature", "stoneskin", "conjure-volley", "swift-quiver", "wrath-of-nature"],
   spells: [],
   token: "R",
   classFeatures: [

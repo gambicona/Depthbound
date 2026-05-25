@@ -84,10 +84,58 @@ function inspectionSuppressedByTargeting() {
   return targetSelectionActive() || performance.now() < suppressInspectUntil;
 }
 
+function consumeTokenTargetSelection(event, combatantId) {
+  if (!targetSelectionActive()) return false;
+  const current = state.fighters[combatantId];
+  if (pendingSpellTargeting && current?.position) {
+    suppressInspectionAfterTargetSelection();
+    void confirmPendingSpellTarget(current.position);
+  } else if (pendingEldritchBlast && current?.position) {
+    suppressInspectionAfterTargetSelection();
+    void confirmPendingEldritchBlast(current.position);
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation?.();
+  return true;
+}
+
+const combatantTokenArtCache = new Map();
+
+function combatantTokenArtCacheKey(fighter, art) {
+  const artKey =
+    typeof art === "string"
+      ? art
+      : art?.type === "custom-file"
+        ? art.path || art.id || art.name || ""
+        : art?.id || art?.path || art?.name || "";
+  return `${fighter?.id ?? ""}|${artKey}`;
+}
+
+function rememberCombatantTokenArt(fighter, art, resolved) {
+  if (!fighter?.id || typeof resolved !== "string" || !resolved) return resolved;
+  combatantTokenArtCache.set(combatantTokenArtCacheKey(fighter, art), resolved);
+  combatantTokenArtCache.set(String(fighter.id), resolved);
+  return resolved;
+}
+
+function rememberedCombatantTokenArt(fighter, art) {
+  if (!fighter?.id) return "";
+  return combatantTokenArtCache.get(combatantTokenArtCacheKey(fighter, art)) ?? combatantTokenArtCache.get(String(fighter.id)) ?? "";
+}
+
+function forgetCombatantTokenArt(fighter, art) {
+  if (!fighter?.id) return;
+  combatantTokenArtCache.delete(combatantTokenArtCacheKey(fighter, art));
+  combatantTokenArtCache.delete(String(fighter.id));
+}
+
 function setCombatantTokenArt(token, art) {
   const tokenImage = token?.querySelector(".token-art");
   if (!tokenImage) return;
+  if (typeof art !== "string") art = "";
   if (!art) {
+    if (token.classList.contains("has-token-art") && tokenImage.getAttribute("src")) return;
     hideCombatantTokenArt(token);
     return;
   }
@@ -165,7 +213,10 @@ function createCombatantToken(combatant) {
   stealthBadge.title = "Hidden";
 
   tokenImage.addEventListener("load", () => showCombatantTokenArt(token));
-  tokenImage.addEventListener("error", () => hideCombatantTokenArt(token));
+  tokenImage.addEventListener("error", () => {
+    forgetCombatantTokenArt(state.fighters?.[combatant.id], state.fighters?.[combatant.id]?.tokenArt ?? combatant.tokenArt);
+    hideCombatantTokenArt(token);
+  });
 
   token.append(tokenImage, tokenLabel, wildShapeBadge, stealthBadge);
   setCombatantTokenArt(token, tokenArtPath);
@@ -194,6 +245,7 @@ function createCombatantToken(combatant) {
     const current = state.fighters[combatant.id];
     if (current?.position) hoverSpellTarget(current.position);
   });
+  token.addEventListener("click", (event) => consumeTokenTargetSelection(event, combatant.id), { capture: true });
 
   if (heroToken) {
     token.addEventListener("pointerdown", handleHeroPointerDown);
@@ -226,6 +278,12 @@ function createCombatantToken(combatant) {
       }
       const current = state.fighters[combatant.id];
       if (!current || !isRosterHeroId(current.id)) return;
+      if (current.dead) {
+        showCombatantInfo(current);
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if ((event.shiftKey || event.ctrlKey || event.metaKey) && state.mode !== "combat") {
         toggleHeroSelection(current.id);
       } else {
@@ -280,31 +338,32 @@ function combatantTokenArt(fighter) {
   if (window.DepthboundPlaytest?.role === "guest" && fighter?.playtestTokenArtId) {
     try {
       const stored = window.localStorage.getItem(`depthbound.playtest.tokenArt.${fighter.playtestTokenArtId}`);
-      if (stored) return stored;
+      if (stored) return rememberCombatantTokenArt(fighter, fighter.playtestTokenArtId, stored);
     } catch {
-      return "";
+      return rememberedCombatantTokenArt(fighter, fighter.playtestTokenArtId);
     }
   }
   let art = fighter.tokenArt ?? fighter.tokenImage ?? fighter.art ?? fighter.portrait ?? fighter.avatar ?? "";
   if (!art) art = recoverHeroTokenArtFromLibrary(fighter);
   if (art?.type === "custom-file") {
     const libraryEntry = loadCustomHeroTokenArt().find((entry) => entry.id === art.id || entry.tokenArt?.id === art.id);
-    if (libraryEntry?.dataUrl) return libraryEntry.dataUrl;
+    if (libraryEntry?.dataUrl) return rememberCombatantTokenArt(fighter, art, libraryEntry.dataUrl);
     const cached = art.runtimeUrl ?? window.DungeonSave?.cachedTokenUrl?.(art.path) ?? "";
-    if (cached) return cached;
+    if (cached) return rememberCombatantTokenArt(fighter, art, cached);
     if (window.DungeonSave?.resolveTokenPath && art.path && !art.resolvePending) {
       art.resolvePending = true;
       window.DungeonSave.resolveTokenPath(art.path).then((url) => {
         art.resolvePending = false;
         if (url) {
           art.runtimeUrl = url;
+          rememberCombatantTokenArt(fighter, art, url);
           render();
         }
       });
     }
-    return "";
+    return rememberedCombatantTokenArt(fighter, art);
   }
-  return art;
+  return rememberCombatantTokenArt(fighter, art, typeof art === "string" ? art : "");
 }
 
 function combatantArtworkMarkup(fighter, className = "combatant-art") {
@@ -399,6 +458,14 @@ function buildRoom() {
 
   const tileLayer = document.createElement("div");
   tileLayer.className = "tile-layer";
+
+  const lightingLayer = document.createElement("div");
+  lightingLayer.className = "lighting-layer";
+  const darknessLayer = document.createElement("div");
+  darknessLayer.className = "lighting-darkness";
+  const glowLayer = document.createElement("div");
+  glowLayer.className = "lighting-glow";
+  lightingLayer.append(darknessLayer, glowLayer);
 
   const tokenLayer = document.createElement("div");
   tokenLayer.className = "token-layer";
@@ -559,7 +626,7 @@ function buildRoom() {
   objectLayer.className = "object-layer";
   tokenLayer.append(objectLayer);
 
-  els.room.append(tileLayer, wallEdgeLayer, tokenLayer);
+  els.room.append(tileLayer, lightingLayer, wallEdgeLayer, tokenLayer);
   roomIsBuilt = true;
 }
 
@@ -706,6 +773,25 @@ function configureFurnitureIconToken(element, template, type, fallbackSymbol, ic
   element.replaceChildren(icon, label);
 }
 
+function wallLightAnchorClass(object) {
+  const cells = objectCells(object);
+  if (!cells.length) return "wall-light-east";
+  const floorKeys = state.mode === "home"
+    ? new Set(activeTileKeys())
+    : new Set([...(state.dungeon?.walkable ?? []), ...(state.dungeon?.corridors ?? []), ...(state.dungeon?.doors ?? [])].map(positionKey));
+  const directions = [
+    { id: "north", dx: 0, dy: -1 },
+    { id: "south", dx: 0, dy: 1 },
+    { id: "west", dx: -1, dy: 0 },
+    { id: "east", dx: 1, dy: 0 },
+  ].map((direction) => ({
+    ...direction,
+    blocked: cells.filter((cell) => !floorKeys.has(positionKey({ x: cell.x + direction.dx, y: cell.y + direction.dy }))).length,
+  }));
+  const best = directions.sort((a, b) => b.blocked - a.blocked)[0];
+  return `wall-light-${best?.blocked ? best.id : "east"}`;
+}
+
 function renderDungeonObjects() {
   const objectLayer = els.room.querySelector(".object-layer");
   if (!objectLayer) return;
@@ -730,10 +816,14 @@ function renderDungeonObjects() {
     const behaviorClasses = objectComponents(object)
       .map((component) => `feature-${component.type.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`)
       .join(" ");
+    const lightComponent = objectComponents(object).find((component) => component.type === "lightSource");
     const floorCovering = objectTypeIsFloorCovering(object.type) || homeObjectTypeIsFloorCovering(object.type);
-    element.className = `dungeon-object ${object.type} ${behaviorClasses}${floorCovering ? " floor-covering" : ""}${object.spent ? " spent" : ""}${object.disarmed ? " disarmed" : ""}${object.detected ? " detected" : ""}`;
+    const wallLightSide = objectHasTag(object, "wall-light") ? wallLightAnchorClass(object) : "";
+    element.className = `dungeon-object ${object.type} ${behaviorClasses}${wallLightSide ? ` ${wallLightSide}` : ""}${floorCovering ? " floor-covering" : ""}${object.spent ? " spent" : ""}${object.disarmed ? " disarmed" : ""}${object.detected ? " detected" : ""}`;
     element.classList.toggle("attackable-object", selectedHeroCanTargetObject(object));
     element.classList.toggle("selected-target", selectedAttackTarget()?.id === object.id);
+    element.classList.toggle("active-light-source", Boolean(lightComponent));
+    if (lightComponent) element.style.setProperty("--object-light-color", lightComponent.color ?? "#7dd3fc");
     element.type = "button";
     element.title = template.name;
     const fallbackSymbol = objectHasTag(object, "terrain-floor")
@@ -745,8 +835,8 @@ function renderDungeonObjects() {
     icon.className = `dungeon-object-icon${iconStatus === "loaded" ? "" : " hidden"}`;
     icon.alt = "";
     icon.draggable = false;
-    icon.style.transform = `rotate(${objectRotation}deg)`;
-    if (objectRotation === 90 || objectRotation === 270) {
+    if (!wallLightSide) icon.style.transform = `rotate(${objectRotation}deg)`;
+    if (!wallLightSide && (objectRotation === 90 || objectRotation === 270)) {
       icon.style.width = `${Math.min(82, (objectSize.height / objectSize.width) * 82)}%`;
       icon.style.height = `${Math.min(82, (objectSize.width / objectSize.height) * 82)}%`;
     }
@@ -941,9 +1031,11 @@ function placeToken(fighter) {
     token.style.setProperty("--token-ring-color", heroClassTokenColor(fighter));
     token.title = `${fighter.name} - ${fighter.className ?? "Hero"}`;
   }
-  const visibleHero = heroToken && !fighter.dead && fighter.alive && (state.mode === "home" || isPartyHeroId(fighter.id));
+  const corpseToken = heroToken && fighter.dead && heroCorpseLocation(fighter) === "dungeon" && state.mode !== "home" && isKnownTile(fighter.position);
+  const visibleHero = heroToken && ((fighter.alive && (state.mode === "home" || isPartyHeroId(fighter.id))) || corpseToken);
   token.classList.toggle("hidden", heroToken ? !visibleHero : !fighter.alive || !isKnownTile(fighter.position));
-  token.classList.toggle("defeated", !fighter.alive);
+  token.classList.toggle("defeated", !heroToken && !fighter.alive);
+  token.classList.toggle("corpse-token", false);
   token.classList.toggle("dragging", (fighter.id === dragHeroId || (heroToken && selectedHeroIds.has(fighter.id))) && Boolean(dragPath));
   token.classList.toggle("active-hero", fighter.id === activeHero()?.id);
   token.classList.toggle("selected-hero", heroToken && selectedHeroIds.has(fighter.id));
@@ -955,6 +1047,8 @@ function placeToken(fighter) {
   token.classList.toggle("wildshaped-druid-token", heroToken && fighter.classId === "druid" && isWildShaped(fighter));
   token.classList.toggle("stealthing-hero-token", heroToken && fighterIsStealthing(fighter));
   token.classList.toggle("dying-hero-token", heroToken && fighter.alive && !fighter.dead && (fighter.hp ?? 0) <= 0);
+  token.classList.remove("emits-light");
+  token.style.removeProperty("--token-light-color");
   const art = combatantTokenArt(fighter);
   setCombatantTokenArt(token, art);
   const hpFill = token.querySelector(".token-hp-fill");
@@ -1005,6 +1099,23 @@ function renderRoom() {
   const persistentAreas = persistentAreaTileKeys();
   const persistentBlockingAreas = typeof persistentAreaBlockingTileKeys === "function" ? persistentAreaBlockingTileKeys() : new Set();
   const persistentDifficultAreas = typeof persistentAreaDifficultTerrainKeys === "function" ? persistentAreaDifficultTerrainKeys() : new Set();
+  const lightingMap = state.mode === "home" || typeof currentLightingMap !== "function" ? { tiles: new Map(), sources: [] } : currentLightingMap();
+  const lightingSourcesById = new Map((lightingMap.sources ?? []).map((source) => [source.id, source]));
+  const visibleLightTileKeys = new Set([...activeTiles].filter((key) => isKnownTile(positionFromKey(key))));
+  renderLightingLayer(lightingMap, scaledTileSizePx, visibleLightTileKeys);
+  renderedLightingSourcesByOwner = new Map();
+  for (const source of lightingMap.sources ?? []) {
+    if (
+      source.ownerId &&
+      source.sourceType !== "ambient" &&
+      source.sourceType !== "darkness" &&
+      !source.magicalDarkness &&
+      Math.max(source.brightRadius ?? 0, source.dimRadius ?? 0) > 0 &&
+      !renderedLightingSourcesByOwner.has(source.ownerId)
+    ) {
+      renderedLightingSourcesByOwner.set(source.ownerId, source);
+    }
+  }
   const shouldShowReachable = !movementInProgress && heroTurn;
   const reachable = !shouldShowReachable
     ? new Map()
@@ -1043,6 +1154,14 @@ function renderRoom() {
     const isPersistentSpellArea = persistentAreas.has(key);
     const isPersistentSpellBlocker = persistentBlockingAreas.has(key);
     const isPersistentDifficult = persistentDifficultAreas.has(key);
+    const lighting = lightingMap.tiles?.get(key) ?? null;
+    const lightingSource =
+      lightingSourcesById.get(lighting?.brightSources?.[0]) ??
+      lightingSourcesById.get(lighting?.dimSources?.[0]) ??
+      lightingSourcesById.get(lighting?.darknessSources?.[0]) ??
+      null;
+    const showTileLighting = state.mode !== "home";
+    const isLitTile = showTileLighting && isKnown && isWalkable && Boolean(lighting);
     const isSpellOrigin = spellTargeting?.hoverPosition && positionKey(spellTargeting.hoverPosition) === key;
     const isSpellTargetable =
       spellTargeting?.mode === "point"
@@ -1069,6 +1188,15 @@ function renderRoom() {
     tile.classList.toggle("persistent-spell-area", isPersistentSpellArea);
     tile.classList.toggle("persistent-spell-blocker", isPersistentSpellBlocker);
     tile.classList.toggle("persistent-spell-difficult", isPersistentDifficult);
+    tile.classList.toggle("light-bright", isLitTile && lighting.level === "bright" && !lighting.magicalDarkness);
+    tile.classList.toggle("light-dim", isLitTile && lighting.level === "dim" && !lighting.magicalDarkness);
+    tile.classList.toggle("light-darkness", isLitTile && lighting.level === "darkness" && !lighting.magicalDarkness);
+    tile.classList.toggle("light-magical-darkness", isLitTile && lighting.magicalDarkness);
+    if (lightingSource) {
+      tile.style.setProperty("--tile-light-color", lightingSourceColor(lightingSource));
+    } else {
+      tile.style.removeProperty("--tile-light-color");
+    }
     tile.classList.toggle("spell-affected-occupied", isSpellAffected && Boolean(spellTargetAtTile));
     tile.classList.toggle("home-comfort-range", state.mode === "home" && homeComfortRangePreviewKeys.has(key));
     const homeFloorColor = state.mode === "home" ? state.home?.floorColors?.[key] : null;
@@ -1109,6 +1237,8 @@ function renderRoom() {
           : isReachable
             ? `${reachable.get(key) * feetPerSquare} ft`
             : "";
+    const lightTitle = isKnown && showTileLighting && lighting ? tileLightingLabel(lighting) : "";
+    if (lightTitle) tile.title = [tile.title, lightTitle].filter(Boolean).join(" - ");
   });
 
   const renderable = renderableFighters(activeTiles);
@@ -1173,10 +1303,12 @@ function renderHeroStatusCard(element, fighter) {
       : state.mode !== "exploration"
         ? "Search is available while exploring."
         : "No room to search here.";
+  const lightCondition = derivedLightConditionForFighter(fighter);
   const statusPills = [
     fighter.dodging ? '<span class="status-pill status-dodge">Dodging</span>' : "",
     fighter.disengaged ? '<span class="status-pill status-disengage">Disengaged</span>' : "",
     stealth ? `<span class="status-pill status-dodge" title="Current Stealth total ${stealth.total}">Stealth ${stealth.total}</span>` : "",
+    lightCondition ? `<span class="status-pill status-light" title="${escapeAttribute([lightCondition.detail, lightCondition.duration].filter(Boolean).join(" - "))}">${escapeHtml(lightCondition.label)}</span>` : "",
     ...(fighter.statusEffects ?? []).map((effect) => `<span class="status-pill status-dodge" title="${escapeAttribute(temporaryEffectDetails(effect))}">${escapeHtml(statusEffectPillText(effect))}</span>`),
     fighter.hp <= 0 && !fighter.dead && heroIsStableAtZero(fighter) ? '<span class="status-pill status-dodge">Stable</span>' : "",
     fighter.hp <= 0 && !fighter.dead && !heroIsStableAtZero(fighter) ? `<span class="status-pill status-dodge">Death saves ${fighter.deathSaves?.successes ?? 0}/3 | ${fighter.deathSaves?.failures ?? 0}/3</span>` : "",
@@ -1251,6 +1383,264 @@ function statusEffectPillText(effect) {
   const label = effect.label ?? effect.conditionLabel ?? effect.id ?? "Effect";
   const duration = temporaryEffectDurationText(effect);
   return duration && duration !== "Temporary" ? `${label} (${duration})` : label;
+}
+
+function lightingSourceColor(source) {
+  return source?.color ?? (source?.sourceType === "darkness" ? "#191126" : "#f3d28b");
+}
+
+function sourceGradientStop(source, scaledTileSizePx, kind = "light") {
+  const origin = source?.origin;
+  if (!origin) return null;
+  const centerX = Math.round((origin.x + 0.5) * scaledTileSizePx);
+  const centerY = Math.round((origin.y + 0.5) * scaledTileSizePx);
+  const brightPx = Math.max(0, Math.round((source.brightRadius ?? 0) * scaledTileSizePx));
+  const dimPx = Math.max(brightPx + Math.round(scaledTileSizePx * 0.45), Math.round((source.dimRadius ?? source.brightRadius ?? 0) * scaledTileSizePx));
+  const color = lightingSourceColor(source);
+  if (kind === "darkness") {
+    const radiusPx = Math.max(Math.round(scaledTileSizePx * 1.2), dimPx || Math.round(scaledTileSizePx * 3));
+    const inner = source.magicalDarkness ? "rgba(27, 12, 40, 0.74)" : "rgba(0, 0, 0, 0.54)";
+    const mid = source.magicalDarkness ? "rgba(12, 5, 20, 0.56)" : "rgba(0, 0, 0, 0.38)";
+    return `radial-gradient(circle ${radiusPx}px at ${centerX}px ${centerY}px, ${inner} 0, ${mid} 58%, rgba(0, 0, 0, 0) 100%)`;
+  }
+  const brightEdgePx = Math.max(0, brightPx - Math.round(scaledTileSizePx * 0.22));
+  const dimNearPx = Math.round(brightPx + (dimPx - brightPx) * 0.28);
+  const dimMidPx = Math.round(brightPx + (dimPx - brightPx) * 0.58);
+  const dimEdgePx = Math.max(brightPx, dimPx - Math.round(scaledTileSizePx * 0.4));
+  const brightBoundary = brightPx > scaledTileSizePx * 0.55
+    ? `radial-gradient(circle ${Math.max(brightPx + scaledTileSizePx * 0.28, scaledTileSizePx)}px at ${centerX}px ${centerY}px, transparent 0, transparent ${brightEdgePx}px, color-mix(in srgb, ${color} 18%, transparent) ${brightPx}px, transparent ${Math.round(brightPx + scaledTileSizePx * 0.38)}px)`
+    : null;
+  const dimBoundary = dimPx > brightPx + scaledTileSizePx
+    ? `radial-gradient(circle ${Math.max(dimPx + scaledTileSizePx * 0.35, scaledTileSizePx)}px at ${centerX}px ${centerY}px, transparent 0, transparent ${dimEdgePx}px, color-mix(in srgb, ${color} 9%, transparent) ${dimPx}px, transparent ${Math.round(dimPx + scaledTileSizePx * 0.42)}px)`
+    : null;
+  const core = `radial-gradient(circle ${Math.max(brightPx + scaledTileSizePx * 0.7, scaledTileSizePx)}px at ${centerX}px ${centerY}px, color-mix(in srgb, ${color} 46%, transparent) 0, color-mix(in srgb, ${color} 32%, transparent) ${brightEdgePx}px, color-mix(in srgb, ${color} 20%, transparent) ${brightPx}px, transparent 100%)`;
+  const halo = `radial-gradient(circle ${dimPx}px at ${centerX}px ${centerY}px, transparent 0, transparent ${Math.max(0, brightPx - Math.round(scaledTileSizePx * 0.15))}px, color-mix(in srgb, ${color} 11%, transparent) ${dimNearPx}px, color-mix(in srgb, ${color} 8%, transparent) ${dimMidPx}px, color-mix(in srgb, ${color} 5%, transparent) ${dimEdgePx}px, transparent 100%)`;
+  return [dimBoundary, brightBoundary, halo, core].filter(Boolean).join(", ");
+}
+
+function cellGradientStops(source, scaledTileSizePx, limit = 36) {
+  const cells = (source?.cells ?? []).slice(0, limit);
+  const color = lightingSourceColor(source);
+  return cells.map((cell) => {
+    const centerX = Math.round((cell.x + 0.5) * scaledTileSizePx);
+    const centerY = Math.round((cell.y + 0.5) * scaledTileSizePx);
+    const radiusPx = Math.round(scaledTileSizePx * 1.22);
+    return source.magicalDarkness
+      ? `radial-gradient(circle ${radiusPx}px at ${centerX}px ${centerY}px, rgba(17, 7, 24, 0.66) 0, rgba(0, 0, 0, 0.34) 68%, transparent 100%)`
+      : `radial-gradient(circle ${radiusPx}px at ${centerX}px ${centerY}px, color-mix(in srgb, ${color} 38%, transparent) 0, color-mix(in srgb, ${color} 18%, transparent) 64%, transparent 100%)`;
+  });
+}
+
+function sourceRadiusFromCells(source) {
+  if (!source?.origin || !source?.cells?.length) return null;
+  let radius = 0;
+  for (const cell of source.cells) {
+    radius = Math.max(radius, Math.hypot(cell.x - source.origin.x, cell.y - source.origin.y) + 1);
+  }
+  return radius;
+}
+
+let lightingMaskCacheKey = "";
+let lightingMaskCacheValue = null;
+
+function lightingMaskForTiles(tileKeys, scaledTileSizePx) {
+  const cacheKey = `${scaledTileSizePx}|${[...(tileKeys ?? [])].sort().join(";")}`;
+  if (cacheKey === lightingMaskCacheKey && lightingMaskCacheValue) return lightingMaskCacheValue;
+  const masks = [];
+  const positions = [];
+  const sizes = [];
+  const rowRuns = new Map();
+  for (const key of tileKeys ?? []) {
+    const position = positionFromKey(key);
+    const row = rowRuns.get(position.y) ?? [];
+    row.push(position.x);
+    rowRuns.set(position.y, row);
+  }
+  for (const [y, xs] of rowRuns) {
+    xs.sort((a, b) => a - b);
+    let start = null;
+    let previous = null;
+    const flush = () => {
+      if (start == null || previous == null) return;
+      const width = previous - start + 1;
+      masks.push("linear-gradient(#000, #000)");
+      positions.push(`${Math.round(start * scaledTileSizePx)}px ${Math.round(y * scaledTileSizePx)}px`);
+      sizes.push(`${Math.ceil(width * scaledTileSizePx)}px ${Math.ceil(scaledTileSizePx)}px`);
+    };
+    for (const x of xs) {
+      if (start == null) {
+        start = x;
+        previous = x;
+        continue;
+      }
+      if (x === previous + 1) {
+        previous = x;
+        continue;
+      }
+      flush();
+      start = x;
+      previous = x;
+    }
+    flush();
+  }
+  if (!masks.length) {
+    for (const key of tileKeys ?? []) {
+      const position = positionFromKey(key);
+      masks.push("linear-gradient(#000, #000)");
+      positions.push(`${Math.round(position.x * scaledTileSizePx)}px ${Math.round(position.y * scaledTileSizePx)}px`);
+      sizes.push(`${Math.ceil(scaledTileSizePx)}px ${Math.ceil(scaledTileSizePx)}px`);
+    }
+  }
+  lightingMaskCacheKey = cacheKey;
+  lightingMaskCacheValue = { images: masks.join(", "), positions: positions.join(", "), sizes: sizes.join(", "), signature: cacheKey };
+  return lightingMaskCacheValue;
+}
+
+function setLightingMask(element, tileKeys, scaledTileSizePx) {
+  if (!element) return null;
+  const mask = lightingMaskForTiles(tileKeys, scaledTileSizePx);
+  element.style.webkitMaskImage = mask.images;
+  element.style.webkitMaskPosition = mask.positions;
+  element.style.webkitMaskSize = mask.sizes;
+  element.style.webkitMaskRepeat = "no-repeat";
+  element.style.maskImage = mask.images;
+  element.style.maskPosition = mask.positions;
+  element.style.maskSize = mask.sizes;
+  element.style.maskRepeat = "no-repeat";
+  return mask;
+}
+
+function clearLightingMask(element) {
+  if (!element) return;
+  element.style.removeProperty("-webkit-mask-image");
+  element.style.removeProperty("-webkit-mask-position");
+  element.style.removeProperty("-webkit-mask-size");
+  element.style.removeProperty("-webkit-mask-repeat");
+  element.style.removeProperty("mask-image");
+  element.style.removeProperty("mask-position");
+  element.style.removeProperty("mask-size");
+  element.style.removeProperty("mask-repeat");
+}
+
+function litTileKeysForLightingMap(lightingMap, visibleLightTileKeys = new Set()) {
+  const keys = new Set();
+  for (const [key, entry] of lightingMap?.tiles ?? []) {
+    if (!visibleLightTileKeys.has(key)) continue;
+    if (entry.magicalDarkness) continue;
+    if (entry.level === "bright" || entry.level === "dim") keys.add(key);
+  }
+  return keys;
+}
+
+function renderLightingLayer(lightingMap, scaledTileSizePx, visibleLightTileKeys = new Set()) {
+  const layer = els.room.querySelector(".lighting-layer");
+  if (!layer) return;
+  const darknessLayer = layer.querySelector(".lighting-darkness") ?? layer;
+  const glowLayer = layer.querySelector(".lighting-glow") ?? layer;
+  const showLighting = state.mode !== "home" && Boolean(lightingMap?.sources?.length) && visibleLightTileKeys.size > 0;
+  layer.classList.toggle("hidden", !showLighting);
+  els.room.classList.toggle("has-dungeon-lighting", showLighting);
+  if (!showLighting) {
+    layer.dataset.lightingSignature = "";
+    glowLayer.style.removeProperty("--lighting-gradients");
+    darknessLayer.style.removeProperty("--darkness-gradients");
+    clearLightingMask(glowLayer);
+    clearLightingMask(darknessLayer);
+    return;
+  }
+
+  const lightGradients = [];
+  const darknessGradients = [];
+  for (const source of lightingMap.sources ?? []) {
+    if (!source || source.sourceType === "ambient") continue;
+    const target = source.magicalDarkness ? darknessGradients : lightGradients;
+    if (source.cells?.length) {
+      if (!source.magicalDarkness && source.origin) {
+        const cellRadius = sourceRadiusFromCells(source);
+        const gradient = sourceGradientStop({
+          ...source,
+          brightRadius: Math.max(source.brightRadius ?? 0, Math.max(0, Math.min(cellRadius ?? 0, 1) - 1)),
+          dimRadius: Math.max(source.dimRadius ?? 0, cellRadius ?? 0),
+        }, scaledTileSizePx, "light");
+        if (gradient) target.push(gradient);
+        continue;
+      }
+      target.push(...cellGradientStops(source, scaledTileSizePx));
+      continue;
+    }
+    const gradient = sourceGradientStop(source, scaledTileSizePx, source.magicalDarkness ? "darkness" : "light");
+    if (gradient) target.push(gradient);
+  }
+
+  const glowTileKeys = litTileKeysForLightingMap(lightingMap, visibleLightTileKeys);
+  const darknessMask = setLightingMask(darknessLayer, visibleLightTileKeys, scaledTileSizePx);
+  const glowMask = setLightingMask(glowLayer, glowTileKeys, scaledTileSizePx);
+  const lightingValue = lightGradients.length ? lightGradients.join(", ") : "none";
+  const darknessValue = darknessGradients.length ? darknessGradients.join(", ") : "none";
+  const signature = [
+    scaledTileSizePx,
+    lightingValue,
+    darknessValue,
+    darknessMask?.signature ?? "",
+    glowMask?.signature ?? "",
+  ].join("|");
+  if (layer.dataset.lightingSignature === signature) return;
+  layer.dataset.lightingSignature = signature;
+  glowLayer.style.setProperty("--lighting-gradients", lightingValue);
+  darknessLayer.style.setProperty("--darkness-gradients", darknessValue);
+}
+
+function tileLightingLabel(lighting) {
+  if (!lighting) return "";
+  if (lighting.magicalDarkness) return "Magical darkness";
+  if (lighting.level === "bright") return "Bright light";
+  if (lighting.level === "dim") return "Dim light";
+  return "Darkness";
+}
+
+let renderedLightingSourcesByOwner = new Map();
+
+function actorEmittedLightSource(fighter) {
+  if (!fighter?.id || typeof collectLightSources !== "function") return null;
+  return renderedLightingSourcesByOwner.get(fighter.id) ?? null;
+}
+
+function derivedLightConditionForFighter(fighter) {
+  if (!fighter?.position || typeof lightingAtPosition !== "function") return null;
+  const lighting = lightingAtPosition(fighter.position);
+  if (!lighting || lighting.level === "bright") return null;
+  const senses = typeof fighterEffectiveSenses === "function" ? fighterEffectiveSenses(fighter) : fighter.senses ?? {};
+  const hasDarkvision = Number(senses.darkvision ?? 0) > 0 || senses.darkvision === true;
+  const hasTruesight = Number(senses.truesight ?? 0) > 0 || senses.truesight === true;
+  const senseText = lighting.magicalDarkness
+    ? hasTruesight
+      ? "Truesight can pierce this magical darkness."
+      : "Normal darkvision does not pierce magical darkness."
+    : hasDarkvision
+      ? `Darkvision ${senses.darkvision === true ? "" : `${senses.darkvision} ft `}covers this light level.`
+      : "Sight-based Perception and Investigation checks are impaired.";
+  if (lighting.magicalDarkness) {
+    return {
+      id: "derived-light-magical-darkness",
+      label: hasTruesight ? "Magical Darkness (Truesight)" : "Magical Darkness",
+      detail: senseText,
+      duration: "Current tile",
+    };
+  }
+  if (lighting.level === "darkness") {
+    return {
+      id: "derived-light-darkness",
+      label: hasDarkvision ? "Darkness (Darkvision)" : "Darkness",
+      detail: senseText,
+      duration: "Current tile",
+    };
+  }
+  return {
+    id: "derived-light-dim",
+    label: hasDarkvision ? "Dim Light (Darkvision)" : "Dim Light",
+    detail: senseText,
+    duration: "Current tile",
+  };
 }
 
 function resourcePoolSpent(fighter, poolId) {
@@ -1643,6 +2033,8 @@ function temporaryEffectsForFighter(fighter) {
   }
   if (fighter.dodging) effects.push({ id: "dodging", label: "Dodging", detail: "Incoming attacks have disadvantage.", duration: "Until start of next turn" });
   if (fighter.disengaged) effects.push({ id: "disengaged", label: "Disengaged", detail: "Movement does not provoke opportunity attacks.", duration: "Until end of turn" });
+  const lightCondition = derivedLightConditionForFighter(fighter);
+  if (lightCondition) effects.push(lightCondition);
   for (const effect of fighter.statusEffects ?? []) {
     effects.push({
       id: effect.id,
@@ -1755,6 +2147,101 @@ async function renameHero() {
   hero.token = tokenFromName(hero.name, hero.token);
   addLog(`Character renamed to ${hero.name}.`, "important");
   render();
+}
+
+function corpseCanBeHandledHere(corpseHero) {
+  if (!corpseHero?.dead) return false;
+  if (state.mode === "home") return heroCorpseLocation(corpseHero) === "base";
+  if (heroCorpseLocation(corpseHero) !== "dungeon") return false;
+  const hero = activeHero();
+  if (!heroCanAct(hero)) return false;
+  if (state.mode === "combat" && activeFighter()?.id !== hero.id) return false;
+  return corpseHero.position && hero.position && distance(hero.position, corpseHero.position) <= 1;
+}
+
+function corpseLootRows(corpseHero, canLoot) {
+  const items = corpseHero.inventory?.items ?? [];
+  const moneyCp = moneyToCp(corpseHero.inventory?.money ?? {});
+  const heroTokens = corpseHero.inventory?.heroTokens ?? 0;
+  const rows = items.map((item) => {
+    const equipped = Object.values(corpseHero.equipment ?? {}).includes(item.id);
+    return `
+      <div class="object-inventory-row">
+        <div>
+          <b>${escapeHtml(item.name)}</b>
+          <span>${escapeHtml(`${itemDetails(item)}${equipped ? " - equipped" : ""}`)}</span>
+        </div>
+        <button type="button" data-action="loot-corpse-item" data-corpse="${escapeAttribute(corpseHero.id)}" data-item="${escapeAttribute(item.id)}" ${canLoot ? "" : "disabled"}>Take</button>
+      </div>
+    `;
+  });
+  if (moneyCp > 0 || heroTokens > 0) {
+    rows.unshift(`
+      <div class="object-inventory-row">
+        <div>
+          <b>Coins and Tokens</b>
+          <span>${escapeHtml([moneyCp ? moneyText(corpseHero.inventory.money) : "", heroTokens ? `${heroTokens} Hero Token${heroTokens === 1 ? "" : "s"}` : ""].filter(Boolean).join(" - "))}</span>
+        </div>
+        <button type="button" data-action="loot-corpse-money" data-corpse="${escapeAttribute(corpseHero.id)}" ${canLoot ? "" : "disabled"}>Take</button>
+      </div>
+    `);
+  }
+  return rows.join("") || `<p class="empty-note">No belongings remain on the body.</p>`;
+}
+
+function corpseSpellChoices(corpseHero, spellIds, { requireBase = false } = {}) {
+  if (requireBase && state.mode !== "home") return [];
+  const casters = (state.mode === "home" ? rosterHeroes() : [activeHero()]).filter((hero) => heroCanAct(hero) && !hero.dead);
+  const choices = [];
+  for (const caster of casters) {
+    for (const spellId of spellIds) {
+      const baseSpell = spellDefinitionsForFighter(caster).find((spell) => spell.id === spellId || spell.aliasOf === spellId);
+      if (!baseSpell) continue;
+      const spell = spellWithCastLevel(baseSpell, spellBaseLevel(baseSpell));
+      const allowed =
+        spell.effect?.kind === "revive"
+          ? canSpellReviveCorpse(caster, spell, corpseHero)
+          : spell.effect?.kind === "preserveCorpse" && canPaySpellCost(caster, spell);
+      choices.push({ caster, spell, allowed });
+    }
+  }
+  return choices;
+}
+
+function corpseSpellButtons(corpseHero, spellIds, options = {}) {
+  return corpseSpellChoices(corpseHero, spellIds, options)
+    .map(({ caster, spell, allowed }) => {
+      const cost = spellPointCost(spell);
+      return `<button type="button" data-action="cast-corpse-spell" data-corpse="${escapeAttribute(corpseHero.id)}" data-caster="${escapeAttribute(caster.id)}" data-spell="${escapeAttribute(spell.id)}" ${allowed ? "" : "disabled"}>${escapeHtml(spell.name)} - ${escapeHtml(caster.name)} (${cost} SP)</button>`;
+    })
+    .join("");
+}
+
+function corpseInfoMarkup(corpseHero) {
+  ensureHeroCorpseState(corpseHero);
+  const canHandle = corpseCanBeHandledHere(corpseHero);
+  const status = corpseDecompositionStatus(corpseHero);
+  const preservationButtons = corpseSpellButtons(corpseHero, ["gentle-repose"]);
+  const dungeonReviveButtons = state.mode !== "home" ? corpseSpellButtons(corpseHero, ["revivify"]) : "";
+  const transportButton =
+    state.mode !== "home" && heroCorpseLocation(corpseHero) === "dungeon"
+      ? `<button type="button" data-action="transport-corpse-base" data-corpse="${escapeAttribute(corpseHero.id)}" ${canHandle ? "" : "disabled"}>Transport to Base</button>`
+      : "";
+  return `
+    <section class="inspect-section corpse-inspect-section">
+      <h3>Corpse</h3>
+      <p class="empty-note">${escapeHtml(status.label)} - ${escapeHtml(status.detail)}</p>
+      <div class="object-actions">
+        ${transportButton}
+        ${preservationButtons || ""}
+        ${dungeonReviveButtons || ""}
+      </div>
+      <section class="object-inventory">
+        <h3>Belongings</h3>
+        ${corpseLootRows(corpseHero, canHandle)}
+      </section>
+    </section>
+  `;
 }
 
 function showCombatantInfo(fighter) {
@@ -1893,6 +2380,7 @@ function showCombatantInfo(fighter) {
             meta: spells.length ? `${spells.length} spells - ${fighter.spellPoints ?? 0}/${fighter.spellPointMax ?? 0} SP` : "",
             body: spells.length ? spellbookInspectMarkup(spells) : "",
           })}
+          ${fighter.dead ? corpseInfoMarkup(fighter) : ""}
         `
         : `
           <p class="empty-note">${escapeHtml(fighter.description ?? fighter.role ?? "A hostile creature.")}</p>
@@ -3772,6 +4260,77 @@ function takeObjectItem(objectId, itemId) {
   showDungeonObjectInfo(object);
 }
 
+function corpseById(corpseId) {
+  const hero = state.fighters?.[corpseId];
+  return hero?.dead ? hero : null;
+}
+
+function lootCorpseMoney(corpseId) {
+  const corpse = corpseById(corpseId);
+  const hero = activeHero();
+  if (!corpse || !corpseCanBeHandledHere(corpse) || !heroCanAct(hero) || !canFighterReceiveInventory(hero)) return;
+  const coins = moneyToCp(corpse.inventory?.money ?? {});
+  const tokens = corpse.inventory?.heroTokens ?? 0;
+  if (coins > 0) addMoney(hero.inventory.money, coins);
+  if (tokens > 0) hero.inventory.heroTokens = (hero.inventory.heroTokens ?? 0) + tokens;
+  corpse.inventory.money = normalizeMoney();
+  corpse.inventory.heroTokens = 0;
+  addLog(`${hero.name} takes ${[coins ? moneyText(cpToMoney(coins)) : "", tokens ? `${tokens} Hero Token${tokens === 1 ? "" : "s"}` : ""].filter(Boolean).join(" and ") || "nothing"} from ${corpse.name}.`, "important");
+  render();
+  showCombatantInfo(corpse);
+}
+
+function lootCorpseItem(corpseId, itemId) {
+  const corpse = corpseById(corpseId);
+  const hero = activeHero();
+  if (!corpse || !corpseCanBeHandledHere(corpse) || !heroCanAct(hero) || !canFighterReceiveInventory(hero)) return;
+  const item = (corpse.inventory?.items ?? []).find((entry) => entry.id === itemId);
+  if (!item) return;
+  corpse.inventory.items = (corpse.inventory.items ?? []).filter((entry) => entry.id !== itemId);
+  for (const slot of equipmentSlots) {
+    if (corpse.equipment?.[slot.id] === itemId) corpse.equipment[slot.id] = null;
+  }
+  addItemToInventory(hero, item, "corpse-loot");
+  refreshDerivedStats(corpse);
+  addLog(`${hero.name} takes ${item.name} from ${corpse.name}'s body.`, "important");
+  render();
+  showCombatantInfo(corpse);
+}
+
+function transportCorpseToBase(corpseId) {
+  const corpse = corpseById(corpseId);
+  if (!corpse || !corpseCanBeHandledHere(corpse)) return;
+  const record = ensureHeroCorpseState(corpse);
+  record.location = "base";
+  record.transportedAtDungeonTimeSeconds = dungeonElapsedSeconds({ sync: false });
+  corpse.corpseAtBase = true;
+  state.party.heroIds = livingPartyHeroIds();
+  selectedHeroIds.delete(corpse.id);
+  if (state.party.activeHeroId === corpse.id || !state.fighters[state.party.activeHeroId] || state.fighters[state.party.activeHeroId].dead) {
+    state.party.activeHeroId = state.party.heroIds.find((id) => state.fighters[id] && !state.fighters[id].dead) ?? "hero";
+  }
+  addLog(`${activeHero()?.name ?? "The party"} sends ${corpse.name}'s body back to base.`, "important");
+  render();
+  hideFighterInfo();
+}
+
+function castCorpseSpell(corpseId, casterId, spellId) {
+  const corpse = corpseById(corpseId);
+  const caster = state.fighters?.[casterId];
+  if (!corpse || !caster || !corpseCanBeHandledHere(corpse)) return;
+  const baseSpell = spellDefinitionsForFighter(caster).find((spell) => spell.id === spellId || spell.aliasOf === spellId);
+  if (!baseSpell) return;
+  const spell = spellWithCastLevel(baseSpell, spellBaseLevel(baseSpell));
+  let success = false;
+  if (spell.effect?.kind === "revive") success = reviveCorpseWithSpell(caster, corpse, spell);
+  if (spell.effect?.kind === "preserveCorpse") success = preserveCorpseWithSpell(caster, corpse, spell);
+  if (!success) return;
+  render();
+  if (state.mode === "home") renderGraveyardMenu();
+  else if (corpse.dead) showCombatantInfo(corpse);
+  else hideFighterInfo();
+}
+
 function pickObjectLock(objectId) {
   const object = dungeonObjectForId(objectId);
   const hero = activeHero();
@@ -3975,18 +4534,28 @@ function disarmTrap(objectId) {
   if (!activeStealthCheckInMonsterRoom(hero, `disarms ${objectTemplate(object.type)?.name ?? "a trap"}`)) return;
 
   const option = bestTrapDisarmOption(hero, trap, object);
-  const rollResult = rollD20ForFighter(hero);
-  const roll = reliableTalentRoll(hero, option.skill, rollResult.roll);
-  const bonus = option.bonus;
-  const guidance = guidanceSkillBonus();
-  const total = roll + bonus + guidance;
+  const disarmPosition = objectCells(object)[0] ?? object.position ?? hero.position;
+  const check = typeof rollSkillCheck === "function"
+    ? rollSkillCheck(hero, option.ability ?? "int", option.skill, { sightBased: ["perception", "investigation"].includes(option.skill), position: disarmPosition, guidance: true })
+    : {
+        rollResult: rollD20ForFighter(hero),
+        roll: 0,
+        bonus: option.bonus,
+        guidance: guidanceSkillBonus(),
+        lightContext: null,
+      };
+  if (!check.roll) check.roll = reliableTalentRoll(hero, option.skill, check.rollResult.roll);
+  check.total = check.total ?? check.roll + check.bonus + check.guidance;
+  const { rollResult, roll, bonus, guidance, total, lightContext } = check;
   const dc = option.dc ?? trap.spotDc ?? 12;
   trap.disarmAttemptsByHero[hero.id] = true;
   const guidanceText = guidance ? ` + Guidance ${guidance}` : "";
-  const attemptText = `${hero.name} attempts to disarm the trap: ${String(option.ability ?? "int").toUpperCase()} ${skillName(option.skill)} ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${dc}.`;
+  const disadvantageText = lightContext?.disadvantage ? " with disadvantage" : "";
+  const lightNote = typeof lightContextNote === "function" ? lightContextNote(lightContext, "; ") : "";
+  const attemptText = `${hero.name} attempts to disarm the trap${disadvantageText}: ${String(option.ability ?? "int").toUpperCase()} ${skillName(option.skill)} ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${dc}${lightNote}.`;
   object.lastResult = attemptText;
   addLog(attemptText, "important");
-  addAdminCheckLog({ actor: hero, label: "Disarm check", target: objectTemplate(object.type)?.name ?? "trap", rollResult, bonus, guidance, total, dc, success: roll !== 1 && total >= dc, note: roll === 1 ? "natural 1 triggers trap" : "" });
+  addAdminCheckLog({ actor: hero, label: "Disarm check", target: objectTemplate(object.type)?.name ?? "trap", rollResult, bonus, guidance, total, dc, success: roll !== 1 && total >= dc, note: [roll === 1 ? "natural 1 triggers trap" : "", lightContext?.note].filter(Boolean).join("; ") });
   if (roll === 1) {
     recordD20OutcomeForFighter(hero, false);
     object.lastResult += " Critical failure — the trap triggers.";
@@ -4445,21 +5014,32 @@ function useObjectInteraction(objectId) {
   if (!activeStealthCheckInMonsterRoom(hero, `uses ${template.name}`)) return;
 
   const option = bestUniqueInteractionOption(hero, component);
-  const rollResult = rollD20ForFighter(hero);
-  const roll = reliableTalentRoll(hero, option.skill, rollResult.roll);
-  const guidance = guidanceSkillBonus();
-  const total = roll + option.bonus + guidance;
+  const interactionPosition = objectCells(object)[0] ?? object.position ?? hero.position;
+  const check = typeof rollSkillCheck === "function"
+    ? rollSkillCheck(hero, option.ability ?? skillDefinitions[option.skill]?.ability ?? "int", option.skill, { sightBased: ["perception", "investigation"].includes(option.skill), position: interactionPosition, guidance: true })
+    : {
+        rollResult: rollD20ForFighter(hero),
+        roll: 0,
+        bonus: option.bonus,
+        guidance: guidanceSkillBonus(),
+        lightContext: null,
+      };
+  if (!check.roll) check.roll = reliableTalentRoll(hero, option.skill, check.rollResult.roll);
+  check.total = check.total ?? check.roll + check.bonus + check.guidance;
+  const { rollResult, roll, bonus, guidance, total, lightContext } = check;
   const dc = component.dc ?? 13;
   const success = total >= dc;
   const guidanceText = guidance ? ` + Guidance ${guidance}` : "";
   const checkLabel = `${String(option.ability).toUpperCase()} ${skillName(option.skill)}`;
-  const checkText = `${hero.name} uses ${template.name}: ${checkLabel} ${roll} ${abilityLabel(option.bonus)}${guidanceText} = ${total} vs DC ${dc}.`;
+  const disadvantageText = lightContext?.disadvantage ? " with disadvantage" : "";
+  const lightNote = typeof lightContextNote === "function" ? lightContextNote(lightContext, "; ") : "";
+  const checkText = `${hero.name} uses ${template.name}${disadvantageText}: ${checkLabel} ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${dc}${lightNote}.`;
   object.uniqueInteractionClaimed = true;
   object.spent = true;
   object.lastResult = checkText;
   addLog(checkText, "important");
   recordD20OutcomeForFighter(hero, success);
-  addAdminCheckLog({ actor: hero, label: `${component.label ?? template.name} interaction`, target: template.name, rollResult, bonus: option.bonus, guidance, total, dc, success, note: component.effect ?? "uniqueInteraction" });
+  addAdminCheckLog({ actor: hero, label: `${component.label ?? template.name} interaction`, target: template.name, rollResult, bonus, guidance, total, dc, success, note: [component.effect ?? "uniqueInteraction", lightContext?.note].filter(Boolean).join("; ") });
 
   const resultText = success ? resolveObjectInteractionSuccess(hero, object, component, total, rollResult) : resolveObjectInteractionFailure(hero, object, component);
   object.lastResult = `${checkText} ${resultText}`;
@@ -4524,18 +5104,28 @@ function farmResourceNode(objectId) {
   }
   if (!activeStealthCheckInMonsterRoom(hero, `gathers from ${template.name}`)) return;
 
-  const rollResult = rollD20ForFighter(hero);
   const skillId = component.skill ?? null;
   const ability = component.ability ?? (skillId ? skillDefinitions[skillId]?.ability : null) ?? "wis";
-  const roll = skillId ? reliableTalentRoll(hero, skillId, rollResult.roll) : rollResult.roll;
-  const bonus = skillCheckBonus(hero, ability, skillId);
-  const guidance = guidanceSkillBonus();
-  const total = roll + bonus + guidance;
+  const gatherPosition = objectCells(object)[0] ?? object.position ?? hero.position;
+  const check = typeof rollSkillCheck === "function" && skillId
+    ? rollSkillCheck(hero, ability, skillId, { sightBased: ["perception", "investigation"].includes(skillId), position: gatherPosition, guidance: true })
+    : {
+        rollResult: rollD20ForFighter(hero),
+        roll: 0,
+        bonus: skillCheckBonus(hero, ability, skillId),
+        guidance: guidanceSkillBonus(),
+        lightContext: null,
+      };
+  if (!check.roll) check.roll = skillId ? reliableTalentRoll(hero, skillId, check.rollResult.roll) : check.rollResult.roll;
+  check.total = check.total ?? check.roll + check.bonus + check.guidance;
+  const { rollResult, roll, bonus, guidance, total, lightContext } = check;
   const dc = component.dc ?? 12;
   const success = total >= dc;
   const guidanceText = guidance ? ` + Guidance ${guidance}` : "";
   const checkLabel = resourceNodeCheckLabel(component);
-  const checkText = `${hero.name} gathers from ${template.name}: ${checkLabel} ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${dc}.`;
+  const disadvantageText = lightContext?.disadvantage ? " with disadvantage" : "";
+  const lightNote = typeof lightContextNote === "function" ? lightContextNote(lightContext, "; ") : "";
+  const checkText = `${hero.name} gathers from ${template.name}${disadvantageText}: ${checkLabel} ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${dc}${lightNote}.`;
   const entries = resourceNodeRewardEntries(component, total, rollResult);
   const granted = success ? addResourceNodeRewards(hero, entries) : [];
   const rewardText = granted.length ? ` Gained ${resourceNodeRewardsText(granted)}.` : " No usable resources recovered.";
@@ -4555,7 +5145,7 @@ function farmResourceNode(objectId) {
     total,
     dc,
     success,
-    note: granted.length ? rewardText.trim() : "resource node spent",
+    note: [granted.length ? rewardText.trim() : "resource node spent", lightContext?.note].filter(Boolean).join("; "),
   });
   advanceDungeonTime(component.timeSeconds ?? component.durationSeconds ?? 900, `${hero.name} gathering from ${template.name}`, { force: true });
 
@@ -4576,17 +5166,27 @@ function investigateObject(objectId) {
   const hiddenLoot = objectComponent(object, "hiddenLoot") ?? objectComponent(object, "harvestableResource");
   const ambush = objectComponent(object, "ambushOnInspect");
   const inspectDc = inspectEvent?.dc ?? hiddenLoot?.dc ?? template.inspectDc ?? template.spotDc ?? 13;
-  const rollResult = rollD20ForFighter(hero);
-  const roll = rollResult.roll;
-  const bonus = skillCheckBonus(hero, "int", "investigation");
-  const guidance = guidanceSkillBonus();
-  const total = roll + bonus + guidance;
+  const inspectPosition = objectCells(object)[0] ?? object.position ?? hero.position;
+  const check = typeof rollSkillCheck === "function"
+    ? rollSkillCheck(hero, "int", "investigation", { sightBased: true, position: inspectPosition, guidance: true })
+    : {
+        rollResult: rollD20ForFighter(hero),
+        roll: 0,
+        bonus: skillCheckBonus(hero, "int", "investigation"),
+        guidance: guidanceSkillBonus(),
+        lightContext: null,
+      };
+  if (!check.roll) check.roll = check.rollResult.roll;
+  check.total = check.total ?? check.roll + check.bonus + check.guidance;
+  const { rollResult, roll, bonus, guidance, total, lightContext } = check;
   recordD20OutcomeForFighter(hero, total >= inspectDc);
   const guidanceText = guidance ? ` + Guidance ${guidance}` : "";
-  const checkText = `${hero.name} investigates ${template.name}: INT ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${inspectDc}.`;
+  const disadvantageText = lightContext?.disadvantage ? " with disadvantage" : "";
+  const lightNote = typeof lightContextNote === "function" ? lightContextNote(lightContext, "; ") : "";
+  const checkText = `${hero.name} investigates ${template.name}${disadvantageText}: INT ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${inspectDc}${lightNote}.`;
   object.lastResult = checkText;
   addLog(checkText, "important");
-  addAdminCheckLog({ actor: hero, label: "Investigation check", target: template.name, rollResult, bonus, guidance, total, dc: inspectDc, success: total >= inspectDc, note: inspectEvent ? "event: monster or loot" : hiddenLoot ? "hidden loot/resource possible" : ambush ? "ambush trigger possible" : "generic inspection" });
+  addAdminCheckLog({ actor: hero, label: "Investigation check", target: template.name, rollResult, bonus, guidance, total, dc: inspectDc, success: total >= inspectDc, note: [inspectEvent ? "event: monster or loot" : hiddenLoot ? "hidden loot/resource possible" : ambush ? "ambush trigger possible" : "generic inspection", lightContext?.note].filter(Boolean).join("; ") });
 
   const ambushOnNaturalOne = ambush && (ambush.trigger === "natural1" || ambush.naturalOne);
   const ambushByChance = ambush && !ambushOnNaturalOne && Math.random() < (ambush.chance ?? 1);
@@ -4656,6 +5256,12 @@ function statusEffectDetails(status = {}) {
   if (status.damageBonus) parts.push(`${abilityLabel(status.damageBonus)} damage`);
   if (status.saveBonus) parts.push(`${abilityLabel(status.saveBonus)} saves`);
   if (status.speedBonusFeet) parts.push(`${abilityLabel(status.speedBonusFeet)} ft speed`);
+  if (status.lightSource) {
+    const source = status.lightSource;
+    const bright = Number(source.brightRadiusFeet ?? source.brightFeet ?? 0) || 0;
+    const dim = Number(source.dimRadiusFeet ?? source.dimFeet ?? 0) || 0;
+    parts.push(`light ${bright}/${dim} ft`);
+  }
   if (status.resistances?.length) parts.push(`resist ${status.resistances.join(", ")}`);
   if (status.vulnerabilities?.length) parts.push(`vulnerable ${status.vulnerabilities.join(", ")}`);
   return parts;
@@ -4666,6 +5272,8 @@ function statusDurationText(status = {}) {
   if (status.expiresAtEndOfTurn) return "until end of turn";
   if (status.startsOnNextEncounter) return "next encounter";
   if (status.durationRounds) return `${status.durationRounds} rounds`;
+  if (status.durationHours) return `${status.durationHours} hour${status.durationHours === 1 ? "" : "s"}`;
+  if (status.durationMinutes) return `${status.durationMinutes} minute${status.durationMinutes === 1 ? "" : "s"}`;
   return "temporary";
 }
 
@@ -4673,6 +5281,14 @@ function itemUseEffectText(item) {
   const use = item?.use;
   if (!use) return "";
   if (use.description) return use.description;
+  if (use.kind === "light" && use.status?.lightSource) {
+    const source = use.status.lightSource;
+    const bright = Number(source.brightRadiusFeet ?? source.brightFeet ?? 0) || 0;
+    const dim = Number(source.dimRadiusFeet ?? source.dimFeet ?? 0) || 0;
+    const duration = statusDurationText(use.status);
+    const fuel = use.fuelItemName ? ` Consumes 1 ${use.fuelItemName} when lit.` : "";
+    return `Toggle light: bright ${bright} ft${dim > bright ? `, dim to ${dim} ft` : ""}; ${duration}.${fuel}`;
+  }
   if (use.kind === "healing" && use.dice) {
     const bonus = Number(use.bonus) || 0;
     return `Restore ${use.dice.count ?? 1}d${use.dice.sides ?? 1}${bonus ? ` + ${bonus}` : ""} HP.`;
@@ -4738,6 +5354,9 @@ function itemDetails(item) {
     }
     if (item.use?.kind === "healing") {
       return `${item.use.dice.count}d${item.use.dice.sides} + ${item.use.bonus} HP; ${item.use.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
+    }
+    if (item.use?.kind === "light") {
+      return `${itemUseEffectText(item)}; ${item.use?.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
     }
     if (item.use?.status) {
       const status = item.use.status;
@@ -6046,7 +6665,7 @@ function itemUseConsumesInventory(item) {
 
 function itemUseIsSupported(item) {
   const kind = item?.use?.kind;
-  return Boolean(["healing", "fullHealing", "buff", "weaponBuff"].includes(kind) || item?.use?.status);
+  return Boolean(["healing", "fullHealing", "buff", "weaponBuff", "light"].includes(kind) || item?.use?.status);
 }
 
 function canUseBeltItem(fighter, item) {
@@ -6056,6 +6675,31 @@ function canUseBeltItem(fighter, item) {
   if (state.mode !== "combat") return true;
   const resource = itemUseResource(item);
   return resource === "bonusAction" ? fighter.hasBonusAction : fighter.hasAction;
+}
+
+function equippedSlotsForItem(fighter, itemId) {
+  return equipmentSlots.map((slot) => slot.id).filter((slotId) => fighter?.equipment?.[slotId] === itemId);
+}
+
+function consumeInventoryItemByTemplateId(fighter, templateId) {
+  const index = (fighter?.inventory?.items ?? []).findIndex((item) => (item.baseItemId ?? item.itemId ?? item.id) === templateId);
+  if (index < 0) return null;
+  const [item] = fighter.inventory.items.splice(index, 1);
+  for (const slot of equipmentSlots) {
+    if (fighter.equipment?.[slot.id] === item.id) fighter.equipment[slot.id] = null;
+  }
+  return item;
+}
+
+function lightItemStatus(item, hero) {
+  const equippedSlots = equippedSlotsForItem(hero, item.id);
+  const requiredSlots = item.use?.requiredSlots ?? item.slots ?? [];
+  return {
+    ...item.use.status,
+    lightItemId: item.id,
+    requiredSlots,
+    detail: equippedSlots.length ? `Equipped in ${equippedSlots.map((slotId) => equipmentSlots.find((slot) => slot.id === slotId)?.label ?? slotId).join(", ")}` : "",
+  };
 }
 
 function canUseHealingItemOnTarget(actor, item, target) {
@@ -6721,14 +7365,17 @@ function abilityRowMarkup(hero, ability, { favoriteIndex = null, favoriteTotal =
 function spellRowMarkup(hero, spell, { favoriteIndex = null, favoriteTotal = 0, hotkeyIndex = null } = {}) {
   const castLevels = spellAvailableCastLevels(hero, spell);
   const favoriteKey = spellFavoriteKey(spell);
-  const castButtons = castLevels
-    .map((castLevel) => {
-      const castSpell = spellWithCastLevel(spell, castLevel);
-      const disabled = canStartSpellCast(hero, castSpell) ? "" : "disabled";
-      const upcast = castLevel > spellBaseLevel(spell) ? ` L${castLevel}` : "";
-      return `<button type="button" data-action="cast-spell" data-spell="${escapeAttribute(spell.id)}" data-cast-level="${castLevel}" ${disabled}>${spellBaseLevel(spell) === 0 ? "Use" : `Cast${upcast}`}</button>`;
-    })
-    .join("");
+  const activeDismissible = activeDismissibleSpellEffect(hero, spell);
+  const castButtons = activeDismissible
+    ? `<button type="button" data-action="dismiss-spell-effect" data-spell="${escapeAttribute(spell.id)}">End</button>`
+    : castLevels
+      .map((castLevel) => {
+        const castSpell = spellWithCastLevel(spell, castLevel);
+        const disabled = canStartSpellCast(hero, castSpell) ? "" : "disabled";
+        const upcast = castLevel > spellBaseLevel(spell) ? ` L${castLevel}` : "";
+        return `<button type="button" data-action="cast-spell" data-spell="${escapeAttribute(spell.id)}" data-cast-level="${castLevel}" ${disabled}>${spellBaseLevel(spell) === 0 ? "Use" : `Cast${upcast}`}</button>`;
+      })
+      .join("");
   const costText = spellBaseLevel(spell) === 0 ? "At will" : castLevels.map((level) => `L${level}: ${spellPointCost(spellWithCastLevel(spell, level))} SP`).join(", ");
   const concentration = spell.concentration ? " Concentration." : "";
   const levelText = spellBaseLevel(spell) === 0 ? "Cantrip" : `L${spellBaseLevel(spell)}`;
@@ -6845,7 +7492,7 @@ function useFavoriteActionByIndex(index) {
   const row = rows[index];
   if (!row) return false;
   const actionButton = Array.from(row.querySelectorAll("button")).find((button) =>
-    !button.disabled && ["use-fighter-ability", "cast-spell", "combat-action", "grab-target"].includes(button.dataset.action),
+    !button.disabled && ["use-fighter-ability", "cast-spell", "dismiss-spell-effect", "combat-action", "grab-target"].includes(button.dataset.action),
   );
   if (!actionButton) return false;
   actionButton.click();
@@ -7165,8 +7812,13 @@ function showNpcInspection(npcId = activeStoreNpcId) {
 function renderVillageMenu() {
   els.villageMenu?.classList.remove("npc-chat-open");
   const npcs = villageNpcs();
+  const graveyardCount = deadRosterHeroes().length;
   els.villageBody.innerHTML = `
     <p class="empty-note">Choose who to visit in the village.</p>
+    <button type="button" data-action="open-graveyard">
+      <span>Graveyard</span>
+      <small>${graveyardCount ? `${graveyardCount} dead companion${graveyardCount === 1 ? "" : "s"} in memory or keeping` : "No dead companions"}</small>
+    </button>
     ${npcs
       .map((npc) => {
         const unlocked = npcIsUnlocked(npc);
@@ -7180,6 +7832,43 @@ function renderVillageMenu() {
       .join("")}
     <hr />
     <button type="button" data-action="close-village">Back</button>
+  `;
+}
+
+function graveyardCorpseMarkup(corpse) {
+  const status = corpseDecompositionStatus(corpse);
+  const reviveButtons = corpseSpellButtons(corpse, ["revivify", "raise-dead", "resurrection", "true-resurrection"], { requireBase: true });
+  const preserveButtons = corpseSpellButtons(corpse, ["gentle-repose"], { requireBase: true });
+  const location = heroCorpseLocation(corpse) === "base" ? "At base" : "Still in dungeon";
+  return `
+    <section class="graveyard-entry">
+      <div>
+        <b>${escapeHtml(corpse.name)}</b>
+        <span>${escapeHtml(`${location} - ${status.label}`)}</span>
+        <small>${escapeHtml(status.detail)}</small>
+      </div>
+      <div class="object-actions">
+        ${preserveButtons || ""}
+        ${reviveButtons || ""}
+      </div>
+      <details>
+        <summary>Belongings</summary>
+        ${corpseLootRows(corpse, heroCorpseLocation(corpse) === "base")}
+      </details>
+    </section>
+  `;
+}
+
+function renderGraveyardMenu() {
+  els.villageMenu?.classList.remove("npc-chat-open");
+  const dead = deadRosterHeroes();
+  els.villageBody.innerHTML = `
+    <p class="empty-note">Dead companions can be preserved, looted, or restored here once their body has been sent home.</p>
+    <section class="graveyard-list">
+      ${dead.length ? dead.map(graveyardCorpseMarkup).join("") : `<p class="empty-note">No dead companions are recorded.</p>`}
+    </section>
+    <hr />
+    <button type="button" data-action="back-to-village-list">Back to Village</button>
   `;
 }
 
@@ -7278,7 +7967,7 @@ function itemIsArmorsmithStock(item) {
 }
 
 function itemIsGeneralMerchantStock(item) {
-  return itemIsStandardNonMagic(item) && (item.type === "ammunition" || item.id === "potion-healing");
+  return itemIsStandardNonMagic(item) && (item.type === "ammunition" || item.id === "potion-healing" || ["torch", "hooded-lantern", "lantern-oil"].includes(item.id));
 }
 
 function storeAcceptsSoldItem(item, npc = storeNpcDefinition()) {
@@ -9682,6 +10371,24 @@ function useUsableInventoryItem(itemId, targetId = null, options = {}) {
     addLog(`${hero.name} uses ${item.name}${targetText} and heals ${healed} HP to full.`, "heal");
     if (itemUseConsumesInventory(item)) consumeEquippedItem(itemId);
     void maybeFinishEncounterAfterHeroRecovery();
+  } else if (item.use?.kind === "light" && item.use?.status) {
+    if (!spendItemCharge(item)) return;
+    const statusId = item.use.status.id;
+    const wasLit = Boolean(statusId && hero.statusEffects?.some((effect) => effect.id === statusId));
+    if (wasLit) {
+      hero.statusEffects = (hero.statusEffects ?? []).filter((effect) => effect.id !== statusId);
+      addLog(`${hero.name} extinguishes ${item.name}.`, "important");
+    } else {
+      const fuelItemId = item.use.fuelItemId;
+      if (fuelItemId && !consumeInventoryItemByTemplateId(hero, fuelItemId)) {
+        addLog(`${hero.name} needs ${item.use.fuelItemName ?? "fuel"} to light ${item.name}.`, "important");
+        render();
+        return;
+      }
+      applyStatusEffect(hero, lightItemStatus(item, hero));
+      addLog(`${hero.name} lights ${item.name}${fuelItemId ? `, consuming 1 ${item.use.fuelItemName ?? "fuel"}` : ""}.`, "important");
+    }
+    if (!wasLit && itemUseConsumesInventory(item)) consumeEquippedItem(itemId);
   } else if (item.use?.status) {
     if (!spendItemCharge(item)) return;
     applyStatusEffect(hero, { ...item.use.status });
@@ -11429,7 +12136,7 @@ function renderControls() {
   els.returnHome.title = state.mode === "combat" ? fleeStatus.reason : "";
   els.endTurn.disabled = movementInProgress || !heroTurn;
 
-  const selectableCount = partyHeroes().filter((entry) => heroCanAct(entry) && !isAutonomousAlly(entry)).length;
+  const selectableCount = selectableHeroIds().size;
   if (els.selectParty) {
     els.selectParty.disabled = !gameHasStarted || state.mode === "combat" || selectableCount <= 1;
   }

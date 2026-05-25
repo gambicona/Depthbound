@@ -26,7 +26,7 @@ const hazardMove = (damage, options = {}) => ({ type: "hazardOnMovement", damage
 const difficult = { type: "difficultTerrain", label: "difficult terrain" };
 const cover = (amount = "half") => ({ type: "cover", amount, label: `${amount} cover` });
 const concealment = (amount = "partial") => ({ type: "concealment", amount, label: `${amount} concealment` });
-const light = (radius = 4) => ({ type: "lightSource", radius });
+const light = (dimRadius = 4, color = "#ff4f2e", brightRadius = Math.max(1, Math.floor(dimRadius / 2)), lightTone = "infernal-red") => ({ type: "lightSource", brightRadius, dimRadius, color, lightTone });
 const destructible = (hp = 12, ac = 13) => ({ type: "destructibleObject", hp, ac });
 const inspectEvent = (options = {}) => ({ type: "inspectEvent", dc: options.dc ?? 13, chance: options.chance ?? 1, spawnChance: options.spawnChance ?? 0.5, ...options });
 const unique = (options = {}) => ({ type: "uniqueInteraction", dc: options.dc ?? 13, timeSeconds: options.timeSeconds ?? 600, ...options });
@@ -55,7 +55,7 @@ feature("infernal-brazier", "Infernal Brazier", ["fire", "light", "forge"], {
   weight: 120,
   spawnChance: 0.07,
   description: "A black iron brazier burns with a steady red flame that never consumes its fuel.",
-  components: [light(5), hazardEnter({ count: 1, sides: 6, type: "fire" }), unique({ label: "Set Infernal Ward", effect: "incenseWard", dc: 13, skills: ["religion", "arcana", "medicine"], resistance: "fire", timeSeconds: 300, tooltip: "Religion, Arcana, or Medicine DC 13; takes 5 minutes. Gain fire resistance for the next encounter.", failureDamage: { count: 1, sides: 6, type: "fire" } })],
+  components: [light(5, "#ff4f2e", 2, "infernal-red"), hazardEnter({ count: 1, sides: 6, type: "fire" }), unique({ label: "Set Infernal Ward", effect: "incenseWard", dc: 13, skills: ["religion", "arcana", "medicine"], resistance: "fire", timeSeconds: 300, tooltip: "Religion, Arcana, or Medicine DC 13; takes 5 minutes. Gain fire resistance for the next encounter.", failureDamage: { count: 1, sides: 6, type: "fire" } })],
 });
 
 feature("chain-curtain", "Chain Curtain", ["chain", "metal", "obstacle"], {
@@ -114,7 +114,7 @@ feature("hell-forge", "Hell Forge", ["forge", "fire", "metal"], {
   description: "A squat forge glows with banked hellfire and half-melted black iron.",
   components: [
     cover("half"),
-    light(5),
+    light(5, "#ff5f24", 2, "hellfire-orange"),
     hazardEnter({ count: 1, sides: 8, type: "fire" }),
     hiddenLoot({ dc: 14, item: "infernal-iron-shard", chance: 0.5 }),
     hiddenLoot({ dc: 15, item: "hellfire-ember", chance: 0.3 }),
@@ -168,7 +168,7 @@ feature("abyssal-rift", "Abyssal Rift", ["rift", "demon", "arcane"], {
   spawnChance: 0.04,
   description: "A jagged tear in the air leaks black wind, sparks, and distant howls.",
   components: [
-    light(3),
+    light(3, "#b36bff", 1, "abyssal-violet"),
     hazardEnter({ count: 1, sides: 8, type: "force" }),
     inspectEvent({
       dc: 15,

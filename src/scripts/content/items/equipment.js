@@ -135,6 +135,48 @@ function simpleConsumable(id, name, description, use = {}) {
   });
 }
 
+function lightGear(id, name, cost, weightLb, lightSource, description, options = {}) {
+  if (window.DungeonContent.get?.("items", id)) return;
+  window.DungeonContent.register("items", id, {
+    name,
+    type: "consumable",
+    category: "light",
+    cost,
+    weightLb,
+    slots: options.slots ?? ["belt1", "belt2", "belt3", "belt4", "belt5"],
+    description,
+    use: {
+      kind: "light",
+      resource: "action",
+      consume: false,
+      fuelItemId: options.fuelItemId ?? null,
+      fuelItemName: options.fuelItemName ?? null,
+      requiredSlots: options.requiredSlots ?? options.slots ?? ["belt1", "belt2", "belt3", "belt4", "belt5"],
+      status: {
+        id: `${id}-lit`,
+        label: name,
+        lightSource,
+        durationHours: options.durationHours ?? 1,
+        consumeLightItemOnExpire: Boolean(options.consumeItemOnExpire),
+      },
+    },
+  });
+}
+
+function adventuringSupply(id, name, cost, weightLb, description, options = {}) {
+  if (window.DungeonContent.get?.("items", id)) return;
+  window.DungeonContent.register("items", id, {
+    name,
+    type: "consumable",
+    category: options.category ?? "supply",
+    cost,
+    weightLb,
+    slots: options.slots ?? ["belt1", "belt2", "belt3", "belt4", "belt5"],
+    tags: uniqueTags(["supply", ...(options.tags ?? [])]),
+    description,
+  });
+}
+
 weapon("club", "Club", "simple melee", "melee", sp(1), { count: 1, sides: 4, type: "bludgeoning", bonusAbility: "str" }, 2, ["light"]);
 weapon("dagger", "Dagger", "simple melee", "melee", gp(2), { count: 1, sides: 4, type: "piercing", bonusAbility: "str" }, 1, ["finesse", "light", "thrown"], { thrown: { kind: "thrown", normal: 20, long: 60, feet: 20 } });
 weapon("greatclub", "Greatclub", "simple melee", "melee", sp(2), { count: 1, sides: 8, type: "bludgeoning", bonusAbility: "str" }, 10, ["two-handed"]);
@@ -203,7 +245,7 @@ healingPotion("potion-supreme-healing", "Potion of Supreme Healing", { count: 10
 simpleConsumable("berry", "Berry", "A small edible berry. It heals 1 HP when used.", { kind: "healing", resource: "bonusAction", dice: { count: 1, sides: 1 } });
 simpleConsumable("medicinal-herb", "Medicinal Herb", "A field herb that heals 1d4 HP when used.", { kind: "healing", dice: { count: 1, sides: 4 } });
 simpleConsumable("glowcap", "Glowcap", "A faintly glowing mushroom cap. Use it to move a little faster while it lights your path for the rest of the dungeon.", {
-  status: { id: "glowcap-light", label: "Glowcap", speedBonusFeet: 5, expiresAtHome: true },
+  status: { id: "glowcap-light", label: "Glowcap", speedBonusFeet: 5, lightSource: { brightRadiusFeet: 0, dimRadiusFeet: 10, color: "#77f7cf" }, expiresAtHome: true },
 });
 simpleConsumable("bitter-root", "Bitter Root", "A bitter root used as a minor poison-resisting remedy. Use it to resist poison damage for the rest of the dungeon.", {
   status: { id: "bitter-root", label: "Bitter Root", resistances: ["poison"], expiresAtHome: true },
@@ -223,6 +265,22 @@ simpleConsumable("crystal-shard", "Crystal Shard", "A small arcane component or 
 simpleConsumable("sacred-ash", "Sacred Ash", "A pinch of ash from a consecrated flame. Use it to resist necrotic damage and gain +1 AC for the rest of the dungeon.", {
   status: { id: "sacred-ash", label: "Sacred Ash", acBonus: 1, resistances: ["necrotic"], expiresAtHome: true },
 });
+
+lightGear("torch", "Torch", cp(1), 1, { brightRadiusFeet: 20, dimRadiusFeet: 40, color: "#ffb35c" }, "A pitch-wrapped torch. It must be held in one hand while lit, sheds bright light for 20 ft and dim light for another 20 ft, and burns for 1 hour.", {
+  slots: ["mainHand", "offHand"],
+  requiredSlots: ["mainHand", "offHand"],
+  durationHours: 1,
+  consumeItemOnExpire: true,
+});
+lightGear("hooded-lantern", "Lantern", gp(5), 2, { brightRadiusFeet: 30, dimRadiusFeet: 60, color: "#ffd27a" }, "A lantern with a shuttered hood. It can be held or worn on the belt, sheds bright light for 30 ft and dim light for another 30 ft, and consumes one flask of lantern oil per hour.", {
+  slots: ["mainHand", "offHand", "belt1", "belt2", "belt3", "belt4", "belt5"],
+  requiredSlots: ["mainHand", "offHand", "belt1", "belt2", "belt3", "belt4", "belt5"],
+  fuelItemId: "lantern-oil",
+  fuelItemName: "Lantern Oil",
+  durationHours: 1,
+});
+lightGear("bullseye-lantern", "Bullseye Lantern", gp(10), 2, { brightRadiusFeet: 60, dimRadiusFeet: 120, color: "#ffe0a3" }, "A focused lantern. The cone is approximated as a longer light radius in the dungeon view.");
+adventuringSupply("lantern-oil", "Lantern Oil", sp(1), 1, "A flask of lantern oil. A hooded lantern consumes one flask for each hour of light.", { category: "light", tags: ["light", "fuel"] });
 
 window.DungeonContent.register("equipmentPacks", "standardEquipment", {
   name: "Standard Weapons and Armor",
