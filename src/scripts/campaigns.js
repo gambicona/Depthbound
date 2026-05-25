@@ -81,6 +81,9 @@ If the Barrow Crown is not found, the first king will rise — and every oath on
   {
     id: "dwarven-smithy-ember-oath",
     name: "The Dwarven Smithy: The Ember Oath",
+    unlock: {
+      questFlag: "flag.borren.claimHammerReturned",
+    },
     quest: {
       giver: "Borren Ashmantle",
       initialTitle: "Reopen the Ember Oath",
@@ -164,6 +167,20 @@ function hasOverride(campaignId, index) {
   return Boolean(loadOverrides()[overrideKey(campaignId, index)]);
 }
 
+function isUnlocked(campaignId, gameState = window.state) {
+  const campaign = campaigns.find((entry) => entry.id === campaignId);
+  if (!campaign) return false;
+  const unlock = campaign.unlock;
+  if (!unlock) return true;
+  if (unlock.questFlag && !gameState?.questFlags?.[unlock.questFlag]) return false;
+  if (unlock.campaignId) {
+    const required = Math.max(1, Math.floor(Number(unlock.campaignProgress) || 1));
+    const completed = Math.floor(Number(gameState?.campaignProgress?.[unlock.campaignId]) || 0);
+    if (completed < required) return false;
+  }
+  return true;
+}
+
 async function dungeon(campaignId, index) {
   const campaign = campaigns.find((entry) => entry.id === campaignId);
   if (!campaign || index < 1 || index > campaign.count) return null;
@@ -196,6 +213,7 @@ window.DungeonCampaigns = {
   get: (id) => campaigns.find((campaign) => campaign.id === id) ?? null,
   dungeon,
   originalDungeon,
+  isUnlocked,
   hasOverride,
   saveOverride,
   removeOverride,

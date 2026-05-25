@@ -95,6 +95,7 @@ function applyDamageToFighter(defender, damage) {
   const hpDamage = Math.max(0, damage - temporaryAbsorbed);
   defender.hp = Math.max(0, defender.hp - hpDamage);
   checkConcentrationAfterDamage(defender, hpDamage);
+  if (hpDamage > 0) maybeTriggerDiseaseOnDamage(defender);
   if (!isPartyHeroId(defender.id)) {
     defender.alive = defender.hp > 0;
     return;
@@ -720,6 +721,7 @@ function resetTurnResources(fighter) {
   agePersistentSpellAreasForCaster(fighter);
   tickStatusDurations(fighter);
   fighter.statusEffects = (fighter.statusEffects ?? []).filter((effect) => !effect.expiresAtStartOfTurn);
+  void applyActivePoisonsAtTurnStart(fighter);
   fighter.lastMoveFeet = 0;
   for (const ability of fighterAbilityDefinitions(fighter).filter((entry) => entry.refresh === "turn")) {
     fighter.abilityUses = { ...(fighter.abilityUses ?? {}), [ability.id]: 0 };
@@ -1649,15 +1651,354 @@ function canApplySneakAttack(attacker, defender, weapon, rangedAttack) {
   );
 }
 
-function consumeWeaponRider(attacker) {
-  const rider = (attacker.statusEffects ?? []).find((effect) => effect.weaponRider || ["thunderous-smite", "wrathful-smite", "branding-smite", "ensnaring-strike", "hail-of-thorns"].includes(effect.id));
+function consumeWeaponRider(attacker, attackDamage = null) {
+  const riders = (attacker.statusEffects ?? []).filter((effect) => effect.weaponRider || ["thunderous-smite", "wrathful-smite", "branding-smite", "ensnaring-strike", "hail-of-thorns"].includes(effect.id));
+  const rider = riders.find((effect) => !effect.poison || ["piercing", "slashing"].includes(String(attackDamage?.type ?? "").toLowerCase()));
   if (!rider) return null;
   attacker.statusEffects = (attacker.statusEffects ?? []).filter((effect) => effect.id !== rider.id);
   return rider;
 }
 
+function rollPoisonDamage(poison = {}) {
+  const dice = poison.damage;
+  if (!dice?.count || !dice?.sides) return { raw: 0, rolls: [] };
+  const roll = rollDice(dice.count, dice.sides);
+  return { raw: Math.max(0, roll.total + (dice.bonus ?? 0)), rolls: roll.rolls };
+}
+
+function poisonConditionEffect(poison, condition) {
+  const id = condition.id ?? `${poison.id ?? "poison"}-${condition.label ?? "effect"}`;
+  const effect = {
+    ...condition,
+    id,
+    sourcePoisonId: poison.id,
+    sourcePoisonName: poison.name,
+    poisonRepeatSaveDc: condition.repeatSaveEnds ? poison.saveDc : condition.poisonRepeatSaveDc,
+  };
+  if (effect.poisonTimedTrigger) {
+    const trigger = { ...effect.poisonTimedTrigger };
+    const delaySeconds = (Number(trigger.delayHours ?? trigger.intervalHours) || 0) * 3600;
+    trigger.nextAtDungeonTimeSeconds = dungeonElapsedSeconds({ sync: false }) + Math.max(1, delaySeconds);
+    effect.poisonTimedTrigger = trigger;
+  }
+  return effect;
+}
+
+async function applyPoisonExposure(source, target, poison = {}, options = {}) {
+  if (!target?.alive || !poison) return false;
+  const label = poison.name ?? options.label ?? "Poison";
+  const saveDc = poison.saveDc ?? 10;
+  const damage = rollPoisonDamage(poison);
+  const save = await rollSavingThrow(target, "con", saveDc, `${label} forces ${target.name} to make a CON save.`);
+  const failed = !save.success;
+  if (!poison.delayedDamage && damage.raw > 0 && (failed || poison.halfDamageOnSave)) {
+    const dealt = failed ? damage.raw : Math.max(0, Math.floor(damage.raw / 2));
+    if (dealt > 0) applySpecialDamage(source ?? target, target, dealt, poison.damage?.type ?? "poison", label);
+  }
+  if (!failed) {
+    addLog(`${target.name} resists ${label}.`, "important");
+    return false;
+  }
+  for (const condition of poison.conditions ?? []) {
+    applyStatusEffect(target, poisonConditionEffect(poison, condition));
+  }
+  for (const entry of poison.failBy ?? []) {
+    if (save.total <= saveDc - (entry.amount ?? 0) && entry.status) applyStatusEffect(target, poisonConditionEffect(poison, entry.status));
+  }
+  if (poison.repeat?.at === "startOfTurn") {
+    applyStatusEffect(target, {
+      id: `poison-repeat-${poison.id ?? label}`,
+      label,
+      sourcePoisonId: poison.id,
+      sourcePoisonName: label,
+      poisonRepeat: { ...poison.repeat, successes: 0 },
+      durationRounds: 10,
+    });
+  }
+  if (poison.delayedStatus) {
+    applyStatusEffect(target, poisonConditionEffect(poison, poison.delayedStatus));
+    addLog(`${label} also leaves a delayed affliction marker on ${target.name}.`, "important");
+  }
+  return true;
+}
+
+function diseaseDefinition(diseaseId) {
+  return window.DungeonAfflictions?.diseases?.[diseaseId] ?? null;
+}
+
+function fighterDiseases(fighter) {
+  return (fighter?.statusEffects ?? []).filter((effect) => effect.disease || effect.diseaseId);
+}
+
+function diseaseStatusEffect(disease, source = null) {
+  const base = disease?.status ?? {};
+  const effect = {
+    ...base,
+    id: base.id ?? `disease-${disease.id}`,
+    label: base.label ?? disease.name,
+    disease: true,
+    diseaseId: disease.id,
+    sourceDiseaseName: disease.name,
+    sourceId: source?.id,
+  };
+  if (effect.diseaseTimedTrigger) {
+    const trigger = { ...effect.diseaseTimedTrigger };
+    trigger.nextAtDungeonTimeSeconds = dungeonElapsedSeconds({ sync: false }) + Math.max(1, (Number(trigger.intervalHours) || 24) * 3600);
+    effect.diseaseTimedTrigger = trigger;
+  }
+  return effect;
+}
+
+async function applyDiseaseExposure(source, target, diseaseId, options = {}) {
+  const disease = typeof diseaseId === "string" ? diseaseDefinition(diseaseId) : diseaseId;
+  if (!target?.alive || !disease) return false;
+  const label = disease.name ?? options.label ?? "Disease";
+  if (typeof fighterIsImmuneToDisease === "function" && fighterIsImmuneToDisease(target)) {
+    addLog(`${target.name} is immune to ${label}.`, "important");
+    return false;
+  }
+  if ((fighterDiseases(target) ?? []).some((effect) => effect.diseaseId === disease.id)) return false;
+  const dc = options.saveDc ?? disease.saveDc ?? 12;
+  const ability = disease.saveAbility ?? "con";
+  const save = await rollSavingThrow(target, ability, dc, `${source?.name ?? label}'s ${label} exposure forces ${target.name} to make a ${ability.toUpperCase()} save.`);
+  if (save.success) {
+    addLog(`${target.name} resists ${label}.`, "important");
+    return false;
+  }
+  applyStatusEffect(target, diseaseStatusEffect(disease, source));
+  addLog(`${target.name} contracts ${label}.`, "important");
+  return true;
+}
+
+function cureFighterDisease(fighter, diseaseId = null) {
+  if (!fighter?.statusEffects?.length) return [];
+  const removed = [];
+  fighter.statusEffects = fighter.statusEffects.filter((effect) => {
+    const matches = (effect.disease || effect.diseaseId) && (!diseaseId || effect.diseaseId === diseaseId);
+    if (matches) removed.push(effect);
+    return !matches;
+  });
+  if (removed.length) refreshDerivedStats(fighter);
+  return removed;
+}
+
+function cureAllFighterDiseases(fighter) {
+  return cureFighterDisease(fighter, null);
+}
+
+function curseDefinition(curseId) {
+  return window.DungeonAfflictions?.curses?.[curseId] ?? null;
+}
+
+function itemCurseEntries(item, trigger = null) {
+  const entries = [
+    ...(item?.curses ?? []),
+    ...(item?.magic?.curses ?? []),
+    ...(item?.magic?.curse?.id ? [item.magic.curse] : []),
+  ].map((entry) => (typeof entry === "string" ? { id: entry } : entry)).filter((entry) => entry?.id);
+  return trigger ? entries.filter((entry) => (entry.mode ?? curseDefinition(entry.id)?.mode ?? "equip") === trigger) : entries;
+}
+
+function curseStatusEffect(curse, item, entry = {}) {
+  const base = { ...(curse?.status ?? {}), ...(entry.status ?? {}) };
+  const effectId = `curse-${entry.id ?? curse.id}-${item?.id ?? "item"}`;
+  return {
+    ...base,
+    id: base.id ?? effectId,
+    label: base.label ?? curse?.name ?? entry.name ?? "Curse",
+    curse: true,
+    curseId: entry.id ?? curse?.id,
+    cursedItemId: item?.id,
+    cursedItemName: item?.name,
+    persistsAfterUnequip: Boolean(entry.persistsAfterUnequip ?? curse?.persistsAfterUnequip),
+    conditionDescription: base.conditionDescription ?? entry.description ?? curse?.description,
+  };
+}
+
+function triggerItemCurses(fighter, item, trigger = "equip") {
+  if (!fighter || !item) return [];
+  const triggered = [];
+  for (const entry of itemCurseEntries(item, trigger)) {
+    const curse = curseDefinition(entry.id);
+    if (!curse) continue;
+    item.curseState = { ...(item.curseState ?? {}), triggered: true, removed: false };
+    if (entry.cannotUnequip ?? curse.cannotUnequip) item.curseState.bound = true;
+    const status = curseStatusEffect(curse, item, entry);
+    if (!(fighter.statusEffects ?? []).some((effect) => effect.id === status.id)) {
+      applyStatusEffect(fighter, status);
+      addLog(`${item.name}'s ${curse.name} curse takes hold of ${fighter.name}.`, "important");
+    }
+    triggered.push(curse);
+  }
+  return triggered;
+}
+
+function itemHasBindingCurse(item) {
+  return Boolean(item?.curseState?.bound && itemCurseEntries(item).some((entry) => entry.cannotUnequip ?? curseDefinition(entry.id)?.cannotUnequip));
+}
+
+function removeItemCurseEffectsOnUnequip(fighter, item) {
+  if (!fighter || !item?.id) return [];
+  const removed = [];
+  fighter.statusEffects = (fighter.statusEffects ?? []).filter((effect) => {
+    if (effect.cursedItemId !== item.id || effect.persistsAfterUnequip) return true;
+    removed.push(effect);
+    return false;
+  });
+  if (removed.length) refreshDerivedStats(fighter);
+  return removed;
+}
+
+function removeCursesFromFighter(fighter, options = {}) {
+  if (!fighter) return { statuses: [], items: [] };
+  const statuses = [];
+  const removedItemIds = new Set();
+  fighter.statusEffects = (fighter.statusEffects ?? []).filter((effect) => {
+    if (!effect.curse && !effect.curseId) return true;
+    if (options.itemId && effect.cursedItemId !== options.itemId) return true;
+    if (options.effectId && effect.id !== options.effectId) return true;
+    statuses.push(effect);
+    if (effect.cursedItemId) removedItemIds.add(effect.cursedItemId);
+    return false;
+  });
+  const items = [];
+  for (const item of fighter.inventory?.items ?? []) {
+    if (!item.curseState && !itemCurseEntries(item).length) continue;
+    if (options.itemId && item.id !== options.itemId) continue;
+    if (options.effectId && !removedItemIds.has(item.id)) continue;
+    item.curseState = { ...(item.curseState ?? {}), triggered: false, bound: false, removed: false };
+    items.push(item);
+  }
+  if (statuses.length || items.length) refreshDerivedStats(fighter);
+  return { statuses, items };
+}
+
+function applyTimedPoisonTrigger(fighter, effect, nowSeconds) {
+  const trigger = effect.poisonTimedTrigger;
+  if (!trigger?.nextAtDungeonTimeSeconds || trigger.nextAtDungeonTimeSeconds > nowSeconds) return false;
+  const label = effect.sourcePoisonName ?? effect.label ?? "Poison";
+  const saveDc = trigger.saveDc ?? 10;
+  const save = savingThrow(fighter, "con", saveDc);
+  addLog(`${fighter.name} rolls CON save against ${label}: ${save.roll} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${saveDc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
+  const dice = trigger.damage ?? {};
+  if (!save.success || trigger.halfDamageOnSave) {
+    const roll = dice.count && dice.sides ? rollDice(dice.count, dice.sides) : { total: 0, rolls: [] };
+    const damage = save.success ? Math.floor(roll.total / 2) : roll.total;
+    if (damage > 0) applySpecialDamage(fighter, fighter, damage, dice.type ?? "poison", label);
+  }
+  if (trigger.mode === "once") {
+    removeStatusEffect(fighter, effect.id);
+    return true;
+  }
+  if (save.success) trigger.successes = (trigger.successes ?? 0) + 1;
+  else {
+    trigger.successes = 0;
+    if (trigger.damageCountStep && trigger.damage) trigger.damage.count = Math.max(1, (trigger.damage.count ?? 1) + trigger.damageCountStep);
+  }
+  if ((trigger.successes ?? 0) >= (trigger.successTarget ?? 1)) {
+    removeStatusEffect(fighter, effect.id);
+    return true;
+  }
+  trigger.nextAtDungeonTimeSeconds = nowSeconds + Math.max(1, (Number(trigger.intervalHours) || 24) * 3600);
+  return true;
+}
+
+function applyTimedDiseaseTrigger(fighter, effect, nowSeconds) {
+  const trigger = effect.diseaseTimedTrigger;
+  if (!trigger?.nextAtDungeonTimeSeconds || trigger.nextAtDungeonTimeSeconds > nowSeconds) return false;
+  const label = effect.sourceDiseaseName ?? effect.label ?? "Disease";
+  const saveDc = trigger.saveDc ?? diseaseDefinition(effect.diseaseId)?.saveDc ?? 12;
+  const save = savingThrow(fighter, "con", saveDc);
+  addLog(`${fighter.name} rolls CON save against ${label}: ${save.roll} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${saveDc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
+  if (save.success) {
+    trigger.successes = (trigger.successes ?? 0) + 1;
+    if ((trigger.successes ?? 0) >= (trigger.successTarget ?? 1)) {
+      removeStatusEffect(fighter, effect.id);
+      for (const related of [...(fighter.statusEffects ?? [])].filter((entry) => entry.diseaseId === effect.diseaseId && entry.id !== effect.id)) removeStatusEffect(fighter, related.id);
+      addLog(`${fighter.name} recovers from ${label}.`, "important");
+      return true;
+    }
+  } else {
+    trigger.successes = 0;
+    trigger.failures = (trigger.failures ?? 0) + 1;
+    if (trigger.failPenalty) {
+      for (const [key, value] of Object.entries(trigger.failPenalty)) {
+        if (typeof value === "number") effect[key] = Math.max(-5, (effect[key] ?? 0) + value);
+      }
+      refreshDerivedStats(fighter);
+    }
+    if (trigger.failureBlindnessAt && trigger.blindedStatus && (trigger.failures ?? 0) >= trigger.failureBlindnessAt) {
+      applyStatusEffect(fighter, { ...trigger.blindedStatus, disease: true, diseaseId: effect.diseaseId });
+      addLog(`${fighter.name}'s ${label} clouds their sight completely.`, "important");
+    }
+  }
+  trigger.nextAtDungeonTimeSeconds = nowSeconds + Math.max(1, (Number(trigger.intervalHours) || 24) * 3600);
+  return true;
+}
+
+function processTimedAfflictions(nowSeconds = dungeonElapsedSeconds({ sync: false })) {
+  let processed = 0;
+  for (const fighter of Object.values(state?.fighters ?? {})) {
+    for (const effect of [...(fighter.statusEffects ?? [])]) {
+      if (applyTimedPoisonTrigger(fighter, effect, nowSeconds)) processed += 1;
+      if (applyTimedDiseaseTrigger(fighter, effect, nowSeconds)) processed += 1;
+    }
+  }
+  return processed;
+}
+
+function maybeTriggerDiseaseOnDamage(fighter) {
+  for (const effect of fighterDiseases(fighter)) {
+    const trigger = effect.diseaseDamageTrigger;
+    if (!trigger) continue;
+    if (trigger.stunnedRounds) {
+      applyStatusEffect(fighter, { id: `disease-stunned-${effect.diseaseId}`, label: "Stunned", condition: "stunned", actionLocked: true, speedLocked: true, durationRounds: trigger.stunnedRounds });
+      addLog(`${fighter.name}'s ${effect.label ?? "disease"} leaves them stunned by the wound.`, "important");
+    }
+  }
+}
+
+async function applyActivePoisonsAtTurnStart(fighter) {
+  if (!fighter?.alive || !fighter.statusEffects?.length) return;
+  for (const effect of [...fighter.statusEffects]) {
+    if (effect.poisonRepeat) {
+      const repeat = effect.poisonRepeat;
+      const save = await rollSavingThrow(fighter, "con", repeat.saveDc ?? 10, `${effect.label ?? "Poison"} continues in ${fighter.name}'s system.`);
+      if (save.success) {
+        effect.poisonRepeat.successes = (effect.poisonRepeat.successes ?? 0) + 1;
+        if (effect.poisonRepeat.successes >= (repeat.successTarget ?? 1)) removeStatusEffect(fighter, effect.id);
+      } else {
+        effect.poisonRepeat.successes = 0;
+        const roll = repeat.damage?.count && repeat.damage?.sides ? rollDice(repeat.damage.count, repeat.damage.sides) : { total: 0, rolls: [] };
+        if (roll.total > 0) applySpecialDamage(fighter, fighter, Math.max(1, roll.total + (repeat.damage.bonus ?? 0)), repeat.damage.type ?? "poison", effect.label ?? "Poison");
+      }
+    } else if (effect.poisonRepeatSaveDc) {
+      const save = await rollSavingThrow(fighter, "con", effect.poisonRepeatSaveDc, `${fighter.name} tries to shake off ${effect.label ?? "poison"}.`);
+      if (save.success) removeStatusEffect(fighter, effect.id);
+    }
+    if (effect.diseaseTurnTrigger && Math.random() <= (effect.diseaseTurnTrigger.chance ?? 1)) {
+      const trigger = effect.diseaseTurnTrigger;
+      const save = await rollSavingThrow(fighter, "con", trigger.saveDc ?? 12, `${fighter.name}'s ${effect.label ?? "disease"} surges under stress.`);
+      if (!save.success) {
+        const dice = trigger.damage ?? {};
+        const roll = dice.count && dice.sides ? rollDice(dice.count, dice.sides) : { total: 0, rolls: [] };
+        if (roll.total > 0) applySpecialDamage(fighter, fighter, roll.total + (dice.bonus ?? 0), dice.type ?? "psychic", effect.label ?? "Disease");
+        if (trigger.incapacitateRounds) applyStatusEffect(fighter, { id: `disease-incapacitated-${effect.diseaseId}`, label: "Incapacitated", condition: "incapacitated", actionLocked: true, durationRounds: trigger.incapacitateRounds });
+      }
+    }
+  }
+}
+
 async function applyWeaponRiderSecondary(attacker, defender, rider, attackDamage) {
-  if (!rider || !defender?.alive) return;
+  if (!rider || !defender) return;
+  if (rider.poison) {
+    if (!["piercing", "slashing"].includes(String(attackDamage?.type ?? "").toLowerCase())) {
+      return;
+    }
+    await applyPoisonExposure(attacker, defender, rider.poison, { label: rider.label, weaponDelivery: true });
+    return;
+  }
+  if (!defender.alive) return;
   if (rider.id === "thunderous-smite") {
     const save = await rollSavingThrow(defender, "str", 8 + proficiencyBonus(attacker) + abilityMod(attacker, "cha"), `${attacker.name}'s Thunderous Smite tries to knock ${defender.name} down.`);
     if (!save.success) {
@@ -5088,7 +5429,7 @@ async function makeAttack(attacker, defender, options = {}) {
     });
     attacker.zealotDivineFuryUsedThisTurn = true;
   }
-  const rider = consumeWeaponRider(attacker);
+  const rider = consumeWeaponRider(attacker, attackDamage);
   if (rider?.damageBonus) {
     packets.push({
       raw: rider.damageBonus,
@@ -5114,6 +5455,7 @@ async function makeAttack(attacker, defender, options = {}) {
       if (splash) applySpecialDamage(attacker, splash, Math.max(1, Math.floor(rider.damageBonus / 2)), attackDamage.type, "Sweeping Attack");
     }
   }
+  if (rider?.poison) await applyWeaponRiderSecondary(attacker, defender, rider, attackDamage);
   if (isPartyHeroId(defender.id) && adminEnabled() && adminGodMode) {
     addLog(`God mode prevents ${attacker.name}'s damage to ${defender.name}.`, "important");
     render();
@@ -5168,7 +5510,7 @@ async function makeAttack(attacker, defender, options = {}) {
     "damage",
   );
   await maybeUseStoneRuneAfterAttack(attacker, defender);
-  await applyWeaponRiderSecondary(attacker, defender, rider, attackDamage);
+  if (!rider?.poison) await applyWeaponRiderSecondary(attacker, defender, rider, attackDamage);
   await applyWildShapeAttackEffects(attacker, defender, attackDamage);
   if (totalDamage > 0) await maybeUseHellishRebuke(defender, attacker);
   await maybeUseStoneRuneAfterAttack(attacker, defender);
@@ -5841,6 +6183,10 @@ function applyStatusEffect(target, effect) {
   if (effect.condition && typeof fighterIsImmuneToCondition === "function" && fighterIsImmuneToCondition(target, effect.condition)) {
     const conditionName = effect.conditionLabel ?? effect.label ?? effect.condition;
     addLog(`${target.name} is immune to ${conditionName}.`, "important");
+    return false;
+  }
+  if ((effect.disease || effect.diseaseId) && typeof fighterIsImmuneToDisease === "function" && fighterIsImmuneToDisease(target)) {
+    addLog(`${target.name} is immune to ${effect.label ?? "disease"}.`, "important");
     return false;
   }
   effect = prepareTimedEffect(effect);
@@ -7047,7 +7393,8 @@ function restorationEffectIsNegative(effect) {
       effect.speedLocked ||
       effect.actionLocked ||
       effect.poisoned ||
-      effect.disease,
+      effect.disease ||
+      effect.curse
   );
 }
 
@@ -7056,11 +7403,24 @@ function applySpellRestoration(caster, target, spell) {
   const removeAll = spell.effect?.removeAll !== false;
   const removed = [];
   target.statusEffects = before.filter((effect) => {
+    if ((effect.curse || effect.curseId) && !spell.effect?.removeCurses) return true;
     if (!restorationEffectIsNegative(effect)) return true;
     if (!removeAll && removed.length >= 1) return true;
     removed.push(effect);
     return false;
   });
+  const diseaseIds = new Set(removed.map((effect) => effect.diseaseId).filter(Boolean));
+  if (diseaseIds.size) {
+    target.statusEffects = target.statusEffects.filter((effect) => {
+      if (!diseaseIds.has(effect.diseaseId)) return true;
+      removed.push(effect);
+      return false;
+    });
+  }
+  if (spell.effect?.removeCurses) {
+    const curseResult = removeCursesFromFighter(target);
+    removed.push(...curseResult.statuses);
+  }
   if (spell.effect?.healDice) {
     const roll = rollDice(spell.effect.healDice.count, spell.effect.healDice.sides);
     const healed = applyHealingToHero(target, roll.total + (spell.effect.healBonus ?? 0));
@@ -7664,6 +8024,36 @@ async function chooseAndCastSpell(spellId, castLevel = null) {
   startSpellTargeting(caster, spell);
 }
 
+function monsterDiseaseCarriers(monster) {
+  const text = [
+    monster?.id,
+    monster?.name,
+    monster?.type,
+    ...(monster?.tags ?? []),
+    ...(monsterSpecialNames(monster) ?? []),
+  ]
+    .join(" ")
+    .toLowerCase();
+  const carriers = [];
+  if (/\b(sewer|filth|plague|mange|rat|vermin|carrion|ghoul|zombie|rot|rotting|diseased)\b/.test(text)) carriers.push({ id: "sewer-plague", chance: 0.28 });
+  if (/\b(fungus|fungal|spore|mold|eye|sight)\b/.test(text)) carriers.push({ id: "sight-rot", chance: 0.22 });
+  if (/\b(cackle|laugh|hyena|madness|gibber)\b/.test(text)) carriers.push({ id: "cackle-fever", chance: 0.2 });
+  if (/contagion|mindrot/.test(text)) carriers.push({ id: "mindfire", chance: 0.18 });
+  return carriers.filter((entry, index, list) => list.findIndex((candidate) => candidate.id === entry.id) === index);
+}
+
+async function maybeApplyMonsterDiseaseOnHit(monster, target) {
+  if (!target?.alive || !isPartyHeroId(target.id)) return false;
+  const carriers = [...(monster?.diseases ?? []), ...monsterDiseaseCarriers(monster)];
+  if (!carriers.length) return false;
+  for (const carrier of carriers) {
+    const diseaseId = typeof carrier === "string" ? carrier : carrier.id;
+    if (!diseaseId || Math.random() > (carrier.chance ?? 0.25)) continue;
+    return applyDiseaseExposure(monster, target, diseaseId, { saveDc: carrier.saveDc });
+  }
+  return false;
+}
+
 function pushTargetAway(source, target) {
   return applyForcedMovement(source, target, { mode: "push", distanceFeet: 5, label: "shove" });
 }
@@ -7674,6 +8064,7 @@ function pullTargetToward(source, target) {
 
 async function applyMonsterOnHitSpecials(monster, target, baseDamage, critical) {
   if (!target.alive) return;
+  await maybeApplyMonsterDiseaseOnHit(monster, target);
   const names = monsterSpecialNames(monster);
   if (!names.length || !shouldUseMonsterSpecial("onHit")) return;
   const normalized = names.join(" | ");

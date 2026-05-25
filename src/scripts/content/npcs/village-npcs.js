@@ -40,6 +40,22 @@ const armorLines = [
   "Come in whole, leave harder to ruin.",
 ];
 
+const apothecaryLines = [
+  "Sit there. No, not on the clean stool. The other one.",
+  "I charge by the symptom, not the scream.",
+  "If it came from a sewer, a bite, or a mushroom, I have seen worse.",
+  "Medicine first, heroic explanations after.",
+  "Keep your hands away from the labeled jars unless you can read Old Elvish.",
+];
+
+const wizardLines = [
+  "No, I do not remove curses for free. I am retired, not dead.",
+  "Bring the reagent first. Then we may discuss your poor decisions.",
+  "If it whispers in your sleep, stop sleeping near it.",
+  "Do not put cursed rings in your mouth. Why does everyone need this explained?",
+  "Yes, yes, tragic doom. Put it on the table.",
+];
+
 npc("general-merchant", {
   name: "Sophie",
   title: "General Merchant",
@@ -77,6 +93,32 @@ npc("armorsmith", {
     "Borren is a broad, soot-stained dwarf armorer who repairs mail, shields, helmets, and grave-dented plate from a portable forge wagon. He is gruff, fair, and deeply offended by badly maintained armor.",
   shop: { type: "armorsmith", sellRate: 0.5, acceptsSoldTypes: ["armor"] },
   description: "Standard non-magical armor and shields.",
+});
+
+npc("apothecary", {
+  name: "Ilyra Fen",
+  title: "Apothecary",
+  portrait: "assets/npcs/alchemist.png",
+  token: { fallbackLabel: "AP" },
+  village: { unlocked: true, order: 35 },
+  dialogue: { entryLines: apothecaryLines },
+  inspection:
+    "Ilyra is a steady-handed village apothecary with a travel case full of clean needles, bitter tonics, poultices, and precise little knives. She treats dungeon sickness for coin and keeps notes on anything unusual the party brings back.",
+  shop: { type: "apothecary", sellRate: 0.3, acceptsSoldTypes: [] },
+  description: "Disease diagnosis and treatment.",
+});
+
+npc("grumpy-wizard", {
+  name: "Old Master Vell",
+  title: "Grumpy Old Wizard",
+  portrait: "assets/npcs/alchemist.png",
+  token: { fallbackLabel: "GW" },
+  village: { unlocked: true, order: 37 },
+  dialogue: { entryLines: wizardLines },
+  inspection:
+    "Vell is an ancient, crabby hedge-wizard wrapped in patched robes and professional disappointment. He can break curses, but only if the party brings exactly the reagent he asks for.",
+  shop: { type: "cursebreaker", sellRate: 0.2, acceptsSoldTypes: [] },
+  description: "Curse removal for a specific reagent.",
 });
 
 npc("monster-guild", {

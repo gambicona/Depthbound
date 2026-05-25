@@ -576,6 +576,12 @@ els.storeMenu.addEventListener("click", (event) => {
   if (button?.dataset.action === "complete-borren-claim-hammer") {
     completeBorrenClaimHammerQuest();
   }
+  if (button?.dataset.action === "apothecary-cure-disease") {
+    apothecaryCureDisease(button.dataset.hero, button.dataset.disease);
+  }
+  if (button?.dataset.action === "wizard-remove-curse") {
+    wizardRemoveCurse(button.dataset.hero, { itemId: button.dataset.item || null, effectId: button.dataset.effect || null });
+  }
 });
 els.storeMenu.addEventListener("input", (event) => {
   if (event.target.id !== "store-search") return;
@@ -606,6 +612,10 @@ els.homeMenu.addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (button?.dataset.homeMenu) {
     setHomeMenuPanel(button.dataset.homeMenu);
+    return;
+  }
+  if (button?.dataset.action === "open-custom-item-creator") {
+    window.open("custom-item-creator.html", "_blank", "noopener");
     return;
   }
   if (button?.dataset.randomDungeonTheme) {

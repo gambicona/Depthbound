@@ -179,6 +179,7 @@ const els = {
   itemTagFilter: document.querySelector("#item-tag-filter"),
   itemSort: document.querySelector("#item-sort"),
   lootItem: document.querySelector("#loot-item"),
+  customBibliographyItems: document.querySelector("#custom-bibliography-items"),
   addLoot: document.querySelector("#add-loot"),
   deleteSelected: document.querySelector("#delete-selected"),
   savedDungeons: document.querySelector("#saved-dungeons"),
@@ -909,11 +910,48 @@ function filteredItemEntries() {
     });
 }
 
+function customBibliographyItems() {
+  return window.DungeonCustomItems?.load?.() ?? [];
+}
+
+function filteredCustomBibliographyItems(excludedIds = new Set()) {
+  return customBibliographyItems()
+    .filter((item) => item?.id && !excludedIds.has(item.id))
+    .filter((item) => item.type !== "class")
+    .filter((item) => !els.itemTypeFilter?.value || (item.type ?? item.category ?? "item") === els.itemTypeFilter.value)
+    .filter((item) => entryHasTag(item, els.itemTagFilter?.value ?? ""))
+    .filter((item) => entryMatchesSearch(item, els.itemSearch, [itemValueText(item)]))
+    .sort(compareByName);
+}
+
+function renderCustomBibliographyItems(items) {
+  if (!els.customBibliographyItems) return;
+  if (!customBibliographyItems().length) {
+    els.customBibliographyItems.innerHTML = `<p class="small-note">No custom bibliography items loaded in this browser tab.</p>`;
+    return;
+  }
+  if (!items.length) {
+    els.customBibliographyItems.innerHTML = `<p class="small-note">No custom bibliography items match these filters.</p>`;
+    return;
+  }
+  els.customBibliographyItems.innerHTML = items.map((item) => `
+    <button type="button" data-custom-bibliography-loot="${escapeAttribute(item.id)}">
+      <b>${escapeHtml(item.name)}</b><br>
+      <span class="small-note">${escapeHtml([item.type ?? item.category ?? "item", ...(item.tags ?? []).slice(0, 3)].filter(Boolean).join(" - "))}</span>
+    </button>
+  `).join("");
+}
+
 function renderItemSelects() {
   const items = filteredItemEntries();
+  const registryIds = new Set(items.map((item) => item.id));
+  const allBibliographyItems = filteredCustomBibliographyItems(new Set());
+  const bibliographyItems = allBibliographyItems.filter((item) => !registryIds.has(item.id));
+  allBibliographyItems.forEach((item) => window.DungeonContent?.register?.("items", item.id, item));
   const options = items.map((item) => `<option value="${escapeAttribute(item.id)}">${escapeHtml(itemOptionLabel(item))}</option>`).join("");
+  const bibliographyOptions = bibliographyItems.map((item) => `<option value="${escapeAttribute(item.id)}">${escapeHtml(itemOptionLabel(item))}</option>`).join("");
   const customOptions = state.customItems
-    .filter((item) => !items.some((entry) => entry.id === item.id))
+    .filter((item) => !registryIds.has(item.id) && !bibliographyItems.some((entry) => entry.id === item.id))
     .filter((item) => entryMatchesSearch(item, els.itemSearch, [itemValueText(item)]))
     .filter((item) => !els.itemTypeFilter?.value || (item.type ?? item.category ?? "item") === els.itemTypeFilter.value)
     .filter((item) => entryHasTag(item, els.itemTagFilter?.value ?? ""))
@@ -922,9 +960,10 @@ function renderItemSelects() {
   const currentLoot = els.lootItem.value;
   const currentGoal = els.goalItem.value;
   const currentTemplate = els.customItemTemplate.value;
-  els.lootItem.innerHTML = options + customOptions || `<option value="">No matching items</option>`;
-  els.goalItem.innerHTML = options + customOptions || `<option value="">No matching items</option>`;
-  els.customItemTemplate.innerHTML = options;
+  els.lootItem.innerHTML = options + bibliographyOptions + customOptions || `<option value="">No matching items</option>`;
+  els.goalItem.innerHTML = options + bibliographyOptions + customOptions || `<option value="">No matching items</option>`;
+  els.customItemTemplate.innerHTML = options + bibliographyOptions;
+  renderCustomBibliographyItems(allBibliographyItems);
   if ([...els.lootItem.options].some((option) => option.value === currentLoot)) els.lootItem.value = currentLoot;
   if ([...els.goalItem.options].some((option) => option.value === currentGoal)) els.goalItem.value = currentGoal;
   if ([...els.customItemTemplate.options].some((option) => option.value === currentTemplate)) els.customItemTemplate.value = currentTemplate;
@@ -933,6 +972,53 @@ function renderItemSelects() {
     .sort((a, b) => compareByName(a, b))
     .map((monster) => `<option value="${escapeAttribute(monster.id)}">${escapeHtml(monster.name)}</option>`)
     .join("") + state.monsters.filter((monster) => monster.customized).map((monster) => `<option value="${monster.id}">${monster.name}</option>`).join("");
+}
+
+let customBibliographySignature = "";
+
+function currentCustomBibliographySignature() {
+  const key = window.DungeonCustomItems?.storageKey;
+  if (!key) return "";
+  return window.localStorage?.getItem(key) ?? "";
+}
+
+function syncCustomBibliographyItems(force = false) {
+  if (!window.DungeonCustomItems?.registerAll) return false;
+  const signature = currentCustomBibliographySignature();
+  if (!force && signature === customBibliographySignature) return false;
+  customBibliographySignature = signature;
+  window.DungeonCustomItems.registerAll();
+  renderCatalogueFilters();
+  renderItemSelects();
+  return true;
+}
+
+function decodeTransferPayload(payload) {
+  const padded = String(payload ?? "").replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(String(payload ?? "").length / 4) * 4, "=");
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function importCustomItemsFromHash() {
+  if (!window.DungeonCustomItems?.save || !window.location.hash.includes("customItems=")) return 0;
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  const payload = params.get("customItems");
+  if (!payload) return 0;
+  try {
+    const incoming = decodeTransferPayload(payload);
+    if (!Array.isArray(incoming)) return 0;
+    const byId = new Map(window.DungeonCustomItems.load().map((item) => [item.id, item]));
+    incoming.forEach((item) => {
+      if (item?.id) byId.set(item.id, item);
+    });
+    window.DungeonCustomItems.save([...byId.values()]);
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    return incoming.length;
+  } catch (error) {
+    console.warn("Failed to import custom item transfer payload.", error);
+    return 0;
+  }
 }
 
 function activateCreatorPanelTab(tab) {
@@ -1930,13 +2016,16 @@ function handleGridClick(position) {
   renderAll();
 }
 
-function addLootToSelected() {
+function addLootItemToSelected(itemId) {
   const selected = selectedEntity();
-  const itemId = els.lootItem.value;
   if (!selected || !itemId) return;
   if (selected.monsterId) selected.extraLoot = [...(selected.extraLoot ?? []), itemId];
   if (selected.type) selected.items = [...(selected.items ?? []), itemId];
   renderAll();
+}
+
+function addLootToSelected() {
+  addLootItemToSelected(els.lootItem.value);
 }
 
 function deleteSelected() {
@@ -2149,7 +2238,9 @@ function generateRandomLayout() {
 }
 
 function init() {
+  const importedCustomItems = importCustomItemsFromHash();
   renderThemes();
+  syncCustomBibliographyItems(true);
   renderCatalogueFilters();
   renderItemSelects();
   els.customItemTemplate.dispatchEvent(new Event("change"));
@@ -2158,6 +2249,7 @@ function init() {
   void renderCampaignDungeons();
   setCreatorPanelOpen("left", true);
   setCreatorPanelOpen("right", false);
+  if (importedCustomItems) setStatus(`Imported ${importedCustomItems} custom item${importedCustomItems === 1 ? "" : "s"} from the item creator.`);
 
   els.toolGrid.addEventListener("click", (event) => {
     const button = event.target.closest("[data-tool]");
@@ -2202,6 +2294,13 @@ function init() {
     updateRoomDrag({ x: Number(cell.dataset.x), y: Number(cell.dataset.y) });
   });
   window.addEventListener("pointerup", finishRoomDrag);
+  window.addEventListener("storage", (event) => {
+    if (event.key === window.DungeonCustomItems?.storageKey) syncCustomBibliographyItems(true);
+  });
+  window.addEventListener("focus", () => syncCustomBibliographyItems());
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") syncCustomBibliographyItems();
+  });
   els.roomList.addEventListener("click", (event) => {
     const button = event.target.closest("[data-room-select]");
     if (!button) return;
@@ -2249,6 +2348,11 @@ function init() {
     renderAll();
   });
   els.addLoot.addEventListener("click", addLootToSelected);
+  els.customBibliographyItems?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-custom-bibliography-loot]");
+    if (!button) return;
+    addLootItemToSelected(button.dataset.customBibliographyLoot);
+  });
   els.deleteSelected.addEventListener("click", deleteSelected);
   els.storyTriggerEvent.addEventListener("change", renderStoryTriggerTargetSelect);
   els.saveStoryTrigger.addEventListener("click", saveStoryTrigger);

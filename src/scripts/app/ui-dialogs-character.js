@@ -3176,7 +3176,7 @@ async function startOneShotDungeonWithHero(oneShotDungeonId = "") {
 
 async function showCampaignMenu(campaignId) {
   const campaign = window.DungeonCampaigns?.get(campaignId);
-  if (!campaign) return;
+  if (!campaign || !(window.DungeonCampaigns?.isUnlocked?.(campaignId, state) ?? true)) return;
   const completed = state.campaignProgress?.[campaign.id] ?? 0;
   const entries = await Promise.all(Array.from({ length: campaign.count }, (_, index) => window.DungeonCampaigns.dungeon(campaign.id, index + 1)));
   return new Promise((resolve) => {

@@ -127,6 +127,7 @@ const availability = {
   "aura-of-vitality": ["paladin"],
   "beacon-of-hope": ["cleric"],
   "bestow-curse": ["bard", "cleric", "wizard"],
+  "remove-curse": ["cleric", "paladin", "warlock", "wizard"],
   "blinding-smite": ["paladin"],
   blink: ["sorcerer", "wizard"],
   "conjure-barrage": ["ranger"],
@@ -1675,7 +1676,7 @@ spell("lesser-restoration", {
   target: "ally",
   effect: { kind: "restoration", removeAll: false },
   aiCategory: "cleanse",
-  description: "Remove one harmful status effect or condition from an adjacent ally.",
+  description: "Remove one harmful status effect, condition, or disease from an adjacent ally.",
 });
 
 spell("protection-from-poison", {
@@ -1798,6 +1799,17 @@ spell("bestow-curse", {
   effect: { kind: "status", status: { id: "bestow-curse", label: "Cursed", attackBonus: -2, saveBonus: -2, durationRounds: 3 } },
   aiCategory: "control-cluster",
   description: "WIS save or cursed for 3 rounds, weakening attacks and saves.",
+});
+
+spell("remove-curse", {
+  name: "Remove Curse",
+  level: 3,
+  resource: action,
+  range: { kind: "touch", feet: 5 },
+  target: "ally",
+  effect: { kind: "restoration", removeAll: true, removeCurses: true },
+  aiCategory: "cleanse",
+  description: "End curses on an adjacent ally and break cursed item bindings.",
 });
 
 spell("blinding-smite", {
@@ -4333,6 +4345,7 @@ const spellAliases = {
   prayer_of_healing: "prayer-of-healing",
   gentle_repose: "gentle-repose",
   lesser_restoration: "lesser-restoration",
+  remove_curse: "remove-curse",
   protection_from_poison: "protection-from-poison",
   ray_of_enfeeblement: "ray-of-enfeeblement",
   shadow_blade: "shadow-blade",

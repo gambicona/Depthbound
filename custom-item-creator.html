@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Depthbound Custom Item Creator</title>
+    <link rel="stylesheet" href="src/styles/main.css" />
+    <style>
+      body { margin: 0; background: #071312; color: #f0dfc2; font-family: system-ui, sans-serif; overflow: hidden; }
+      main { width: min(1680px, calc(100vw - 32px)); height: calc(100vh - 32px); margin: 16px auto; display: grid; grid-template-columns: minmax(760px, 1fr) minmax(260px, 360px); gap: 14px; }
+      h1, h2 { margin: 0 0 12px; }
+      h1 { font-size: clamp(2rem, 3vw, 3.2rem); line-height: 1; }
+      .creator-panel { border: 1px solid rgba(77, 201, 190, 0.35); background: rgba(4, 17, 16, 0.92); border-radius: 8px; padding: 16px; min-height: 0; overflow: auto; }
+      .creator-topbar { align-items: center; display: flex; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+      .creator-topbar .ghost-button { border: 1px solid rgba(77, 201, 190, 0.5); border-radius: 6px; color: #f0dfc2; padding: 9px 12px; text-decoration: none; white-space: nowrap; }
+      label { display: grid; gap: 6px; margin: 10px 0; font-weight: 700; }
+      input, select, textarea { width: 100%; box-sizing: border-box; border: 1px solid rgba(220, 177, 112, 0.35); border-radius: 6px; background: #091c1a; color: #f5e6cd; padding: 9px; }
+      textarea { min-height: 88px; resize: vertical; font-family: ui-monospace, monospace; }
+      .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .effect-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+      .curse-list { display: grid; gap: 8px; }
+      .curse-card, .item-card { border: 1px solid rgba(220, 177, 112, 0.22); border-radius: 6px; padding: 10px; background: rgba(255, 255, 255, 0.03); }
+      .curse-card label { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-weight: 600; }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+      button { border: 1px solid rgba(77, 201, 190, 0.5); border-radius: 6px; background: #1d897f; color: white; font-weight: 800; padding: 9px 12px; cursor: pointer; }
+      button.secondary { background: transparent; color: #f0dfc2; }
+      .bibliography { display: grid; gap: 10px; }
+      .small-note { color: #bba37c; font-size: 0.9rem; }
+      @media (max-width: 1100px) { body { overflow: auto; } main { height: auto; grid-template-columns: 1fr; } .effect-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      @media (max-width: 700px) { .row, .effect-grid { grid-template-columns: 1fr; } .creator-topbar { align-items: flex-start; flex-direction: column; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="creator-panel">
+        <div class="creator-topbar">
+          <h1>Custom Item Creator</h1>
+          <div class="actions">
+            <a class="ghost-button" href="index.html">Open Game</a>
+            <a class="ghost-button" href="dungeon-creator.html" data-open-dungeon-creator>Open Dungeon Creator</a>
+          </div>
+        </div>
+        <input id="custom-item-id" type="hidden" />
+        <label>Template <select id="template-item"></select></label>
+        <label>Name <input id="item-name" /></label>
+        <div class="row">
+          <label>Type <input id="item-type" /></label>
+          <label>Category <input id="item-category" /></label>
+        </div>
+        <div class="row">
+          <label>Value gp <input id="item-value" type="number" min="0" step="1" /></label>
+          <label>Weight lb <input id="item-weight" type="number" min="0" step="0.1" /></label>
+        </div>
+        <label>Slots <input id="item-slots" placeholder="mainHand, offHand, ring1" /></label>
+        <label>Description <textarea id="item-description"></textarea></label>
+        <h2>Magic Effects</h2>
+        <div class="effect-grid">
+          <label>Rarity <select id="magic-rarity"><option value="">None</option><option>common</option><option>uncommon</option><option>rare</option><option>very rare</option><option>legendary</option></select></label>
+          <label>Attack bonus <input id="magic-attack" type="number" step="1" /></label>
+          <label>Damage bonus <input id="magic-damage" type="number" step="1" /></label>
+          <label>AC bonus <input id="magic-ac" type="number" step="1" /></label>
+          <label>Max HP bonus <input id="magic-maxhp" type="number" step="1" /></label>
+          <label>Speed bonus ft <input id="magic-speed" type="number" step="5" /></label>
+          <label>Initiative bonus <input id="magic-initiative" type="number" step="1" /></label>
+          <label>Save bonus <input id="magic-save" type="number" step="1" /></label>
+          <label>Skill bonus <input id="magic-skill" type="number" step="1" /></label>
+        </div>
+        <div class="effect-grid">
+          <label>STR bonus <input data-ability-bonus="str" type="number" step="1" /></label>
+          <label>DEX bonus <input data-ability-bonus="dex" type="number" step="1" /></label>
+          <label>CON bonus <input data-ability-bonus="con" type="number" step="1" /></label>
+          <label>INT bonus <input data-ability-bonus="int" type="number" step="1" /></label>
+          <label>WIS bonus <input data-ability-bonus="wis" type="number" step="1" /></label>
+          <label>CHA bonus <input data-ability-bonus="cha" type="number" step="1" /></label>
+        </div>
+        <div class="row">
+          <label>Resistances <input id="magic-resistances" placeholder="fire, cold" /></label>
+          <label>Immunities <input id="magic-immunities" placeholder="poison" /></label>
+        </div>
+        <div class="row">
+          <label>Extra damage dice <input id="magic-extra-dice" placeholder="1d4" /></label>
+          <label>Extra damage type <select id="magic-extra-type"></select></label>
+        </div>
+        <h2>Usable Effect</h2>
+        <div class="effect-grid">
+          <label>Use kind <select id="use-kind"><option value="">None</option><option value="healing">Healing</option><option value="buff">Temporary buff</option></select></label>
+          <label>Heal dice <input id="use-heal-dice" placeholder="2d4" /></label>
+          <label>Heal bonus <input id="use-heal-bonus" type="number" step="1" /></label>
+          <label>Charges <input id="use-charges" type="number" min="0" step="1" /></label>
+          <label>Refresh <select id="use-refresh"><option value="newDungeon">New Dungeon</option><option value="shortRest">Short Rest</option><option value="longRest">Long Rest</option><option value="home">Home</option></select></label>
+          <label>Resource <select id="use-resource"><option value="bonusAction">Bonus Action</option><option value="action">Action</option></select></label>
+        </div>
+        <h2>Curses</h2>
+        <div id="curse-list" class="curse-list"></div>
+        <label>Advanced curse JSON <textarea id="curse-json" placeholder='[{"id":"binding-spite","mode":"equip","cannotUnequip":true}]'></textarea></label>
+        <div class="actions">
+          <button id="save-item" type="button">Save Item</button>
+          <button id="new-item" class="secondary" type="button">New Variant</button>
+        </div>
+        <p id="status" class="small-note"></p>
+      </section>
+      <section class="creator-panel">
+        <h2>Custom Item Bibliography</h2>
+        <div id="bibliography" class="bibliography"></div>
+      </section>
+    </main>
+
+    <script src="src/scripts/content/registry.js"></script>
+    <script src="src/scripts/content/items/equipment.js"></script>
+    <script src="src/scripts/content/items/treasure.js"></script>
+    <script src="src/scripts/content/items/materials.js"></script>
+    <script src="src/scripts/content/items/poisons.js"></script>
+    <script src="src/scripts/content/afflictions/diseases.js"></script>
+    <script src="src/scripts/content/afflictions/curses.js"></script>
+    <script src="src/scripts/content/items/handouts.js"></script>
+    <script src="src/scripts/content/items/magic_items.js"></script>
+    <script src="src/scripts/content/items/magic_accessories.js"></script>
+    <script src="src/scripts/content/items/magic-forest-pack.js"></script>
+    <script src="src/scripts/content/items/magic-undead-pack.js"></script>
+    <script src="src/scripts/content/items/magic-hell-pack.js"></script>
+    <script src="src/scripts/content/items/magic-underdark-drow-pack.js"></script>
+    <script src="src/scripts/custom-items.js"></script>
+    <script src="src/scripts/custom-item-creator.js"></script>
+  </body>
+</html>

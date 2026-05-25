@@ -1209,6 +1209,17 @@ function fighterIsImmuneToCondition(fighter, conditionId) {
   return Boolean(canonical && fighterConditionImmunities(fighter).has(canonical));
 }
 
+function fighterIsImmuneToDisease(fighter) {
+  if (!fighter) return false;
+  if (fighter.classId === "paladin" && (fighter.level ?? 1) >= 3) return true;
+  const entries = [
+    ...conditionValueList(fighter.diseaseImmunity),
+    ...conditionValueList(fighter.diseaseImmunities),
+    ...conditionValueList(fighter.immunities?.diseases),
+  ];
+  return entries.some((entry) => entry === true || String(entry).toLowerCase() === "all" || String(entry).toLowerCase() === "disease");
+}
+
 function mergeConditionLists(current = [], added = []) {
   return Array.from(new Set([...(current ?? []), ...(added ?? [])].filter(Boolean)));
 }
@@ -1251,7 +1262,9 @@ function normalizeConditionEffect(effect = {}) {
 
 function normalizeStatusEffectsForFighter(fighter) {
   if (!fighter?.statusEffects?.length) return [];
-  return fighter.statusEffects.map((effect) => normalizeConditionEffect(effect));
+  return fighter.statusEffects
+    .filter((effect) => !(effect?.disease || effect?.diseaseId) || !fighterIsImmuneToDisease(fighter))
+    .map((effect) => normalizeConditionEffect(effect));
 }
 
 function timedEffectRemainingSeconds(effect) {
@@ -1363,6 +1376,7 @@ function clearExpiredConcentrations() {
 function expireTimedDungeonEffects() {
   const nowSeconds = dungeonElapsedSeconds({ sync: false });
   let expiredCount = 0;
+  if (typeof processTimedAfflictions === "function") expiredCount += processTimedAfflictions(nowSeconds);
   for (const fighter of Object.values(state?.fighters ?? {})) {
     expiredCount += expireTimedEffectsForFighter(fighter, nowSeconds);
   }
@@ -5050,6 +5064,7 @@ function magicEffects(fighter) {
     skillBonus: 0,
     resistances: [],
     vulnerabilities: [],
+    immunities: [],
     extraDamage: [],
   };
 
@@ -5083,11 +5098,13 @@ function magicEffects(fighter) {
     if (magicAttackConditionApplies(fighter, effects.damageBonusCondition)) merged.damageBonus += effects.damageBonus ?? 0;
     merged.resistances.push(...(effects.resistances ?? []), ...(magic?.resistances ?? []));
     merged.vulnerabilities.push(...(effects.vulnerabilities ?? []), ...(magic?.vulnerabilities ?? []));
+    merged.immunities.push(...(effects.immunities ?? []), ...(magic?.immunities ?? []));
     if (magicAttackConditionApplies(fighter, effects.extraDamageCondition)) merged.extraDamage.push(...(effects.extraDamage ?? []));
   }
 
   merged.resistances = Array.from(new Set(merged.resistances));
   merged.vulnerabilities = Array.from(new Set(merged.vulnerabilities));
+  merged.immunities = Array.from(new Set(merged.immunities));
   return merged;
 }
 
@@ -5329,8 +5346,10 @@ function calculateDamageModifiers(target, damage, type) {
   const effects = magicEffects(target);
   const statusResistances = (target.statusEffects ?? []).flatMap((effect) => effect.resistances ?? []);
   const statusVulnerabilities = (target.statusEffects ?? []).flatMap((effect) => effect.vulnerabilities ?? []);
+  const statusImmunities = (target.statusEffects ?? []).flatMap((effect) => effect.immunities ?? effect.damageImmunities ?? []);
   const resistances = [...(target.damageResistances ?? []), ...effects.resistances, ...statusResistances];
   const vulnerabilities = [...(target.damageVulnerabilities ?? []), ...effects.vulnerabilities, ...statusVulnerabilities];
+  const immunities = [...(target.damageImmunities ?? []), ...effects.immunities, ...statusImmunities];
   if ((target.statusEffects ?? []).some((effect) => effect.id === "rage") && ["bludgeoning", "piercing", "slashing"].includes(normalizedType)) {
     resistances.push(normalizedType);
   }
@@ -5347,7 +5366,7 @@ function calculateDamageModifiers(target, damage, type) {
     resistances.push(normalizedType);
   }
 
-  if (damageFlagMatches(target.damageImmunities, normalizedType)) {
+  if (damageFlagMatches(immunities, normalizedType)) {
     return { damage: 0, reason: "immune" };
   }
 
@@ -5727,7 +5746,13 @@ function refreshDerivedStats(fighter) {
   const statusSpeedBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.speedBonusFeet ?? 0), 0);
   const statusSpeedOverride = (fighter.statusEffects ?? []).reduce((speed, effect) => Math.max(speed, effect.speedOverrideFeet ?? 0), 0);
   const statusMaxHpBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.maxHpBonus ?? 0), 0);
-  fighter.maxHp = isWildShaped(fighter) ? Math.max(1, fighter.baseMaxHp + statusMaxHpBonus) : Math.max(1, fighter.baseMaxHp + (effects.maxHpBonus ?? 0) + statusMaxHpBonus);
+  const statusMaxHpMultiplier = (fighter.statusEffects ?? []).reduce((multiplier, effect) => {
+    if (effect.maxHpMultiplier != null) return multiplier * Math.max(0, Number(effect.maxHpMultiplier) || 0);
+    if (effect.maxHpPenaltyPercent != null) return multiplier * Math.max(0, 1 - (Number(effect.maxHpPenaltyPercent) || 0) / 100);
+    return multiplier;
+  }, 1);
+  const rawMaxHp = isWildShaped(fighter) ? fighter.baseMaxHp + statusMaxHpBonus : fighter.baseMaxHp + (effects.maxHpBonus ?? 0) + statusMaxHpBonus;
+  fighter.maxHp = Math.max(1, Math.floor(rawMaxHp * statusMaxHpMultiplier));
   if (fighter.hp > fighter.maxHp) fighter.hp = fighter.maxHp;
   const derivedSpeedFeet = isWildShaped(fighter)
     ? Math.max(5, (fighter.baseSpeedFeet ?? fighter.speedFeet ?? 30) + statusSpeedBonus)

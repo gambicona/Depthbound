@@ -1764,6 +1764,9 @@ function temporaryEffectDetails(effect) {
   if (effect.saveBonus) parts.push(`${abilityLabel(effect.saveBonus)} saves`);
   if (effect.speedBonusFeet) parts.push(`${abilityLabel(effect.speedBonusFeet)} ft speed`);
   if (effect.maxHpBonus) parts.push(`${abilityLabel(effect.maxHpBonus)} max HP`);
+  if (effect.maxHpPenaltyPercent) parts.push(`-${effect.maxHpPenaltyPercent}% max HP`);
+  if (effect.healingReceivedMultiplier === 0) parts.push("cannot heal");
+  else if (effect.healingReceivedMultiplier != null && effect.healingReceivedMultiplier < 1) parts.push(`${Math.round(effect.healingReceivedMultiplier * 100)}% healing received`);
   if (effect.extraHitDice) parts.push(`${abilityLabel(effect.extraHitDice)} hit dice`);
   if (effect.secondWindBonus) parts.push(`${abilityLabel(effect.secondWindBonus)} Second Wind use`);
   if (effect.spellPointBonus && !effect.classBonusLines?.length) parts.push(`${abilityLabel(effect.spellPointBonus)} spell points`);
@@ -1776,6 +1779,7 @@ function temporaryEffectDetails(effect) {
   if (effect.speedLocked) parts.push("movement locked");
   if (effect.actionLocked) parts.push("action locked");
   if (effect.resistances?.length) parts.push(`resists ${effect.resistances.join(", ")}`);
+  if (effect.immunities?.length || effect.damageImmunities?.length) parts.push(`immune to ${(effect.immunities ?? effect.damageImmunities).join(", ")}`);
   if (effect.vulnerabilities?.length) parts.push(`vulnerable to ${effect.vulnerabilities.join(", ")}`);
   if (effect.tempHp) parts.push(`${effect.tempHp} temporary HP`);
   if (effect.conditionDescription) parts.push(effect.conditionDescription);
@@ -1963,7 +1967,7 @@ function classFeatureInspectionDescription(hero, feature, abilityDefinitions = [
     if (name === "Perfect Self") return "When combat begins and all your ki is spent, you automatically recover 4 ki.";
   }
   if (hero?.classId === "paladin") {
-    if (name === "Lay on Hands") return `Action. Your healing pool is ${abilityMaxUses(hero, ability)} HP at this level, equal to 5 x paladin level. Choose yourself or an adjacent wounded ally, then spend up to the remaining pool.`;
+    if (name === "Lay on Hands") return `Action. Your healing pool is ${abilityMaxUses(hero, ability)} HP at this level, equal to 5 x paladin level. Choose yourself or an adjacent ally, then spend points to heal or spend 5 points to cure one disease.`;
     if (name === "Divine Smite") return "Bonus action before a weapon hit. Spend up to 5 spell points; the next hit deals radiant damage starting at 2d8 and increasing with more spell points.";
     if (name === "Aura of Protection") return `Allies within 10 ft add +${Math.max(1, abilityMod(hero, "cha"))} to saving throws from your Charisma.`;
   }
@@ -5309,6 +5313,12 @@ function itemUseEffectText(item) {
       ? `Your next weapon hit deals +${extra.count}d${extra.sides} ${extra.type ?? "damage"}.`
       : "Your next weapon hit gains the listed magic rider.";
   }
+  if (use.kind === "poison" && use.poison) {
+    const poison = use.poison;
+    const save = poison.saveDc ? `DC ${poison.saveDc} CON` : "CON save";
+    if (poison.delivery === "injury") return `Coat a piercing or slashing weapon. The next hit subjects the target to ${save}.`;
+    return `Expose a creature to this ${poison.delivery} poison (${save}).`;
+  }
   return itemDisplayDescription(item);
 }
 
@@ -5453,11 +5463,15 @@ function magicItemDetails(item) {
   for (const [ability, value] of Object.entries(effects.abilityScorePenalties ?? {})) parts.push(`${ability.toUpperCase()} ${abilityLabel(value)}`);
   const resistances = [...(effects.resistances ?? []), ...(magic.resistances ?? [])];
   const vulnerabilities = [...(effects.vulnerabilities ?? []), ...(magic.vulnerabilities ?? [])];
+  const immunities = [...(effects.immunities ?? []), ...(magic.immunities ?? [])];
   if (resistances.length) parts.push(`resist ${resistances.join(", ")}`);
+  if (immunities.length) parts.push(`immune ${immunities.join(", ")}`);
   if (vulnerabilities.length) parts.push(`vulnerable ${vulnerabilities.join(", ")}`);
   const extraDamage = [...(effects.extraDamage ?? []), ...(magic.extraDamage ?? [])];
   if (extraDamage.length) parts.push(`extra ${extraDamage.map((entry) => `${entry.count}d${entry.sides} ${entry.type}`).join(", ")}`);
-  if (magic.curse || effects.vulnerabilities?.length) parts.push("cursed");
+  const itemCurses = item.curses ?? magic.curses ?? [];
+  if (itemCurses.length) parts.push(`cursed: ${itemCurses.map((entry) => window.DungeonAfflictions?.curses?.[entry.id ?? entry]?.name ?? entry.id ?? entry).join(", ")}`);
+  else if (magic.curse || effects.vulnerabilities?.length) parts.push("cursed");
   return parts.length ? `; ${parts.join("; ")}` : "";
 }
 
@@ -6152,6 +6166,19 @@ function renderChestInventoryItem(item) {
   `;
 }
 
+let openInventoryItemGroups = null;
+
+function inventoryItemGroupOpen(groupId, defaultOpen = false) {
+  return openInventoryItemGroups ? openInventoryItemGroups.has(groupId) : defaultOpen;
+}
+
+function rememberOpenInventoryItemGroups() {
+  if (!els.inventoryMenu || els.inventoryMenu.classList.contains("hidden")) return;
+  const groups = Array.from(els.inventoryMenu.querySelectorAll("details[data-inventory-item-group]"));
+  if (!groups.length) return;
+  openInventoryItemGroups = new Set(groups.filter((details) => details.open).map((details) => details.dataset.inventoryItemGroup));
+}
+
 function groupedInventoryItemsMarkup(items, { emptyText, renderItem }) {
   if (!items.length) return `<p class="empty-note">${escapeHtml(emptyText)}</p>`;
   const groups = new Map();
@@ -6165,7 +6192,7 @@ function groupedInventoryItemsMarkup(items, { emptyText, renderItem }) {
     .map((group, index) => {
       const sortedItems = [...group.items].sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
       return `
-        <details class="inventory-item-group" ${index === 0 ? "open" : ""}>
+        <details class="inventory-item-group" data-inventory-item-group="${escapeAttribute(group.id)}" ${inventoryItemGroupOpen(group.id, index === 0) ? "open" : ""}>
           <summary>${escapeHtml(group.label)} <span>${sortedItems.length}</span></summary>
           <div class="inventory-item-group-body">
             ${sortedItems.map((item) => renderItem(item)).join("")}
@@ -6218,6 +6245,7 @@ function setInventoryTab(tabId) {
 }
 
 function renderInventoryMenu() {
+  rememberOpenInventoryItemGroups();
   const fighter = activeHero();
   refreshDerivedStats(fighter);
   const equippedIds = new Set(Object.values(fighter.equipment).filter(Boolean));
@@ -6659,13 +6687,25 @@ function itemWeaponRiderStatus(item) {
   };
 }
 
+function itemPoisonRiderStatus(item) {
+  const poison = item?.use?.poison;
+  if (!poison || poison.delivery !== "injury") return null;
+  return {
+    id: `item-poison-${item.id}`,
+    label: poison.name ?? item.name,
+    weaponRider: true,
+    poison,
+    durationRounds: 10,
+  };
+}
+
 function itemUseConsumesInventory(item) {
   return item.use?.consume !== false && !item.use?.charges;
 }
 
 function itemUseIsSupported(item) {
   const kind = item?.use?.kind;
-  return Boolean(["healing", "fullHealing", "buff", "weaponBuff", "light"].includes(kind) || item?.use?.status);
+  return Boolean(["healing", "fullHealing", "buff", "weaponBuff", "poison", "light"].includes(kind) || item?.use?.status);
 }
 
 function canUseBeltItem(fighter, item) {
@@ -7234,8 +7274,8 @@ function fighterAbilityUnavailableReason(fighter, ability) {
   if (ability.resource === "passive") return "";
   if (abilityResourceSpent(fighter, ability) >= abilityMaxUses(fighter, ability)) return "No uses remaining.";
   if (ability.id === "rage" && fighterWearsHeavyArmor(fighter)) return "Cannot rage while wearing heavy armor.";
-  if (ability.id === "layOnHands" && !partyHeroes().some((target) => !target.dead && (target.id === fighter.id || hasMeleeAccess(fighter, target)) && (target.hp ?? 0) < (target.maxHp ?? 0))) {
-    return "No wounded adjacent hero.";
+  if (ability.id === "layOnHands" && !partyHeroes().some((target) => !target.dead && (target.id === fighter.id || hasMeleeAccess(fighter, target)) && ((target.hp ?? 0) < (target.maxHp ?? 0) || (typeof fighterDiseases === "function" && fighterDiseases(target).length > 0)))) {
+    return "No wounded or diseased adjacent hero.";
   }
   if (ability.id === "actionSurge" && state.mode !== "combat") return "Only usable in combat.";
   if (["battleragerSpikes", "battleragerCharge", "frenzy", "elementalCleaver", "mightyImpel", "stormAuraPulse", "totemSurge", "unstableBacklash"].includes(ability.id) && !isBarbarianRaging(fighter)) {
@@ -7673,7 +7713,7 @@ function renderHomeAdventurePanels() {
   const thornwoodCompleted = state.campaignProgress?.["thornwood-pact"] ?? 0;
   const emberveinCompleted = state.campaignProgress?.["embervein-first-claim"] ?? 0;
   const smithyCompleted = state.campaignProgress?.["dwarven-smithy-ember-oath"] ?? 0;
-  const smithyUnlocked = Boolean(state.questFlags?.["flag.borren.claimHammerReturned"]);
+  const smithyUnlocked = window.DungeonCampaigns?.isUnlocked?.("dwarven-smithy-ember-oath", state) ?? false;
   els.goBarrowCrown?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${barrowCompleted}/7`));
   els.goThornwoodPact?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${thornwoodCompleted}/8`));
   els.goEmberveinFirstClaim?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${emberveinCompleted}/1`));
@@ -8385,6 +8425,7 @@ function campaignQuestLogEntries() {
   const campaigns = window.DungeonCampaigns?.list?.() ?? [];
   return campaigns
     .filter((campaign) => !campaign.hidden && campaign.count > 0)
+    .filter((campaign) => window.DungeonCampaigns?.isUnlocked?.(campaign.id, state) ?? true)
     .map((campaign) => {
       const completed = Math.max(0, Math.min(campaign.count, Math.floor(Number(state?.campaignProgress?.[campaign.id]) || 0)));
       const quest = campaign.quest ?? {};
@@ -8583,6 +8624,7 @@ function toggleQuestLog() {
 function storeStockItems(npc = storeNpcDefinition()) {
   const query = storeSearch.trim().toLowerCase();
   const shopType = npc?.shop?.type ?? "general";
+  if (["apothecary", "cursebreaker"].includes(shopType)) return [];
   return window.DungeonContent.list("items")
     .filter((item) =>
       shopType === "weaponsmith"
@@ -8593,6 +8635,133 @@ function storeStockItems(npc = storeNpcDefinition()) {
     )
     .filter((item) => !query || searchableItemText(item).includes(query) || itemDetails(item).toLowerCase().includes(query))
     .sort((a, b) => itemCategoryLabel(a).localeCompare(itemCategoryLabel(b)) || a.name.localeCompare(b.name));
+}
+
+function diseaseCurePriceCp(diseaseId) {
+  const disease = typeof diseaseDefinition === "function" ? diseaseDefinition(diseaseId) : window.DungeonAfflictions?.diseases?.[diseaseId];
+  return Math.max(0, Math.floor(disease?.curePriceCp ?? 2500));
+}
+
+function apothecaryTreatmentEntries() {
+  return partyHeroes()
+    .flatMap((hero) =>
+      (typeof fighterDiseases === "function" ? fighterDiseases(hero) : [])
+        .map((effect) => {
+          const disease = typeof diseaseDefinition === "function" ? diseaseDefinition(effect.diseaseId) : window.DungeonAfflictions?.diseases?.[effect.diseaseId];
+          return { hero, effect, disease, priceCp: diseaseCurePriceCp(effect.diseaseId) };
+        }),
+    );
+}
+
+function apothecaryTreatmentMarkup(npc) {
+  if (npc?.shop?.type !== "apothecary") return "";
+  const hero = activeHero();
+  const entries = apothecaryTreatmentEntries();
+  return `
+    <section class="store-section">
+      <h3>Treatment</h3>
+      <div class="store-list">
+        ${
+          entries.length
+            ? entries
+                .map((entry) => {
+                  const affordable = moneyToCp(hero.inventory.money) >= entry.priceCp;
+                  return `
+                    <div class="store-row">
+                      <div>
+                        <b>${escapeHtml(entry.hero.name)} - ${escapeHtml(entry.disease?.name ?? entry.effect.label ?? "Disease")}</b>
+                        <span>${escapeHtml(entry.disease?.description ?? entry.effect.conditionDescription ?? "Disease treatment.")} Treatment: ${escapeHtml(priceText(entry.priceCp))}</span>
+                      </div>
+                      <button type="button" data-action="apothecary-cure-disease" data-hero="${escapeAttribute(entry.hero.id)}" data-disease="${escapeAttribute(entry.effect.diseaseId)}" ${affordable ? "" : "disabled"}>${affordable ? "Treat" : "Need Coin"}</button>
+                    </div>
+                  `;
+                })
+                .join("")
+            : `<p class="empty-note">No party diseases to treat.</p>`
+        }
+      </div>
+    </section>
+  `;
+}
+
+function apothecaryCureDisease(heroId, diseaseId) {
+  const npc = storeNpcDefinition();
+  if (npc?.shop?.type !== "apothecary") return;
+  const payer = activeHero();
+  const target = state.fighters[heroId];
+  if (!target || !diseaseId) return;
+  const price = diseaseCurePriceCp(diseaseId);
+  if (!spendMoney(payer.inventory.money, price)) return;
+  const removed = typeof cureFighterDisease === "function" ? cureFighterDisease(target, diseaseId) : [];
+  if (!removed.length) {
+    addMoney(payer.inventory.money, price);
+    return;
+  }
+  const disease = typeof diseaseDefinition === "function" ? diseaseDefinition(diseaseId) : window.DungeonAfflictions?.diseases?.[diseaseId];
+  addLog(`${npc.name} treats ${target.name}'s ${disease?.name ?? removed[0]?.label ?? "disease"} for ${priceText(price)}.`, "important");
+  render();
+  renderStoreMenu();
+}
+
+function cursebreakerEntries() {
+  return partyHeroes()
+    .flatMap((hero) => {
+      const statuses = (hero.statusEffects ?? []).filter((effect) => effect.curse || effect.curseId);
+      const boundItems = (hero.inventory?.items ?? []).filter((item) => item.curseState?.bound || (typeof itemCurseEntries === "function" && itemCurseEntries(item).length));
+      return [
+        ...statuses.map((effect) => ({ hero, effect, label: effect.label ?? "Curse", item: null })),
+        ...boundItems.map((item) => ({ hero, effect: null, item, label: item.magic?.curse?.name ?? item.curses?.[0]?.id ?? "Cursed Item" })),
+      ];
+    })
+    .filter((entry, index, list) => list.findIndex((candidate) => candidate.hero.id === entry.hero.id && candidate.label === entry.label && candidate.item?.id === entry.item?.id) === index);
+}
+
+function cursebreakerMarkup(npc) {
+  if (npc?.shop?.type !== "cursebreaker") return "";
+  const reagentId = "demon-ichor";
+  const reagent = getItemTemplate(reagentId);
+  const have = partyResourceCount(reagentId);
+  const entries = cursebreakerEntries();
+  return `
+    <section class="store-section">
+      <h3>Cursebreaking</h3>
+      <div class="store-list">
+        ${
+          entries.length
+            ? entries
+                .map((entry) => {
+                  const ready = have >= 1;
+                  return `
+                    <div class="store-row">
+                      <div>
+                        <b>${escapeHtml(entry.hero.name)} - ${escapeHtml(entry.item?.name ?? entry.label)}</b>
+                        <span>${escapeHtml(npc.name)} demands 1 ${escapeHtml(reagent?.name ?? "Demon Ichor")}. Satchel: ${escapeHtml(have)}/1</span>
+                      </div>
+                      <button type="button" data-action="wizard-remove-curse" data-hero="${escapeAttribute(entry.hero.id)}" data-item="${escapeAttribute(entry.item?.id ?? entry.effect?.cursedItemId ?? "")}" data-effect="${escapeAttribute(entry.effect?.id ?? "")}" ${ready ? "" : "disabled"}>${ready ? "Remove Curse" : "Need Reagent"}</button>
+                    </div>
+                  `;
+                })
+                .join("")
+            : `<p class="empty-note">No party curses to break.</p>`
+        }
+      </div>
+    </section>
+  `;
+}
+
+function wizardRemoveCurse(heroId, options = {}) {
+  const npc = storeNpcDefinition();
+  if (npc?.shop?.type !== "cursebreaker") return;
+  const target = state.fighters[heroId];
+  if (!target || !consumePartyResource("demon-ichor", 1)) return;
+  const result = typeof removeCursesFromFighter === "function" ? removeCursesFromFighter(target, options) : { statuses: [], items: [] };
+  if (!result.statuses.length && !result.items.length) {
+    addPartyResourceItem(getItemTemplate("demon-ichor"), 1);
+    return;
+  }
+  addLog(`${npc.name} uses Demon Ichor to break ${target.name}'s curse${result.statuses.length + result.items.length === 1 ? "" : "s"}.`, "important");
+  render();
+  renderStoreMenu();
 }
 
 function renderStoreMenu() {
@@ -8617,6 +8786,8 @@ function renderStoreMenu() {
     <div class="store-wallet">${escapeHtml(moneyText(hero.inventory.money))}</div>
     ${borrenClaimHammerMarkup(npc)}
     ${smithMaterialCommissionMarkup(npc)}
+    ${apothecaryTreatmentMarkup(npc)}
+    ${cursebreakerMarkup(npc)}
     <label class="store-search" for="store-search">
       <span>Search</span>
       <input id="store-search" type="search" placeholder="Search store" value="${escapeAttribute(storeSearch)}" />
@@ -10313,6 +10484,8 @@ function consumeEquippedItem(itemId) {
 }
 
 function applyHealingToHero(target, healing) {
+  const multiplier = (target.statusEffects ?? []).reduce((value, effect) => Math.min(value, effect.healingReceivedMultiplier ?? 1), 1);
+  healing = Math.floor(Math.max(0, healing) * multiplier);
   const before = target.hp;
   target.hp = Math.min(target.maxHp, target.hp + healing);
   if (target.hp > 0) {
@@ -10324,7 +10497,7 @@ function applyHealingToHero(target, healing) {
   return target.hp - before;
 }
 
-function useUsableInventoryItem(itemId, targetId = null, options = {}) {
+async function useUsableInventoryItem(itemId, targetId = null, options = {}) {
   const hero = state.mode === "combat" ? activeFighter() : activeHero();
   const item = itemForId(hero, itemId);
   const target = targetId ? state.fighters[targetId] : hero;
@@ -10337,6 +10510,7 @@ function useUsableInventoryItem(itemId, targetId = null, options = {}) {
   if (!requireEquipped && (state.mode === "combat" || item.type !== "consumable")) return;
   if (usingOnDyingHero && !canUseHealingItemOnTarget(hero, item, target)) return;
   if (!usingOnDyingHero && !canUseBeltItem(hero, item)) return;
+  if (typeof triggerItemCurses === "function") triggerItemCurses(hero, item, "use");
 
   if (state.mode === "combat") {
     if (usingOnDyingHero) {
@@ -10410,6 +10584,20 @@ function useUsableInventoryItem(itemId, targetId = null, options = {}) {
       addLog(`${hero.name} uses ${item.name}, but its weapon coating has no supported damage rider.`, "important");
     }
     if (itemUseConsumesInventory(item)) consumeEquippedItem(itemId);
+  } else if (item.use?.kind === "poison") {
+    if (!spendItemCharge(item)) return;
+    const poison = item.use.poison;
+    if (poison?.delivery === "injury") {
+      const rider = itemPoisonRiderStatus(item);
+      if (rider) {
+        applyStatusEffect(hero, rider);
+        addLog(`${hero.name} coats a weapon with ${poison.name ?? item.name}. The next piercing or slashing hit delivers it.`, "important");
+      }
+    } else {
+      const poisonTarget = state.mode === "combat" ? selectedAttackTarget?.() ?? hero : hero;
+      await applyPoisonExposure?.(hero, poisonTarget, poison, { label: item.name, directUse: true });
+    }
+    if (itemUseConsumesInventory(item)) consumeEquippedItem(itemId);
   } else {
     addLog(`${hero.name} uses ${item.name}. Its special effect is not implemented in the current item-use UI yet.`, "important");
   }
@@ -10445,15 +10633,19 @@ async function chooseLayOnHandsTarget(paladin) {
     (target) =>
       !target.dead &&
       (target.id === paladin.id || hasMeleeAccess(paladin, target)) &&
-      (target.hp ?? 0) < (target.maxHp ?? 0),
+      ((target.hp ?? 0) < (target.maxHp ?? 0) || (typeof fighterDiseases === "function" && fighterDiseases(target).length > 0)),
   );
   if (!targets.length) return null;
   if (targets.length === 1) return targets[0];
   const targetId = await showChoiceDialog({
     title: "Lay on Hands",
-    message: "Choose yourself or an adjacent hero to heal.",
+    message: "Choose yourself or an adjacent hero to heal or cleanse.",
     actor: paladin,
-    choices: targets.map((target) => ({ value: target.id, label: `${target.name} (${target.hp}/${target.maxHp} HP)` })),
+    choices: targets.map((target) => {
+      const diseases = typeof fighterDiseases === "function" ? fighterDiseases(target) : [];
+      const diseaseText = diseases.length ? `, ${diseases.length} disease${diseases.length === 1 ? "" : "s"}` : "";
+      return { value: target.id, label: `${target.name} (${target.hp}/${target.maxHp} HP${diseaseText})` };
+    }),
   });
   return targetId ? state.fighters[targetId] : null;
 }
@@ -10472,6 +10664,34 @@ async function chooseLayOnHandsAmount(paladin, target, remainingPool) {
   const amount = Math.floor(Number(raw));
   if (!Number.isFinite(amount) || amount <= 0) return null;
   return clamp(amount, 1, Math.min(remainingPool, missingHp));
+}
+
+async function chooseLayOnHandsUse(paladin, target, remainingPool) {
+  const missingHp = Math.max(0, (target.maxHp ?? 0) - (target.hp ?? 0));
+  const diseases = typeof fighterDiseases === "function" ? fighterDiseases(target) : [];
+  if (missingHp > 0 && (!diseases.length || remainingPool < 5)) {
+    const healing = await chooseLayOnHandsAmount(paladin, target, remainingPool);
+    return healing ? { kind: "heal", amount: healing } : null;
+  }
+  if (missingHp <= 0 && diseases.length === 1 && remainingPool >= 5) return { kind: "cureDisease", amount: 5, diseaseId: diseases[0].diseaseId, label: diseases[0].label ?? diseases[0].diseaseId };
+  const choices = [];
+  if (missingHp > 0) choices.push({ value: "heal", label: `Heal HP`, description: `${target.name} is missing ${missingHp} HP.` });
+  if (remainingPool >= 5) {
+    for (const disease of diseases) choices.push({ value: `disease:${disease.diseaseId}`, label: `Cure ${disease.label ?? disease.diseaseId}`, description: "Costs 5 Lay on Hands HP." });
+  }
+  if (!choices.length) {
+    addLog(`${paladin.name} needs 5 Lay on Hands HP to cure ${target.name}'s disease.`, "important");
+    return null;
+  }
+  const choice = await showChoiceDialog({ title: "Lay on Hands", message: `${paladin.name} has ${remainingPool} Lay on Hands HP left.`, actor: paladin, choices });
+  if (!choice) return null;
+  if (choice === "heal") {
+    const healing = await chooseLayOnHandsAmount(paladin, target, remainingPool);
+    return healing ? { kind: "heal", amount: healing } : null;
+  }
+  const diseaseId = choice.replace(/^disease:/, "");
+  const disease = diseases.find((entry) => entry.diseaseId === diseaseId);
+  return { kind: "cureDisease", amount: 5, diseaseId, label: disease?.label ?? diseaseId };
 }
 
 function refundFighterAbilityUse(hero, ability) {
@@ -11573,17 +11793,23 @@ async function useFighterAbility(abilityId) {
       renderAbilitiesMenu();
       return;
     }
-    const remainingPool = Math.max(0, abilityMaxUses(hero, ability) - Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1));
-    const healing = await chooseLayOnHandsAmount(hero, target, remainingPool);
-    if (!healing) {
+    const spentBefore = Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1);
+    const remainingPool = Math.max(0, abilityMaxUses(hero, ability) - spentBefore);
+    const use = await chooseLayOnHandsUse(hero, target, remainingPool);
+    if (!use) {
       refundFighterAbilityUse(hero, ability);
       renderAbilitiesMenu();
       return;
     }
-    const healed = applyHealingToHero(target, healing);
-    hero.abilityUses[ability.id] = Math.min(abilityMaxUses(hero, ability), Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1) + healing);
+    hero.abilityUses[ability.id] = Math.min(abilityMaxUses(hero, ability), spentBefore + use.amount);
     const targetText = target.id === hero.id ? "" : ` on ${target.name}`;
-    addLog(`${hero.name} spends ${healing} Lay on Hands HP${targetText} and heals ${healed} HP.`, "heal");
+    if (use.kind === "cureDisease") {
+      const removed = typeof cureFighterDisease === "function" ? cureFighterDisease(target, use.diseaseId) : [];
+      addLog(`${hero.name} spends 5 Lay on Hands HP${targetText} and cures ${removed[0]?.label ?? use.label ?? "one disease"}.`, "heal");
+    } else {
+      const healed = applyHealingToHero(target, use.amount);
+      addLog(`${hero.name} spends ${use.amount} Lay on Hands HP${targetText} and heals ${healed} HP.`, "heal");
+    }
     await maybeFinishEncounterAfterHeroRecovery();
   }
 
@@ -11812,12 +12038,18 @@ async function takeShortRest() {
 function unequipSlot(slotId) {
   const hero = activeHero();
   const item = equippedItem(hero, slotId);
+  if (typeof itemHasBindingCurse === "function" && itemHasBindingCurse(item)) {
+    addLog(`${item.name} will not come free. Remove Curse can break the binding.`, "important");
+    renderLog();
+    return;
+  }
   if (itemRequiresTwoHands(item) && ["mainHand", "offHand"].includes(slotId)) {
     hero.equipment.mainHand = null;
     hero.equipment.offHand = null;
   } else {
     hero.equipment[slotId] = null;
   }
+  if (typeof removeItemCurseEffectsOnUnequip === "function") removeItemCurseEffectsOnUnequip(hero, item);
   refreshDerivedStats(hero);
   render();
   renderInventoryMenu();
@@ -11838,16 +12070,31 @@ function equipItem(itemId, slotId) {
 
   const equippingHand = isHandSlot(slotId);
   for (const slot of equipmentSlots) {
+    const current = equippedItem(hero, slot.id);
+    if ((hero.equipment[slot.id] === itemId || (equippingHand && isHandSlot(slot.id) && itemRequiresTwoHands(current))) && typeof itemHasBindingCurse === "function" && itemHasBindingCurse(current)) {
+      addLog(`${current.name} is bound by a curse and cannot be replaced.`, "important");
+      renderLog();
+      return;
+    }
     if (hero.equipment[slot.id] === itemId || (equippingHand && isHandSlot(slot.id) && itemRequiresTwoHands(equippedItem(hero, slot.id)))) {
+      if (typeof removeItemCurseEffectsOnUnequip === "function") removeItemCurseEffectsOnUnequip(hero, current);
       hero.equipment[slot.id] = null;
     }
+  }
+  const targetItem = equippedItem(hero, slotId);
+  if (targetItem && targetItem.id !== itemId && typeof itemHasBindingCurse === "function" && itemHasBindingCurse(targetItem)) {
+    addLog(`${targetItem.name} is bound by a curse and cannot be replaced.`, "important");
+    renderLog();
+    return;
   }
   if (itemRequiresTwoHands(item)) {
     hero.equipment.mainHand = itemId;
     hero.equipment.offHand = itemId;
   } else {
+    if (targetItem && targetItem.id !== itemId && typeof removeItemCurseEffectsOnUnequip === "function") removeItemCurseEffectsOnUnequip(hero, targetItem);
     hero.equipment[slotId] = itemId;
   }
+  if (typeof triggerItemCurses === "function") triggerItemCurses(hero, item, "equip");
   refreshDerivedStats(hero);
   render();
   renderInventoryMenu();

@@ -44,6 +44,7 @@ window.DungeonContent.register("classes", "cleric", {
     "revivify",
     "animate-dead",
     "bestow-curse",
+    "remove-curse",
     "protection-from-energy",
     "banishment",
     "death-ward",
