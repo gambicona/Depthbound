@@ -19,6 +19,7 @@ let dragHeroId = null;
 let roomZoom = 1;
 let currentInventoryDrag = null;
 let mapPan = null;
+let roomPinchZoom = null;
 let suppressNextTileClick = false;
 let pendingSpellTargeting = null;
 let pendingEldritchBlast = null;

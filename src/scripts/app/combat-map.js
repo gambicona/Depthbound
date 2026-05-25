@@ -2142,15 +2142,27 @@ function animateScrollRoomToGridPoint(point, duration = 180) {
   roomScrollAnimation = window.requestAnimationFrame(step);
 }
 
-function centerViewOnHero({ animate = false } = {}) {
+function centerViewOnHero({ animate = false, bringArenaIntoView = window.matchMedia?.("(max-width: 620px)")?.matches && state?.mode !== "home", retries = 2 } = {}) {
   const hero = activeHero();
-  window.requestAnimationFrame(() => {
+  if (!hero?.position) return;
+
+  const center = (remainingRetries) => {
+    if (!els.roomScroll || !els.room || !els.roomScroll.clientWidth || !els.roomScroll.clientHeight) {
+      if (remainingRetries > 0) window.requestAnimationFrame(() => center(remainingRetries - 1));
+      return;
+    }
+    if (bringArenaIntoView) {
+      document.querySelector(".arena")?.scrollIntoView({ block: "start", inline: "nearest" });
+    }
     if (animate) {
       animateScrollRoomToGridPoint({ x: hero.position.x + 0.5, y: hero.position.y + 0.5 });
     } else {
       scrollRoomToGridPoint({ x: hero.position.x + 0.5, y: hero.position.y + 0.5 });
     }
-  });
+    if (remainingRetries > 0) window.requestAnimationFrame(() => center(remainingRetries - 1));
+  };
+
+  window.requestAnimationFrame(() => center(retries));
 }
 
 function nudgeViewForHeroNearEdge() {

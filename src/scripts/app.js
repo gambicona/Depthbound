@@ -27,6 +27,50 @@ function adjustRoomZoom(delta, focusPoint = viewportCenterGridPoint()) {
   setRoomZoom(roomZoom + delta, focusPoint);
 }
 
+function touchDistance(touchA, touchB) {
+  return Math.hypot(touchA.clientX - touchB.clientX, touchA.clientY - touchB.clientY);
+}
+
+function touchMidpoint(touchA, touchB) {
+  return {
+    x: (touchA.clientX + touchB.clientX) / 2,
+    y: (touchA.clientY + touchB.clientY) / 2,
+  };
+}
+
+function beginRoomPinchZoom(event) {
+  if (!gameHasStarted || event.touches.length !== 2) return;
+  if (event.target?.closest?.("input, textarea, select, button, .fighter-info, .topbar")) return;
+  const [touchA, touchB] = event.touches;
+  const startDistance = touchDistance(touchA, touchB);
+  if (startDistance < 24) return;
+  const midpoint = touchMidpoint(touchA, touchB);
+  roomPinchZoom = {
+    startDistance,
+    startZoom: roomZoom,
+    focusPoint: gridPointFromClientPoint(midpoint.x, midpoint.y),
+  };
+  if (roomScrollAnimation) {
+    window.cancelAnimationFrame(roomScrollAnimation);
+    roomScrollAnimation = null;
+  }
+  event.preventDefault();
+}
+
+function updateRoomPinchZoom(event) {
+  if (!roomPinchZoom || event.touches.length !== 2) return;
+  const [touchA, touchB] = event.touches;
+  const distance = touchDistance(touchA, touchB);
+  if (distance <= 0) return;
+  event.preventDefault();
+  setRoomZoom(roomPinchZoom.startZoom * (distance / roomPinchZoom.startDistance), roomPinchZoom.focusPoint);
+}
+
+function finishRoomPinchZoom(event) {
+  if (!roomPinchZoom || event.touches.length >= 2) return;
+  roomPinchZoom = null;
+}
+
 function handleDungeonCtrlWheelZoom(event) {
   if (!event.ctrlKey || !gameHasStarted) return;
   const target = event.target;
@@ -910,6 +954,10 @@ els.roomScroll.addEventListener("pointerdown", handleMapPanPointerDown);
 els.roomScroll.addEventListener("pointermove", handleMapPanPointerMove);
 els.roomScroll.addEventListener("pointerup", finishMapPan);
 els.roomScroll.addEventListener("pointercancel", finishMapPan);
+els.roomScroll.addEventListener("touchstart", beginRoomPinchZoom, { passive: false });
+els.roomScroll.addEventListener("touchmove", updateRoomPinchZoom, { passive: false });
+els.roomScroll.addEventListener("touchend", finishRoomPinchZoom);
+els.roomScroll.addEventListener("touchcancel", finishRoomPinchZoom);
 els.roomScroll.addEventListener("scroll", () => {
   if (interactiveTutorialActive) updateInteractiveTutorial();
 });
