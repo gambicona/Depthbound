@@ -15,21 +15,21 @@
         background: var(--bg);
         color: var(--text);
         display: grid;
-        grid-template-columns: 58px 340px minmax(0, 1fr) 380px;
+        grid-template-columns: 82px 330px minmax(0, 1fr) 360px;
         height: 100vh;
         min-width: 0;
       }
 
       .creator-shell.left-collapsed {
-        grid-template-columns: 58px 0 minmax(0, 1fr) 380px;
+        grid-template-columns: 82px 0 minmax(0, 1fr) 360px;
       }
 
       .creator-shell.right-collapsed {
-        grid-template-columns: 58px 340px minmax(0, 1fr) 0;
+        grid-template-columns: 82px 330px minmax(0, 1fr) 0;
       }
 
       .creator-shell.left-collapsed.right-collapsed {
-        grid-template-columns: 58px 0 minmax(0, 1fr) 0;
+        grid-template-columns: 82px 0 minmax(0, 1fr) 0;
       }
 
       .creator-tool-rail,
@@ -43,7 +43,7 @@
         display: grid;
         grid-template-rows: auto 1fr auto;
         overflow: hidden;
-        padding: 8px 7px;
+        padding: 8px;
       }
 
       .creator-rail-mark {
@@ -58,23 +58,59 @@
       .tool-grid {
         align-content: start;
         display: grid;
-        gap: 7px;
+        gap: 6px;
+      }
+
+      .tool-group {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        display: grid;
+        gap: 6px;
+        padding-bottom: 8px;
+      }
+
+      .tool-group + .tool-group {
+        padding-top: 2px;
+      }
+
+      .tool-group-label {
+        color: var(--muted);
+        font-size: 0.58rem;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-align: center;
+        text-transform: uppercase;
       }
 
       .tool-grid button,
       .creator-rail-toggle {
         align-items: center;
-        aspect-ratio: 1;
         background: rgba(255, 255, 255, 0.055);
         border: 1px solid var(--line);
         border-radius: 6px;
         color: var(--text);
         display: inline-flex;
-        font-size: 0.68rem;
+        flex-direction: column;
+        font-size: 0.64rem;
         font-weight: 900;
+        gap: 3px;
         justify-content: center;
         line-height: 1;
+        min-height: 46px;
         padding: 0;
+        width: 100%;
+      }
+
+      .tool-icon {
+        color: var(--accent);
+        font-size: 0.88rem;
+        line-height: 1;
+      }
+
+      .tool-label {
+        color: var(--muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
         width: 100%;
       }
 
@@ -83,6 +119,11 @@
         background: rgba(215, 168, 79, 0.16);
         border-color: var(--accent);
         box-shadow: 0 0 0 1px var(--accent);
+        color: #fff3d0;
+      }
+
+      .tool-grid button.active .tool-label,
+      .creator-rail-toggle.active .tool-label {
         color: #fff3d0;
       }
 
@@ -155,7 +196,8 @@
 
       .creator-panel-body {
         min-height: 0;
-        overflow: auto;
+        overflow-x: hidden;
+        overflow-y: auto;
         padding: 12px;
       }
 
@@ -179,7 +221,7 @@
 
       .creator-topbar {
         align-items: center;
-        background: var(--panel2);
+        background: color-mix(in srgb, var(--panel) 72%, #000 28%);
         border-bottom: 1px solid var(--line);
         display: grid;
         gap: 10px;
@@ -401,6 +443,66 @@
         padding-bottom: 12px;
       }
 
+      .creator-section.compact {
+        gap: 6px;
+      }
+
+      .creator-disclosure {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        display: grid;
+        gap: 9px;
+        padding-bottom: 12px;
+      }
+
+      .creator-disclosure summary {
+        align-items: center;
+        color: var(--text);
+        cursor: pointer;
+        display: flex;
+        font-size: 0.84rem;
+        font-weight: 900;
+        justify-content: space-between;
+        list-style: none;
+        width: 100%;
+      }
+
+      .creator-disclosure summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .creator-disclosure summary::after {
+        color: var(--accent);
+        content: "+";
+        font-size: 1rem;
+      }
+
+      .creator-disclosure[open] summary::after {
+        content: "-";
+      }
+
+      .creator-disclosure:last-child {
+        border-bottom: 0;
+      }
+
+      .creator-inline-actions {
+        display: grid;
+        gap: 7px;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .creator-inline-actions button {
+        min-width: 0;
+        padding: 7px 8px;
+        white-space: normal;
+      }
+
+      .creator-panel-note {
+        color: var(--muted);
+        font-size: 0.74rem;
+        line-height: 1.35;
+        margin: -2px 0 0;
+      }
+
       .creator-section:last-child {
         border-bottom: 0;
         padding-bottom: 0;
@@ -413,12 +515,14 @@
       }
 
       .creator-form label,
-      .creator-section label {
+      .creator-section label,
+      .creator-disclosure label {
         color: var(--muted);
         display: grid;
         font-size: 0.78rem;
         font-weight: 800;
         gap: 4px;
+        min-width: 0;
       }
 
       .creator-form input,
@@ -426,12 +530,17 @@
       .creator-form textarea,
       .creator-section input,
       .creator-section select,
-      .creator-section textarea {
+      .creator-section textarea,
+      .creator-disclosure input,
+      .creator-disclosure select,
+      .creator-disclosure textarea {
         background: rgba(255, 255, 255, 0.06);
         border: 1px solid var(--line);
         border-radius: 6px;
         color: var(--text);
+        min-width: 0;
         padding: 7px 8px;
+        width: 100%;
       }
 
       .creator-form textarea,
@@ -443,7 +552,7 @@
       .creator-row {
         display: grid;
         gap: 8px;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       }
 
       .creator-section a.ghost-button {
@@ -470,7 +579,7 @@
       .catalogue {
         display: grid;
         gap: 6px;
-        max-height: min(42vh, 360px);
+        max-height: min(48vh, 430px);
         overflow: auto;
       }
 
@@ -592,6 +701,45 @@
         gap: 7px;
       }
 
+      .creator-list-category {
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+        display: grid;
+        overflow: hidden;
+      }
+
+      .creator-list-category summary {
+        align-items: center;
+        background: rgba(255, 255, 255, 0.035);
+        color: var(--text);
+        cursor: pointer;
+        display: flex;
+        font-size: 0.8rem;
+        font-weight: 900;
+        justify-content: space-between;
+        list-style: none;
+        padding: 8px;
+      }
+
+      .creator-list-category summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .creator-list-category summary::after {
+        color: var(--accent);
+        content: "+";
+      }
+
+      .creator-list-category[open] summary::after {
+        content: "-";
+      }
+
+      .creator-list-category-body {
+        display: grid;
+        gap: 7px;
+        padding: 8px;
+      }
+
       .creator-list-item {
         align-items: center;
         background: rgba(255, 255, 255, 0.04);
@@ -652,7 +800,7 @@
         .creator-shell.left-collapsed,
         .creator-shell.right-collapsed,
         .creator-shell.left-collapsed.right-collapsed {
-          grid-template-columns: 52px minmax(0, 1fr);
+          grid-template-columns: 68px minmax(0, 1fr);
           grid-template-rows: minmax(0, 1fr) auto;
         }
 
@@ -688,28 +836,59 @@
         .creator-command-actions {
           justify-content: start;
         }
+
+        .tool-grid button,
+        .creator-rail-toggle {
+          min-height: 42px;
+        }
+
+        .tool-label {
+          font-size: 0.58rem;
+        }
+      }
+
+      @media (max-width: 520px) {
+        .creator-inline-actions {
+          grid-template-columns: 1fr;
+        }
+
+        .creator-panel {
+          max-height: 52vh;
+        }
       }
     </style>
   </head>
   <body>
-    <main class="creator-shell" id="creator-shell">
+    <main class="creator-shell right-collapsed" id="creator-shell">
       <nav class="creator-tool-rail" aria-label="Creator tools">
         <div class="creator-rail-mark">DB</div>
         <div class="tool-grid" id="tool-grid">
-          <button type="button" data-tool="select" title="Select / Edit" aria-label="Select / Edit">SEL</button>
-          <button type="button" data-tool="connect" title="Connect Rooms" aria-label="Connect Rooms">CON</button>
-          <button type="button" data-tool="hallway" title="Draw Hallway" aria-label="Draw Hallway">HAL</button>
-          <button type="button" data-tool="furniture" title="Place Furniture" aria-label="Place Furniture">FUR</button>
-          <button type="button" data-tool="trap" title="Place Trap" aria-label="Place Trap">TRP</button>
-          <button type="button" data-tool="monster" title="Place Monster" aria-label="Place Monster">MON</button>
-          <button type="button" data-tool="start" title="Set Party Start" aria-label="Set Party Start">STA</button>
-          <button type="button" data-tool="exit" title="Set Exit" aria-label="Set Exit">EXT</button>
-          <button type="button" data-tool="portal" title="Linked Portals" aria-label="Linked Portals">POR</button>
-          <button type="button" data-tool="erase" title="Erase" aria-label="Erase">DEL</button>
+          <div class="tool-group">
+            <span class="tool-group-label">Edit</span>
+            <button type="button" data-tool="select" title="Select / Edit" aria-label="Select / Edit"><span class="tool-icon">S</span><span class="tool-label">Select</span></button>
+            <button type="button" data-tool="erase" title="Erase" aria-label="Erase"><span class="tool-icon">X</span><span class="tool-label">Erase</span></button>
+          </div>
+          <div class="tool-group">
+            <span class="tool-group-label">Map</span>
+            <button type="button" data-tool="connect" title="Connect Rooms" aria-label="Connect Rooms"><span class="tool-icon">C</span><span class="tool-label">Connect</span></button>
+            <button type="button" data-tool="hallway" title="Draw Hallway" aria-label="Draw Hallway"><span class="tool-icon">H</span><span class="tool-label">Hallway</span></button>
+          </div>
+          <div class="tool-group">
+            <span class="tool-group-label">Place</span>
+            <button type="button" data-tool="furniture" title="Place Furniture" aria-label="Place Furniture"><span class="tool-icon">F</span><span class="tool-label">Props</span></button>
+            <button type="button" data-tool="trap" title="Place Trap" aria-label="Place Trap"><span class="tool-icon">T</span><span class="tool-label">Traps</span></button>
+            <button type="button" data-tool="monster" title="Place Monster" aria-label="Place Monster"><span class="tool-icon">M</span><span class="tool-label">Monsters</span></button>
+          </div>
+          <div class="tool-group">
+            <span class="tool-group-label">Marks</span>
+            <button type="button" data-tool="start" title="Set Party Start" aria-label="Set Party Start"><span class="tool-icon">A</span><span class="tool-label">Start</span></button>
+            <button type="button" data-tool="exit" title="Set Exit" aria-label="Set Exit"><span class="tool-icon">E</span><span class="tool-label">Exit</span></button>
+            <button type="button" data-tool="portal" title="Linked Portals" aria-label="Linked Portals"><span class="tool-icon">P</span><span class="tool-label">Portal</span></button>
+          </div>
         </div>
         <div class="tool-grid">
-          <button class="creator-rail-toggle active" type="button" data-toggle-panel="left" title="Toggle build drawer" aria-label="Toggle build drawer">L</button>
-          <button class="creator-rail-toggle active" type="button" data-toggle-panel="right" title="Toggle inspector drawer" aria-label="Toggle inspector drawer">R</button>
+          <button class="creator-rail-toggle active" type="button" data-toggle-panel="left" title="Toggle setup drawer" aria-label="Toggle setup drawer"><span class="tool-icon">B</span><span class="tool-label">Build</span></button>
+          <button class="creator-rail-toggle" type="button" data-toggle-panel="right" title="Toggle assets drawer" aria-label="Toggle assets drawer"><span class="tool-icon">I</span><span class="tool-label">Assets</span></button>
         </div>
       </nav>
 
@@ -726,7 +905,7 @@
         </div>
         <div class="creator-panel-body">
           <div class="creator-panel-page active" data-panel-page="build">
-            <section class="creator-section">
+            <section class="creator-section compact">
               <h2>Dungeon</h2>
               <label>
                 Name
@@ -740,9 +919,14 @@
                 Grid size
                 <input id="creator-grid-size" type="number" min="16" max="72" value="36" />
               </label>
-              <button id="new-dungeon" type="button">New Blank Dungeon</button>
-              <div id="random-layout-controls" class="creator-section">
-                <h3>Random Layout</h3>
+              <div class="creator-inline-actions">
+                <button id="new-dungeon" type="button">New Blank</button>
+                <button id="random-layout" type="button">Random</button>
+              </div>
+            </section>
+
+            <details id="random-layout-controls" class="creator-disclosure">
+              <summary>Random settings</summary>
                 <div class="creator-row">
                   <label>
                     Rooms
@@ -754,12 +938,10 @@
                     <span id="hallway-width-label" class="small-note">1 square</span>
                   </label>
                 </div>
-                <button id="random-layout" type="button">Random Layout</button>
-              </div>
-            </section>
+            </details>
 
-            <section class="creator-section">
-              <h2>Add Room</h2>
+            <details class="creator-disclosure" open>
+              <summary>Add room</summary>
               <div class="creator-row">
                 <label>X <input id="room-x" type="number" value="3" /></label>
                 <label>Y <input id="room-y" type="number" value="3" /></label>
@@ -773,12 +955,12 @@
                 <input id="room-name" value="Dungeon Room" />
               </label>
               <button id="add-room" type="button">Add Room</button>
-            </section>
+            </details>
 
-            <section class="creator-section">
-              <h2>Rooms</h2>
+            <details class="creator-disclosure">
+              <summary>Rooms</summary>
               <div id="room-list" class="creator-list"></div>
-            </section>
+            </details>
           </div>
 
           <div class="creator-panel-page" data-panel-page="story">
@@ -874,16 +1056,17 @@
 
           <div class="creator-panel-page" data-panel-page="save">
             <section class="creator-section">
-              <h2>Saved Custom Dungeons</h2>
+              <h2>Load / Edit Dungeons</h2>
               <div id="saved-dungeons" class="creator-list"></div>
+              <div id="one-shot-dungeons" class="creator-list"></div>
+              <div id="campaign-dungeons" class="creator-list"></div>
               <button id="save-dungeon" type="button">Save Dungeon For Game</button>
               <button id="calc-xp" type="button" class="ghost-button">Calc XP</button>
               <p id="creator-status" class="creator-status"></p>
             </section>
 
             <section class="creator-section">
-              <h2>Campaign Dungeons</h2>
-              <div id="campaign-dungeons" class="creator-list"></div>
+              <h2>Source Override</h2>
               <button id="save-campaign-override" type="button" class="ghost-button" disabled>Save Campaign Override</button>
             </section>
 
@@ -905,8 +1088,8 @@
             <span class="creator-chip" id="creator-map-summary">0 rooms</span>
           </div>
           <div class="creator-command-actions">
-            <button type="button" data-open-panel="left">Build</button>
-            <button type="button" data-open-panel="right">Inspector</button>
+            <button type="button" data-open-panel="left">Setup</button>
+            <button type="button" data-open-panel="right">Assets</button>
             <button id="top-save-dungeon" type="button">Save</button>
             <a class="ghost-button" href="index.html">Open Game</a>
           </div>
@@ -924,7 +1107,7 @@
 
       <aside class="creator-panel right hidden-mobile" id="creator-right-panel">
         <div class="creator-panel-header">
-          <h2>Inspector</h2>
+          <h2>Assets & Inspector</h2>
           <button class="creator-panel-close ghost-button" type="button" data-toggle-panel="right">Close</button>
         </div>
         <div class="creator-panel-body">
@@ -949,6 +1132,8 @@
 
             <div class="creator-asset-page active" data-asset-page="furniture">
               <input id="furniture-search" type="search" placeholder="Search furniture" />
+              <details class="creator-disclosure">
+                <summary>Filters</summary>
               <div class="creator-filter-grid">
                 <label>
                   Kind
@@ -967,11 +1152,14 @@
                   </select>
                 </label>
               </div>
+              </details>
               <div id="furniture-catalogue" class="catalogue"></div>
             </div>
 
             <div class="creator-asset-page" data-asset-page="monsters">
               <input id="monster-search" type="search" placeholder="Search monsters" />
+              <details class="creator-disclosure">
+                <summary>Filters</summary>
               <div class="creator-filter-grid">
                 <label>
                   Category
@@ -990,6 +1178,7 @@
                   </select>
                 </label>
               </div>
+              </details>
               <label>
                 <input id="monster-is-boss" type="checkbox" />
                 Place as boss
@@ -999,6 +1188,8 @@
 
             <div class="creator-asset-page" data-asset-page="items">
               <input id="item-search" type="search" placeholder="Search items" />
+              <details class="creator-disclosure">
+                <summary>Filters</summary>
               <div class="creator-filter-grid">
                 <label>
                   Type
@@ -1018,6 +1209,7 @@
                   </select>
                 </label>
               </div>
+              </details>
               <label>
                 Add loot item
                 <select id="loot-item"></select>
@@ -1122,6 +1314,7 @@
     <script src="src/scripts/dungeon.js" defer></script>
     <script src="src/scripts/custom-dungeons.js" defer></script>
     <script src="src/scripts/campaigns.js" defer></script>
+    <script src="src/scripts/one-shot-dungeons.js" defer></script>
     <script src="src/scripts/save.js" defer></script>
     <script src="src/scripts/dungeon-creator.js" defer></script>
   </body>

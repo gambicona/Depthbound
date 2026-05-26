@@ -37,6 +37,14 @@ function itemOptionLabel(item) {
   return `${item.name} (${itemValueText(item)})`;
 }
 
+function damageText(damage) {
+  if (!damage) return "";
+  const count = Math.max(1, Number(damage.count) || 1);
+  const sides = Math.max(1, Number(damage.sides) || 1);
+  const bonus = Number(damage.bonus) || 0;
+  return `${count}d${sides}${bonus ? (bonus > 0 ? `+${bonus}` : String(bonus)) : ""} ${damage.type ?? "damage"}`;
+}
+
 function parseListInput(value) {
   return Array.from(
     new Set(
@@ -183,6 +191,7 @@ const els = {
   addLoot: document.querySelector("#add-loot"),
   deleteSelected: document.querySelector("#delete-selected"),
   savedDungeons: document.querySelector("#saved-dungeons"),
+  oneShotDungeons: document.querySelector("#one-shot-dungeons"),
   saveDungeon: document.querySelector("#save-dungeon"),
   campaignDungeons: document.querySelector("#campaign-dungeons"),
   saveCampaignOverride: document.querySelector("#save-campaign-override"),
@@ -245,6 +254,7 @@ const state = {
   start: null,
   exit: null,
   campaignSource: null,
+  oneShotSource: null,
 };
 
 function cellInRoom(room, position) {
@@ -257,6 +267,36 @@ function isBoundaryCell(room, position) {
 
 function roomAt(position) {
   return state.rooms.find((room) => cellInRoom(room, position)) ?? null;
+}
+
+function corridorAt(position) {
+  return state.corridors.find((cell) => cell.x === position.x && cell.y === position.y) ?? null;
+}
+
+function objectIsFloorTrapType(type) {
+  const template = window.DungeonContent.get("furniture", type);
+  return Boolean(template?.kind === "trap" || (template?.components ?? []).some((component) => component?.type === "trap" && component?.mode === "floor"));
+}
+
+function cellPlacementArea(position) {
+  const room = roomAt(position);
+  if (room) return { type: "room", id: room.id, room };
+  if (corridorAt(position)) return { type: "corridor", id: "corridor" };
+  return null;
+}
+
+function objectCanUsePlacementArea(object, area) {
+  if (!area) return false;
+  if (area.type === "room") return true;
+  return area.type === "corridor" && objectIsFloorTrapType(object.type);
+}
+
+function objectFitsPlacementArea(object, area) {
+  if (!objectCanUsePlacementArea(object, area)) return false;
+  return objectCellsForCreator(object).every((cell) => {
+    if (area.type === "room") return roomAt(cell)?.id === area.id;
+    return Boolean(corridorAt(cell));
+  });
 }
 
 function objectAt(position) {
@@ -380,6 +420,15 @@ function trapTemplateFromCreatorSelection(trapId) {
     ...(template.disarmAbility ? { disarmAbility: template.disarmAbility } : {}),
     description: template.description ?? "A hidden container trap.",
   };
+}
+
+function trapDamageForTemplate(template) {
+  return template?.damage ?? (template?.components ?? []).find((component) => component?.type === "trap")?.damage ?? null;
+}
+
+function trapDefaultSpotDc(template) {
+  const normal = (template?.spotDcs ?? []).find((entry) => String(entry.label).toLowerCase() === "normal");
+  return Math.max(1, Number(template?.spotDc ?? normal?.dc ?? template?.spotDcs?.[0]?.dc) || 12);
 }
 
 function updateObjectTrapFromCard(object, changedField) {
@@ -618,6 +667,7 @@ function exportedCreatorObject(object) {
     ...(object.width ? { width: object.width } : {}),
     ...(object.height ? { height: object.height } : {}),
     ...(object.pairId ? { pairId: object.pairId } : {}),
+    ...(object.spotDc ? { spotDc: Math.max(1, Number(object.spotDc) || 12) } : {}),
     ...(hasLock || typeof object.locked === "boolean" ? { locked: specialLock ? true : Boolean(object.locked) } : {}),
     ...(specialLock ? { specialLock } : {}),
     ...(!specialLock && object.lockDc ? { lockDc: object.lockDc } : {}),
@@ -634,6 +684,7 @@ function templateFromState(options = {}) {
     name: els.name.value.trim() || "Custom Dungeon",
     themeId: els.theme.value || "oldGuardroom",
     gridSize: state.gridSize,
+    ...(state.oneShotSource ? { oneShotDungeon: true, oneShotDungeonId: state.oneShotSource.id } : {}),
     dungeon,
     exit: state.exit ?? { roomId: dungeon.rooms.at(-1)?.id ?? dungeon.entranceRoomId, position: dungeon.rooms.at(-1)?.cells?.[0] ?? dungeon.startPosition },
     objects: state.objects.map(exportedCreatorObject),
@@ -837,6 +888,12 @@ function monsterCatalogueButton(entry, selectedId) {
 function furnitureCatalogueButton(entry, selectedId) {
   const fallbackSymbol = entry.symbol ?? (entry.kind === "trap" ? "!" : "?");
   const iconPath = furnitureIconPath(entry, entry.id);
+  const trapDamage = entry.kind === "trap" ? damageText(trapDamageForTemplate(entry)) : "";
+  const meta = [
+    trapDamage,
+    entry.floor ? "floor" : entry.kind,
+    ...(entry.tags ?? []).slice(0, trapDamage ? 2 : 3),
+  ].filter(Boolean).join(" - ");
   return `
     <button type="button" data-id="${escapeAttribute(entry.id)}" class="furniture-catalogue-button ${entry.id === selectedId ? "active" : ""}">
       <span class="furniture-catalogue-icon">
@@ -845,7 +902,7 @@ function furnitureCatalogueButton(entry, selectedId) {
       </span>
       <span class="furniture-catalogue-copy">
         <b>${escapeHtml(entry.name)}</b>
-        <span class="small-note">${escapeHtml([entry.floor ? "floor" : entry.kind, ...(entry.tags ?? []).slice(0, 3)].filter(Boolean).join(" - "))}</span>
+        <span class="small-note">${escapeHtml(meta)}</span>
       </span>
     </button>
   `;
@@ -1405,6 +1462,10 @@ function renderSelected() {
   }
   if (selected.type) {
     const def = window.DungeonContent.get("furniture", selected.type);
+    const isFloorTrap = objectIsFloorTrapType(selected.type);
+    const placementArea = cellPlacementArea(selected.position);
+    const trapDamage = isFloorTrap ? damageText(trapDamageForTemplate(def)) : "";
+    const selectedSpotDc = Math.max(1, Number(selected.spotDc) || trapDefaultSpotDc(def));
     const lock = (def?.components ?? []).find((component) => component?.type === "lock");
     const specialLock = specialLockDraft(selected.specialLock);
     const specialLockEnabled = Boolean(selected.specialLock);
@@ -1412,7 +1473,8 @@ function renderSelected() {
     const canUseContainerTrap = objectCanUseContainerTrap(selected);
     const trapDraft = containerTrapDraft(selected.trap);
     const trapOptions = containerTrapOptionList(trapDraft.id);
-    els.selectedCard.innerHTML = `<b>${def?.name ?? selected.type}</b><br>${def?.kind === "trap" ? "Trap" : "Furniture"} at ${selected.position.x}, ${selected.position.y}<br>Loot: ${(selected.items ?? []).map(itemName).join(", ") || "none"}
+    els.selectedCard.innerHTML = `<b>${def?.name ?? selected.type}</b><br>${def?.kind === "trap" ? "Trap" : "Furniture"} at ${selected.position.x}, ${selected.position.y}${placementArea?.type === "corridor" ? " in hallway" : ""}<br>
+      ${isFloorTrap ? `Damage: ${escapeHtml(trapDamage || "unknown")}<br><label>Spot DC <input data-object-field="spotDc" type="number" min="1" value="${selectedSpotDc}" /></label>` : `Loot: ${(selected.items ?? []).map(itemName).join(", ") || "none"}`}
       ${
         lock && !specialLockEnabled
           ? `<label><input data-object-field="locked" type="checkbox" ${selected.locked ? "checked" : ""} /> Locked in this dungeon</label>
@@ -1437,6 +1499,7 @@ function renderSelected() {
                </select>
              </label>
              <label>Trap Spot DC <input data-object-field="trapSpotDc" type="number" value="${trapDraft.spotDc}" ${selected.trap ? "" : "disabled"} /></label>
+             ${selected.trap ? `<small>Damage: ${escapeHtml(damageText(selected.trap.damage))}</small>` : ""}
              ${selected.trap?.description ? `<small>${escapeHtml(selected.trap.description)}</small>` : ""}`
           : ""
       }
@@ -1480,9 +1543,18 @@ function renderRoomList() {
     : `<p class="small-note">No rooms yet.</p>`;
 }
 
+function creatorListCategory(title, body, { open = false } = {}) {
+  return `
+    <details class="creator-list-category" ${open ? "open" : ""}>
+      <summary>${escapeHtml(title)}</summary>
+      <div class="creator-list-category-body">${body}</div>
+    </details>
+  `;
+}
+
 function renderSavedDungeons() {
   const entries = window.DungeonCustom?.list?.() ?? [];
-  els.savedDungeons.innerHTML = entries.length
+  const body = entries.length
     ? entries.map((entry) => `
       <div class="creator-list-item">
         <div><b>${entry.name}</b><br><span class="small-note">${entry.id}</span></div>
@@ -1493,11 +1565,36 @@ function renderSavedDungeons() {
       </div>
     `).join("")
     : `<p class="small-note">No custom dungeons saved yet.</p>`;
+  els.savedDungeons.innerHTML = creatorListCategory(`Custom Dungeons (${entries.length})`, body, { open: true });
+}
+
+function renderOneShotDungeons() {
+  if (!els.oneShotDungeons) return;
+  const entries = window.DungeonOneShots?.list?.() ?? [];
+  const body = entries.length
+    ? entries.map((entry) => {
+      const overridden = window.DungeonOneShots?.hasOverride?.(entry.id);
+      return `
+        <div class="creator-list-item">
+          <div>
+            <b>${escapeHtml(entry.name)}</b><br>
+            <span class="small-note">One-shot template${overridden ? " - edited override" : ""}</span>
+          </div>
+          <div>
+            <button type="button" data-action="load-one-shot" data-id="${escapeAttribute(entry.id)}">Load</button>
+            ${overridden ? `<button type="button" class="ghost-button" data-action="load-original-one-shot" data-id="${escapeAttribute(entry.id)}">Original</button>` : ""}
+            ${overridden ? `<button type="button" class="ghost-button" data-action="reset-one-shot" data-id="${escapeAttribute(entry.id)}">Reset</button>` : ""}
+          </div>
+        </div>
+      `;
+    }).join("")
+    : `<p class="small-note">No one-shot dungeons found.</p>`;
+  els.oneShotDungeons.innerHTML = creatorListCategory(`One-Shot Dungeons (${entries.length})`, body);
 }
 
 async function renderCampaignDungeons() {
   if (!els.campaignDungeons || !window.DungeonCampaigns) return;
-  els.campaignDungeons.innerHTML = `<p class="small-note">Loading campaign dungeons...</p>`;
+  els.campaignDungeons.innerHTML = creatorListCategory("Campaign Dungeons", `<p class="small-note">Loading campaign dungeons...</p>`);
   const campaigns = window.DungeonCampaigns.list();
   const sections = [];
   for (const campaign of campaigns) {
@@ -1521,18 +1618,21 @@ async function renderCampaignDungeons() {
         `;
       }),
     );
-    sections.push(`<div class="small-note"><b>${escapeHtml(campaign.name)}</b></div>${rows.join("")}`);
+    sections.push(creatorListCategory(`${campaign.name} (${campaign.count})`, rows.join("")));
   }
-  els.campaignDungeons.innerHTML = sections.join("") || `<p class="small-note">No campaign dungeons found.</p>`;
+  els.campaignDungeons.innerHTML = creatorListCategory("Campaign Dungeons", sections.join("") || `<p class="small-note">No campaign dungeons found.</p>`);
   renderCampaignSaveState();
 }
 
 function renderCampaignSaveState() {
   if (!els.saveCampaignOverride) return;
-  const source = state.campaignSource;
-  els.saveCampaignOverride.disabled = !source;
-  els.saveCampaignOverride.textContent = source
-    ? `Save ${source.campaignName ?? source.campaignId} Dungeon ${source.campaignIndex} Override`
+  const campaignSource = state.campaignSource;
+  const oneShotSource = state.oneShotSource;
+  els.saveCampaignOverride.disabled = !campaignSource && !oneShotSource;
+  els.saveCampaignOverride.textContent = campaignSource
+    ? `Save ${campaignSource.campaignName ?? campaignSource.campaignId} Dungeon ${campaignSource.campaignIndex} Override`
+    : oneShotSource
+      ? `Save ${oneShotSource.name ?? oneShotSource.id} Override`
     : "Save Campaign Override";
 }
 
@@ -1808,14 +1908,11 @@ function moveSelectedObject(dx, dy) {
   const object = selectedEntity();
   if (!object?.type || (!dx && !dy)) return;
   const position = { x: object.position.x + dx, y: object.position.y + dy };
-  const room = roomAt(position);
   const nextObject = { ...object, position };
-  if (
-    !room ||
-    objectCellsForCreator(nextObject).some((cell) => !roomAt(cell) || roomAt(cell).id !== room.id || occupied(cell, object.id, object.type))
-  ) return;
+  const area = cellPlacementArea(position);
+  if (!objectFitsPlacementArea(nextObject, area) || objectCellsForCreator(nextObject).some((cell) => occupied(cell, object.id, object.type))) return;
   object.position = position;
-  object.roomId = room.id;
+  object.roomId = area?.type === "room" ? area.id : null;
   renderAll();
 }
 
@@ -1827,8 +1924,8 @@ function rotateSelectedObject() {
   const height = object.height ?? template?.height ?? 1;
   if (width === height) return;
   const rotated = { ...object, width: height, height: width };
-  const room = roomAt(object.position);
-  if (!room || objectCellsForCreator(rotated).some((cell) => !roomAt(cell) || roomAt(cell).id !== room.id || occupied(cell, object.id, object.type))) return;
+  const area = cellPlacementArea(object.position);
+  if (!objectFitsPlacementArea(rotated, area) || objectCellsForCreator(rotated).some((cell) => occupied(cell, object.id, object.type))) return;
   object.width = height;
   object.height = width;
   renderAll();
@@ -1883,14 +1980,21 @@ function createCustomItem() {
 }
 
 function placeFurniture(position) {
-  const room = roomAt(position);
-  if (!room || !state.selectedFurnitureId) return;
+  if (!state.selectedFurnitureId) return;
   const template = window.DungeonContent.get("furniture", state.selectedFurnitureId);
   if (!furnitureEntryMatchesTool(template, state.tool)) return;
   const id = `${state.selectedFurnitureId}-${state.objects.length + 1}`;
-  const object = { id, type: state.selectedFurnitureId, position: { ...position }, items: [], roomId: room.id };
+  const area = cellPlacementArea(position);
+  const object = {
+    id,
+    type: state.selectedFurnitureId,
+    position: { ...position },
+    items: [],
+    roomId: area?.type === "room" ? area.id : null,
+    ...(objectIsFloorTrapType(state.selectedFurnitureId) ? { spotDc: trapDefaultSpotDc(template) } : {}),
+  };
   if (objectHasLockComponent(object)) object.locked = false;
-  if (objectCellsForCreator(object).some((cell) => !roomAt(cell) || roomAt(cell).id !== room.id || occupied(cell, "", object.type))) return;
+  if (!objectFitsPlacementArea(object, area) || objectCellsForCreator(object).some((cell) => occupied(cell, "", object.type))) return;
   state.objects.push(object);
   state.selectedId = id;
 }
@@ -2066,13 +2170,28 @@ function saveDungeon() {
   const saved = window.DungeonCustom.save(templateFromState());
   state.id = saved.id;
   state.campaignSource = null;
+  state.oneShotSource = null;
   setStatus(`Saved ${saved.name}. It will appear at the Home Door as a Custom dungeon.`);
   renderAll();
 }
 
 async function saveCampaignOverride() {
-  if (!state.campaignSource) {
-    setStatus("Load a campaign dungeon first.");
+  if (!state.campaignSource && !state.oneShotSource) {
+    setStatus("Load a campaign or one-shot dungeon first.");
+    return;
+  }
+  if (state.oneShotSource) {
+    const saved = window.DungeonOneShots?.saveOverride?.(
+      state.oneShotSource.id,
+      templateFromState({ includeOneShotSource: true }),
+    );
+    if (!saved) {
+      setStatus("Could not save the one-shot override.");
+      return;
+    }
+    setStatus(`Saved override for ${state.oneShotSource.name ?? state.oneShotSource.id}.`);
+    renderOneShotDungeons();
+    renderAll();
     return;
   }
   const saved = window.DungeonCampaigns?.saveOverride?.(
@@ -2102,6 +2221,16 @@ function loadTemplate(template, options = {}) {
         }
       : null
   );
+  state.oneShotSource = options.oneShotSource ?? (
+    template.oneShotDungeonId
+      ? {
+          id: template.oneShotDungeonId,
+          name: window.DungeonOneShots?.list?.().find((entry) => entry.id === template.oneShotDungeonId)?.name ?? template.name ?? template.oneShotDungeonId,
+        }
+      : null
+  );
+  if (state.campaignSource) state.oneShotSource = null;
+  if (state.oneShotSource) state.campaignSource = null;
   state.gridSize = template.gridSize ?? template.dungeon?.gridSize ?? 36;
   state.rooms = clone(template.dungeon?.rooms ?? []);
   state.corridors = clone(template.dungeon?.corridors ?? []);
@@ -2156,6 +2285,7 @@ function newBlankDungeon() {
   state.selectedStoryTriggerId = "";
   state.exit = null;
   state.campaignSource = null;
+  state.oneShotSource = null;
   state.start = null;
   state.selectedId = "";
   state.connectFromRoomId = "";
@@ -2246,8 +2376,9 @@ function init() {
   els.customItemTemplate.dispatchEvent(new Event("change"));
   newBlankDungeon();
   setTool("select");
+  renderOneShotDungeons();
   void renderCampaignDungeons();
-  setCreatorPanelOpen("left", true);
+  setCreatorPanelOpen("left", !window.matchMedia("(max-width: 700px)").matches);
   setCreatorPanelOpen("right", false);
   if (importedCustomItems) setStatus(`Imported ${importedCustomItems} custom item${importedCustomItems === 1 ? "" : "s"} from the item creator.`);
 
@@ -2424,6 +2555,7 @@ function init() {
       const field = objectInput.dataset.objectField;
       if (field === "locked") selected.locked = objectInput.checked;
       if (field === "lockDc") selected.lockDc = Math.max(1, Number(objectInput.value) || 12);
+      if (field === "spotDc") selected.spotDc = Math.max(1, Number(objectInput.value) || 12);
       if (field.startsWith("specialLock")) updateObjectSpecialLockFromCard(selected, field);
       if (field.startsWith("trap")) updateObjectTrapFromCard(selected, field);
       renderExport();
@@ -2454,6 +2586,7 @@ function init() {
     const field = objectInput.dataset.objectField;
     if (field === "locked") selected.locked = objectInput.checked;
     if (field === "lockDc") selected.lockDc = Math.max(1, Number(objectInput.value) || 12);
+    if (field === "spotDc") selected.spotDc = Math.max(1, Number(objectInput.value) || 12);
     if (field.startsWith("specialLock")) updateObjectSpecialLockFromCard(selected, field);
     if (field.startsWith("trap")) updateObjectTrapFromCard(selected, field);
     renderExport();
@@ -2483,6 +2616,38 @@ function init() {
     if (button.dataset.action === "delete") {
       window.DungeonCustom.remove(button.dataset.id);
       renderAll();
+    }
+  });
+  els.oneShotDungeons?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-action]");
+    if (!button) return;
+    const oneShotId = button.dataset.id;
+    if (button.dataset.action === "load-one-shot") void window.DungeonOneShots?.get?.(oneShotId).then((template) => {
+      if (!template) {
+        setStatus("Could not load that one-shot dungeon.");
+        return;
+      }
+      const entry = window.DungeonOneShots?.list?.().find((item) => item.id === oneShotId);
+      loadTemplate(template, { oneShotSource: { id: oneShotId, name: entry?.name ?? template.name ?? oneShotId } });
+      setStatus(`Loaded ${entry?.name ?? template.name ?? "one-shot dungeon"}. Save Source Override to replace it in the one-shot menu.`);
+    });
+    if (button.dataset.action === "load-original-one-shot") void window.DungeonOneShots?.original?.(oneShotId).then((template) => {
+      if (!template) {
+        setStatus("Could not load the original one-shot JSON.");
+        return;
+      }
+      const entry = window.DungeonOneShots?.list?.().find((item) => item.id === oneShotId);
+      loadTemplate(template, { oneShotSource: { id: oneShotId, name: entry?.name ?? template.name ?? oneShotId } });
+      setStatus(`Loaded original JSON for ${entry?.name ?? template.name ?? oneShotId}. Save Source Override to replace the edited version.`);
+    });
+    if (button.dataset.action === "reset-one-shot") {
+      window.DungeonOneShots?.removeOverride?.(oneShotId);
+      if (state.oneShotSource?.id === oneShotId) {
+        state.oneShotSource = null;
+        renderAll();
+      }
+      renderOneShotDungeons();
+      setStatus("One-shot override removed. The original JSON dungeon will be used again.");
     }
   });
   els.campaignDungeons?.addEventListener("click", (event) => {
