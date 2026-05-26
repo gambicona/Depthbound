@@ -2,6 +2,7 @@ Spell sound effects
 Sidekicks expert and spellcaster availability
 recruitable sidekicks
 ally and companion spawn, configurable
+continous mob spawner
 
 packs to find (Medizin Pack Proviant Pack, etc) that can either be sold to merchants or even factions for points or be opened to gain whatever is inside
 
@@ -16,10 +17,6 @@ Quests:
 stealthing
 find secret rooms
 
-lighitng system
-5. Add vision/light/detection fifth. This justifies un-hiding Light and Dancing Lights and makes Darkness, Daylight, True Seeing, See Invisibility, Sunbeam, Sunburst, and Maddening Darkness much better.
-
-
-poisons, diseases, curses
+underwater
 
 WoW Addon: Races, Classes, Monster, Dungeons

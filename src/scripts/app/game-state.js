@@ -74,6 +74,7 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
 
   return {
     themeId,
+    worldDay: 1,
     dungeonSizeId: dungeonSize?.id ?? "large",
     dungeonSizeName: dungeonSize?.name ?? "Large",
     encounterTarget,
@@ -540,6 +541,7 @@ function createDungeonStateForParty(partyMembers, previousState, themeId = defau
   nextState.monsterCompendium = normalizeMonsterCompendium(previousState?.monsterCompendium);
   nextState.d20Mode = normalizeD20Mode(previousState?.d20Mode);
   nextState.d20FailureStreak = previousState?.d20FailureStreak ?? 0;
+  nextState.worldDay = normalizeWorldDay(previousState?.worldDay);
   nextState.campaignProgress = cloneData(previousState?.campaignProgress ?? {});
   nextState.questFlags = cloneData(previousState?.questFlags ?? {});
   nextState.partyResources = normalizePartyResources(previousState?.partyResources ?? {});
@@ -734,6 +736,7 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
     completed: false,
     d20Mode: normalizeD20Mode(previousState?.d20Mode),
     d20FailureStreak: previousState?.d20FailureStreak ?? 0,
+    worldDay: normalizeWorldDay(previousState?.worldDay),
     shortRestsUsed: 0,
     shortRestLimit: shortRestLimitForTheme(theme, 3),
     dungeonClock: createDungeonClock(),
@@ -876,6 +879,22 @@ function createDungeonClock(overrides = {}) {
   };
 }
 
+function normalizeWorldDay(day = 1) {
+  return Math.max(1, Math.floor(Number(day) || 1));
+}
+
+function campaignElapsedSeconds(options = {}) {
+  const daySeconds = (normalizeWorldDay(state?.worldDay) - 1) * 24 * 60 * 60;
+  const dungeonSeconds = state?.mode !== "home" ? dungeonElapsedSeconds(options) : 0;
+  return daySeconds + dungeonSeconds;
+}
+
+function advanceWorldDay(days = 1) {
+  if (!state) return 1;
+  state.worldDay = normalizeWorldDay(state.worldDay) + Math.max(0, Math.floor(Number(days) || 0));
+  return state.worldDay;
+}
+
 function dungeonClockApplies() {
   return gameHasStarted && state?.mode !== "home" && !state?.completed;
 }
@@ -959,14 +978,30 @@ const corpseGentleReposeSeconds = 10 * 24 * 60 * 60;
 
 function ensureHeroCorpseState(hero, options = {}) {
   if (!hero?.dead) return null;
-  const nowSeconds = dungeonElapsedSeconds({ sync: false });
+  const nowDungeonSeconds = dungeonElapsedSeconds({ sync: false });
+  const nowCampaignSeconds = campaignElapsedSeconds({ sync: false });
   const previous = hero.corpse && typeof hero.corpse === "object" ? hero.corpse : {};
+  const diedAtDungeonTimeSeconds = Math.max(0, Math.floor(Number(previous.diedAtDungeonTimeSeconds ?? options.diedAtDungeonTimeSeconds ?? nowDungeonSeconds) || 0));
+  const legacyAgeSeconds = Math.max(0, nowDungeonSeconds - diedAtDungeonTimeSeconds);
+  const diedAtCampaignTimeSeconds = Math.max(
+    0,
+    Math.floor(Number(previous.diedAtCampaignTimeSeconds ?? options.diedAtCampaignTimeSeconds ?? nowCampaignSeconds - legacyAgeSeconds) || 0),
+  );
+  const legacyPreservedRemaining = Math.max(0, Math.floor(Number(previous.preservedUntilDungeonTimeSeconds ?? 0) || 0) - nowDungeonSeconds);
+  const preservedUntilCampaignTimeSeconds = Math.max(
+    0,
+    Math.floor(Number(previous.preservedUntilCampaignTimeSeconds ?? (legacyPreservedRemaining > 0 ? nowCampaignSeconds + legacyPreservedRemaining : 0)) || 0),
+  );
   hero.corpse = {
-    diedAtDungeonTimeSeconds: Math.max(0, Math.floor(Number(previous.diedAtDungeonTimeSeconds ?? options.diedAtDungeonTimeSeconds ?? nowSeconds) || 0)),
+    diedAtDungeonTimeSeconds,
+    diedAtCampaignTimeSeconds,
     location: options.location ?? previous.location ?? (previous.sentHome || hero.corpseAtBase ? "base" : "dungeon"),
     preservedUntilDungeonTimeSeconds: Math.max(0, Math.floor(Number(previous.preservedUntilDungeonTimeSeconds ?? 0) || 0)),
+    preservedUntilCampaignTimeSeconds,
     transportedAtDungeonTimeSeconds: previous.transportedAtDungeonTimeSeconds ?? null,
+    transportedAtCampaignTimeSeconds: previous.transportedAtCampaignTimeSeconds ?? null,
     revivedAtDungeonTimeSeconds: previous.revivedAtDungeonTimeSeconds ?? null,
+    revivedAtCampaignTimeSeconds: previous.revivedAtCampaignTimeSeconds ?? null,
   };
   hero.corpseAtBase = hero.corpse.location === "base";
   return hero.corpse;
@@ -977,29 +1012,29 @@ function heroCorpseLocation(hero) {
   return ensureHeroCorpseState(hero)?.location ?? "dungeon";
 }
 
-function corpsePreserved(hero, nowSeconds = dungeonElapsedSeconds({ sync: false })) {
+function corpsePreserved(hero, nowSeconds = campaignElapsedSeconds({ sync: false })) {
   const corpse = ensureHeroCorpseState(hero);
-  return Boolean(corpse && (corpse.preservedUntilDungeonTimeSeconds ?? 0) > nowSeconds);
+  return Boolean(corpse && (corpse.preservedUntilCampaignTimeSeconds ?? 0) > nowSeconds);
 }
 
-function corpseAgeSeconds(hero, nowSeconds = dungeonElapsedSeconds({ sync: false })) {
+function corpseAgeSeconds(hero, nowSeconds = campaignElapsedSeconds({ sync: false })) {
   const corpse = ensureHeroCorpseState(hero);
   if (!corpse) return 0;
-  return Math.max(0, nowSeconds - (corpse.diedAtDungeonTimeSeconds ?? nowSeconds));
+  return Math.max(0, nowSeconds - (corpse.diedAtCampaignTimeSeconds ?? nowSeconds));
 }
 
-function corpseEffectiveAgeSeconds(hero, nowSeconds = dungeonElapsedSeconds({ sync: false })) {
+function corpseEffectiveAgeSeconds(hero, nowSeconds = campaignElapsedSeconds({ sync: false })) {
   if (corpsePreserved(hero, nowSeconds)) return 0;
   return corpseAgeSeconds(hero, nowSeconds);
 }
 
-function corpseDecompositionStatus(hero, nowSeconds = dungeonElapsedSeconds({ sync: false })) {
+function corpseDecompositionStatus(hero, nowSeconds = campaignElapsedSeconds({ sync: false })) {
   const corpse = ensureHeroCorpseState(hero);
   if (!corpse) return { label: "Alive", detail: "" };
   if (corpsePreserved(hero, nowSeconds)) {
     return {
       label: "Preserved",
-      detail: `Gentle Repose holds decay for ${formatDuration((corpse.preservedUntilDungeonTimeSeconds ?? nowSeconds) - nowSeconds)}.`,
+      detail: `Gentle Repose holds decay for ${formatDuration((corpse.preservedUntilCampaignTimeSeconds ?? nowSeconds) - nowSeconds)}.`,
     };
   }
   const age = corpseAgeSeconds(hero, nowSeconds);
@@ -1879,6 +1914,7 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
 
   return {
     combatStarted: false,
+    worldDay: normalizeWorldDay(normalizedPartyData?.worldDay ?? (partyData ? 1 : state?.worldDay)),
     mode: "home",
     round: 0,
     activeIndex: 0,
@@ -2256,7 +2292,7 @@ async function loadPredefinedHeroTokenArt() {
     if (!response.ok) return;
     const files = await response.json();
     predefinedHeroTokenArt = (Array.isArray(files) ? files : [])
-      .filter((file) => typeof file === "string" && /\.(png|jpe?g|webp|gif|svg)$/i.test(file))
+      .filter((file) => typeof file === "string" && /\.(png|jpe?g|webp|gif)$/i.test(file))
       .map((file) => ({
         name: file.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "),
         path: `assets/tokens/preheros/${file}`,
@@ -6104,6 +6140,7 @@ function normalizeLoadedState(loadedState) {
     completed: Boolean(loadedState.completed),
     d20Mode: normalizeD20Mode(loadedState.d20Mode ?? freshState.d20Mode),
     d20FailureStreak: Math.max(0, Math.floor(loadedState.d20FailureStreak ?? freshState.d20FailureStreak ?? 0)),
+    worldDay: normalizeWorldDay(loadedState.worldDay ?? freshState.worldDay),
     shortRestsUsed: loadedState.shortRestsUsed ?? (loadedState.shortRestUsed ? 1 : 0),
     shortRestLimit: loadedState.shortRestLimit ?? shortRestLimitForTheme(null, 3),
     dungeonClock: createDungeonClock({ ...loadedState.dungeonClock, lastRealMs: Date.now() }),
@@ -6162,12 +6199,29 @@ function normalizeLoadedState(loadedState) {
     removeLegacyTestingBeastAllyFromPartyData(normalized.party);
   }
   const loadedDungeonTime = Math.floor(normalized.dungeonClock?.elapsedSeconds ?? 0);
+  const loadedCampaignTime = (normalizeWorldDay(normalized.worldDay) - 1) * 24 * 60 * 60 + (normalized.mode !== "home" ? loadedDungeonTime : 0);
   Object.values(normalized.fighters).forEach((fighter) => {
     if (fighter.dead) {
       fighter.hp = 0;
       fighter.alive = false;
       fighter.stableAtZero = false;
       fighter.deathSaves = fighter.deathSaves ?? { successes: 0, failures: 3 };
+      const previousCorpse = fighter.corpse && typeof fighter.corpse === "object" ? fighter.corpse : {};
+      const diedAtDungeonTimeSeconds = Math.max(0, Math.floor(Number(previousCorpse.diedAtDungeonTimeSeconds ?? loadedDungeonTime) || 0));
+      const legacyAgeSeconds = Math.max(0, loadedDungeonTime - diedAtDungeonTimeSeconds);
+      const preservedRemainingSeconds = Math.max(0, Math.floor(Number(previousCorpse.preservedUntilDungeonTimeSeconds ?? 0) || 0) - loadedDungeonTime);
+      fighter.corpse = {
+        ...previousCorpse,
+        diedAtDungeonTimeSeconds,
+        diedAtCampaignTimeSeconds: Math.max(
+          0,
+          Math.floor(Number(previousCorpse.diedAtCampaignTimeSeconds ?? loadedCampaignTime - legacyAgeSeconds) || 0),
+        ),
+        preservedUntilCampaignTimeSeconds: Math.max(
+          0,
+          Math.floor(Number(previousCorpse.preservedUntilCampaignTimeSeconds ?? (preservedRemainingSeconds > 0 ? loadedCampaignTime + preservedRemainingSeconds : 0)) || 0),
+        ),
+      };
       ensureHeroCorpseState(fighter);
     } else if (normalized.party.rosterIds.includes(fighter.id)) {
       if (fighter.hp > 0) fighter.stableAtZero = false;

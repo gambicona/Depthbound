@@ -4307,6 +4307,7 @@ function transportCorpseToBase(corpseId) {
   const record = ensureHeroCorpseState(corpse);
   record.location = "base";
   record.transportedAtDungeonTimeSeconds = dungeonElapsedSeconds({ sync: false });
+  record.transportedAtCampaignTimeSeconds = campaignElapsedSeconds({ sync: false });
   corpse.corpseAtBase = true;
   state.party.heroIds = livingPartyHeroIds();
   selectedHeroIds.delete(corpse.id);
@@ -12472,10 +12473,15 @@ function renderControls() {
 function renderDungeonClock() {
   if (!els.dungeonTimerLabel || !els.toggleDungeonTimer) return;
   const active = gameHasStarted && state?.mode !== "home";
-  els.dungeonTimerLabel.textContent = active ? `Time ${formatDungeonClockTime(dungeonElapsedSeconds({ sync: false }))}` : "Time 00:00:00";
+  els.dungeonTimerLabel.textContent = state?.mode === "home"
+    ? `Day ${normalizeWorldDay(state?.worldDay)}`
+    : active
+      ? `Time ${formatDungeonClockTime(dungeonElapsedSeconds({ sync: false }))}`
+      : "Time 00:00:00";
   const paused = dungeonClockIsPaused();
   els.toggleDungeonTimer.textContent = paused ? "Resume" : "Pause";
   els.toggleDungeonTimer.setAttribute("aria-pressed", paused ? "true" : "false");
   els.toggleDungeonTimer.disabled = !active || state?.completed;
+  els.toggleDungeonTimer.classList.toggle("hidden", state?.mode === "home");
   els.toggleDungeonTimer.title = state?.mode === "combat" ? "Paused combat time stops round-based durations." : "";
 }

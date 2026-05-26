@@ -3882,6 +3882,7 @@ function checkDungeonCompletion(hero = activeHero()) {
     }
     state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, {
       ...state.party,
+      worldDay: normalizeWorldDay(state.worldDay) + 1,
       campaignProgress: completedCampaign,
       questFlags,
       partyResources,
@@ -7473,7 +7474,12 @@ function reviveCorpseWithSpell(caster, corpseHero, spell) {
   corpseHero.stableAtZero = false;
   corpseHero.deathSaves = { successes: 0, failures: 0 };
   corpseHero.deathLootDropped = false;
-  corpseHero.corpse = { ...(corpseHero.corpse ?? {}), revivedAtDungeonTimeSeconds: dungeonElapsedSeconds({ sync: false }), location: null };
+  corpseHero.corpse = {
+    ...(corpseHero.corpse ?? {}),
+    revivedAtDungeonTimeSeconds: dungeonElapsedSeconds({ sync: false }),
+    revivedAtCampaignTimeSeconds: campaignElapsedSeconds({ sync: false }),
+    location: null,
+  };
   corpseHero.corpseAtBase = false;
   if (state.mode !== "home" && caster.position) corpseHero.position = { ...caster.position };
   state.party.rosterIds = uniqueValues([...(state.party.rosterIds ?? []), corpseHero.id]);
@@ -7489,9 +7495,12 @@ function preserveCorpseWithSpell(caster, corpseHero, spell) {
   if (!caster || !spell || !corpseHero?.dead || !heroCanAct(caster) || spell.effect?.kind !== "preserveCorpse" || !canPaySpellCost(caster, spell)) return false;
   spendSpellResources(caster, spell);
   const corpse = ensureHeroCorpseState(corpseHero);
-  const nowSeconds = dungeonElapsedSeconds({ sync: false });
-  corpse.preservedUntilDungeonTimeSeconds = Math.max(corpse.preservedUntilDungeonTimeSeconds ?? 0, nowSeconds + (spell.effect?.durationSeconds ?? corpseGentleReposeSeconds));
-  addLog(`${caster.name} casts ${spell.name}. ${corpseHero.name}'s body will not decay for ${formatDuration(corpse.preservedUntilDungeonTimeSeconds - nowSeconds)}.`, "important");
+  const durationSeconds = spell.effect?.durationSeconds ?? corpseGentleReposeSeconds;
+  const nowDungeonSeconds = dungeonElapsedSeconds({ sync: false });
+  const nowCampaignSeconds = campaignElapsedSeconds({ sync: false });
+  corpse.preservedUntilDungeonTimeSeconds = Math.max(corpse.preservedUntilDungeonTimeSeconds ?? 0, nowDungeonSeconds + durationSeconds);
+  corpse.preservedUntilCampaignTimeSeconds = Math.max(corpse.preservedUntilCampaignTimeSeconds ?? 0, nowCampaignSeconds + durationSeconds);
+  addLog(`${caster.name} casts ${spell.name}. ${corpseHero.name}'s body will not decay for ${formatDuration(corpse.preservedUntilCampaignTimeSeconds - nowCampaignSeconds)}.`, "important");
   return true;
 }
 

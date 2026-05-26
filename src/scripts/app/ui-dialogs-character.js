@@ -3275,6 +3275,7 @@ async function returnHomeEarly() {
   const saveSlotId = state.saveSlotId ?? activeSaveSlot;
   state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, {
     ...state.party,
+    worldDay: normalizeWorldDay(state.worldDay) + 1,
     campaignProgress: state.campaignProgress ?? {},
     questFlags: state.questFlags ?? {},
     partyResources: state.partyResources ?? {},
