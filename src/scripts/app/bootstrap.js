@@ -42,6 +42,7 @@ let adminItemInstanceCounter = 0;
 let activeDialogCancel = null;
 let currentMusicKey = "";
 let currentMusic = null;
+let activeInstrumentPerformance = null;
 let soundVolume = Number(window.localStorage.getItem("dungeonCrawler.soundVolume.v1") ?? 0.5);
 let buttonTheme = window.localStorage.getItem("dungeonCrawler.buttonTheme.v1") || "verdigris";
 let selectedAttackTargetId = null;
@@ -181,11 +182,16 @@ const toolDefinitions = {
   "tinkers-tools": { name: "Tinker's Tools", category: "artisan" },
   "weavers-tools": { name: "Weaver's Tools", category: "artisan" },
   "woodcarvers-tools": { name: "Woodcarver's Tools", category: "artisan" },
+  bagpipes: { name: "Bagpipes", category: "instrument" },
   drum: { name: "Drum", category: "instrument" },
+  dulcimer: { name: "Dulcimer", category: "instrument" },
   flute: { name: "Flute", category: "instrument" },
   horn: { name: "Horn", category: "instrument" },
   lute: { name: "Lute", category: "instrument" },
   lyre: { name: "Lyre", category: "instrument" },
+  "pan-flute": { name: "Pan Flute", category: "instrument" },
+  piano: { name: "Piano", category: "instrument" },
+  shawm: { name: "Shawm", category: "instrument" },
   viol: { name: "Viol", category: "instrument" },
 };
 const musicalInstrumentToolIds = Object.entries(toolDefinitions).filter(([, tool]) => tool.category === "instrument").map(([id]) => id);

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Depthbound Recruit Creator</title>
+    <link rel="stylesheet" href="src/styles/main.css" />
+    <style>
+      body {
+        margin: 0;
+        background: #101315;
+        color: #f5efe3;
+      }
+
+      .recruit-shell {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: minmax(320px, 440px) minmax(0, 1fr);
+      }
+
+      .recruit-panel {
+        border-right: 1px solid rgba(245, 239, 227, 0.16);
+        background: #171313;
+        padding: 18px;
+        overflow: auto;
+      }
+
+      .recruit-stage {
+        padding: 18px;
+        overflow: auto;
+      }
+
+      .recruit-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+
+      .recruit-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .recruit-panel label,
+      .recruit-stage label {
+        display: grid;
+        gap: 4px;
+        margin-bottom: 10px;
+      }
+
+      .recruit-panel input,
+      .recruit-panel select,
+      .recruit-panel textarea,
+      .recruit-stage input,
+      .recruit-stage textarea {
+        width: 100%;
+        box-sizing: border-box;
+        background: #231c1d;
+        color: #f5efe3;
+        border: 1px solid rgba(245, 239, 227, 0.22);
+        border-radius: 6px;
+        padding: 8px;
+      }
+
+      .recruit-card {
+        border: 1px solid rgba(245, 239, 227, 0.16);
+        border-radius: 8px;
+        background: #151719;
+        padding: 14px;
+        margin-bottom: 12px;
+      }
+
+      .recruit-output {
+        min-height: 460px;
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .recruit-items {
+        display: grid;
+        gap: 8px;
+      }
+
+      .recruit-item-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+      }
+
+      @media (max-width: 900px) {
+        .recruit-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .recruit-panel {
+          border-right: 0;
+          border-bottom: 1px solid rgba(245, 239, 227, 0.16);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="recruit-shell">
+      <aside class="recruit-panel">
+        <div class="recruit-toolbar">
+          <h1>Recruit Creator</h1>
+          <a class="ghost-button" href="dungeon-creator.html">Dungeon Creator</a>
+        </div>
+
+        <section class="recruit-card">
+          <h2>Hero</h2>
+          <label>Name <input id="recruit-name" value="Dungeon Recruit" /></label>
+          <div class="recruit-grid">
+            <label>Class id <input id="recruit-class" value="fighter" /></label>
+            <label>Level <input id="recruit-level" type="number" min="1" max="20" value="1" /></label>
+          </div>
+          <button id="run-hero-builder" type="button">Full Hero Builder</button>
+          <p class="small-note">Uses the normal hero creation choices, then opens level-up choices until this level is reached.</p>
+          <label>Token art <input id="recruit-token-art" value="assets/tokens/preheros/fighter_human_f.jpg" /></label>
+          <label>Species <input id="recruit-species" value="Human" /></label>
+          <label>Subrace <input id="recruit-subrace" value="Standard Human" /></label>
+          <label>Party role
+            <select id="recruit-role">
+              <option value="dd">Damage</option>
+              <option value="tank">Tank</option>
+              <option value="heal">Heal</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="recruit-card">
+          <h2>Scores</h2>
+          <div class="recruit-grid">
+            <label>STR <input data-score="str" type="number" value="15" /></label>
+            <label>DEX <input data-score="dex" type="number" value="13" /></label>
+            <label>CON <input data-score="con" type="number" value="14" /></label>
+            <label>INT <input data-score="int" type="number" value="10" /></label>
+            <label>WIS <input data-score="wis" type="number" value="11" /></label>
+            <label>CHA <input data-score="cha" type="number" value="10" /></label>
+          </div>
+          <label>Base max HP <input id="recruit-max-hp" type="number" value="12" /></label>
+        </section>
+
+        <section class="recruit-card">
+          <h2>Training</h2>
+          <label>Skills <input id="recruit-skills" value="athletics, perception" /></label>
+          <label>Extra JSON overrides <textarea id="recruit-extra-json" rows="6">{}</textarea></label>
+        </section>
+      </aside>
+
+      <section class="recruit-stage">
+        <div class="recruit-toolbar">
+          <div>
+            <h2>Inventory</h2>
+            <span class="small-note">Add item ids, then choose equipped ids by slot.</span>
+          </div>
+          <button id="add-recruit-item" type="button">Add Item</button>
+        </div>
+        <div id="recruit-items" class="recruit-items"></div>
+
+        <section class="recruit-card">
+          <h2>Equipment</h2>
+          <div class="recruit-grid">
+            <label>Main hand <input id="equip-mainHand" value="longsword" /></label>
+            <label>Off hand <input id="equip-offHand" value="shield" /></label>
+            <label>Torso <input id="equip-torso" value="chain-mail" /></label>
+            <label>Ring <input id="equip-ring" /></label>
+          </div>
+        </section>
+
+        <section class="recruit-card">
+          <div class="recruit-toolbar">
+            <h2>Recruit Marker JSON</h2>
+            <div>
+              <button id="copy-recruit-json" type="button">Copy</button>
+              <button id="save-recruit-json" type="button">Save JSON</button>
+            </div>
+          </div>
+          <textarea id="recruit-output" class="recruit-output" spellcheck="false"></textarea>
+          <p class="small-note">Suggested folder: src/scripts/content/npcs/Recruits</p>
+        </section>
+      </section>
+    </main>
+
+    <div id="fighter-info" class="fighter-info hidden" aria-live="polite">
+      <div class="fighter-info-panel">
+        <div class="panel-heading">
+          <h2 id="fighter-info-name">Recruit</h2>
+        </div>
+        <div id="fighter-info-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+    <div id="home-menu" class="menu-panel hidden"></div>
+    <ol id="combat-log" class="hidden"></ol>
+    <div id="game-dialog" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="game-dialog-title">
+      <form id="game-dialog-form" class="fighter-info-panel dialog-panel">
+        <div class="panel-heading">
+          <h2 id="game-dialog-title">Dialog</h2>
+        </div>
+        <div class="fighter-info-body">
+          <p id="game-dialog-message" class="dialog-message"></p>
+          <label id="game-dialog-field" class="dialog-field hidden">
+            <span id="game-dialog-label">Name</span>
+            <input id="game-dialog-input" type="text" autocomplete="off" />
+          </label>
+          <div id="game-dialog-actions" class="dialog-actions"></div>
+        </div>
+      </form>
+    </div>
+
+    <script src="src/scripts/config.js" defer></script>
+    <script src="src/scripts/content/registry.js" defer></script>
+    <script src="src/scripts/content/items/equipment.js" defer></script>
+    <script src="src/scripts/content/items/treasure.js" defer></script>
+    <script src="src/scripts/content/items/materials.js" defer></script>
+    <script src="src/scripts/content/items/poisons.js" defer></script>
+    <script src="src/scripts/content/afflictions/diseases.js" defer></script>
+    <script src="src/scripts/content/afflictions/curses.js" defer></script>
+    <script src="src/scripts/content/items/handouts.js" defer></script>
+    <script src="src/scripts/content/items/magic_items.js" defer></script>
+    <script src="src/scripts/content/items/magic_accessories.js" defer></script>
+    <script src="src/scripts/content/items/magic-forest-pack.js" defer></script>
+    <script src="src/scripts/content/items/magic-undead-pack.js" defer></script>
+    <script src="src/scripts/content/items/magic-hell-pack.js" defer></script>
+    <script src="src/scripts/content/items/magic-underdark-drow-pack.js" defer></script>
+    <script src="src/scripts/content/crafting.js" defer></script>
+    <script src="src/scripts/content/spells/core-spells.js" defer></script>
+    <script src="src/scripts/content/classes/barbarian.js" defer></script>
+    <script src="src/scripts/content/classes/fighter.js" defer></script>
+    <script src="src/scripts/content/classes/monk.js" defer></script>
+    <script src="src/scripts/content/classes/rogue.js" defer></script>
+    <script src="src/scripts/content/classes/cleric.js" defer></script>
+    <script src="src/scripts/content/classes/druid.js" defer></script>
+    <script src="src/scripts/content/classes/wizard.js" defer></script>
+    <script src="src/scripts/content/classes/bard.js" defer></script>
+    <script src="src/scripts/content/classes/sorcerer.js" defer></script>
+    <script src="src/scripts/content/classes/paladin.js" defer></script>
+    <script src="src/scripts/content/classes/ranger.js" defer></script>
+    <script src="src/scripts/content/classes/warlock.js" defer></script>
+    <script src="src/scripts/content/classes/subclass-packs.js" defer></script>
+    <script src="src/scripts/content/feats/core-feats.js" defer></script>
+    <script src="src/scripts/content/hero-names.js" defer></script>
+    <script src="src/scripts/content/classes/sidekick-warrior.js" defer></script>
+    <script src="src/scripts/content/classes/sidekick-expert.js" defer></script>
+    <script src="src/scripts/content/classes/sidekick-spellcaster.js" defer></script>
+    <script src="src/scripts/content/monsters/summons-pack.js" defer></script>
+    <script src="src/scripts/content/furniture/dungeon-furniture-pack.js" defer></script>
+    <script src="src/scripts/content/furniture/home-decor-pack.js" defer></script>
+    <script src="src/scripts/content/loot/basic-dungeon.js" defer></script>
+    <script src="src/scripts/content/themes/old-guardroom.js" defer></script>
+    <script src="src/scripts/dice.js" defer></script>
+    <script src="src/scripts/grid.js" defer></script>
+    <script src="src/scripts/dungeon.js" defer></script>
+    <script src="src/scripts/save.js" defer></script>
+    <script src="src/scripts/app/bootstrap.js" defer></script>
+    <script src="src/scripts/app/game-state.js" defer></script>
+    <script src="src/scripts/app/ui-dialogs-character.js" defer></script>
+    <script src="src/scripts/app/rendering-inventory.js" defer></script>
+    <script src="src/scripts/recruit-creator.js" defer></script>
+  </body>
+</html>

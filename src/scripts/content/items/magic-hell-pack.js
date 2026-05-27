@@ -108,12 +108,14 @@ function registerMagicWeapon(id, baseItemId, name, rarity, priceGp, magic = {}) 
   const attackBonus = magic.attackBonus ?? magic.enhancementBonus ?? 0;
   const damageBonus = magic.damageBonus ?? magic.enhancementBonus ?? 0;
   const extraDamage = Array.isArray(magic.extraDamage) ? magic.extraDamage : magic.extraDamage ? [magic.extraDamage] : [];
+  const attunementFields = magic.requiresAttunement == null ? {} : { requiresAttunement: Boolean(magic.requiresAttunement) };
 
   window.DungeonContent.register("items", id, {
     ...base,
     name,
     type: "weapon",
     cost: gp(priceGp),
+    ...attunementFields,
     baseEquipmentId: baseItemId,
     tags: uniqueTags([
       ...(base.tags ?? []),
@@ -147,6 +149,7 @@ function registerMagicWeapon(id, baseItemId, name, rarity, priceGp, magic = {}) 
       attackBonus,
       damageBonus,
       extraDamage,
+      ...attunementFields,
       resistances: magic.resistances ?? [],
       vulnerabilities: magic.vulnerabilities ?? [],
       properties: magic.properties ?? [],
@@ -166,12 +169,14 @@ function registerMagicArmor(id, baseItemId, name, rarity, priceGp, magic = {}) {
   const acBonus = magic.acBonus ?? magic.enhancementBonus ?? 0;
   const resistances = magic.resistances ?? [];
   const vulnerabilities = magic.vulnerabilities ?? [];
+  const attunementFields = magic.requiresAttunement == null ? {} : { requiresAttunement: Boolean(magic.requiresAttunement) };
 
   window.DungeonContent.register("items", id, {
     ...base,
     name,
     type: "armor",
     cost: gp(priceGp),
+    ...attunementFields,
     armor: boostedArmor(base.armor, acBonus),
     baseEquipmentId: baseItemId,
     tags: uniqueTags([
@@ -205,6 +210,7 @@ function registerMagicArmor(id, baseItemId, name, rarity, priceGp, magic = {}) {
       kind: "armor",
       rarity,
       priceGp,
+      ...attunementFields,
       acBonusAppliedToArmor: acBonus,
       resistances,
       vulnerabilities,
@@ -224,12 +230,14 @@ function registerMagicAccessory(id, name, slots, rarity, priceGp, options = {}) 
   const use = options.use ?? null;
   const slotGroup = options.slotGroup ?? slotLabels[slotList[0]] ?? "Accessory";
   const isCursed = Boolean(options.curse || effects.vulnerabilities?.length || effects.abilityScorePenalties);
+  const attunementFields = options.requiresAttunement == null ? {} : { requiresAttunement: Boolean(options.requiresAttunement) };
 
   window.DungeonContent.register("items", id, {
     name,
     type: "accessory",
     category: slotGroup.toLowerCase(),
     cost: gp(priceGp),
+    ...attunementFields,
     weightLb: options.weightLb ?? 0.25,
     slots: slotList,
     tags: uniqueTags([
@@ -262,6 +270,7 @@ function registerMagicAccessory(id, name, slots, rarity, priceGp, options = {}) 
       slotGroup,
       rarity,
       priceGp,
+      ...attunementFields,
       effects,
       curse: options.curse ?? null,
       description: options.description ?? "",
@@ -348,6 +357,7 @@ function healingUse(count, sides, bonus, options = {}) {
 // Hell Magic Items
 
 registerMagicWeapon("magic-hell-hellbrand-longsword", "longsword", "Hellbrand Longsword", "rare", 7500, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "extraDamage": [
     {
@@ -368,6 +378,7 @@ registerMagicWeapon("magic-hell-hellbrand-longsword", "longsword", "Hellbrand Lo
 
 // IMPLEMENTATION NOTE: Later hook: first hit marks the target; next hit against it deals bonus fire or psychic damage.
 registerMagicWeapon("magic-hell-contract-dagger", "dagger", "Infernal Contract Dagger", "uncommon", 900, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "extraDamage": [
     {
@@ -390,6 +401,7 @@ registerMagicWeapon("magic-hell-contract-dagger", "dagger", "Infernal Contract D
 
 // IMPLEMENTATION NOTE: Later hook: hit can pull target 1 tile closer.
 registerMagicWeapon("magic-hell-barbed-chain-halberd", "halberd", "Barbed Chain Halberd", "rare", 6800, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "extraDamage": [
     {
@@ -411,6 +423,7 @@ registerMagicWeapon("magic-hell-barbed-chain-halberd", "halberd", "Barbed Chain 
 });
 
 registerMagicWeapon("magic-hell-brimstone-warhammer", "warhammer", "Brimstone Warhammer", "rare", 7000, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "extraDamage": [
     {
@@ -430,6 +443,7 @@ registerMagicWeapon("magic-hell-brimstone-warhammer", "warhammer", "Brimstone Wa
 });
 
 registerMagicWeapon("magic-hell-ashen-punisher-maul", "maul", "Ashen Punisher Maul", "very rare", 25000, {
+  "requiresAttunement": true,
   "enhancementBonus": 2,
   "extraDamage": [
     {
@@ -450,6 +464,7 @@ registerMagicWeapon("magic-hell-ashen-punisher-maul", "maul", "Ashen Punisher Ma
 });
 
 registerMagicWeapon("magic-hell-devils-due-longbow", "longbow", "Devil's Due Longbow", "very rare", 24000, {
+  "requiresAttunement": true,
   "enhancementBonus": 2,
   "extraDamage": [
     {
@@ -470,6 +485,7 @@ registerMagicWeapon("magic-hell-devils-due-longbow", "longbow", "Devil's Due Lon
 });
 
 registerMagicArmor("magic-hell-infernal-plate", "plate", "Infernal Plate", "very rare", 34000, {
+  "requiresAttunement": true,
   "enhancementBonus": 2,
   "resistances": [
     "fire",
@@ -494,6 +510,7 @@ registerMagicArmor("magic-hell-infernal-plate", "plate", "Infernal Plate", "very
 });
 
 registerMagicArmor("magic-hell-cinderhide-studded-leather", "studded-leather", "Cinderhide Studded Leather", "uncommon", 1200, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "resistances": [
     "fire"
@@ -510,6 +527,7 @@ registerMagicArmor("magic-hell-cinderhide-studded-leather", "studded-leather", "
 
 // IMPLEMENTATION NOTE: Later hook: blocking a melee hit deals small fire damage back.
 registerMagicArmor("magic-hell-hellgate-shield", "shield", "Hellgate Shield", "rare", 7200, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "resistances": [
     "fire"
@@ -527,6 +545,7 @@ registerMagicArmor("magic-hell-hellgate-shield", "shield", "Hellgate Shield", "r
 });
 
 registerMagicArmor("magic-hell-chainmail-nine-hells", "chain-mail", "Chain Mail of the Nine Hells", "rare", 8500, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "resistances": [
     "fire",
@@ -547,6 +566,7 @@ registerMagicAccessory("magic-hell-ring-hellfire", "Ring of Hellfire", [
   "ring1",
   "ring2"
 ], "rare", 6800, {
+  "requiresAttunement": true,
   "effects": {
     "resistances": [
       "fire"
@@ -571,6 +591,7 @@ registerMagicAccessory("magic-hell-ring-hellfire", "Ring of Hellfire", [
 });
 
 registerMagicAccessory("magic-hell-amulet-infernal-bargain", "Amulet of Infernal Bargain", "amulet", "rare", 6200, {
+  "requiresAttunement": true,
   "effects": {
     "abilityScoreBonuses": {
       "cha": 2
@@ -591,6 +612,7 @@ registerMagicAccessory("magic-hell-amulet-infernal-bargain", "Amulet of Infernal
 });
 
 registerMagicAccessory("magic-hell-boots-cinderstride", "Boots of Cinderstride", "boots", "uncommon", 1500, {
+  "requiresAttunement": true,
   "effects": {
     "speedBonusFeet": 10,
     "resistances": [
@@ -610,6 +632,7 @@ registerMagicAccessory("magic-hell-boots-cinderstride", "Boots of Cinderstride",
 
 // IMPLEMENTATION NOTE: Later hook: when reduced below half HP, create smoke/concealment once per dungeon.
 registerMagicAccessory("magic-hell-cloak-smoke-sulfur", "Cloak of Smoke and Sulfur", "cloak", "rare", 6500, {
+  "requiresAttunement": true,
   "effects": {
     "acBonus": 1,
     "initiativeBonus": 1
@@ -627,6 +650,7 @@ registerMagicAccessory("magic-hell-cloak-smoke-sulfur", "Cloak of Smoke and Sulf
 });
 
 registerMagicAccessory("magic-hell-gauntlets-pit", "Gauntlets of the Pit", "gauntlets", "rare", 7000, {
+  "requiresAttunement": true,
   "effects": {
     "abilityScoreBonuses": {
       "str": 2
@@ -644,6 +668,7 @@ registerMagicAccessory("magic-hell-gauntlets-pit", "Gauntlets of the Pit", "gaun
 
 // IMPLEMENTATION NOTE: Later hook: can command/charm a low-category fiend once per dungeon.
 registerMagicAccessory("magic-hell-crown-tyrant-flame", "Crown of Tyrant Flame", "head", "very rare", 22000, {
+  "requiresAttunement": true,
   "effects": {
     "abilityScoreBonuses": {
       "cha": 2

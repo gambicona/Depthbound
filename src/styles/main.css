@@ -3623,6 +3623,10 @@ button[data-ui-icon]::before,
   white-space: normal;
 }
 
+.dialog-actions .choice-with-description:disabled {
+  opacity: 0.72;
+}
+
 .dialog-actions .choice-with-description b {
   align-items: center;
   color: var(--text);

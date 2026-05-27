@@ -134,6 +134,7 @@ function updatePerfOverlay() {
 
 function render() {
   const renderStart = performance.now();
+  processDungeonPassiveObjects();
   renderRoom();
   renderPartyRoster();
   renderHeroStatusCard(els.heroCard, activeHero());
@@ -145,6 +146,7 @@ function render() {
   updateInteractiveTutorial();
   perfStats.renderMs = performance.now() - renderStart;
   updatePerfOverlay();
+  updateBackgroundMusic();
 }
 
 els.rollInitiative.addEventListener("click", rollInitiative);
@@ -211,7 +213,8 @@ window.setInterval(() => {
   }
   const advanced = syncDungeonClock();
   const expired = advanced > 0 ? expireTimedDungeonEffects() : 0;
-  if (expired > 0) render();
+  const passive = advanced > 0 ? processDungeonPassiveObjects() : { spawned: 0, recruited: 0 };
+  if (expired > 0 || passive.spawned > 0 || passive.recruited > 0) render();
   else {
     renderDungeonClock();
     renderHeroStatusCard(els.heroCard, activeHero());
@@ -495,6 +498,9 @@ els.fighterInfo.addEventListener("click", (event) => {
   }
   if (button.dataset.action === "show-bed-range") {
     showHomeBedRange(button.dataset.object);
+  }
+  if (button.dataset.action === "play-home-instrument") {
+    void playHomeInstrument(button.dataset.object);
   }
   if (button.dataset.action === "create-roster-hero") {
     createRosterHero();
@@ -863,6 +869,10 @@ els.inventoryMenu.addEventListener("click", (event) => {
   if (button.dataset.action === "set-admin-progress") {
     setNpcAdminProgress(button.dataset.npc, button.dataset.progress);
   }
+  if (button.dataset.action === "set-admin-campaign-progress") {
+    setAdminCampaignProgress(button.dataset.campaign, button.dataset.progress);
+    renderInventoryMenu();
+  }
   if (button.dataset.action === "admin-heal") {
     handleAdminQuickAction(button.dataset.action);
   }
@@ -920,6 +930,12 @@ els.inventoryMenu.addEventListener("click", (event) => {
   }
   if (button.dataset.action === "equip") {
     equipItem(button.dataset.item, button.dataset.slot);
+  }
+  if (button.dataset.action === "attune-item") {
+    changeItemAttunement(activeHero(), button.dataset.item, true);
+  }
+  if (button.dataset.action === "unattune-item") {
+    changeItemAttunement(activeHero(), button.dataset.item, false);
   }
   if (button.dataset.action === "inspect-item") {
     showInventoryItemInfo(button.dataset.item);

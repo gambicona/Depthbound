@@ -1,0 +1,46 @@
+{
+  "id": "recruit-hero-template",
+  "name": "Dungeon Recruit Template",
+  "kind": "hero",
+  "classId": "fighter",
+  "level": 1,
+  "tokenArt": "assets/tokens/preheros/fighter_human_f.jpg",
+  "overrides": {
+    "name": "Dungeon Recruit Template",
+    "speciesName": "Human",
+    "subraceName": "Standard Human",
+    "partyRole": "dd",
+    "baseMaxHp": 12,
+    "abilityScores": {
+      "str": 15,
+      "dex": 13,
+      "con": 14,
+      "int": 10,
+      "wis": 11,
+      "cha": 10
+    },
+    "skillProficiencies": [
+      "athletics",
+      "perception"
+    ],
+    "inventory": {
+      "money": {
+        "cp": 0,
+        "sp": 0,
+        "gp": 25
+      },
+      "items": [
+        "longsword",
+        "shield",
+        "chain-mail",
+        "potion-healing"
+      ]
+    },
+    "equipment": {
+      "mainHand": "longsword",
+      "offHand": "shield",
+      "torso": "chain-mail"
+    },
+    "notes": "Template for heroes recruited by an Invisible Recruit Marker. Copy or edit this with recruit-creator.html."
+  }
+}

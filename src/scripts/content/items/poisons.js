@@ -80,7 +80,10 @@ function registerPoison(poison) {
     delivery: "contact",
     cost: gp(200),
     saveDc: 13,
-    conditions: [{ id: "poisoned", label: "Poisoned and Paralyzed", durationMinutes: 1, actionLocked: true, speedLocked: true, incomingAttackAdvantage: true, repeatSaveEnds: true }],
+    conditions: [
+      { id: "poisoned", label: "Poisoned", durationMinutes: 1, repeatSaveEnds: true },
+      { id: "paralyzed", label: "Paralyzed", condition: "paralyzed", durationMinutes: 1, repeatSaveEnds: true },
+    ],
   },
   {
     id: "drow-poison",

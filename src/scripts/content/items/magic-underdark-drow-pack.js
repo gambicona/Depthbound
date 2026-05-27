@@ -108,12 +108,14 @@ function registerMagicWeapon(id, baseItemId, name, rarity, priceGp, magic = {}) 
   const attackBonus = magic.attackBonus ?? magic.enhancementBonus ?? 0;
   const damageBonus = magic.damageBonus ?? magic.enhancementBonus ?? 0;
   const extraDamage = Array.isArray(magic.extraDamage) ? magic.extraDamage : magic.extraDamage ? [magic.extraDamage] : [];
+  const attunementFields = magic.requiresAttunement == null ? {} : { requiresAttunement: Boolean(magic.requiresAttunement) };
 
   window.DungeonContent.register("items", id, {
     ...base,
     name,
     type: "weapon",
     cost: gp(priceGp),
+    ...attunementFields,
     baseEquipmentId: baseItemId,
     tags: uniqueTags([
       ...(base.tags ?? []),
@@ -147,6 +149,7 @@ function registerMagicWeapon(id, baseItemId, name, rarity, priceGp, magic = {}) 
       attackBonus,
       damageBonus,
       extraDamage,
+      ...attunementFields,
       resistances: magic.resistances ?? [],
       vulnerabilities: magic.vulnerabilities ?? [],
       properties: magic.properties ?? [],
@@ -166,12 +169,14 @@ function registerMagicArmor(id, baseItemId, name, rarity, priceGp, magic = {}) {
   const acBonus = magic.acBonus ?? magic.enhancementBonus ?? 0;
   const resistances = magic.resistances ?? [];
   const vulnerabilities = magic.vulnerabilities ?? [];
+  const attunementFields = magic.requiresAttunement == null ? {} : { requiresAttunement: Boolean(magic.requiresAttunement) };
 
   window.DungeonContent.register("items", id, {
     ...base,
     name,
     type: "armor",
     cost: gp(priceGp),
+    ...attunementFields,
     armor: boostedArmor(base.armor, acBonus),
     baseEquipmentId: baseItemId,
     tags: uniqueTags([
@@ -205,6 +210,7 @@ function registerMagicArmor(id, baseItemId, name, rarity, priceGp, magic = {}) {
       kind: "armor",
       rarity,
       priceGp,
+      ...attunementFields,
       acBonusAppliedToArmor: acBonus,
       resistances,
       vulnerabilities,
@@ -224,12 +230,14 @@ function registerMagicAccessory(id, name, slots, rarity, priceGp, options = {}) 
   const use = options.use ?? null;
   const slotGroup = options.slotGroup ?? slotLabels[slotList[0]] ?? "Accessory";
   const isCursed = Boolean(options.curse || effects.vulnerabilities?.length || effects.abilityScorePenalties);
+  const attunementFields = options.requiresAttunement == null ? {} : { requiresAttunement: Boolean(options.requiresAttunement) };
 
   window.DungeonContent.register("items", id, {
     name,
     type: "accessory",
     category: slotGroup.toLowerCase(),
     cost: gp(priceGp),
+    ...attunementFields,
     weightLb: options.weightLb ?? 0.25,
     slots: slotList,
     tags: uniqueTags([
@@ -262,6 +270,7 @@ function registerMagicAccessory(id, name, slots, rarity, priceGp, options = {}) 
       slotGroup,
       rarity,
       priceGp,
+      ...attunementFields,
       effects,
       curse: options.curse ?? null,
       description: options.description ?? "",
@@ -348,6 +357,7 @@ function healingUse(count, sides, bonus, options = {}) {
 // Underdark and Drow Magic Items
 
 registerMagicWeapon("magic-underdark-drow-venom-rapier", "rapier", "Drow Venom Rapier", "rare", 6600, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "extraDamage": [
     {
@@ -366,6 +376,7 @@ registerMagicWeapon("magic-underdark-drow-venom-rapier", "rapier", "Drow Venom R
 });
 
 registerMagicWeapon("magic-underdark-spiderfang-dagger", "dagger", "Spiderfang Dagger", "uncommon", 800, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "extraDamage": [
     {
@@ -385,6 +396,7 @@ registerMagicWeapon("magic-underdark-spiderfang-dagger", "dagger", "Spiderfang D
 });
 
 registerMagicWeapon("magic-underdark-faerzress-longbow", "longbow", "Faerzress Longbow", "rare", 7000, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "extraDamage": [
     {
@@ -404,6 +416,7 @@ registerMagicWeapon("magic-underdark-faerzress-longbow", "longbow", "Faerzress L
 });
 
 registerMagicWeapon("magic-underdark-umbral-scimitar", "scimitar", "Umbral Scimitar", "uncommon", 1000, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "extraDamage": [
     {
@@ -422,6 +435,7 @@ registerMagicWeapon("magic-underdark-umbral-scimitar", "scimitar", "Umbral Scimi
 });
 
 registerMagicWeapon("magic-underdark-deepstone-warhammer", "warhammer", "Deepstone Warhammer", "rare", 7200, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "extraDamage": [
     {
@@ -441,6 +455,7 @@ registerMagicWeapon("magic-underdark-deepstone-warhammer", "warhammer", "Deepsto
 });
 
 registerMagicWeapon("magic-underdark-matrons-whisper-shortsword", "shortsword", "Matron's Whisper Shortsword", "very rare", 23000, {
+  "requiresAttunement": true,
   "enhancementBonus": 2,
   "extraDamage": [
     {
@@ -460,6 +475,7 @@ registerMagicWeapon("magic-underdark-matrons-whisper-shortsword", "shortsword", 
 });
 
 registerMagicArmor("magic-underdark-spider-silk-leather", "leather", "Spider-Silk Leather", "uncommon", 1100, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "resistances": [
     "poison"
@@ -476,6 +492,7 @@ registerMagicArmor("magic-underdark-spider-silk-leather", "leather", "Spider-Sil
 
 // IMPLEMENTATION NOTE: Later hook: extra stealth or AC while in darkness/dim light.
 registerMagicArmor("magic-underdark-drow-shadow-breastplate", "breastplate", "Drow Shadow Breastplate", "rare", 6800, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "resistances": [
     "necrotic"
@@ -492,6 +509,7 @@ registerMagicArmor("magic-underdark-drow-shadow-breastplate", "breastplate", "Dr
 });
 
 registerMagicArmor("magic-underdark-deepwarden-shield", "shield", "Deepwarden Shield", "rare", 6200, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "resistances": [
     "psychic"
@@ -507,6 +525,7 @@ registerMagicArmor("magic-underdark-deepwarden-shield", "shield", "Deepwarden Sh
 });
 
 registerMagicArmor("magic-underdark-adamant-gloom-half-plate", "half-plate", "Adamant Gloom Half Plate", "very rare", 28000, {
+  "requiresAttunement": true,
   "enhancementBonus": 2,
   "resistances": [
     "poison",
@@ -527,6 +546,7 @@ registerMagicAccessory("magic-underdark-ring-darkvision", "Ring of Deep Sight", 
   "ring1",
   "ring2"
 ], "uncommon", 1400, {
+  "requiresAttunement": true,
   "effects": {
     "initiativeBonus": 1
   },
@@ -543,6 +563,7 @@ registerMagicAccessory("magic-underdark-ring-darkvision", "Ring of Deep Sight", 
 
 // IMPLEMENTATION NOTE: Needs accessory extra-damage hook.
 registerMagicAccessory("magic-underdark-amulet-lolths-venom", "Amulet of Lolth's Venom", "amulet", "rare", 6800, {
+  "requiresAttunement": true,
   "effects": {
     "resistances": [
       "poison"
@@ -568,6 +589,7 @@ registerMagicAccessory("magic-underdark-amulet-lolths-venom", "Amulet of Lolth's
 
 // IMPLEMENTATION NOTE: Later hook: ignore web difficult terrain; optional climbing movement.
 registerMagicAccessory("magic-underdark-boots-webwalker", "Boots of the Webwalker", "boots", "rare", 5600, {
+  "requiresAttunement": true,
   "effects": {
     "speedBonusFeet": 10
   },
@@ -583,6 +605,7 @@ registerMagicAccessory("magic-underdark-boots-webwalker", "Boots of the Webwalke
 });
 
 registerMagicAccessory("magic-underdark-cloak-deep-shadow", "Cloak of Deep Shadow", "cloak", "rare", 6500, {
+  "requiresAttunement": true,
   "effects": {
     "acBonus": 1,
     "initiativeBonus": 2
@@ -599,6 +622,7 @@ registerMagicAccessory("magic-underdark-cloak-deep-shadow", "Cloak of Deep Shado
 
 // IMPLEMENTATION NOTE: Needs ranged-only extra-damage support.
 registerMagicAccessory("magic-underdark-bracers-spider-silk-archery", "Bracers of Spider-Silk Archery", "bracers", "uncommon", 1600, {
+  "requiresAttunement": true,
   "effects": {
     "extraDamage": [
       {
@@ -621,6 +645,7 @@ registerMagicAccessory("magic-underdark-bracers-spider-silk-archery", "Bracers o
 
 // IMPLEMENTATION NOTE: Later hook: bonus to deception/intimidation dialogue checks.
 registerMagicAccessory("magic-underdark-mask-matrons-lie", "Mask of the Matron's Lie", "head", "very rare", 19000, {
+  "requiresAttunement": true,
   "effects": {
     "abilityScoreBonuses": {
       "cha": 2

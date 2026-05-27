@@ -107,6 +107,7 @@ const availability = {
   "enhance-ability": ["bard", "cleric", "druid", "sorcerer"],
   "enlarge-reduce": ["sorcerer", "wizard"],
   "find-steed": ["paladin"],
+  "find-greater-steed": ["paladin"],
   "flame-blade": ["druid"],
   "flaming-sphere": ["druid", "wizard"],
   "gust-of-wind": ["druid", "sorcerer", "wizard"],
@@ -323,6 +324,34 @@ spell("dragonborn-breath", {
   effect: { kind: "damage", dice: { count: 2, sides: 6 }, type: "fire" },
   aiCategory: "area-damage",
   description: "Ancestral 15 ft cone. DEX save for half damage. Damage type follows draconic ancestry.",
+});
+
+[
+  ["acid", "Acid Breath", "line", "dex"],
+  ["cold", "Cold Breath", "cone", "con"],
+  ["fire", "Fire Breath", "cone", "dex"],
+  ["lightning", "Lightning Breath", "line", "dex"],
+  ["poison", "Poison Breath", "cone", "con"],
+  ["force", "Force Breath", "cone", "dex"],
+  ["necrotic", "Necrotic Breath", "cone", "dex"],
+  ["psychic", "Psychic Breath", "cone", "dex"],
+  ["radiant", "Radiant Breath", "cone", "dex"],
+  ["thunder", "Thunder Breath", "cone", "dex"],
+].forEach(([type, name, shape, saveAbility]) => {
+  spell(`potion-breath-${type}`, {
+    name,
+    level: 0,
+    resource: action,
+    range: { kind: "self", feet: 15 },
+    target: "direction",
+    area: { shape, lengthFeet: 15, widthFeet: shape === "line" ? 5 : undefined },
+    save: { ability: saveAbility, halfDamage: true },
+    saveDcAbility: "con",
+    effect: { kind: "damage", dice: { count: 4, sides: 6 }, type },
+    potionBreath: true,
+    aiCategory: "area-damage",
+    description: `Potion-granted 15 ft ${shape} for 4d6 ${type}, ${saveAbility.toUpperCase()} save half.`,
+  });
 });
 
 spell("eladrin-fey-step", {
@@ -694,7 +723,7 @@ spell("hold-person", {
   save: { ability: "wis", negatesStatus: true },
   concentration: true,
   ...oneRound,
-  effect: { kind: "status", status: { id: "held", label: "Held", speedLocked: true, actionLocked: true, expiresAtEndOfTurn: true } },
+  effect: { kind: "status", status: { id: "paralyzed", label: "Paralyzed", expiresAtEndOfTurn: true } },
   upcast: { targetsPerLevel: 1 },
   aiCategory: "control-cluster",
   description: "WIS save or Held for 1 round. Bosses receive a weaker effect.",
@@ -3656,9 +3685,38 @@ spell("find-familiar", {
   range: { kind: "self", feet: 0 },
   target: "self",
   duration: { kind: "hours", hours: 8 },
-  effect: { kind: "summon", summon: { profile: "familiar", name: "Familiar", count: 1, durationHours: 8 } },
+  effect: {
+    kind: "summon",
+    summon: {
+      profile: "familiar",
+      name: "Familiar",
+      count: 1,
+      durationHours: 8,
+      kind: "companion",
+      control: "player",
+      className: "Familiar",
+      allowIdentity: true,
+      chooseFrom: [
+        "summonFamiliarBat",
+        "summonFamiliarCat",
+        "summonFamiliarCrab",
+        "summonFamiliarFrog",
+        "summonFamiliarHawk",
+        "summonFamiliarLizard",
+        "summonFamiliarOctopus",
+        "summonFamiliarOwl",
+        "summonFamiliarPoisonousSnake",
+        "summonFamiliarFish",
+        "summonFamiliarRat",
+        "summonFamiliarRaven",
+        "summonFamiliarSeaHorse",
+        "summonFamiliarSpider",
+        "summonFamiliarWeasel",
+      ],
+    },
+  },
   aiCategory: "summon",
-  description: "Summon a fragile familiar actor that scouts, harasses, and follows you until it fades.",
+  description: "Summon a fragile player-controlled familiar companion. Pick its form, name, and token picture when you cast.",
 });
 
 spell("find-steed", {
@@ -3668,9 +3726,56 @@ spell("find-steed", {
   range: { kind: "self", feet: 0 },
   target: "self",
   duration: { kind: "hours", hours: 8 },
-  effect: { kind: "summon", summon: { profile: "steed", name: "Steed", count: 1, durationHours: 8, hpPerCasterLevel: 2 } },
+  effect: {
+    kind: "summon",
+    summon: {
+      profile: "steed",
+      name: "Steed",
+      count: 1,
+      durationHours: 8,
+      hpPerCasterLevel: 2,
+      kind: "companion",
+      control: "player",
+      className: "Steed",
+      allowIdentity: true,
+      chooseFrom: ["summonSteedWarhorse", "summonSteedPony", "summonSteedCamel", "summonSteedElk", "summonSteedMastiff"],
+    },
+  },
   aiCategory: "summon",
-  description: "Summon a durable steed actor that fights beside you and follows closely.",
+  description: "Summon a durable player-controlled steed companion. Pick its form, name, and token picture when you cast.",
+});
+
+spell("find-greater-steed", {
+  name: "Find Greater Steed",
+  level: 4,
+  resource: action,
+  range: { kind: "self", feet: 0 },
+  target: "self",
+  duration: { kind: "hours", hours: 8 },
+  effect: {
+    kind: "summon",
+    summon: {
+      profile: "greaterSteed",
+      name: "Greater Steed",
+      count: 1,
+      durationHours: 8,
+      hpPerCasterLevel: 2,
+      kind: "companion",
+      control: "player",
+      className: "Greater Steed",
+      allowIdentity: true,
+      chooseFrom: [
+        "summonGreaterSteedGriffon",
+        "summonGreaterSteedPegasus",
+        "summonGreaterSteedPeryton",
+        "summonGreaterSteedDireWolf",
+        "summonGreaterSteedRhinoceros",
+        "summonGreaterSteedSaberToothedTiger",
+      ],
+    },
+  },
+  aiCategory: "summon",
+  description: "Summon a powerful player-controlled greater steed companion. Pick its form, name, and token picture when you cast.",
 });
 
 spell("animate-dead", {
@@ -4279,6 +4384,86 @@ spell("true-strike", {
   description: "Cantrip. Study the fight and gain advantage on your next attack before the focus fades.",
 });
 
+function spellScrollId(spellId) {
+  return `spell-scroll-${spellId}`;
+}
+
+function spellScrollCostGp(level) {
+  return [50, 100, 250, 500, 1000, 2500, 5000, 10000, 20000, 40000][Math.max(0, Math.min(9, Number(level) || 0))] ?? 100;
+}
+
+function spellScrollRarity(level) {
+  if (level <= 0) return "common";
+  if (level <= 2) return "uncommon";
+  if (level <= 5) return "rare";
+  if (level <= 8) return "very rare";
+  return "legendary";
+}
+
+function spellScrollResourceText(resource) {
+  if (resource === "bonusAction") return "a bonus action";
+  if (resource === "reaction") return "a reaction";
+  if (resource === "weaponRider") return "a bonus action";
+  return "an action";
+}
+
+function registerSpellScrolls() {
+  for (const entry of window.DungeonContent.list("spells")) {
+    if (!entry?.id || entry.id === "guidance" || entry.aliasOf) continue;
+    const level = Math.max(0, Math.min(9, Number(entry.level ?? 0) || 0));
+    const classes = [...(entry.classes ?? [])];
+    const resource = entry.resource ?? "action";
+    const costGp = spellScrollCostGp(level);
+    const levelText = level === 0 ? "cantrip" : `level ${level}`;
+    window.DungeonContent.register("items", spellScrollId(entry.id), {
+      name: `Spell Scroll: ${entry.name}`,
+      type: "consumable",
+      category: "spell scroll",
+      cost: { amount: costGp, unit: "gp", text: `${costGp} gp` },
+      weightLb: 0,
+      slots: ["belt1", "belt2", "belt3", "belt4", "belt5"],
+      tags: [
+        "magic",
+        "magic-item",
+        "consumable",
+        "scroll",
+        "spell-scroll",
+        "loot:magic",
+        `spell:${entry.id}`,
+        `spell-level:${level}`,
+        ...classes.map((classId) => `spell-class:${classId}`),
+      ],
+      store: { buyable: false, sellable: true, reason: "spell scrolls are loot-only for now" },
+      loot: {
+        kind: "spell scroll",
+        rarity: spellScrollRarity(level),
+        priceGp: costGp,
+        priceCp: costGp * 100,
+        dropWeight: Math.max(1, 12 - level),
+      },
+      scroll: {
+        kind: "spell",
+        spellId: entry.id,
+        spellName: entry.name,
+        level,
+        classes,
+        resource,
+      },
+      use: {
+        kind: "spellScroll",
+        resource,
+        consume: true,
+        spellId: entry.id,
+        castLevel: level,
+        description: `Cast ${entry.name} once from the scroll.`,
+      },
+      description: `A consumable ${levelText} spell scroll. Anyone can cast ${entry.name} from it once as ${spellScrollResourceText(resource)}.`,
+    });
+  }
+}
+
+registerSpellScrolls();
+
 const spellAliases = {
   cure_wounds: "cure-wounds",
   healing_word: "healing-word",
@@ -4336,6 +4521,7 @@ const spellAliases = {
   enhance_ability: "enhance-ability",
   enlarge_reduce: "enlarge-reduce",
   find_steed: "find-steed",
+  find_greater_steed: "find-greater-steed",
   flame_blade: "flame-blade",
   flaming_sphere: "flaming-sphere",
   gust_of_wind: "gust-of-wind",

@@ -108,12 +108,14 @@ function registerMagicWeapon(id, baseItemId, name, rarity, priceGp, magic = {}) 
   const attackBonus = magic.attackBonus ?? magic.enhancementBonus ?? 0;
   const damageBonus = magic.damageBonus ?? magic.enhancementBonus ?? 0;
   const extraDamage = Array.isArray(magic.extraDamage) ? magic.extraDamage : magic.extraDamage ? [magic.extraDamage] : [];
+  const attunementFields = magic.requiresAttunement == null ? {} : { requiresAttunement: Boolean(magic.requiresAttunement) };
 
   window.DungeonContent.register("items", id, {
     ...base,
     name,
     type: "weapon",
     cost: gp(priceGp),
+    ...attunementFields,
     baseEquipmentId: baseItemId,
     tags: uniqueTags([
       ...(base.tags ?? []),
@@ -147,6 +149,7 @@ function registerMagicWeapon(id, baseItemId, name, rarity, priceGp, magic = {}) 
       attackBonus,
       damageBonus,
       extraDamage,
+      ...attunementFields,
       resistances: magic.resistances ?? [],
       vulnerabilities: magic.vulnerabilities ?? [],
       properties: magic.properties ?? [],
@@ -166,12 +169,14 @@ function registerMagicArmor(id, baseItemId, name, rarity, priceGp, magic = {}) {
   const acBonus = magic.acBonus ?? magic.enhancementBonus ?? 0;
   const resistances = magic.resistances ?? [];
   const vulnerabilities = magic.vulnerabilities ?? [];
+  const attunementFields = magic.requiresAttunement == null ? {} : { requiresAttunement: Boolean(magic.requiresAttunement) };
 
   window.DungeonContent.register("items", id, {
     ...base,
     name,
     type: "armor",
     cost: gp(priceGp),
+    ...attunementFields,
     armor: boostedArmor(base.armor, acBonus),
     baseEquipmentId: baseItemId,
     tags: uniqueTags([
@@ -205,6 +210,7 @@ function registerMagicArmor(id, baseItemId, name, rarity, priceGp, magic = {}) {
       kind: "armor",
       rarity,
       priceGp,
+      ...attunementFields,
       acBonusAppliedToArmor: acBonus,
       resistances,
       vulnerabilities,
@@ -224,12 +230,14 @@ function registerMagicAccessory(id, name, slots, rarity, priceGp, options = {}) 
   const use = options.use ?? null;
   const slotGroup = options.slotGroup ?? slotLabels[slotList[0]] ?? "Accessory";
   const isCursed = Boolean(options.curse || effects.vulnerabilities?.length || effects.abilityScorePenalties);
+  const attunementFields = options.requiresAttunement == null ? {} : { requiresAttunement: Boolean(options.requiresAttunement) };
 
   window.DungeonContent.register("items", id, {
     name,
     type: "accessory",
     category: slotGroup.toLowerCase(),
     cost: gp(priceGp),
+    ...attunementFields,
     weightLb: options.weightLb ?? 0.25,
     slots: slotList,
     tags: uniqueTags([
@@ -262,6 +270,7 @@ function registerMagicAccessory(id, name, slots, rarity, priceGp, options = {}) 
       slotGroup,
       rarity,
       priceGp,
+      ...attunementFields,
       effects,
       curse: options.curse ?? null,
       description: options.description ?? "",
@@ -348,6 +357,7 @@ function healingUse(count, sides, bonus, options = {}) {
 // Forest Magic Items
 
 registerMagicWeapon("magic-forest-thornbriar-sickle", "sickle", "Thornbriar Sickle", "uncommon", 650, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "extraDamage": [
     {
@@ -367,6 +377,7 @@ registerMagicWeapon("magic-forest-thornbriar-sickle", "sickle", "Thornbriar Sick
 
 // IMPLEMENTATION NOTE: On a critical hit, later hook can root the target for 1 round.
 registerMagicWeapon("magic-forest-verdant-longbow", "longbow", "Verdant Longbow", "uncommon", 1100, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "extraDamage": [
     {
@@ -386,6 +397,7 @@ registerMagicWeapon("magic-forest-verdant-longbow", "longbow", "Verdant Longbow"
 });
 
 registerMagicWeapon("magic-forest-moonlit-hunter-rapier", "rapier", "Moonlit Hunter Rapier", "rare", 6200, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "extraDamage": [
     {
@@ -405,6 +417,7 @@ registerMagicWeapon("magic-forest-moonlit-hunter-rapier", "rapier", "Moonlit Hun
 
 // IMPLEMENTATION NOTE: Later hook: heavy hits can push the target 1 tile if there is free space.
 registerMagicWeapon("magic-forest-rootbreaker-maul", "maul", "Rootbreaker Maul", "rare", 7200, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "extraDamage": [
     {
@@ -424,6 +437,7 @@ registerMagicWeapon("magic-forest-rootbreaker-maul", "maul", "Rootbreaker Maul",
 });
 
 registerMagicWeapon("magic-forest-amberleaf-scimitar", "scimitar", "Amberleaf Scimitar", "uncommon", 900, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "extraDamage": [
     {
@@ -442,6 +456,7 @@ registerMagicWeapon("magic-forest-amberleaf-scimitar", "scimitar", "Amberleaf Sc
 });
 
 registerMagicWeapon("magic-forest-heartwood-greatsword", "greatsword", "Heartwood Greatsword", "very rare", 26000, {
+  "requiresAttunement": true,
   "enhancementBonus": 2,
   "extraDamage": [
     {
@@ -460,6 +475,7 @@ registerMagicWeapon("magic-forest-heartwood-greatsword", "greatsword", "Heartwoo
 });
 
 registerMagicArmor("magic-forest-barkskin-leather", "leather", "Barkskin Leather", "uncommon", 1000, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "resistances": [
     "piercing"
@@ -473,6 +489,7 @@ registerMagicArmor("magic-forest-barkskin-leather", "leather", "Barkskin Leather
 });
 
 registerMagicArmor("magic-forest-mossguard-shield", "shield", "Mossguard Shield", "uncommon", 1200, {
+  "requiresAttunement": true,
   "enhancementBonus": 1,
   "resistances": [
     "poison"
@@ -500,6 +517,7 @@ registerMagicArmor("magic-forest-stagwarden-breastplate", "breastplate", "Stagwa
 });
 
 registerMagicArmor("magic-forest-elderbark-plate", "plate", "Elderbark Plate", "very rare", 30000, {
+  "requiresAttunement": true,
   "enhancementBonus": 2,
   "resistances": [
     "poison",
@@ -517,6 +535,7 @@ registerMagicArmor("magic-forest-elderbark-plate", "plate", "Elderbark Plate", "
 });
 
 registerMagicAccessory("magic-forest-cloak-falling-leaves", "Cloak of Falling Leaves", "cloak", "uncommon", 1400, {
+  "requiresAttunement": true,
   "effects": {
     "initiativeBonus": 2,
     "speedBonusFeet": 5
@@ -534,6 +553,7 @@ registerMagicAccessory("magic-forest-ring-green-path", "Ring of the Green Path",
   "ring1",
   "ring2"
 ], "uncommon", 1500, {
+  "requiresAttunement": true,
   "effects": {
     "resistances": [
       "poison"
@@ -548,6 +568,7 @@ registerMagicAccessory("magic-forest-ring-green-path", "Ring of the Green Path",
 });
 
 registerMagicAccessory("magic-forest-amulet-old-grove", "Amulet of the Old Grove", "amulet", "rare", 6200, {
+  "requiresAttunement": true,
   "effects": {
     "maxHpBonus": 10,
     "abilityScoreBonuses": {
@@ -565,6 +586,7 @@ registerMagicAccessory("magic-forest-amulet-old-grove", "Amulet of the Old Grove
 
 // IMPLEMENTATION NOTE: Later hook: ignore difficult terrain from roots, vines, brambles, moss, and forest tiles.
 registerMagicAccessory("magic-forest-boots-rootstep", "Boots of Rootstep", "boots", "rare", 5200, {
+  "requiresAttunement": true,
   "effects": {
     "speedBonusFeet": 10
   },
@@ -580,6 +602,7 @@ registerMagicAccessory("magic-forest-boots-rootstep", "Boots of Rootstep", "boot
 
 // IMPLEMENTATION NOTE: Later hook: when hit by melee, attacker takes small piercing damage.
 registerMagicAccessory("magic-forest-bracers-thornward", "Bracers of Thornward", "bracers", "rare", 7000, {
+  "requiresAttunement": true,
   "effects": {
     "acBonus": 1
   },
@@ -594,6 +617,7 @@ registerMagicAccessory("magic-forest-bracers-thornward", "Bracers of Thornward",
 });
 
 registerMagicAccessory("magic-forest-crown-seedlight", "Crown of Seedlight", "head", "rare", 6800, {
+  "requiresAttunement": true,
   "use": {
     "kind": "healing",
     "resource": "bonusAction",

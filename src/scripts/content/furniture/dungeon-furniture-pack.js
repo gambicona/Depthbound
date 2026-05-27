@@ -23,6 +23,8 @@ const C = {
   harvest: (item, options = {}) => ({ type: "harvestableResource", item, dc: options.dc ?? 10, chance: options.chance ?? 1, ...options }),
   light: (dimRadius = 3, color = "#7dd3fc", brightRadius = Math.max(0, Math.floor(dimRadius / 2)), lightTone = "neutral") => ({ type: "lightSource", brightRadius, dimRadius, color, lightTone }),
   spawn: (options = {}) => ({ type: "spawnPoint", ...options }),
+  continuousSpawner: (options = {}) => ({ type: "continuousSpawner", intervalSeconds: 60, count: 1, maxAlive: 8, ...options }),
+  recruitmentMarker: (options = {}) => ({ type: "recruitmentMarker", ...options }),
   toggle: (options = {}) => ({ type: "interactableToggle", ...options }),
   captive: (options = {}) => ({ type: "captiveCreature", dc: options.dc ?? 13, skill: options.skill ?? "animal-handling", ability: options.ability ?? "wis", ...options }),
   unique: (options = {}) => ({ type: "uniqueInteraction", dc: options.dc ?? 13, timeSeconds: options.timeSeconds ?? 600, ...options }),
@@ -792,5 +794,21 @@ feature("undead-crate", "Undead Crate", ["old-guardroom", "dungeon", "crypt", "r
   weight: 160,
   spawnChance: 0.02,
   components: [C.captive({ dc: 14, skill: "arcana", ability: "int", monsterIds: ["boneRecruit", "cryptGuard", "guardroomHound", "skeletalSpearman", "skeletonArcher"], allyKind: "Undead Ally" })],
+});
+
+feature("continuous-spawner", "Invisible Continuous Spawner", ["custom-placement", "spawner", "invisible", "admin"], {
+  placement: "custom-placement",
+  spawnChance: 0,
+  symbol: "S",
+  invisiblePlayer: true,
+  components: [C.continuousSpawner()],
+});
+
+feature("recruitment-marker", "Invisible Recruit Marker", ["custom-placement", "recruitment", "companion", "invisible", "admin"], {
+  placement: "custom-placement",
+  spawnChance: 0,
+  symbol: "R",
+  invisiblePlayer: true,
+  components: [C.recruitmentMarker()],
 });
 })();

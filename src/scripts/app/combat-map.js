@@ -121,6 +121,21 @@ function applyDamageToFighter(defender, damage) {
     resetDeathSaveCounters(defender);
     return;
   }
+  if (
+    previousHp > 0 &&
+    activeMagicItemByTemplate(defender, barrowCrownItemIds.lastHeirRing) &&
+    hasReactionAvailable(defender) &&
+    canUseItemPower(defender, itemPowerKey(barrowCrownItemIds.lastHeirRing, "bloodRemembers"))
+  ) {
+    spendItemPower(defender, itemPowerKey(barrowCrownItemIds.lastHeirRing, "bloodRemembers"), "longRest");
+    consumeReaction(defender, "Blood Remembers");
+    defender.hp = 1;
+    defender.alive = true;
+    clearStableAtZero(defender);
+    resetDeathSaveCounters(defender);
+    addLog(`${defender.name}'s Ring of the Last Heir remembers the bloodline and leaves them at 1 HP.`, "important");
+    return;
+  }
   if (defender.classId === "barbarian" && (defender.statusEffects ?? []).some((effect) => effect.id === "rage")) {
     if (defender.subclassId === "zealot" && (defender.level ?? 1) >= 14) {
       defender.hp = 1;
@@ -726,7 +741,9 @@ function resetTurnResources(fighter) {
   for (const ability of fighterAbilityDefinitions(fighter).filter((entry) => entry.refresh === "turn")) {
     fighter.abilityUses = { ...(fighter.abilityUses ?? {}), [ability.id]: 0 };
   }
+  fighter.itemPowerUses = Object.fromEntries(Object.entries(fighter.itemPowerUses ?? {}).filter(([, entry]) => entry?.refresh !== "turn"));
   refreshDerivedStats(fighter);
+  maybeUseGravebreakersLanternFlare(fighter);
   if (isPartyHeroId(fighter?.id) && fighter.hp <= 0) {
     endConcentration(fighter, "defeated");
     fighter.movementLeft = 0;
@@ -775,24 +792,121 @@ function consumeReaction(fighter, label = "reaction") {
   return true;
 }
 
+const barrowCrownItemIds = {
+  gravebreakersLantern: "magic-undead-barrowcrown-gravebreakers-lantern",
+  drownedLegionShield: "magic-undead-barrowcrown-shield-drowned-legion",
+  blackMarketCoin: "magic-undead-barrowcrown-black-market-coin",
+  bellRingersMaul: "magic-undead-barrowcrown-bell-ringers-maul",
+  bellRingersWarhammer: "magic-undead-barrowcrown-bell-ringers-warhammer",
+  lastHeirRing: "magic-undead-barrowcrown-ring-last-heir",
+  crownshardShortsword: "magic-undead-barrowcrown-crownshard-shortsword",
+  crownshardLongsword: "magic-undead-barrowcrown-crownshard-longsword",
+  crownshardGreatsword: "magic-undead-barrowcrown-crownshard-greatsword",
+};
+
+function activeItemMatchesTemplate(item, templateId) {
+  return Boolean(item && [item.id, item.baseItemId, item.itemId, item.baseEquipmentId].includes(templateId));
+}
+
+function activeMagicItemByTemplate(fighter, templateId) {
+  return equippedMagicItems(fighter).find((item) => activeItemMatchesTemplate(item, templateId)) ?? null;
+}
+
+function activeMagicItemByTemplates(fighter, templateIds = []) {
+  return templateIds.map((id) => activeMagicItemByTemplate(fighter, id)).find(Boolean) ?? null;
+}
+
+function activeWeaponMatchesTemplate(fighter, weapon, templateIds = []) {
+  if (!weapon || !activeItemMagic(fighter, weapon)) return false;
+  return templateIds.some((id) => activeItemMatchesTemplate(weapon, id));
+}
+
+function itemPowerKey(templateId, power) {
+  return `${templateId}:${power}`;
+}
+
+function itemPowerUseCount(fighter, key) {
+  const entry = fighter?.itemPowerUses?.[key];
+  return typeof entry === "number" ? entry : entry?.count ?? 0;
+}
+
+function canUseItemPower(fighter, key, max = 1) {
+  return itemPowerUseCount(fighter, key) < max;
+}
+
+function spendItemPower(fighter, key, refresh = "longRest") {
+  fighter.itemPowerUses = { ...(fighter.itemPowerUses ?? {}) };
+  const entry = fighter.itemPowerUses[key];
+  const count = typeof entry === "number" ? entry : entry?.count ?? 0;
+  fighter.itemPowerUses[key] = { count: count + 1, refresh };
+}
+
+function maybeUseGravebreakersLanternFlare(fighter) {
+  if (!fighter?.alive || isPartyHeroId(fighter.id) || fighter.team === "heroes" || fighter.friendly || !monsterIsUndead(fighter)) return;
+  const holder = partyHeroes().find((hero) => {
+    const key = itemPowerKey(barrowCrownItemIds.gravebreakersLantern, "graveFlare");
+    return heroCanAct(hero) &&
+      activeMagicItemByTemplate(hero, barrowCrownItemIds.gravebreakersLantern) &&
+      canUseItemPower(hero, key) &&
+      fightersWithinSquares(hero, fighter, 4) &&
+      hasClearLineOfSightBetweenFighters(hero, fighter);
+  });
+  if (!holder) return;
+  const key = itemPowerKey(barrowCrownItemIds.gravebreakersLantern, "graveFlare");
+  spendItemPower(holder, key, "longRest");
+  const save = savingThrow(fighter, "wis", 13, { source: holder, label: "Grave-Flare" });
+  addLog(`${holder.name}'s Gravebreaker's Lantern flares as ${fighter.name}'s turn begins. ${fighter.name} rolls WIS ${save.total} vs DC 13.`, "important");
+  if (!save.success) {
+    applyStatusEffect(fighter, { id: "frightened", label: "Frightened", attackBonus: -2, expiresAtEndOfTurn: true });
+    addLog(`${fighter.name} is frightened by the pale grave-flare.`, "important");
+  }
+}
+
 function fighterKnowsSpell(fighter, spellId) {
   const canonical = canonicalSpellId(spellId);
   return (fighter?.spells ?? []).some((knownId) => canonicalSpellId(knownId) === canonical);
 }
 
-function canUseReactionSpell(fighter, spellId) {
-  const spell = getContentDefinition("spells", spellId);
-  return Boolean(spell && spell.resource === "reaction" && hasReactionAvailable(fighter) && fighterKnowsSpell(fighter, spellId) && canPaySpellCost(fighter, spell));
+function fighterIsRaging(fighter) {
+  return Boolean((fighter?.statusEffects ?? []).some((effect) => effect.id === "rage"));
 }
 
-function spendReactionSpellResources(caster, spell) {
-  const cost = spellPointCost(spell);
-  if (cost > 0) {
-    ensureSpellPointState(caster);
-    caster.spellPoints = Math.max(0, (caster.spellPoints ?? 0) - cost);
-    addLog(`${caster.name} spends ${cost} SP on ${spell.name}.`, "important");
+function equippedSpellScrollForSpell(fighter, spellId) {
+  const canonical = canonicalSpellId(spellId);
+  return (fighter?.inventory?.items ?? []).find((item) => {
+    const itemSpellId = item?.use?.spellId ?? item?.scroll?.spellId;
+    return item?.use?.kind === "spellScroll" &&
+      canonicalSpellId(itemSpellId) === canonical &&
+      Object.values(fighter?.equipment ?? {}).includes(item.id);
+  }) ?? null;
+}
+
+function spellForScrollItem(item) {
+  const spellId = canonicalSpellId(item?.use?.spellId ?? item?.scroll?.spellId);
+  const spell = spellId ? getContentDefinition("spells", spellId) : null;
+  if (!spell || spellId === "guidance") return null;
+  return {
+    ...spellWithCastLevel(spell, item?.use?.castLevel ?? spellBaseLevel(spell)),
+    castFromScroll: true,
+    scrollItemId: item.id,
+    scrollTemplateId: item.baseItemId ?? item.itemId ?? item.id,
+  };
+}
+
+function reactionSpellSource(fighter, spellId) {
+  const spell = getContentDefinition("spells", spellId);
+  if (!spell || spell.resource !== "reaction" || !hasReactionAvailable(fighter)) return null;
+  if (fighterKnowsSpell(fighter, spellId) && canPaySpellCost(fighter, spell)) {
+    return { spell: { ...spell, casterLevel: fighter.level ?? 1 }, item: null };
   }
-  consumeReaction(caster, spell.name);
+  if (fighter?.classId === "barbarian" && fighterIsRaging(fighter)) return null;
+  const scroll = equippedSpellScrollForSpell(fighter, spellId);
+  const scrollSpell = scroll ? spellForScrollItem(scroll) : null;
+  return scrollSpell ? { spell: { ...scrollSpell, casterLevel: fighter.level ?? 1 }, item: scroll } : null;
+}
+
+function canUseReactionSpell(fighter, spellId) {
+  return Boolean(reactionSpellSource(fighter, spellId));
 }
 
 function bardicInspirationDie(target) {
@@ -844,16 +958,17 @@ async function maybeUseBendLuckAttack(attacker, totalAttack, defenderAc) {
 }
 
 async function maybeUseShieldReaction(defender, attacker, totalAttack, defenderAc) {
-  if (!isPartyHeroId(defender?.id) || totalAttack < defenderAc || totalAttack >= defenderAc + 5 || !canUseReactionSpell(defender, "shield")) return false;
+  const source = reactionSpellSource(defender, "shield");
+  if (!isPartyHeroId(defender?.id) || totalAttack < defenderAc || totalAttack >= defenderAc + 5 || !source) return false;
   const useShield = await showReactionPrompt({
     actor: defender,
     title: "Shield",
     message: `${attacker.name}'s attack would hit AC ${defenderAc}. Cast Shield to raise AC by 5 and block it?`,
-    acceptLabel: "Cast Shield",
+    acceptLabel: source.item ? "Read Scroll" : "Cast Shield",
   });
   if (!useShield) return false;
-  const spell = { ...getContentDefinition("spells", "shield"), casterLevel: defender.level ?? 1 };
-  spendReactionSpellResources(defender, spell);
+  const spell = source.spell;
+  spendSpellResources(defender, spell);
   applyStatusEffect(defender, { ...(spell.effect?.status ?? {}), id: "shield", label: "Shield" });
   refreshDerivedStats(defender);
   addLog(`${defender.name}'s Shield turns the attack aside.`, "important");
@@ -941,7 +1056,7 @@ function reactionWeaponAttackDamage(attacker, defender, label, extraDamage = 0, 
   const profile = opportunityAttackProfile(attacker);
   const lightContext = attackLightContext(attacker, defender);
   const attackRollResult = rollD20ForFighter(attacker, { disadvantage: lightContext.disadvantage });
-  const criticalResult = resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll);
+  const criticalResult = applyMeleeAutoCritical(resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll), attacker, defender, true);
   const attackRoll = criticalResult.attackRoll;
   const bonus = profile.weapon ? attackBonusForWeapon(attacker, profile.weapon) : attackBonusForAbility(attacker, profile.attackAbility ?? "str");
   const total = attackRoll + bonus;
@@ -1152,6 +1267,23 @@ async function maybeUseSpiritShield(target, attacker, damage) {
   addLog(`${candidate.name}'s Spirit Shield reduces damage by ${roll.total}.`, "important");
   if ((candidate.level ?? 1) >= 14 && attacker?.alive && roll.total > 0) applySpecialDamage(candidate, attacker, roll.total, "force", "Vengeful Ancestors");
   return reduced;
+}
+
+async function maybeUseDrownedLegionWall(defender, attacker, damage, meleeAttack) {
+  if (!meleeAttack || damage <= 0 || !isPartyHeroId(defender?.id) || !hasReactionAvailable(defender)) return damage;
+  if (!activeMagicItemByTemplate(defender, barrowCrownItemIds.drownedLegionShield)) return damage;
+  const useWall = await showReactionPrompt({
+    actor: defender,
+    title: "Legion Wall",
+    message: `${attacker.name} would deal ${damage} melee damage. Use Shield of the Drowned Legion to reduce it by 1d8 + proficiency?`,
+    acceptLabel: "Raise Legion",
+    declineLabel: "Take Hit",
+  });
+  if (!useWall || !consumeReaction(defender, "Legion Wall")) return damage;
+  const roll = rollDice(1, 8);
+  const reduction = Math.max(1, roll.total + proficiencyBonus(defender));
+  addLog(`${defender.name}'s drowned legion reduces damage by ${reduction} (${roll.rolls[0]} ${abilityLabel(proficiencyBonus(defender))}).`, "important");
+  return Math.max(0, damage - reduction);
 }
 
 async function maybeUseBattleMasterParry(defender, attacker, damage, meleeAttack) {
@@ -1373,17 +1505,18 @@ async function maybeUseSubclassAfterDamageReactions(defender, attacker, damage, 
 }
 
 async function maybeUseHellishRebuke(defender, attacker) {
-  if (!isPartyHeroId(defender?.id) || !defender.alive || !attacker?.alive || !canUseReactionSpell(defender, "hellish-rebuke")) return;
+  const source = reactionSpellSource(defender, "hellish-rebuke");
+  if (!isPartyHeroId(defender?.id) || !defender.alive || !attacker?.alive || !source) return;
   if (!isInAttackRangeWithProfile(defender, attacker, { range: { kind: "ranged", feet: 60 } }) || !hasClearLineOfSight(defender.position, attacker.position)) return;
   const useRebuke = await showReactionPrompt({
     actor: defender,
     title: "Hellish Rebuke",
     message: `${defender.name} was damaged by ${attacker.name}. Cast Hellish Rebuke?`,
-    acceptLabel: "Rebuke",
+    acceptLabel: source.item ? "Read Scroll" : "Rebuke",
   });
   if (!useRebuke) return;
-  const spell = { ...getContentDefinition("spells", "hellish-rebuke"), casterLevel: defender.level ?? 1 };
-  spendReactionSpellResources(defender, spell);
+  const spell = source.spell;
+  spendSpellResources(defender, spell);
   const wasAlive = attacker.alive;
   await applySpellDamage(defender, attacker, spell);
   if (wasAlive && !attacker.alive && !isPartyHeroId(attacker.id)) {
@@ -3491,7 +3624,7 @@ function nearestVisibleMonster() {
 
 function attackBonusForAbility(fighter, ability) {
   const weapon = activeWeapon(fighter);
-  const magicBonus = (weapon?.magic?.attackBonus ?? 0) + magicEffects(fighter).attackBonus;
+  const magicBonus = (activeItemMagic(fighter, weapon)?.attackBonus ?? 0) + magicEffects(fighter).attackBonus;
   if (isPartyHeroId(fighter?.id)) return abilityMod(fighter, ability) + proficiencyBonus(fighter) + magicBonus;
   const baseBonus = fighter.attackBonus ?? 0;
   const baseAbility = fighter.baseAttackAbilityMod ?? abilityMod(fighter, "str");
@@ -3554,6 +3687,14 @@ async function finishEncounterAfterLastMonsterFalls() {
   }
 
   if (combatMonsters().length === 0 && state.combatStarted && !partyDefeatedOrDying()) {
+    Object.values(state.fighters ?? {})
+      .filter((fighter) => fighter?.barrowCrownDustAfterCombat && fighter.alive)
+      .forEach((fighter) => {
+        fighter.hp = 0;
+        fighter.alive = false;
+        fighter.dead = true;
+        addLog(`${fighter.name} turns to dust as the Crownshard's stolen command ends.`, "important");
+      });
     endCurrentEncounter();
     addLog("The room falls quiet. Exploration resumes.", "important");
   }
@@ -3570,6 +3711,19 @@ function defenderGrantsAttackAdvantage(defender) {
   return Boolean((defender?.statusEffects ?? []).some((effect) => effect.incomingAttackAdvantage));
 }
 
+function defenderGrantsMeleeAutoCritical(defender) {
+  return Boolean((defender?.statusEffects ?? []).some((effect) => effect.meleeAutoCritical));
+}
+
+function applyMeleeAutoCritical(criticalResult, attacker, defender, meleeAttack) {
+  if (!criticalResult || !meleeAttack || !defenderGrantsMeleeAutoCritical(defender) || !hasMeleeAccess(attacker, defender)) return criticalResult;
+  if (criticalResult.isCritical && criticalResult.doublesDamage) return criticalResult;
+  criticalResult.isCritical = true;
+  criticalResult.doublesDamage = true;
+  criticalResult.note = [criticalResult.note, "Hit from within 5 ft against a helpless target is a critical hit."].filter(Boolean).join(" ");
+  return criticalResult;
+}
+
 async function opportunityAttack(attacker, defender) {
   if (!consumeReaction(attacker, "an opportunity attack")) return;
   const profile = opportunityAttackProfile(attacker);
@@ -3580,7 +3734,7 @@ async function opportunityAttack(attacker, defender) {
   const hasAdvantage = targetReckless;
   const attackRollResult = rollD20ForFighter(attacker, { advantage: hasAdvantage && !hasDisadvantage, disadvantage: hasDisadvantage && !hasAdvantage });
   const attackRolls = attackRollResult.rolls;
-  const criticalResult = resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll);
+  const criticalResult = applyMeleeAutoCritical(resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll), attacker, defender, true);
   const attackRoll = criticalResult.attackRoll;
   const currentAttackBonus = profile.weapon ? attackBonusForWeapon(attacker, profile.weapon) : attackBonusForAbility(attacker, profile.attackAbility ?? "str");
   let defenderAc = armorClass(defender);
@@ -3595,7 +3749,8 @@ async function opportunityAttack(attacker, defender) {
   totalAttack = hitReaction.totalAttack;
   defenderAc += hitReaction.acBonus ?? 0;
   const shieldBlocked = !hitReaction.blocked && attackRoll !== 1 && totalAttack >= defenderAc ? await maybeUseShieldReaction(defender, attacker, totalAttack, defenderAc) : false;
-  const isMiss = attackRoll === 1 || hitReaction.blocked || (!criticalResult.forcedHit && totalAttack < defenderAc) || shieldBlocked;
+  const unfairBargainHit = !hitReaction.blocked && !shieldBlocked && attackRoll !== 1 && totalAttack < defenderAc ? await maybeUseUnfairBargain(attacker, totalAttack, defenderAc) : false;
+  const isMiss = attackRoll === 1 || hitReaction.blocked || (!criticalResult.forcedHit && !unfairBargainHit && totalAttack < defenderAc) || shieldBlocked;
   const attackRollText = attackRolls.length > 1 ? `${attackRolls.join(" / ")} -> ${attackRoll}` : attackRoll;
 
   addLog(
@@ -5246,6 +5401,10 @@ async function attackDestructibleObject(attacker, object, options = {}) {
     const extraRoll = rollDice((extra.count ?? 1) * (isCritical ? 2 : 1), extra.sides ?? 4);
     totalDamage += Math.max(1, extraRoll.total + (extra.bonus ?? 0));
   }
+  if (activeWeaponMatchesTemplate(attacker, weapon, [barrowCrownItemIds.bellRingersMaul, barrowCrownItemIds.bellRingersWarhammer])) {
+    totalDamage *= 2;
+    addLog(`${attacker.name}'s Bell-Ringer weapon resonates through ${targetName}, doubling the damage.`, "important");
+  }
   object.hp = Math.max(0, (object.hp ?? objectMaxHp(object)) - totalDamage);
   const critText = isCritical ? " Critical hit." : "";
   addLog(`${attacker.name} hits ${targetName} for ${totalDamage} damage (${damageRoll.rolls.join(" + ")} ${abilityLabel(attackDamage.bonus)}${attackDamage.type ? ` ${attackDamage.type}` : ""}). ${object.hp}/${object.maxHp} HP remains.${critText}`, "damage");
@@ -5254,6 +5413,159 @@ async function attackDestructibleObject(attacker, object, options = {}) {
   render();
   if (destroyed) hideFighterInfo?.();
   else if (!els.fighterInfo.classList.contains("hidden")) showDungeonObjectInfo(object);
+}
+
+function targetHasCommandBreakingCondition(target) {
+  return monsterIsUndead(target) || (target.statusEffects ?? []).some((effect) => {
+    const text = `${effect.id ?? ""} ${effect.label ?? ""}`.toLowerCase();
+    return /charmed|frightened|possessed|commanded|dominated|beguiled/.test(text);
+  });
+}
+
+async function maybeApplyBlackMarketCoin(attacker, packets) {
+  if (!isPartyHeroId(attacker?.id) || !activeMagicItemByTemplate(attacker, barrowCrownItemIds.blackMarketCoin)) return;
+  const key = itemPowerKey(barrowCrownItemIds.blackMarketCoin, `paidInBlood:${state.round ?? 0}:${attacker.id}`);
+  if (!canUseItemPower(attacker, key)) return;
+  const useCoin = await showReactionPrompt({
+    actor: attacker,
+    title: "Paid in Blood",
+    message: "Flip the Black Market Coin for this hit? 1-3 hurts you; 4-6 adds necrotic damage.",
+    acceptLabel: "Flip Coin",
+    declineLabel: "No",
+  });
+  if (!useCoin) return;
+  spendItemPower(attacker, key, "turn");
+  const roll = rollDie(6);
+  if (roll <= 3) {
+    const damage = proficiencyBonus(attacker);
+    applySpecialDamage(attacker, attacker, damage, "necrotic", "Black Market Coin");
+    addLog(`${attacker.name}'s Black Market Coin shows blood. ${attacker.name} takes ${damage} necrotic damage.`, "important");
+  } else {
+    const damage = Math.max(1, proficiencyBonus(attacker) * 2);
+    packets.push({ raw: damage, type: "necrotic", label: `Black Market Coin ${damage} necrotic` });
+    addLog(`${attacker.name}'s Black Market Coin shows profit. The hit gains ${damage} necrotic damage.`, "important");
+  }
+}
+
+async function maybeUseUnfairBargain(attacker, totalAttack, defenderAc) {
+  if (!isPartyHeroId(attacker?.id) || totalAttack >= defenderAc || !activeMagicItemByTemplate(attacker, barrowCrownItemIds.blackMarketCoin)) return false;
+  const key = itemPowerKey(barrowCrownItemIds.blackMarketCoin, "unfairBargain");
+  if (!canUseItemPower(attacker, key)) return false;
+  const useBargain = await showReactionPrompt({
+    actor: attacker,
+    title: "Unfair Bargain",
+    message: `The attack misses AC ${defenderAc}. Use Black Market Coin to make it hit?`,
+    acceptLabel: "Make It Hit",
+    declineLabel: "Miss",
+  });
+  if (!useBargain) return false;
+  const payExhaustion = await showReactionPrompt({
+    actor: attacker,
+    title: "Pay the Coin",
+    message: "Pay with one level of exhaustion? Decline to take necrotic damage equal to twice your level instead.",
+    acceptLabel: "Exhaustion",
+    declineLabel: "Necrotic",
+  });
+  spendItemPower(attacker, key, "longRest");
+  if (payExhaustion) {
+    applyStatusEffect(attacker, { id: "exhaustion", label: "Exhaustion", condition: "exhaustion" });
+    addLog(`${attacker.name} pays the Black Market Coin with exhaustion.`, "important");
+  } else {
+    const damage = Math.max(1, (attacker.level ?? 1) * 2);
+    applySpecialDamage(attacker, attacker, damage, "necrotic", "Black Market Coin");
+    addLog(`${attacker.name} pays the Black Market Coin with ${damage} necrotic damage.`, "important");
+  }
+  return true;
+}
+
+async function maybeApplyRingOfLastHeir(attacker, defender) {
+  if (!isPartyHeroId(attacker?.id) || !defender?.alive || !activeMagicItemByTemplate(attacker, barrowCrownItemIds.lastHeirRing)) return;
+  const key = itemPowerKey(barrowCrownItemIds.lastHeirRing, "royalCommand");
+  if (!canUseItemPower(attacker, key)) return;
+  const useCommand = await showReactionPrompt({
+    actor: attacker,
+    title: "Royal Command",
+    message: `Command ${defender.name} to kneel? DC 14 Wisdom save; charm-immune targets have advantage.`,
+    acceptLabel: "Command",
+    declineLabel: "Save It",
+  });
+  if (!useCommand) return;
+  spendItemPower(attacker, key, "shortRest");
+  const charmImmune = damageFlagMatches(defender.conditionImmunities ?? [], "charmed");
+  const save = savingThrow(defender, "wis", 14, { source: attacker, label: "Royal Command", advantage: charmImmune });
+  addLog(`${attacker.name}'s Ring of the Last Heir commands ${defender.name} to kneel: WIS ${save.total} vs DC 14${charmImmune ? " with advantage" : ""}.`, "important");
+  if (!save.success) {
+    applyStatusEffect(defender, { id: "royal-command", label: "Commanded to Kneel", prone: true, speedLocked: true, expiresAtStartOfTurn: true });
+    addLog(`${defender.name} falls prone and cannot move until ${attacker.name}'s next turn begins.`, "important");
+  }
+}
+
+async function maybeApplyCrownshardSeverCommand(attacker, defender, weapon) {
+  if (!isPartyHeroId(attacker?.id) || !monsterIsUndead(defender) || !activeWeaponMatchesTemplate(attacker, weapon, [barrowCrownItemIds.crownshardShortsword, barrowCrownItemIds.crownshardLongsword, barrowCrownItemIds.crownshardGreatsword])) return;
+  const key = itemPowerKey(weapon.baseItemId ?? weapon.itemId ?? weapon.id, "severCommand");
+  if (!canUseItemPower(attacker, key)) return;
+  const useSever = await showReactionPrompt({
+    actor: attacker,
+    title: "Sever Command",
+    message: `Attempt to command ${defender.name}? DC 16 Charisma save. On failure it becomes an AI ally for this combat.`,
+    acceptLabel: "Sever Command",
+    declineLabel: "Save It",
+  });
+  if (!useSever) return;
+  spendItemPower(attacker, key, "shortRest");
+  const save = savingThrow(defender, "cha", 16, { source: attacker, label: "Sever Command" });
+  addLog(`${attacker.name}'s Crownshard attempts to sever command: ${defender.name} rolls CHA ${save.total} vs DC 16.`, "important");
+  if (!save.success) {
+    defender.team = "heroes";
+    defender.friendly = true;
+    defender.aiControlled = true;
+    defender.barrowCrownDustAfterCombat = true;
+    applyStatusEffect(defender, { id: "sever-command", label: "Severed Command", durationRounds: 99 });
+    addLog(`${defender.name} becomes an AI ally for this combat. The Crownshard will turn it to dust afterward.`, "important");
+  }
+}
+
+async function maybeApplyCrownshardCrownbreaker(attacker, defender, weapon, isCritical) {
+  if (!isCritical || !isPartyHeroId(attacker?.id) || !activeWeaponMatchesTemplate(attacker, weapon, [barrowCrownItemIds.crownshardShortsword, barrowCrownItemIds.crownshardLongsword, barrowCrownItemIds.crownshardGreatsword])) return;
+  const key = itemPowerKey(weapon.baseItemId ?? weapon.itemId ?? weapon.id, "crownbreaker");
+  if (!canUseItemPower(attacker, key)) return;
+  const targets = visibleMonsters().filter((monster) => monster.alive && fightersWithinSquares(attacker, monster, 3));
+  if (!targets.length) return;
+  const useCrownbreaker = await showReactionPrompt({
+    actor: attacker,
+    title: "Crownbreaker",
+    message: `Force ${targets.length} hostile creature${targets.length === 1 ? "" : "s"} within 15 feet to save against fear?`,
+    acceptLabel: "Break Them",
+    declineLabel: "Save It",
+  });
+  if (!useCrownbreaker) return;
+  spendItemPower(attacker, key, "longRest");
+  for (const target of targets) {
+    const save = savingThrow(target, "wis", 16, { source: attacker, label: "Crownbreaker" });
+    addLog(`${target.name} rolls WIS ${save.total} vs DC 16 against Crownbreaker.`, "important");
+    if (!save.success) applyStatusEffect(target, { id: "frightened", label: "Frightened", attackBonus: -2, expiresAtEndOfTurn: true });
+  }
+}
+
+async function maybeApplyBarrowCrownOnHit(attacker, defender, weapon, packets, isCritical) {
+  await maybeApplyBlackMarketCoin(attacker, packets);
+  await maybeApplyRingOfLastHeir(attacker, defender);
+  if (activeWeaponMatchesTemplate(attacker, weapon, [barrowCrownItemIds.bellRingersMaul, barrowCrownItemIds.bellRingersWarhammer])) {
+    const key = itemPowerKey(weapon.baseItemId ?? weapon.itemId ?? weapon.id, `funeralToll:${state.round ?? 0}:${attacker.id}`);
+    const splash = visibleMonsters().find((monster) => monster.id !== defender.id && monster.alive && fightersWithinSquares(monster, defender, 2));
+    if (splash && canUseItemPower(attacker, key)) {
+      spendItemPower(attacker, key, "turn");
+      applySpecialDamage(attacker, splash, Math.max(1, proficiencyBonus(attacker)), "thunder", "Funeral Toll");
+    }
+  }
+  if (activeWeaponMatchesTemplate(attacker, weapon, [barrowCrownItemIds.crownshardShortsword, barrowCrownItemIds.crownshardLongsword, barrowCrownItemIds.crownshardGreatsword])) {
+    if (targetHasCommandBreakingCondition(defender)) {
+      const roll = rollDice(1, 8);
+      packets.push({ raw: Math.max(1, roll.total), type: monsterIsUndead(defender) ? "radiant" : "necrotic", label: `No King Above Me ${roll.rolls[0]} ${monsterIsUndead(defender) ? "radiant" : "necrotic"}` });
+    }
+    await maybeApplyCrownshardSeverCommand(attacker, defender, weapon);
+    await maybeApplyCrownshardCrownbreaker(attacker, defender, weapon, isCritical);
+  }
 }
 
 async function makeAttack(attacker, defender, options = {}) {
@@ -5323,7 +5635,7 @@ async function makeAttack(attacker, defender, options = {}) {
   const hasDisadvantage = rangedDisadvantage || defenderDodge || defendedBySidekick || lightContext.disadvantage;
   const attackRollResult = rollD20ForFighter(attacker, { advantage: attackAdvantage && !hasDisadvantage, disadvantage: hasDisadvantage && !attackAdvantage });
   const attackRolls = attackRollResult.rolls;
-  const criticalResult = resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll);
+  const criticalResult = applyMeleeAutoCritical(resolveMonsterHeroCritical(attacker, defender, attackRollResult.roll), attacker, defender, hasMeleeAccess(attacker, defender));
   const attackRoll = criticalResult.attackRoll;
   let defenderAc = armorClass(defender);
   const currentAttackBonus = attackBonusForWeapon(attacker, weapon);
@@ -5469,6 +5781,7 @@ async function makeAttack(attacker, defender, options = {}) {
     }
   }
   if (rider?.poison) await applyWeaponRiderSecondary(attacker, defender, rider, attackDamage);
+  await maybeApplyBarrowCrownOnHit(attacker, defender, weapon, packets, isCritical);
   if (isPartyHeroId(defender.id) && adminEnabled() && adminGodMode) {
     addLog(`God mode prevents ${attacker.name}'s damage to ${defender.name}.`, "important");
     render();
@@ -5486,6 +5799,7 @@ async function makeAttack(attacker, defender, options = {}) {
   totalDamage = await maybeUseBattleMasterParry(defender, attacker, totalDamage, !rangedAttack);
   totalDamage = await maybeUseProtectiveField(defender, totalDamage);
   totalDamage = await maybeUseSpiritShield(defender, attacker, totalDamage);
+  totalDamage = await maybeUseDrownedLegionWall(defender, attacker, totalDamage, !rangedAttack);
   applyDamageToFighter(defender, totalDamage);
   defender.lastDamagedById = attacker.id;
   const encounterDefeated = partyDefeatedOrDying();
@@ -5990,19 +6304,22 @@ async function maybeTriggerMonsterDeathBurst(monster) {
   return true;
 }
 
-function savingThrow(target, ability, dc) {
-  const rollResult = rollD20ForFighter(target);
+function savingThrow(target, ability, dc, options = {}) {
+  const normalizedAbility = String(ability ?? "").toLowerCase();
+  const autoFailed = (target.statusEffects ?? []).some((effect) => (effect.autoFailSaves ?? []).map((entry) => String(entry).toLowerCase()).includes(normalizedAbility));
+  const saveDisadvantage = (target.statusEffects ?? []).some((effect) => (effect.saveDisadvantageAbilities ?? []).map((entry) => String(entry).toLowerCase()).includes(normalizedAbility));
+  const rollResult = rollD20ForFighter(target, { advantage: options.advantage && !saveDisadvantage, disadvantage: saveDisadvantage && !options.advantage });
   const roll = rollResult.roll;
   const statusBonus = (target.statusEffects ?? []).reduce((sum, effect) => sum + (effect.saveBonus ?? 0), 0) + (magicEffects(target).saveBonus ?? 0);
   const auraBonus = auraSaveBonus(target);
   const proficiency = (target.savingThrowProficiencies ?? []).includes(ability) ? rangerCompanionProficiencyBonus(target) : 0;
   const bonus = abilityMod(target, ability) + proficiency + statusBonus + auraBonus;
   let total = roll + bonus;
-  let success = total >= dc;
+  let success = !autoFailed && total >= dc;
   let indomitable = null;
   const indomitableAbility = fighterAbilityDefinitions(target).find((entry) => entry.id === "indomitable");
-  if (!success && indomitableAbility && (target.level ?? 1) >= (indomitableAbility.level ?? 1) && (target.abilityUses?.indomitable ?? 0) < abilityMaxUses(target, indomitableAbility)) {
-    const rerollResult = rollD20ForFighter(target);
+  if (!autoFailed && !success && indomitableAbility && (target.level ?? 1) >= (indomitableAbility.level ?? 1) && (target.abilityUses?.indomitable ?? 0) < abilityMaxUses(target, indomitableAbility)) {
+    const rerollResult = rollD20ForFighter(target, { disadvantage: saveDisadvantage });
     const rerollTotal = rerollResult.roll + bonus;
     target.abilityUses.indomitable = (target.abilityUses.indomitable ?? 0) + 1;
     indomitable = { roll: rerollResult.roll, rolls: rerollResult.rolls, rawRolls: rerollResult.rawRolls, rollResult: rerollResult, total: rerollTotal };
@@ -6010,8 +6327,8 @@ function savingThrow(target, ability, dc) {
     success = total >= dc;
   }
   const fanaticalFocus = fighterAbilityDefinitions(target).find((entry) => entry.id === "fanaticalFocus");
-  if (!success && target.subclassId === "zealot" && (target.level ?? 1) >= 6 && fanaticalFocus && (target.abilityUses?.fanaticalFocus ?? 0) < abilityMaxUses(target, fanaticalFocus)) {
-    const rerollResult = rollD20ForFighter(target);
+  if (!autoFailed && !success && target.subclassId === "zealot" && (target.level ?? 1) >= 6 && fanaticalFocus && (target.abilityUses?.fanaticalFocus ?? 0) < abilityMaxUses(target, fanaticalFocus)) {
+    const rerollResult = rollD20ForFighter(target, { disadvantage: saveDisadvantage });
     const rerollTotal = rerollResult.roll + bonus;
     target.abilityUses = { ...(target.abilityUses ?? {}), fanaticalFocus: (target.abilityUses?.fanaticalFocus ?? 0) + 1 };
     total = rerollTotal;
@@ -6019,7 +6336,7 @@ function savingThrow(target, ability, dc) {
     addLog(`${target.name}'s Fanatical Focus rerolls the save: ${rerollResult.roll} ${abilityLabel(bonus)} = ${total}.`, "important");
   }
   recordD20OutcomeForFighter(target, success);
-  return { ability, roll, rolls: rollResult.rolls, rawRolls: rollResult.rawRolls, rollResult, bonus, proficiency, statusBonus, auraBonus, total, success, indomitable };
+  return { ability, roll, rolls: rollResult.rolls, rawRolls: rollResult.rawRolls, rollResult, bonus, proficiency, statusBonus, auraBonus, total, success, indomitable, autoFailed, saveDisadvantage };
 }
 
 function auraSaveBonus(target) {
@@ -6114,11 +6431,12 @@ function showSavingThrowMenu({ target, ability, dc, message, explanation = null 
       }
       if (!event.target.closest("[data-save-roll]")) return;
       resultSave = savingThrow(target, ability, dc);
+      const conditionNote = resultSave.autoFailed ? " Automatic failure from condition." : resultSave.saveDisadvantage ? " Rolled with disadvantage from condition." : "";
       els.gameDialogMessage.innerHTML = `
         ${dialogActorMarkup(target)}
         <p>${escapeHtml(message)}</p>
         <p>${escapeHtml(resultSave.success ? details.success : details.failure)}</p>
-        <p><b>Result:</b> ${resultSave.roll} ${escapeHtml(abilityLabel(resultSave.bonus))} = ${resultSave.total} vs DC ${dc}.</p>
+        <p><b>Result:</b> ${resultSave.roll} ${escapeHtml(abilityLabel(resultSave.bonus))} = ${resultSave.total} vs DC ${dc}.${escapeHtml(conditionNote)}</p>
         <p>${resultSave.success ? "Success." : "Failure."}</p>
       `;
       els.gameDialogActions.innerHTML = `<button type="button" data-save-close>Close</button>`;
@@ -6138,12 +6456,13 @@ async function rollSavingThrow(target, ability, dc, message, explanation = null)
     const save = savingThrow(target, ability, dc);
     if (save.indomitable) addLog(`${target.name} uses Indomitable and rerolls ${save.indomitable.roll}.`, "important");
     const rollText = save.indomitable ? `${save.roll} -> ${save.indomitable.roll}` : save.roll;
-    addLog(`${target.name} rolls ${ability.toUpperCase()} save: ${rollText} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
+    const conditionNote = save.autoFailed ? " (automatic failure)" : save.saveDisadvantage ? " with disadvantage" : "";
+    addLog(`${target.name} rolls ${ability.toUpperCase()} save${conditionNote}: ${rollText} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
     return save;
   }
   addLog(message, "important");
   const save = await showSavingThrowMenu({ target, ability, dc, message, explanation });
-  if (!save.success) {
+  if (!save.autoFailed && !save.success) {
     const inspiration = bardicInspirationDie(target);
     if (inspiration && save.total + inspiration.sides >= dc) {
       const useDie = await showReactionPrompt({
@@ -6162,7 +6481,7 @@ async function rollSavingThrow(target, ability, dc, message, explanation = null)
       }
     }
   }
-  if (!save.success) {
+  if (!save.autoFailed && !save.success) {
     const candidate = partyHeroes().find((hero) => {
       const ability = reactionAbility(hero, "bendLuck");
       return hero.id !== target.id && heroCanAct(hero) && hasReactionAvailable(hero) && canSpendCombatAbility(hero, ability) && fightersWithinSquares(hero, target, 12);
@@ -6186,12 +6505,24 @@ async function rollSavingThrow(target, ability, dc, message, explanation = null)
   }
   if (save.indomitable) addLog(`${target.name} uses Indomitable and rerolls ${save.indomitable.roll}.`, "important");
   const rollText = save.indomitable ? `${save.roll} -> ${save.indomitable.roll}` : save.roll;
-  addLog(`${target.name} rolls ${ability.toUpperCase()} save: ${rollText} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
-  addAdminLog(`${target.name} ${ability.toUpperCase()} save breakdown: ${d20RollDetail(save.rollResult)} + ability ${abilityLabel(abilityMod(target, ability))}${save.proficiency ? ` + proficiency ${save.proficiency}` : ""}${save.statusBonus ? ` + status ${save.statusBonus}` : ""}${save.auraBonus ? ` + aura ${save.auraBonus}` : ""}${save.indomitable ? `; Indomitable ${d20RollDetail(save.indomitable.rollResult)} => ${save.indomitable.total}` : ""} = ${save.total} vs DC ${dc}.`);
+  const conditionNote = save.autoFailed ? " (automatic failure)" : save.saveDisadvantage ? " with disadvantage" : "";
+  addLog(`${target.name} rolls ${ability.toUpperCase()} save${conditionNote}: ${rollText} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
+  addAdminLog(`${target.name} ${ability.toUpperCase()} save breakdown: ${d20RollDetail(save.rollResult)} + ability ${abilityLabel(abilityMod(target, ability))}${save.proficiency ? ` + proficiency ${save.proficiency}` : ""}${save.statusBonus ? ` + status ${save.statusBonus}` : ""}${save.auraBonus ? ` + aura ${save.auraBonus}` : ""}${save.autoFailed ? "; condition forces automatic failure" : save.saveDisadvantage ? "; condition imposes disadvantage" : ""}${save.indomitable ? `; Indomitable ${d20RollDetail(save.indomitable.rollResult)} => ${save.indomitable.total}` : ""} = ${save.total} vs DC ${dc}.`);
   return save;
 }
 
 function applyStatusEffect(target, effect) {
+  const rawCondition = typeof inferConditionIdFromEffect === "function" ? inferConditionIdFromEffect(effect) : "";
+  if ((rawCondition === "prone" || effect?.prone) && activeMagicItemByTemplate(target, barrowCrownItemIds.drownedLegionShield)) {
+    const roll = rollD20ForFighter(target, { advantage: true });
+    const total = roll.roll + proficiencyBonus(target);
+    addLog(`${target.name}'s Bone-Bound shield resists being knocked prone: d20 ${roll.rolls.join(" / ")} -> ${roll.roll} ${abilityLabel(proficiencyBonus(target))} = ${total} vs DC 13.`, "important");
+    if (total >= 13) return false;
+  }
+  if (rawCondition === "exhaustion" && effect && effect.exhaustionLevel == null && effect.level == null && effect.stacks == null) {
+    const existingLevel = Math.max(0, ...(target?.statusEffects ?? []).filter((entry) => inferConditionIdFromEffect(entry) === "exhaustion").map((entry) => Number(entry.exhaustionLevel ?? entry.level ?? entry.stacks ?? 1) || 1));
+    effect = { ...effect, exhaustionLevel: Math.min(6, existingLevel + 1) };
+  }
   effect = typeof normalizeConditionEffect === "function" ? normalizeConditionEffect(effect) : { ...effect };
   if (effect.condition && typeof fighterIsImmuneToCondition === "function" && fighterIsImmuneToCondition(target, effect.condition)) {
     const conditionName = effect.conditionLabel ?? effect.label ?? effect.condition;
@@ -6208,6 +6539,15 @@ function applyStatusEffect(target, effect) {
   refreshDerivedStats(target);
   if (effect.tempHp) {
     target.temporaryHp = Math.max(target.temporaryHp ?? 0, effect.tempHp);
+  }
+  if (effect.condition === "exhaustion" && (effect.exhaustionLevel ?? 0) >= 6) {
+    if (isPartyHeroId(target.id)) {
+      killHero(target);
+    } else {
+      target.hp = 0;
+      target.alive = false;
+    }
+    addLog(`${target.name} collapses from fatal exhaustion.`, "important");
   }
   return true;
 }
@@ -6615,11 +6955,15 @@ function canPaySpellCost(caster, spell) {
 }
 
 function canCastSpell(caster, spell) {
-  if (!heroCanAct(caster) || !spell || !canPaySpellCost(caster, spell)) return false;
-  if (spell.metamagic?.id && !canSpendMetamagic(caster, spell, metamagicAbilityForSpell(caster, spell.metamagic.id))) return false;
+  const fromScroll = Boolean(spell?.castFromScroll);
+  if (!heroCanAct(caster) || !spell || (!fromScroll && !canPaySpellCost(caster, spell))) return false;
+  if (fromScroll && caster?.classId === "barbarian" && fighterIsRaging(caster)) return false;
+  if (fromScroll && !caster?.inventory?.items?.some((item) => item.id === spell.scrollItemId)) return false;
+  if (spell.potionBreath && !(caster?.statusEffects ?? []).some((effect) => effect.potionBreath?.type === spell.effect?.type && (Number(effect.potionBreath?.uses ?? 0) || 0) > 0)) return false;
+  if (!fromScroll && spell.metamagic?.id && !canSpendMetamagic(caster, spell, metamagicAbilityForSpell(caster, spell.metamagic.id))) return false;
   if (isWildShaped(caster) && (caster.level ?? 1) < 18) return false;
-  if (spell.id === "dragonborn-breath" && (caster.abilityUses?.dragonbornBreath ?? 0) >= 1) return false;
-  if (spell.racialAbilityId) {
+  if (!fromScroll && spell.id === "dragonborn-breath" && (caster.abilityUses?.dragonbornBreath ?? 0) >= 1) return false;
+  if (!fromScroll && spell.racialAbilityId) {
     const ability = fighterAbilityDefinitions(caster).find((entry) => entry.id === spell.racialAbilityId);
     if (!ability || (caster.level ?? 1) < (ability.level ?? 1)) return false;
     if ((caster.abilityUses?.[ability.id] ?? 0) >= abilityMaxUses(caster, ability)) return false;
@@ -6633,20 +6977,48 @@ function canCastSpell(caster, spell) {
   return true;
 }
 
+function consumeSpellScrollItem(caster, spell) {
+  if (!spell?.castFromScroll || !spell.scrollItemId || !caster?.inventory?.items) return false;
+  const index = caster.inventory.items.findIndex((item) => item.id === spell.scrollItemId);
+  if (index < 0) return false;
+  const [item] = caster.inventory.items.splice(index, 1);
+  for (const slot of equipmentSlots) {
+    if (caster.equipment?.[slot.id] === item.id) caster.equipment[slot.id] = null;
+  }
+  addLog(`${caster.name} consumes ${item.name ?? "a spell scroll"}.`, "important");
+  return true;
+}
+
 function spendSpellResources(caster, spell) {
   if (spell.concentration) startConcentration(caster, spell);
-  if (spell.id === "dragonborn-breath") {
+  const fromScroll = Boolean(spell?.castFromScroll);
+  if (fromScroll) {
+    consumeSpellScrollItem(caster, spell);
+  }
+  if (spell.potionBreath) {
+    const effect = (caster.statusEffects ?? []).find((entry) => entry.potionBreath?.type === spell.effect?.type && (Number(entry.potionBreath?.uses ?? 0) || 0) > 0);
+    if (effect?.potionBreath) {
+      effect.potionBreath.uses = Math.max(0, (Number(effect.potionBreath.uses ?? 0) || 0) - 1);
+      if (effect.potionBreath.uses <= 0) {
+        caster.statusEffects = (caster.statusEffects ?? []).filter((entry) => entry.id !== effect.id);
+        addLog(`${caster.name}'s ${effect.label ?? "breath potion"} is spent.`, "important");
+      } else {
+        addLog(`${caster.name} has ${effect.potionBreath.uses} ${effect.potionBreath.type} breath use${effect.potionBreath.uses === 1 ? "" : "s"} remaining.`, "important");
+      }
+    }
+  }
+  if (!fromScroll && spell.id === "dragonborn-breath") {
     caster.abilityUses = { ...(caster.abilityUses ?? {}), dragonbornBreath: 1 };
   }
-  if (spell.racialAbilityId) {
+  if (!fromScroll && spell.racialAbilityId) {
     caster.abilityUses = { ...(caster.abilityUses ?? {}), [spell.racialAbilityId]: (caster.abilityUses?.[spell.racialAbilityId] ?? 0) + 1 };
   }
   const cost = spellPointCost(spell);
-  if (cost > 0) {
+  if (!fromScroll && cost > 0) {
     caster.spellPoints = Math.max(0, (caster.spellPoints ?? 0) - cost);
     addLog(`${caster.name} spends ${cost} SP on ${spell.name} (spell level ${spellCastLevel(spell)}).`, "important");
   }
-  spendMetamagic(caster, spell);
+  if (!fromScroll) spendMetamagic(caster, spell);
   if (state.mode === "combat") {
     if (spell.resource === "reaction") caster.hasReaction = false;
     else if (["bonusAction", "weaponRider"].includes(spell.resource)) caster.hasBonusAction = false;
@@ -6706,11 +7078,33 @@ function spellTargetCount(spell) {
   return base + (spell?.metamagic?.extraTarget ?? 0) + Math.max(0, spellCastLevel(spell) - spellBaseLevel(spell)) * (spell?.upcast?.targetsPerLevel ?? 0);
 }
 
+function pendingSpellTargetingState(caster, spell, mode, hoverPosition) {
+  return {
+    casterId: caster.id,
+    spellId: spell.id,
+    castLevel: spellCastLevel(spell),
+    metamagicId: spell.metamagic?.id ?? null,
+    castFromScroll: Boolean(spell.castFromScroll),
+    scrollItemId: spell.scrollItemId ?? null,
+    scrollTemplateId: spell.scrollTemplateId ?? null,
+    mode,
+    hoverPosition,
+  };
+}
+
 function currentPendingSpellTargeting() {
   if (!pendingSpellTargeting) return null;
   const caster = state.fighters[pendingSpellTargeting.casterId];
   const spell = getContentDefinition("spells", pendingSpellTargeting.spellId);
   let castSpell = spell ? spellWithCastLevel(spell, pendingSpellTargeting.castLevel) : null;
+  if (castSpell && pendingSpellTargeting.castFromScroll) {
+    castSpell = {
+      ...castSpell,
+      castFromScroll: true,
+      scrollItemId: pendingSpellTargeting.scrollItemId ?? null,
+      scrollTemplateId: pendingSpellTargeting.scrollTemplateId ?? null,
+    };
+  }
   const metamagicAbility = pendingSpellTargeting.metamagicId ? metamagicAbilityForSpell(caster, pendingSpellTargeting.metamagicId) : null;
   if (castSpell && metamagicAbility) castSpell = applyMetamagicToSpell(caster, castSpell, metamagicAbility);
   if (castSpell?.id === "dragonborn-breath") {
@@ -7147,14 +7541,7 @@ function startSpellTargeting(caster, spell) {
   const mode = spellTargetingMode(spell);
   const targetCount = mode === "target" ? Math.min(spellTargetCount(spell), spellTargetsFor(caster, spell).length) : 1;
   pendingMultiTargetSpell = targetCount > 1 ? { targetIds: [] } : null;
-  pendingSpellTargeting = {
-    casterId: caster.id,
-    spellId: spell.id,
-    castLevel: spellCastLevel(spell),
-    metamagicId: spell.metamagic?.id ?? null,
-    mode,
-    hoverPosition: mode === "target" ? spellTargetsFor(caster, spell)[0]?.position ?? null : caster.position,
-  };
+  pendingSpellTargeting = pendingSpellTargetingState(caster, spell, mode, mode === "target" ? spellTargetsFor(caster, spell)[0]?.position ?? null : caster.position);
   const instructions = {
     point: "Choose a square for the spell area.",
     direction: "Choose a direction from the caster.",
@@ -7173,7 +7560,7 @@ async function confirmPendingSpellTarget(position) {
   pendingSpellTargeting = null;
   if (mode === "point") {
     if (!isValidSpellPointTarget(caster, spell, position)) {
-      pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), metamagicId: spell.metamagic?.id ?? null, mode, hoverPosition: position };
+      pendingSpellTargeting = pendingSpellTargetingState(caster, spell, mode, position);
       addLog(`${spell.name} needs a visible square in range inside this room.`, "important");
       render();
       return true;
@@ -7184,7 +7571,7 @@ async function confirmPendingSpellTarget(position) {
   if (mode === "direction") {
     const direction = directionFromCasterToPosition(caster, position);
     if (!direction) {
-      pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), metamagicId: spell.metamagic?.id ?? null, mode, hoverPosition: position };
+      pendingSpellTargeting = pendingSpellTargetingState(caster, spell, mode, position);
       render();
       return true;
     }
@@ -7193,7 +7580,7 @@ async function confirmPendingSpellTarget(position) {
   }
   const target = fighterAtPosition(position);
   if (!isValidSpellTarget(caster, spell, target)) {
-    pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), metamagicId: spell.metamagic?.id ?? null, mode, hoverPosition: position };
+    pendingSpellTargeting = pendingSpellTargetingState(caster, spell, mode, position);
     addLog(`That is not a valid target for ${spell.name}.`, "important");
     render();
     return true;
@@ -7203,7 +7590,7 @@ async function confirmPendingSpellTarget(position) {
     pendingMultiTargetSpell = pendingMultiTargetSpell ?? { targetIds: [] };
     if (!pendingMultiTargetSpell.targetIds.includes(target.id)) pendingMultiTargetSpell.targetIds.push(target.id);
     if (pendingMultiTargetSpell.targetIds.length < targetCount) {
-      pendingSpellTargeting = { casterId: caster.id, spellId: spell.id, castLevel: spellCastLevel(spell), metamagicId: spell.metamagic?.id ?? null, mode, hoverPosition: position };
+      pendingSpellTargeting = pendingSpellTargetingState(caster, spell, mode, position);
       addLog(`${spell.name}: choose target ${pendingMultiTargetSpell.targetIds.length + 1} of ${targetCount}.`, "important");
       render();
       return true;
@@ -7304,6 +7691,13 @@ function forcedMovementLabel(source, target, movement = {}, movedSquares = 0) {
 
 function applyForcedMovement(source, target, movement = {}, context = {}) {
   if (!source?.position || !target?.position || !target.alive || target.dead) return false;
+  if (activeMagicItemByTemplate(target, barrowCrownItemIds.drownedLegionShield)) {
+    const dc = movement.dc ?? 13;
+    const roll = rollD20ForFighter(target, { advantage: true });
+    const total = roll.roll + proficiencyBonus(target);
+    addLog(`${target.name}'s Bone-Bound shield resists forced movement: d20 ${roll.rolls.join(" / ")} -> ${roll.roll} ${abilityLabel(proficiencyBonus(target))} = ${total} vs DC ${dc}.`, "important");
+    if (total >= dc) return false;
+  }
   if ((target.statusEffects ?? []).some((effect) => effect.speedLocked && movement.respectsSpeedLock !== false)) {
     addLog(`${target.name} is held in place and cannot be moved by ${movement.label ?? "the force"}.`, "important");
     return false;
@@ -7506,8 +7900,9 @@ function preserveCorpseWithSpell(caster, corpseHero, spell) {
 
 function summonActorProfiles() {
   return {
-    familiar: { monsterId: "thornbackHare", name: "Familiar", behavior: "skirmisher", hpMultiplier: 0.55, damageBonus: -1, followDistanceSquares: 1 },
-    steed: { monsterId: "gloomhornHellsteed", name: "Steed", behavior: "melee", hpMultiplier: 1.15, damageBonus: 1, followDistanceSquares: 1 },
+    familiar: { monsterId: "summonFamiliarCat", name: "Familiar", behavior: "skirmisher", hpMultiplier: 1, damageBonus: 0, followDistanceSquares: 1 },
+    steed: { monsterId: "summonSteedWarhorse", name: "Steed", behavior: "melee", hpMultiplier: 1, damageBonus: 0, followDistanceSquares: 1 },
+    greaterSteed: { monsterId: "summonGreaterSteedPegasus", name: "Greater Steed", behavior: "melee", hpMultiplier: 1, damageBonus: 0, followDistanceSquares: 1 },
     skeleton: { monsterId: "skeletonArcher", name: "Skeleton", behavior: "rangedKiter", hpMultiplier: 0.9, followDistanceSquares: 2 },
     beast: { monsterId: "forestWolf", name: "Conjured Beast", behavior: "melee", hpMultiplier: 0.9, followDistanceSquares: 2 },
     elemental: { monsterId: "shaleHound", name: "Conjured Elemental", behavior: "melee", hpMultiplier: 1.25, damageBonus: 1, followDistanceSquares: 2 },
@@ -7561,11 +7956,12 @@ function scaleSummonedSpellActor(actor, caster, spell, summon = {}, profile = {}
   actor.summonedBySpellId = spell.id;
   actor.summonDurationRounds = durationRounds;
   if (durationSeconds > 0) actor.summonExpiresAtDungeonTimeSeconds = dungeonElapsedSeconds({ sync: false }) + durationSeconds;
-  actor.renameable = false;
-  actor.companionControl = "ai";
+  const playerControlled = summon.control === "player";
+  actor.renameable = summon.allowIdentity ? true : false;
+  actor.companionControl = playerControlled ? "player" : "ai";
   actor.team = "heroes";
   actor.friendly = true;
-  actor.partyMemberKind = "ally";
+  actor.partyMemberKind = playerControlled ? "companion" : "ally";
   actor.followHeroId = caster.id;
   actor.followDistanceSquares = profile.followDistanceSquares ?? summon.followDistanceSquares ?? 2;
   actor.behavior = profile.behavior ?? summon.behavior ?? "melee";
@@ -7573,6 +7969,104 @@ function scaleSummonedSpellActor(actor, caster, spell, summon = {}, profile = {}
   refreshDerivedStats(actor);
   actor.hp = actor.maxHp;
   return actor;
+}
+
+function summonChoiceLabel(monsterId) {
+  const monster = getMonsterTemplate(monsterId);
+  return cleanSummonChoiceLabel(monster?.name ?? monsterId);
+}
+
+function cleanSummonChoiceLabel(name) {
+  return String(name ?? "")
+    .replace(/^(Familiar|Pact Familiar|Summoned|Ranger)\s+/i, "")
+    .trim();
+}
+
+function summonMemoryFor(caster, key) {
+  return key ? caster?.summonedCompanionMemory?.[key] ?? null : null;
+}
+
+function rememberSummonedCompanion(caster, key, options) {
+  if (!caster || !key || !options?.monsterId) return;
+  caster.summonedCompanionMemory = { ...(caster.summonedCompanionMemory ?? {}) };
+  caster.summonedCompanionMemory[key] = {
+    monsterId: options.monsterId,
+    name: options.name,
+    tokenArt: options.tokenArt ?? "",
+  };
+}
+
+function removePreviousSummonedCompanion(caster, key) {
+  if (!caster?.id || !key) return;
+  const removeIds = Object.values(state.fighters ?? {})
+    .filter((fighter) => fighter.summonedByHeroId === caster.id && fighter.summonMemoryKey === key)
+    .map((fighter) => fighter.id);
+  for (const id of removeIds) delete state.fighters[id];
+  if (!removeIds.length) return;
+  state.party.heroIds = (state.party.heroIds ?? []).filter((id) => !removeIds.includes(id));
+  state.party.rosterIds = (state.party.rosterIds ?? []).filter((id) => !removeIds.includes(id));
+  state.initiative = (state.initiative ?? []).filter((entry) => !removeIds.includes(entry.fighterId));
+}
+
+async function chooseSummonedCompanionOptions(caster, spell, summon = {}, profile = {}) {
+  const memoryKey = summon.memoryKey ?? spell.id;
+  const saved = summonMemoryFor(caster, memoryKey);
+  if (saved?.monsterId && typeof showChoiceDialog === "function") {
+    const mode = await showChoiceDialog({
+      actor: caster,
+      title: spell.name,
+      message: `${caster.name} remembers ${saved.name ?? summonChoiceLabel(saved.monsterId)}. Resummon that companion or choose a new form?`,
+      choices: [
+        { value: "resummon", label: `Resummon ${saved.name ?? summonChoiceLabel(saved.monsterId)}` },
+        { value: "new", label: "Choose New Form" },
+      ],
+    });
+    if (!mode) return null;
+    if (mode === "resummon") return { ...saved, memoryKey };
+  }
+  const choices = summon.chooseFrom ?? [];
+  let monsterId = summon.monsterId ?? profile.monsterId;
+  let identity = null;
+  let template = null;
+  let defaultName = summon.name ?? profile.name ?? spell.name;
+  while (!identity) {
+    if (choices.length > 1 && typeof showChoiceDialog === "function") {
+      const picked = await showChoiceDialog({
+        actor: caster,
+        title: spell.name,
+        message: "Choose the companion form to summon.",
+        choices: choices.map((id) => ({ value: id, label: summonChoiceLabel(id) })),
+      });
+      if (!picked) return null;
+      monsterId = picked;
+    } else if (choices.length === 1) {
+      monsterId = choices[0];
+    }
+    template = getMonsterTemplate(monsterId);
+    const formName = summonChoiceLabel(monsterId);
+    defaultName = summon.name && summon.name !== profile.name ? summon.name : formName || template?.name || profile.name || spell.name;
+    identity = { name: defaultName, tokenArt: template?.tokenArt ?? "" };
+    if (summon.allowIdentity && typeof showHeroIdentityDialog === "function") {
+      const pickedIdentity = await showHeroIdentityDialog({
+        title: spell.name,
+        message: `Name your ${formName || "companion"} and choose its token picture.`,
+        nameValue: defaultName,
+        tokenArt: template?.tokenArt ?? "",
+        confirmText: "Summon",
+        backText: choices.length > 1 ? "Back" : "",
+        cancelText: "Cancel",
+      });
+      if (pickedIdentity === dialogBackValue) {
+        identity = null;
+        continue;
+      }
+      if (!pickedIdentity) return null;
+      identity = pickedIdentity;
+    }
+  }
+  const chosen = { monsterId, name: identity.name || defaultName, tokenArt: identity.tokenArt ?? template?.tokenArt ?? "", memoryKey };
+  rememberSummonedCompanion(caster, memoryKey, chosen);
+  return chosen;
 }
 
 function createSimulacrumActor(caster, spell, position, summon = {}) {
@@ -7607,41 +8101,59 @@ function addSummonedSpellActorToCombat(caster, actor) {
   }
 }
 
-async function castSummonSpell(caster, spell, originTarget = caster) {
+async function castSummonSpell(caster, spell, originTarget = caster, options = {}) {
+  let resourcesSpent = false;
+  const spendForSummon = () => {
+    if (!options.spendResources || resourcesSpent) return;
+    spendSpellResources(caster, spell);
+    resourcesSpent = true;
+  };
   const summon = spell.effect?.summon ?? {};
   const extraCount = Math.max(0, spellCastLevel(spell) - spellBaseLevel(spell)) * (spell.upcast?.targetsPerLevel ?? 0);
   const count = Math.max(1, (summon.count ?? 1) + extraCount);
   const origin = originTarget?.position ?? originTarget ?? caster.position;
   const positions = summonOpenPositionsAround(caster, origin, count);
   if (!positions.length) {
+    spendForSummon();
     applyStatusEffect(caster, { id: `${spell.id}-summon-fallback`, label: spell.name, tempHp: 6 + proficiencyBonus(caster), durationRounds: 3 });
     addLog(`${spell.name} cannot find space for a summon, so the magic reinforces ${caster.name}.`, "important");
     return [];
   }
   const profileId = summon.profile ?? "beast";
   const profile = summonActorProfiles()[profileId] ?? summonActorProfiles().beast;
+  const companionOptions = summon.control === "player" ? await chooseSummonedCompanionOptions(caster, spell, summon, profile) : null;
+  if (summon.control === "player" && !companionOptions) {
+    addLog(`${spell.name} was not completed.`, "important");
+    return null;
+  }
+  spendForSummon();
+  if (companionOptions?.memoryKey) removePreviousSummonedCompanion(caster, companionOptions.memoryKey);
   const actors = [];
   for (let index = 0; index < Math.min(count, positions.length); index += 1) {
     let actor = null;
     if (profileId === "simulacrum") {
       actor = createSimulacrumActor(caster, spell, positions[index], summon);
     } else {
-      actor = createFriendlyBeastFromMonster(summon.monsterId ?? profile.monsterId, {
+      actor = createFriendlyBeastFromMonster(companionOptions?.monsterId ?? summon.monsterId ?? profile.monsterId, {
         id: `${spell.id}-${caster.id}-${Date.now()}-${index + 1}`,
-        name: count > 1 ? `${summon.name ?? profile.name} ${index + 1}` : summon.name ?? profile.name ?? spell.name,
+        name: count > 1 ? `${summon.name ?? profile.name} ${index + 1}` : companionOptions?.name ?? summon.name ?? profile.name ?? spell.name,
         position: positions[index],
-        kind: "ally",
-        control: "ai",
+        tokenArt: companionOptions?.tokenArt,
+        kind: summon.control === "player" ? "companion" : "ally",
+        control: summon.control === "player" ? "player" : "ai",
         followHeroId: caster.id,
         followDistanceSquares: profile.followDistanceSquares ?? 2,
+        className: summon.className ?? profile.className,
       });
       if (actor) scaleSummonedSpellActor(actor, caster, spell, summon, profile);
     }
     if (!actor) continue;
+    if (companionOptions?.memoryKey) actor.summonMemoryKey = companionOptions.memoryKey;
     addSummonedSpellActorToCombat(caster, actor);
     actors.push(actor);
   }
   if (!actors.length) {
+    spendForSummon();
     applyStatusEffect(caster, { id: `${spell.id}-summon-fallback`, label: spell.name, tempHp: 6 + proficiencyBonus(caster), durationRounds: 3 });
     addLog(`${spell.name} cannot shape a summon yet, so the magic reinforces ${caster.name}.`, "important");
     return [];
@@ -7653,7 +8165,7 @@ async function castSummonSpell(caster, spell, originTarget = caster) {
 async function applySpellAttack(caster, target, spell) {
   const lightContext = attackLightContext(caster, target);
   const rollResult = rollD20ForFighter(caster, { disadvantage: lightContext.disadvantage });
-  const criticalResult = resolveMonsterHeroCritical(caster, target, rollResult.roll);
+  const criticalResult = applyMeleeAutoCritical(resolveMonsterHeroCritical(caster, target, rollResult.roll), caster, target, hasMeleeAccess(caster, target));
   const roll = criticalResult.attackRoll;
   const bonus = spellAttackBonus(caster, spell);
   const total = roll + bonus;
@@ -7742,7 +8254,7 @@ async function resolveEldritchBlastBeam(caster, target, beamIndex, beamCount) {
   const lightContext = attackLightContext(caster, target);
   const sightAdvantage = devilSightAdvantage || witchSightAdvantage;
   const rollResult = rollD20ForFighter(caster, { advantage: sightAdvantage && !lightContext.disadvantage, disadvantage: lightContext.disadvantage && !sightAdvantage });
-  const criticalResult = resolveMonsterHeroCritical(caster, target, rollResult.roll);
+  const criticalResult = applyMeleeAutoCritical(resolveMonsterHeroCritical(caster, target, rollResult.roll), caster, target, hasMeleeAccess(caster, target));
   const roll = criticalResult.attackRoll;
   const bonus = spellAttackBonus(caster);
   const total = roll + bonus;
@@ -7856,15 +8368,21 @@ async function applySpellStatus(caster, target, spell, options = {}) {
   if (effect.weaponRider && spell.upcast?.damageBonusPerLevel) {
     effect.damageBonus = (effect.damageBonus ?? 0) + Math.max(0, spellCastLevel(spell) - spellBaseLevel(spell)) * spell.upcast.damageBonusPerLevel;
   }
+  if (typeof normalizeConditionEffect === "function") effect = normalizeConditionEffect(effect);
   if (effect.id === "spare-the-dying" && isPartyHeroId(target.id) && target.hp <= 0) {
     markFighterStableAtZero(target);
     addLog(`${target.name} is stabilized by ${spell.name}.`, "important");
     await maybeFinishEncounterAfterHeroRecovery();
   }
   if ((target.id?.startsWith("boss-") || target.tags?.includes("boss")) && effect.actionLocked) {
-    delete effect.actionLocked;
+    effect.actionLocked = false;
+    effect.speedLocked = false;
+    effect.meleeAutoCritical = false;
+    effect.incomingAttackAdvantage = false;
     effect.speedBonusFeet = Math.min(effect.speedBonusFeet ?? 0, -10);
+    effect.attackBonus = Math.min(effect.attackBonus ?? 0, -2);
     effect.label = `${effect.label} Resisted`;
+    effect.conditionDescription = "Powerful foe resists the full condition: actions are not locked, but speed and attacks are hindered.";
   }
   applySpellForcedMovement(caster, target, spell, null, { origin: caster.position });
   applyStatusEffect(target, effect);
@@ -7874,13 +8392,18 @@ async function applySpellStatus(caster, target, spell, options = {}) {
 async function castSpellAtTarget(caster, spell, target) {
   if (!canCastSpell(caster, spell) || !target) return;
   spell = { ...spell, casterLevel: caster.level ?? 1 };
+  if (spell.effect?.kind === "summon") {
+    await castSummonSpell(caster, spell, target, { spendResources: true });
+    refreshDerivedStats(caster);
+    hideAbilitiesMenu();
+    render();
+    return;
+  }
   spendSpellResources(caster, spell);
   if (spell.effect?.kind === "healing") {
     applySpellHealing(caster, target, spell);
   } else if (spell.effect?.kind === "restoration") {
     applySpellRestoration(caster, target, spell);
-  } else if (spell.effect?.kind === "summon") {
-    await castSummonSpell(caster, spell, target);
   } else if (spell.effect?.kind === "status") {
     await applySpellStatus(caster, target, spell);
   } else if (spell.effect?.kind === "attackDamage") {
@@ -7918,6 +8441,14 @@ async function castSpellAtTarget(caster, spell, target) {
 async function castSpellAtTargets(caster, spell, targets) {
   if (!canCastSpell(caster, spell) || !targets?.length) return;
   spell = { ...spell, casterLevel: caster.level ?? 1 };
+  if (spell.effect?.kind === "summon") {
+    const target = targets[0];
+    await castSummonSpell(caster, spell, target, { spendResources: true });
+    refreshDerivedStats(caster);
+    hideAbilitiesMenu();
+    render();
+    return;
+  }
   spendSpellResources(caster, spell);
   addLog(`${caster.name} casts ${spell.name} on ${targets.map((target) => target.name).join(", ")}.`, "important");
   for (const target of targets) {
@@ -7925,8 +8456,6 @@ async function castSpellAtTargets(caster, spell, targets) {
       applySpellHealing(caster, target, spell);
     } else if (spell.effect?.kind === "restoration") {
       applySpellRestoration(caster, target, spell);
-    } else if (spell.effect?.kind === "summon") {
-      await castSummonSpell(caster, spell, target);
     } else if (spell.effect?.kind === "status") {
       await applySpellStatus(caster, target, spell);
     } else if (spell.effect?.kind === "damage") {
@@ -7964,6 +8493,13 @@ async function castSpellAtPoint(caster, spell, position) {
     render();
     return;
   }
+  if (spell.effect?.kind === "summon") {
+    await castSummonSpell(caster, spell, position, { spendResources: true });
+    refreshDerivedStats(caster);
+    hideAbilitiesMenu();
+    render();
+    return;
+  }
   spendSpellResources(caster, spell);
   createPersistentSpellArea(caster, spell, position, { origin: position, orientation: spellAreaOrientation(caster, position) });
   if (spell.effect?.dispelsMagicalDarkness || spell.lightSource?.dispelsMagicalDarkness) {
@@ -7972,17 +8508,9 @@ async function castSpellAtPoint(caster, spell, position) {
   }
   const targets = spell.area ? areaTargetsForSpell(position, spell, caster) : spellTargetsFromCells([position]);
   addLog(`${caster.name} casts ${spell.name} at spell level ${spellCastLevel(spell)} for ${spellPointCost(spell)} SP at (${position.x + 1}, ${position.y + 1}).`, "important");
-  if (spell.effect?.kind === "summon") {
-    await castSummonSpell(caster, spell, position);
-    refreshDerivedStats(caster);
-    hideAbilitiesMenu();
-    render();
-    return;
-  }
   for (const target of targets) {
     const wasAlive = target.alive;
     if (spell.effect?.kind === "damage") await applySpellDamage(caster, target, spell, { origin: position });
-    else if (spell.effect?.kind === "summon") await castSummonSpell(caster, spell, position);
     else if (spell.effect?.kind === "status") await applySpellStatus(caster, target, spell);
     if (!target.alive && isPartyHeroId(target.id)) handleHeroDeath();
     if (wasAlive && !target.alive && !isPartyHeroId(target.id)) {
@@ -8001,6 +8529,12 @@ async function castSpellAtPoint(caster, spell, position) {
 async function castSpellInDirection(caster, spell, direction) {
   if (!canCastSpell(caster, spell)) return;
   spell = { ...spell, casterLevel: caster.level ?? 1 };
+  if (spell.effect?.kind === "summon") {
+    await castSummonSpell(caster, spell, caster, { spendResources: true });
+    hideAbilitiesMenu();
+    render();
+    return;
+  }
   spendSpellResources(caster, spell);
   const targets = breathTemplateTargets(caster, direction, spell);
   createPersistentSpellArea(caster, spell, caster.position, { origin: caster.position, direction });
@@ -8008,7 +8542,6 @@ async function castSpellInDirection(caster, spell, direction) {
   for (const target of targets) {
     const wasAlive = target.alive;
     if (spell.effect?.kind === "damage") await applySpellDamage(caster, target, spell, { direction, origin: caster.position });
-    else if (spell.effect?.kind === "summon") await castSummonSpell(caster, spell, caster);
     else if (spell.effect?.kind === "status") await applySpellStatus(caster, target, spell);
     if (wasAlive && !target.alive && !isPartyHeroId(target.id)) {
       triggerMonsterDeathStory(target);

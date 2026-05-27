@@ -55,6 +55,17 @@ window.DungeonContent.register("classes", "bard", {
           },
         ],
       },
+      {
+        title: "Starting Instrument",
+        message: "Choose your bard instrument.",
+        choices: [
+          {
+            value: "instrument",
+            label: "Musical instrument",
+            select: { pool: "musicalInstruments", title: "Choose Instrument", message: "Select a musical instrument.", label: "Instrument", slot: "" },
+          },
+        ],
+      },
     ],
   },
 });

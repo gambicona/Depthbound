@@ -37,12 +37,43 @@ function itemOptionLabel(item) {
   return `${item.name} (${itemValueText(item)})`;
 }
 
+function joinReadable(values) {
+  return (Array.isArray(values) ? values : values ? [values] : []).filter(Boolean).join(", ");
+}
+
 function damageText(damage) {
   if (!damage) return "";
   const count = Math.max(1, Number(damage.count) || 1);
   const sides = Math.max(1, Number(damage.sides) || 1);
   const bonus = Number(damage.bonus) || 0;
   return `${count}d${sides}${bonus ? (bonus > 0 ? `+${bonus}` : String(bonus)) : ""} ${damage.type ?? "damage"}`;
+}
+
+function effectSummary(effects = {}) {
+  const parts = [];
+  if (effects.acBonus) parts.push(`AC ${effects.acBonus > 0 ? "+" : ""}${effects.acBonus}`);
+  if (effects.attackBonus) parts.push(`attack ${effects.attackBonus > 0 ? "+" : ""}${effects.attackBonus}`);
+  if (effects.damageBonus) parts.push(`damage ${effects.damageBonus > 0 ? "+" : ""}${effects.damageBonus}`);
+  if (effects.saveBonus) parts.push(`saves ${effects.saveBonus > 0 ? "+" : ""}${effects.saveBonus}`);
+  if (effects.skillBonus) parts.push(`skills ${effects.skillBonus > 0 ? "+" : ""}${effects.skillBonus}`);
+  if (effects.maxHpBonus) parts.push(`max HP ${effects.maxHpBonus > 0 ? "+" : ""}${effects.maxHpBonus}`);
+  if (effects.speedBonusFeet) parts.push(`speed ${effects.speedBonusFeet > 0 ? "+" : ""}${effects.speedBonusFeet} ft`);
+  if (effects.initiativeBonus) parts.push(`initiative ${effects.initiativeBonus > 0 ? "+" : ""}${effects.initiativeBonus}`);
+  for (const [ability, value] of Object.entries(effects.abilityScoreBonuses ?? {})) parts.push(`${ability.toUpperCase()} ${value > 0 ? "+" : ""}${value}`);
+  for (const [ability, value] of Object.entries(effects.abilityScorePenalties ?? {})) parts.push(`${ability.toUpperCase()} ${value}`);
+  if (effects.resistances?.length) parts.push(`resist ${effects.resistances.join(", ")}`);
+  if (effects.vulnerabilities?.length) parts.push(`vulnerable ${effects.vulnerabilities.join(", ")}`);
+  if (effects.immunities?.length) parts.push(`immune ${effects.immunities.join(", ")}`);
+  if (effects.extraDamage?.length) parts.push(`extra ${effects.extraDamage.map(damageText).join(", ")}`);
+  return parts.join("; ");
+}
+
+function descriptionForEntry(entry) {
+  return entry?.customDescription ?? entry?.handout?.text ?? entry?.magic?.description ?? entry?.description ?? entry?.treasure?.description ?? "";
+}
+
+function infoButton(kind, id, label = "Info") {
+  return `<button type="button" class="creator-info-button" data-info-${kind}="${escapeAttribute(id)}" title="${escapeAttribute(label)}" aria-label="${escapeAttribute(label)}">i</button>`;
 }
 
 function parseListInput(value) {
@@ -185,8 +216,11 @@ const els = {
   itemSearch: document.querySelector("#item-search"),
   itemTypeFilter: document.querySelector("#item-type-filter"),
   itemTagFilter: document.querySelector("#item-tag-filter"),
+  scrollSpellLevelFilter: document.querySelector("#scroll-spell-level-filter"),
+  scrollSpellClassFilter: document.querySelector("#scroll-spell-class-filter"),
   itemSort: document.querySelector("#item-sort"),
   lootItem: document.querySelector("#loot-item"),
+  inspectLootItem: document.querySelector("#inspect-loot-item"),
   customBibliographyItems: document.querySelector("#custom-bibliography-items"),
   addLoot: document.querySelector("#add-loot"),
   deleteSelected: document.querySelector("#delete-selected"),
@@ -405,6 +439,34 @@ function containerTrapOptionList(selectedTrapId = "") {
     .join("");
 }
 
+function normalizeCreatorSpawnerConfig(config = {}) {
+  return {
+    monsterIds: parseListInput(config.monsterIds ?? config.monsterId ?? "forestWolf"),
+    intervalSeconds: Math.max(6, Math.floor(Number(config.intervalSeconds ?? 60) || 60)),
+    count: Math.max(1, Math.floor(Number(config.count ?? 1) || 1)),
+    maxAlive: Math.max(1, Math.floor(Number(config.maxAlive ?? 8) || 8)),
+  };
+}
+
+function normalizeCreatorRecruitConfig(config = {}) {
+  const kind = config.kind === "ally" ? "ally" : "hero";
+  return {
+    kind,
+    name: String(config.name ?? "").trim(),
+    monsterId: String(config.monsterId ?? "forestWolf").trim(),
+    control: config.control === "player" ? "player" : "ai",
+    companionKind: config.companionKind === "companion" ? "companion" : "ally",
+    classId: String(config.classId ?? "fighter").trim() || "fighter",
+    level: Math.max(1, Math.min(20, Math.floor(Number(config.level ?? 1) || 1))),
+    tokenArt: String(config.tokenArt ?? "").trim(),
+    overridesText: typeof config.overridesText === "string" ? config.overridesText : JSON.stringify(config.overrides ?? {}, null, 2),
+    dialogueTitle: String(config.dialogueTitle ?? "A Stranger Waits").trim() || "A Stranger Waits",
+    dialogueText: String(config.dialogueText ?? "The recruit looks ready to join your expedition.").trim() || "The recruit looks ready to join your expedition.",
+    recruitLabel: String(config.recruitLabel ?? "Recruit").trim() || "Recruit",
+    backLabel: String(config.backLabel ?? "Back").trim() || "Back",
+  };
+}
+
 function trapTemplateFromCreatorSelection(trapId) {
   const template = window.DungeonContent.get("traps", trapId);
   if (!template) return null;
@@ -450,6 +512,40 @@ function updateObjectTrapFromCard(object, changedField) {
     spotDc: Math.max(1, Number(spotInput?.value) || trap.spotDc || 12),
   };
   if (changedField === "trapEnabled" || changedField === "trapId") renderSelected();
+}
+
+function updateObjectSpawnerFromCard(object, changedField = "") {
+  object.spawner = normalizeCreatorSpawnerConfig({
+    monsterIds: readSelectedLockField("data-object-field='spawnerMonsterIds'")?.value ?? object.spawner?.monsterIds,
+    intervalSeconds: readSelectedLockField("data-object-field='spawnerIntervalSeconds'")?.value ?? object.spawner?.intervalSeconds,
+    count: readSelectedLockField("data-object-field='spawnerCount'")?.value ?? object.spawner?.count,
+    maxAlive: readSelectedLockField("data-object-field='spawnerMaxAlive'")?.value ?? object.spawner?.maxAlive,
+  });
+  if (changedField === "spawnerAddSelectedMonster" && state.selectedMonsterId) {
+    object.spawner.monsterIds = Array.from(new Set([...(object.spawner.monsterIds ?? []), state.selectedMonsterId]));
+    renderSelected();
+  }
+}
+
+function updateObjectRecruitFromCard(object, changedField = "") {
+  const existing = normalizeCreatorRecruitConfig(object.recruit);
+  object.recruit = normalizeCreatorRecruitConfig({
+    kind: readSelectedLockField("data-object-field='recruitKind'")?.value ?? existing.kind,
+    name: readSelectedLockField("data-object-field='recruitName'")?.value ?? existing.name,
+    monsterId: readSelectedLockField("data-object-field='recruitMonsterId'")?.value ?? existing.monsterId,
+    control: readSelectedLockField("data-object-field='recruitControl'")?.value ?? existing.control,
+    companionKind: readSelectedLockField("data-object-field='recruitCompanionKind'")?.value ?? existing.companionKind,
+    overridesText: readSelectedLockField("data-object-field='recruitOverridesText'")?.value ?? existing.overridesText,
+    dialogueTitle: readSelectedLockField("data-object-field='recruitDialogueTitle'")?.value ?? existing.dialogueTitle,
+    dialogueText: readSelectedLockField("data-object-field='recruitDialogueText'")?.value ?? existing.dialogueText,
+    recruitLabel: readSelectedLockField("data-object-field='recruitLabel'")?.value ?? existing.recruitLabel,
+    backLabel: readSelectedLockField("data-object-field='recruitBackLabel'")?.value ?? existing.backLabel,
+  });
+  if (changedField === "recruitUseSelectedMonster" && state.selectedMonsterId) {
+    object.recruit.monsterId = state.selectedMonsterId;
+    renderSelected();
+  }
+  if (changedField === "recruitKind") renderSelected();
 }
 
 function objectTypeIsTerrainFloor(type) {
@@ -672,6 +768,8 @@ function exportedCreatorObject(object) {
     ...(specialLock ? { specialLock } : {}),
     ...(!specialLock && object.lockDc ? { lockDc: object.lockDc } : {}),
     ...(object.trap ? { trap: clone(object.trap) } : {}),
+    ...(object.spawner ? { spawner: normalizeCreatorSpawnerConfig(object.spawner) } : {}),
+    ...(object.recruit ? { recruit: normalizeCreatorRecruitConfig(object.recruit) } : {}),
     items: [...(object.items ?? [])],
   };
 }
@@ -808,8 +906,8 @@ function uniqueSorted(values) {
   return Array.from(new Set(values.filter(Boolean).map(String))).sort((a, b) => a.localeCompare(b));
 }
 
-function optionList(values, allLabel = "All") {
-  return [`<option value="">${escapeHtml(allLabel)}</option>`, ...values.map((value) => `<option value="${escapeAttribute(value)}">${escapeHtml(value)}</option>`)].join("");
+function optionList(values, allLabel = "All", labelForValue = (value) => value) {
+  return [`<option value="">${escapeHtml(allLabel)}</option>`, ...values.map((value) => `<option value="${escapeAttribute(value)}">${escapeHtml(labelForValue(value))}</option>`)].join("");
 }
 
 function preserveSelectValue(select, renderOptions) {
@@ -856,6 +954,20 @@ function compareByName(a, b) {
   return String(a.name ?? a.id).localeCompare(String(b.name ?? b.id));
 }
 
+function isSpellScrollItem(item) {
+  return item?.use?.kind === "spellScroll" || item?.scroll?.kind === "spell" || item?.category === "spell scroll";
+}
+
+function spellScrollLevelValue(item) {
+  const level = Number(item?.scroll?.level ?? item?.use?.castLevel ?? 0) || 0;
+  return `spell-level:${Math.max(0, Math.min(9, level))}`;
+}
+
+function spellScrollLevelLabel(value) {
+  const level = Number(String(value).replace("spell-level:", ""));
+  return level === 0 ? "Cantrip" : `Level ${level}`;
+}
+
 function renderCatalogueFilters() {
   preserveSelectValue(els.furnitureKindFilter, () => optionList(uniqueSorted(window.DungeonContent.list("furniture").map((entry) => entry.floor ? "floor" : entry.kind ?? "furniture")), "All kinds"));
   preserveSelectValue(els.furnitureTagFilter, () => optionList(uniqueSorted(window.DungeonContent.list("furniture").flatMap((entry) => entry.tags ?? [])), "All tags"));
@@ -863,6 +975,9 @@ function renderCatalogueFilters() {
   preserveSelectValue(els.monsterTagFilter, () => optionList(uniqueSorted(window.DungeonContent.list("monsters").flatMap((entry) => entry.tags ?? [])), "All tags"));
   preserveSelectValue(els.itemTypeFilter, () => optionList(uniqueSorted(window.DungeonContent.list("items").filter((item) => item.type !== "class").map((item) => item.type ?? item.category ?? "item")), "All types"));
   preserveSelectValue(els.itemTagFilter, () => optionList(uniqueSorted(window.DungeonContent.list("items").filter((item) => item.type !== "class").flatMap((item) => item.tags ?? [])), "All tags"));
+  const scrolls = window.DungeonContent.list("items").filter(isSpellScrollItem);
+  preserveSelectValue(els.scrollSpellLevelFilter, () => optionList(uniqueSorted(scrolls.map(spellScrollLevelValue)), "All scroll levels", spellScrollLevelLabel));
+  preserveSelectValue(els.scrollSpellClassFilter, () => optionList(uniqueSorted(scrolls.flatMap((item) => item.scroll?.classes ?? [])), "All scroll classes"));
 }
 
 function catalogueButton(entry, selectedId) {
@@ -875,13 +990,16 @@ function monsterCategoryLabel(monster) {
 
 function monsterCatalogueButton(entry, selectedId) {
   return `
-    <button type="button" data-id="${escapeAttribute(entry.id)}" class="monster-catalogue-button ${entry.id === selectedId ? "active" : ""}">
-      <span class="monster-catalogue-title">
-        <b>${escapeHtml(entry.name)}</b>
-        <span class="monster-category-badge" title="Monster category">${escapeHtml(monsterCategoryLabel(entry))}</span>
-      </span>
-      <span class="small-note">${escapeHtml(entry.id)}${entry.tags?.length ? ` - ${escapeHtml(entry.tags.slice(0, 5).join(", "))}` : ""}</span>
-    </button>
+    <div class="creator-catalogue-entry">
+      <button type="button" data-id="${escapeAttribute(entry.id)}" class="monster-catalogue-button ${entry.id === selectedId ? "active" : ""}">
+        <span class="monster-catalogue-title">
+          <b>${escapeHtml(entry.name)}</b>
+          <span class="monster-category-badge" title="Monster category">${escapeHtml(monsterCategoryLabel(entry))}</span>
+        </span>
+        <span class="small-note">${escapeHtml(entry.id)}${entry.tags?.length ? ` - ${escapeHtml(entry.tags.slice(0, 5).join(", "))}` : ""}</span>
+      </button>
+      ${infoButton("monster", entry.id, `Inspect ${entry.name}`)}
+    </div>
   `;
 }
 
@@ -952,12 +1070,16 @@ function renderMonsterCatalogue() {
 function filteredItemEntries() {
   const typeFilter = els.itemTypeFilter?.value ?? "";
   const tagFilter = els.itemTagFilter?.value ?? "";
+  const scrollLevelFilter = els.scrollSpellLevelFilter?.value ?? "";
+  const scrollClassFilter = els.scrollSpellClassFilter?.value ?? "";
   const sort = els.itemSort?.value ?? "name";
   return window.DungeonContent
     .list("items")
     .filter((item) => item.type !== "class")
     .filter((item) => !typeFilter || (item.type ?? item.category ?? "item") === typeFilter)
     .filter((item) => entryHasTag(item, tagFilter))
+    .filter((item) => !scrollLevelFilter || (isSpellScrollItem(item) && spellScrollLevelValue(item) === scrollLevelFilter))
+    .filter((item) => !scrollClassFilter || (isSpellScrollItem(item) && (item.scroll?.classes ?? []).includes(scrollClassFilter)))
     .filter((entry) => entryMatchesSearch(entry, els.itemSearch, [itemValueText(entry)]))
     .sort((a, b) => {
       if (sort === "id") return a.id.localeCompare(b.id);
@@ -972,11 +1094,15 @@ function customBibliographyItems() {
 }
 
 function filteredCustomBibliographyItems(excludedIds = new Set()) {
+  const scrollLevelFilter = els.scrollSpellLevelFilter?.value ?? "";
+  const scrollClassFilter = els.scrollSpellClassFilter?.value ?? "";
   return customBibliographyItems()
     .filter((item) => item?.id && !excludedIds.has(item.id))
     .filter((item) => item.type !== "class")
     .filter((item) => !els.itemTypeFilter?.value || (item.type ?? item.category ?? "item") === els.itemTypeFilter.value)
     .filter((item) => entryHasTag(item, els.itemTagFilter?.value ?? ""))
+    .filter((item) => !scrollLevelFilter || (isSpellScrollItem(item) && spellScrollLevelValue(item) === scrollLevelFilter))
+    .filter((item) => !scrollClassFilter || (isSpellScrollItem(item) && (item.scroll?.classes ?? []).includes(scrollClassFilter)))
     .filter((item) => entryMatchesSearch(item, els.itemSearch, [itemValueText(item)]))
     .sort(compareByName);
 }
@@ -992,10 +1118,13 @@ function renderCustomBibliographyItems(items) {
     return;
   }
   els.customBibliographyItems.innerHTML = items.map((item) => `
-    <button type="button" data-custom-bibliography-loot="${escapeAttribute(item.id)}">
-      <b>${escapeHtml(item.name)}</b><br>
-      <span class="small-note">${escapeHtml([item.type ?? item.category ?? "item", ...(item.tags ?? []).slice(0, 3)].filter(Boolean).join(" - "))}</span>
-    </button>
+    <div class="creator-catalogue-entry">
+      <button type="button" data-custom-bibliography-loot="${escapeAttribute(item.id)}">
+        <b>${escapeHtml(item.name)}</b><br>
+        <span class="small-note">${escapeHtml([item.type ?? item.category ?? "item", ...(item.tags ?? []).slice(0, 3)].filter(Boolean).join(" - "))}</span>
+      </button>
+      ${infoButton("item", item.id, `Inspect ${item.name}`)}
+    </div>
   `).join("");
 }
 
@@ -1012,6 +1141,8 @@ function renderItemSelects() {
     .filter((item) => entryMatchesSearch(item, els.itemSearch, [itemValueText(item)]))
     .filter((item) => !els.itemTypeFilter?.value || (item.type ?? item.category ?? "item") === els.itemTypeFilter.value)
     .filter((item) => entryHasTag(item, els.itemTagFilter?.value ?? ""))
+    .filter((item) => !els.scrollSpellLevelFilter?.value || (isSpellScrollItem(item) && spellScrollLevelValue(item) === els.scrollSpellLevelFilter.value))
+    .filter((item) => !els.scrollSpellClassFilter?.value || (isSpellScrollItem(item) && (item.scroll?.classes ?? []).includes(els.scrollSpellClassFilter.value)))
     .map((item) => `<option value="${escapeAttribute(item.id)}">${escapeHtml(itemOptionLabel(item))}</option>`)
     .join("");
   const currentLoot = els.lootItem.value;
@@ -1249,6 +1380,24 @@ function itemName(itemId) {
   return state.customItems.find((item) => item.id === itemId)?.name ?? window.DungeonContent.get("items", itemId)?.name ?? itemId;
 }
 
+function itemTemplateForInfo(itemId) {
+  return state.customItems.find((item) => item.id === itemId) ?? window.DungeonContent.get("items", itemId) ?? null;
+}
+
+function lootItemsMarkup(itemIds = []) {
+  if (!itemIds.length) return "none";
+  return `
+    <div class="creator-inline-list">
+      ${itemIds.map((itemId) => `
+        <div class="creator-inline-entry">
+          ${infoButton("item", itemId, `Inspect ${itemName(itemId)}`)}
+          <span>${escapeHtml(itemName(itemId))}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
 function triggerEventLabel(event) {
   return {
     enterRoom: "Walk into room",
@@ -1394,6 +1543,114 @@ function storyTriggerFromForm() {
   };
 }
 
+function detailRows(rows) {
+  return `<dl>${rows
+    .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "")
+    .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`)
+    .join("")}</dl>`;
+}
+
+function showCreatorInfo(title, subtitle, rows) {
+  let modal = document.querySelector("#creator-info-modal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "creator-info-modal";
+    modal.className = "creator-info-modal hidden";
+    modal.innerHTML = `
+      <div class="creator-info-panel" role="dialog" aria-modal="true" aria-labelledby="creator-info-title">
+        <header>
+          <div>
+            <h3 id="creator-info-title"></h3>
+            <span class="small-note" data-info-subtitle></span>
+          </div>
+          <button type="button" class="creator-info-button" data-close-info aria-label="Close">x</button>
+        </header>
+        <div data-info-body></div>
+      </div>
+    `;
+    document.body.append(modal);
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal || event.target.closest("[data-close-info]")) modal.classList.add("hidden");
+    });
+  }
+  modal.querySelector("#creator-info-title").textContent = title;
+  modal.querySelector("[data-info-subtitle]").textContent = subtitle;
+  modal.querySelector("[data-info-body]").innerHTML = detailRows(rows);
+  modal.classList.remove("hidden");
+}
+
+function showItemInfo(itemId) {
+  const item = itemTemplateForInfo(itemId);
+  if (!item) {
+    showCreatorInfo(itemId, "Missing item", [["ID", itemId]]);
+    return;
+  }
+  const magic = item.magic ?? {};
+  const effects = magic.effects ?? {};
+  const rows = [
+    ["ID", item.id],
+    ["Type", [item.type, item.category].filter(Boolean).join(" - ")],
+    ["Value", itemValueText(item)],
+    ["Weight", item.weightLb || item.weightLb === 0 ? `${item.weightLb} lb` : ""],
+    ["Slots", joinReadable(item.slots)],
+    ["Requires Attunement", item.requiresAttunement || magic.requiresAttunement ? "yes" : ""],
+    ["Scroll Spell", item.scroll?.spellName],
+    ["Scroll Level", isSpellScrollItem(item) ? spellScrollLevelLabel(spellScrollLevelValue(item)) : ""],
+    ["Scroll Classes", joinReadable(item.scroll?.classes)],
+    ["Damage", damageText(item.damage)],
+    ["Armor", item.armor?.bonus ? `+${item.armor.bonus} AC` : item.armor?.base ? `AC ${item.armor.base}` : ""],
+    ["Properties", joinReadable(item.properties)],
+    ["Magic", [
+      magic.rarity,
+      magic.attackBonus ? `attack +${magic.attackBonus}` : "",
+      magic.damageBonus ? `damage +${magic.damageBonus}` : "",
+      magic.extraDamage?.length ? `extra ${magic.extraDamage.map(damageText).join(", ")}` : "",
+      magic.resistances?.length ? `resist ${magic.resistances.join(", ")}` : "",
+      magic.vulnerabilities?.length ? `vulnerable ${magic.vulnerabilities.join(", ")}` : "",
+      effectSummary(effects),
+    ].filter(Boolean).join("; ")],
+    ["Special", joinReadable(magic.properties)],
+    ["Use", item.use?.description ?? (item.use?.kind ? `${item.use.kind}${item.use.resource ? ` (${item.use.resource})` : ""}` : "")],
+    ["Description", descriptionForEntry(item)],
+    ["Tags", joinReadable(item.tags)],
+  ];
+  showCreatorInfo(item.name ?? item.id, "Item", rows);
+}
+
+function showMonsterInfo(monsterId) {
+  const placed = state.monsters.find((monster) => monster.id === monsterId);
+  const monster = placed ? { ...(window.DungeonContent.get("monsters", placed.monsterId) ?? {}), ...(placed.overrides ?? {}), id: placed.id, name: placed.name } : window.DungeonContent.get("monsters", monsterId);
+  if (!monster) {
+    showCreatorInfo(monsterId, "Missing monster", [["ID", monsterId]]);
+    return;
+  }
+  const lootItems = placed?.extraLoot ?? monster.extraLoot ?? monster.loot ?? [];
+  const rows = [
+    ["ID", monster.id],
+    ["Template", placed?.monsterId],
+    ["Category", Number.isFinite(monster.category) ? String(monster.category) : ""],
+    ["Role", monster.role],
+    ["HP", monster.maxHp],
+    ["AC", monster.ac],
+    ["Speed", monster.speedFeet ? `${monster.speedFeet} ft` : ""],
+    ["Attack Bonus", monster.attackBonus],
+    ["Damage", monster.damage?.label ?? damageText(monster.damage)],
+    ["Senses", Object.entries(monster.senses ?? {}).map(([sense, value]) => `${sense} ${value === true ? "" : value}`).join(", ")],
+    ["Saves", joinReadable(monster.savingThrowProficiencies)],
+    ["Skills", joinReadable(monster.skillProficiencies)],
+    ["Resistances", joinReadable(monster.damageResistances)],
+    ["Vulnerabilities", joinReadable(monster.damageVulnerabilities)],
+    ["Immunities", joinReadable(monster.damageImmunities)],
+    ["Condition Immunities", joinReadable(monster.conditionImmunities)],
+    ["Special", joinReadable(monster.specialAbility)],
+    ["Equipment", Object.entries(monster.equipment ?? {}).map(([slot, item]) => `${slot}: ${item}`).join(", ")],
+    ["Loot", lootItems.map(itemName).join(", ")],
+    ["Description", descriptionForEntry(monster)],
+    ["Tags", joinReadable(monster.tags)],
+  ];
+  showCreatorInfo(monster.name ?? monster.id, "Monster", rows);
+}
+
 function saveStoryTrigger() {
   const trigger = storyTriggerFromForm();
   if (!trigger.targetId) {
@@ -1446,7 +1703,7 @@ function renderSelected() {
   }
   if (selected.monsterId) {
     const template = window.DungeonContent.get("monsters", selected.monsterId);
-    els.selectedCard.innerHTML = `<b>${selected.name}</b><br>${selected.isBoss ? "Boss " : ""}Monster at ${selected.position.x}, ${selected.position.y}<br>
+    els.selectedCard.innerHTML = `<div class="creator-inline-entry"><b>${escapeHtml(selected.name)}</b>${infoButton("monster", selected.id, `Inspect ${selected.name}`)}</div>${selected.isBoss ? "Boss " : ""}Monster at ${selected.position.x}, ${selected.position.y}<br>
       <label>Name <input data-monster-field="name" value="${selected.name}" /></label>
       <label>HP <input data-monster-field="maxHp" type="number" value="${selected.overrides?.maxHp ?? template?.maxHp ?? ""}" /></label>
       <label>AC <input data-monster-field="ac" type="number" value="${selected.overrides?.ac ?? template?.ac ?? ""}" /></label>
@@ -1457,7 +1714,7 @@ function renderSelected() {
       <label>Damage label <input data-monster-field="damageLabel" value="${selected.overrides?.damage?.label ?? template?.damage?.label ?? ""}" /></label>
       <label>Main hand item id <input data-monster-field="mainHand" value="${selected.overrides?.equipment?.mainHand ?? template?.equipment?.mainHand ?? ""}" /></label>
       <label>Armor item id <input data-monster-field="torso" value="${selected.overrides?.equipment?.torso ?? template?.equipment?.torso ?? ""}" /></label>
-      <small>Extra loot: ${(selected.extraLoot ?? []).map(itemName).join(", ") || "none"}</small>`;
+      <small>Extra loot:</small>${lootItemsMarkup(selected.extraLoot ?? [])}`;
     return;
   }
   if (selected.type) {
@@ -1473,8 +1730,38 @@ function renderSelected() {
     const canUseContainerTrap = objectCanUseContainerTrap(selected);
     const trapDraft = containerTrapDraft(selected.trap);
     const trapOptions = containerTrapOptionList(trapDraft.id);
+    const spawner = normalizeCreatorSpawnerConfig(selected.spawner);
+    const recruit = normalizeCreatorRecruitConfig(selected.recruit);
+    const isContinuousSpawner = selected.type === "continuous-spawner";
+    const isRecruitmentMarker = selected.type === "recruitment-marker";
     els.selectedCard.innerHTML = `<b>${def?.name ?? selected.type}</b><br>${def?.kind === "trap" ? "Trap" : "Furniture"} at ${selected.position.x}, ${selected.position.y}${placementArea?.type === "corridor" ? " in hallway" : ""}<br>
-      ${isFloorTrap ? `Damage: ${escapeHtml(trapDamage || "unknown")}<br><label>Spot DC <input data-object-field="spotDc" type="number" min="1" value="${selectedSpotDc}" /></label>` : `Loot: ${(selected.items ?? []).map(itemName).join(", ") || "none"}`}
+      ${isFloorTrap ? `Damage: ${escapeHtml(trapDamage || "unknown")}<br><label>Spot DC <input data-object-field="spotDc" type="number" min="1" value="${selectedSpotDc}" /></label>` : `Loot: ${lootItemsMarkup(selected.items ?? [])}`}
+      ${
+        isContinuousSpawner
+          ? `<hr>
+             <b>Continuous Spawner</b>
+             <label>Monster ids <textarea data-object-field="spawnerMonsterIds" rows="3">${escapeHtml((spawner.monsterIds ?? []).join(", "))}</textarea></label>
+             <button type="button" data-action="spawner-add-selected-monster" ${state.selectedMonsterId ? "" : "disabled"}>Add selected monster</button>
+             <label>Interval seconds <input data-object-field="spawnerIntervalSeconds" type="number" min="6" value="${spawner.intervalSeconds}" /></label>
+             <label>Spawn count <input data-object-field="spawnerCount" type="number" min="1" value="${spawner.count}" /></label>
+             <label>Max alive from this spawner <input data-object-field="spawnerMaxAlive" type="number" min="1" value="${spawner.maxAlive}" /></label>
+             <small>This marker is invisible to players and spawns valid selected monsters around itself.</small>`
+          : ""
+      }
+      ${
+        isRecruitmentMarker
+          ? `<hr>
+             <b>Recruitment Marker</b>
+             <label>Dialogue title <input data-object-field="recruitDialogueTitle" value="${escapeAttribute(recruit.dialogueTitle)}" /></label>
+             <label>Dialogue text <textarea data-object-field="recruitDialogueText" rows="3">${escapeHtml(recruit.dialogueText)}</textarea></label>
+             <div class="creator-row">
+               <label>Recruit button <input data-object-field="recruitLabel" value="${escapeAttribute(recruit.recruitLabel)}" /></label>
+               <label>Back button <input data-object-field="recruitBackLabel" value="${escapeAttribute(recruit.backLabel)}" /></label>
+             </div>
+             <label>Recruit JSON <textarea data-object-field="recruitOverridesText" rows="8">${escapeHtml(recruit.overridesText || "{}")}</textarea></label>
+             <small>Paste JSON from the Recruit Creator. The recruit appears when this room is revealed, then joins only if clicked and recruited.</small>`
+          : ""
+      }
       ${
         lock && !specialLockEnabled
           ? `<label><input data-object-field="locked" type="checkbox" ${selected.locked ? "checked" : ""} /> Locked in this dungeon</label>
@@ -1630,10 +1917,17 @@ function renderCampaignSaveState() {
   const oneShotSource = state.oneShotSource;
   els.saveCampaignOverride.disabled = !campaignSource && !oneShotSource;
   els.saveCampaignOverride.textContent = campaignSource
-    ? `Save ${campaignSource.campaignName ?? campaignSource.campaignId} Dungeon ${campaignSource.campaignIndex} Override`
+    ? `Overwrite ${campaignSource.campaignName ?? campaignSource.campaignId} Dungeon ${campaignSource.campaignIndex}`
     : oneShotSource
-      ? `Save ${oneShotSource.name ?? oneShotSource.id} Override`
-    : "Save Campaign Override";
+      ? `Overwrite ${oneShotSource.name ?? oneShotSource.id}`
+    : "Overwrite Loaded Source";
+  if (els.topSaveDungeon) {
+    els.topSaveDungeon.textContent = campaignSource || oneShotSource ? "Overwrite" : "Save";
+  }
+}
+
+function hasLoadedSource() {
+  return Boolean(state.campaignSource || state.oneShotSource);
 }
 
 function canRerollRandomLayout() {
@@ -1649,7 +1943,7 @@ function renderRandomLayoutControls() {
   const width = Math.max(1, Math.min(3, Number(els.hallwayWidth?.value) || state.hallwayWidth || 1));
   state.hallwayWidth = width;
   if (els.hallwayWidthLabel) els.hallwayWidthLabel.textContent = `${width} square${width === 1 ? "" : "s"}`;
-  els.randomLayout.disabled = !canRerollRandomLayout();
+  els.randomLayout.disabled = !canRerollRandomLayout() && !hasLoadedSource();
 }
 
 function creatorValidationItems() {
@@ -1994,6 +2288,8 @@ function placeFurniture(position) {
     ...(objectIsFloorTrapType(state.selectedFurnitureId) ? { spotDc: trapDefaultSpotDc(template) } : {}),
   };
   if (objectHasLockComponent(object)) object.locked = false;
+  if (state.selectedFurnitureId === "continuous-spawner") object.spawner = normalizeCreatorSpawnerConfig({ monsterIds: state.selectedMonsterId || "forestWolf" });
+  if (state.selectedFurnitureId === "recruitment-marker") object.recruit = normalizeCreatorRecruitConfig({ monsterId: state.selectedMonsterId || "forestWolf" });
   if (!objectFitsPlacementArea(object, area) || objectCellsForCreator(object).some((cell) => occupied(cell, "", object.type))) return;
   state.objects.push(object);
   state.selectedId = id;
@@ -2175,9 +2471,17 @@ function saveDungeon() {
   renderAll();
 }
 
+function primarySaveDungeon() {
+  if (hasLoadedSource()) {
+    void saveCampaignOverride();
+    return;
+  }
+  saveDungeon();
+}
+
 async function saveCampaignOverride() {
   if (!state.campaignSource && !state.oneShotSource) {
-    setStatus("Load a campaign or one-shot dungeon first.");
+    setStatus("Load a main story or one-shot dungeon first.");
     return;
   }
   if (state.oneShotSource) {
@@ -2337,6 +2641,8 @@ function applyGeneratedDungeonLayout(generated) {
   state.corridorPassages = clone(generated.corridorPassages ?? []);
   state.objects = [];
   state.monsters = [];
+  state.storyTriggers = [];
+  state.selectedStoryTriggerId = "";
   state.selectedId = "";
   state.connectFromRoomId = "";
   state.pendingPortalId = "";
@@ -2349,9 +2655,16 @@ function applyGeneratedDungeonLayout(generated) {
 }
 
 function generateRandomLayout() {
-  if (!canRerollRandomLayout()) {
+  const loadedSource = hasLoadedSource();
+  if (!canRerollRandomLayout() && !loadedSource) {
     setStatus("Random Layout is locked once furniture, traps, monsters, or story triggers have been placed. Use New Blank Dungeon first.");
     return;
+  }
+  if (loadedSource) {
+    const confirmed = window.confirm(
+      "Generate a new room layout for this loaded source dungeon?\n\nThis will replace the current rooms, hallways, furniture, traps, monsters, start, exit, and story triggers in the editor. The source link will stay attached so the next Overwrite saves back to the loaded template.",
+    );
+    if (!confirmed) return;
   }
   state.gridSize = Math.max(16, Math.min(72, Number(els.gridSize.value) || state.gridSize || 36));
   state.hallwayWidth = Math.max(1, Math.min(3, Number(els.hallwayWidth?.value) || 1));
@@ -2363,7 +2676,9 @@ function generateRandomLayout() {
   });
   applyGeneratedDungeonLayout(generated);
   els.gridSize.value = String(state.gridSize);
-  setStatus(`Random layout created with ${state.rooms.length} of ${requestedRooms} requested rooms.`);
+  setStatus(loadedSource
+    ? `Generated a new layout for the loaded source with ${state.rooms.length} of ${requestedRooms} requested rooms. Click Overwrite to save it back to that template.`
+    : `Random layout created with ${state.rooms.length} of ${requestedRooms} requested rooms.`);
   renderAll();
 }
 
@@ -2454,7 +2769,7 @@ function init() {
   els.monsterSearch.addEventListener("input", renderMonsterCatalogue);
   [els.monsterCategoryFilter, els.monsterTagFilter, els.monsterSort].forEach((element) => element?.addEventListener("change", renderMonsterCatalogue));
   els.itemSearch?.addEventListener("input", renderItemSelects);
-  [els.itemTypeFilter, els.itemTagFilter, els.itemSort].forEach((element) => element?.addEventListener("change", renderItemSelects));
+  [els.itemTypeFilter, els.itemTagFilter, els.scrollSpellLevelFilter, els.scrollSpellClassFilter, els.itemSort].forEach((element) => element?.addEventListener("change", renderItemSelects));
   els.furnitureCatalogue.addEventListener("click", (event) => {
     const button = event.target.closest("[data-id]");
     if (!button) return;
@@ -2472,6 +2787,13 @@ function init() {
     els.selectedCard.innerHTML = `<b>${monster.name}</b><br>HP ${monster.maxHp ?? "?"} · AC ${monster.ac ?? "?"} · Attack ${monster.attackBonus ?? "?"}<br>${monster.damage?.label ?? ""}<br><span class="small-note">${monster.role ?? ""}</span>`;
   });
   els.monsterCatalogue.addEventListener("click", (event) => {
+    const info = event.target.closest("[data-info-monster]");
+    if (info) {
+      event.preventDefault();
+      event.stopPropagation();
+      showMonsterInfo(info.dataset.infoMonster);
+      return;
+    }
     const button = event.target.closest("[data-id]");
     if (!button) return;
     state.selectedMonsterId = button.dataset.id;
@@ -2479,7 +2801,15 @@ function init() {
     renderAll();
   });
   els.addLoot.addEventListener("click", addLootToSelected);
+  els.inspectLootItem?.addEventListener("click", () => showItemInfo(els.lootItem.value));
   els.customBibliographyItems?.addEventListener("click", (event) => {
+    const info = event.target.closest("[data-info-item]");
+    if (info) {
+      event.preventDefault();
+      event.stopPropagation();
+      showItemInfo(info.dataset.infoItem);
+      return;
+    }
     const button = event.target.closest("[data-custom-bibliography-loot]");
     if (!button) return;
     addLootItemToSelected(button.dataset.customBibliographyLoot);
@@ -2516,11 +2846,32 @@ function init() {
     els.customItemValue.value = String(itemValueCp(template) / 100);
   });
   els.selectedCard.addEventListener("click", (event) => {
+    const itemInfo = event.target.closest("[data-info-item]");
+    if (itemInfo) {
+      event.preventDefault();
+      showItemInfo(itemInfo.dataset.infoItem);
+      return;
+    }
+    const monsterInfo = event.target.closest("[data-info-monster]");
+    if (monsterInfo) {
+      event.preventDefault();
+      showMonsterInfo(monsterInfo.dataset.infoMonster);
+      return;
+    }
     const button = event.target.closest("[data-action]");
     if (!button) return;
     if (button.dataset.action === "move-room") moveSelectedRoom(Number(button.dataset.dx), Number(button.dataset.dy));
     if (button.dataset.action === "move-object") moveSelectedObject(Number(button.dataset.dx), Number(button.dataset.dy));
     if (button.dataset.action === "rotate-object") rotateSelectedObject();
+    const selected = selectedEntity();
+    if (button.dataset.action === "spawner-add-selected-monster" && selected?.type) {
+      updateObjectSpawnerFromCard(selected, "spawnerAddSelectedMonster");
+      renderExport();
+    }
+    if (button.dataset.action === "recruit-use-selected-monster" && selected?.type) {
+      updateObjectRecruitFromCard(selected, "recruitUseSelectedMonster");
+      renderExport();
+    }
   });
   els.selectedCard.addEventListener("input", (event) => {
     const selected = selectedEntity();
@@ -2558,6 +2909,8 @@ function init() {
       if (field === "spotDc") selected.spotDc = Math.max(1, Number(objectInput.value) || 12);
       if (field.startsWith("specialLock")) updateObjectSpecialLockFromCard(selected, field);
       if (field.startsWith("trap")) updateObjectTrapFromCard(selected, field);
+      if (field.startsWith("spawner")) updateObjectSpawnerFromCard(selected, field);
+      if (field.startsWith("recruit")) updateObjectRecruitFromCard(selected, field);
       renderExport();
       return;
     }
@@ -2589,10 +2942,12 @@ function init() {
     if (field === "spotDc") selected.spotDc = Math.max(1, Number(objectInput.value) || 12);
     if (field.startsWith("specialLock")) updateObjectSpecialLockFromCard(selected, field);
     if (field.startsWith("trap")) updateObjectTrapFromCard(selected, field);
+    if (field.startsWith("spawner")) updateObjectSpawnerFromCard(selected, field);
+    if (field.startsWith("recruit")) updateObjectRecruitFromCard(selected, field);
     renderExport();
   });
   els.saveDungeon.addEventListener("click", saveDungeon);
-  els.topSaveDungeon?.addEventListener("click", saveDungeon);
+  els.topSaveDungeon?.addEventListener("click", primarySaveDungeon);
   els.saveCampaignOverride?.addEventListener("click", () => {
     void saveCampaignOverride();
   });
@@ -2663,7 +3018,7 @@ function init() {
         }
         const campaign = window.DungeonCampaigns.get(campaignId);
         loadTemplate(template, { campaignSource: { campaignId, campaignIndex: index, campaignName: campaign?.name ?? campaignId } });
-        setStatus(`Loaded ${campaign?.name ?? campaignId} Dungeon ${index}. Save Campaign Override to replace it in the campaign menu.`);
+        setStatus(`Loaded ${campaign?.name ?? campaignId} Dungeon ${index}. Click Overwrite to replace it in the main story menu.`);
       });
     }
     if (button.dataset.action === "load-original-campaign") {
@@ -2674,7 +3029,7 @@ function init() {
         }
         const campaign = window.DungeonCampaigns.get(campaignId);
         loadTemplate(template, { campaignSource: { campaignId, campaignIndex: index, campaignName: campaign?.name ?? campaignId } });
-        setStatus(`Loaded original JSON for ${campaign?.name ?? campaignId} Dungeon ${index}. Save Campaign Override to replace the edited version.`);
+        setStatus(`Loaded original JSON for ${campaign?.name ?? campaignId} Dungeon ${index}. Click Overwrite to replace the edited version.`);
       });
     }
     if (button.dataset.action === "reset-campaign") {

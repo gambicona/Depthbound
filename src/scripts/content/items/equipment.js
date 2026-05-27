@@ -135,6 +135,61 @@ function simpleConsumable(id, name, description, use = {}) {
   });
 }
 
+function magicPotion(id, name, rarity, cost, description, use) {
+  if (window.DungeonContent.get?.("items", id)) return;
+  window.DungeonContent.register("items", id, {
+    name,
+    type: "consumable",
+    category: "potion",
+    cost,
+    weightLb: 0.5,
+    slots: ["belt1", "belt2", "belt3", "belt4", "belt5"],
+    tags: uniqueTags(["consumable", "potion", "magic", "magic-consumable", `rarity:${rarity}`, id]),
+    magic: { rarity },
+    description,
+    use: {
+      resource: "bonusAction",
+      consume: true,
+      ...use,
+    },
+  });
+}
+
+function statusPotion(id, name, rarity, cost, description, status) {
+  magicPotion(id, name, rarity, cost, description, {
+    kind: "buff",
+    duration: "custom",
+    status,
+  });
+}
+
+function resistancePotion(type, name = null) {
+  const label = name ?? `${type[0].toUpperCase()}${type.slice(1)} Resistance`;
+  statusPotion(
+    `potion-${type}-resistance`,
+    `Potion of ${label}`,
+    "uncommon",
+    gp(300),
+    `Drink this potion to gain resistance to ${type} damage for 1 hour.`,
+    { id: `potion-${type}-resistance`, label: label, resistances: [type], durationHours: 1 },
+  );
+}
+
+function breathPotion(type, saveAbility = "dex", shape = "cone") {
+  const label = `${type[0].toUpperCase()}${type.slice(1)} Breath`;
+  magicPotion(`potion-${type}-breath`, `Potion of ${label}`, "uncommon", gp(150), `Drink this potion to gain three ${type} breath exhalations within 1 hour. Each exhalation is a 15 ft ${shape} for 4d6 ${type} damage, ${saveAbility.toUpperCase()} save for half.`, {
+    kind: "breathPotion",
+    resource: "bonusAction",
+    status: {
+      id: `potion-${type}-breath`,
+      label,
+      durationHours: 1,
+      potionBreath: { type, saveAbility, shape, uses: 3 },
+      conditionDescription: `Three remaining ${type} breath exhalations. Use an action to exhale a 15 ft ${shape}.`,
+    },
+  });
+}
+
 function lightGear(id, name, cost, weightLb, lightSource, description, options = {}) {
   if (window.DungeonContent.get?.("items", id)) return;
   window.DungeonContent.register("items", id, {
@@ -143,6 +198,7 @@ function lightGear(id, name, cost, weightLb, lightSource, description, options =
     category: "light",
     cost,
     weightLb,
+    stackable: Boolean(options.stackable),
     slots: options.slots ?? ["belt1", "belt2", "belt3", "belt4", "belt5"],
     description,
     use: {
@@ -174,6 +230,29 @@ function adventuringSupply(id, name, cost, weightLb, description, options = {}) 
     slots: options.slots ?? ["belt1", "belt2", "belt3", "belt4", "belt5"],
     tags: uniqueTags(["supply", ...(options.tags ?? [])]),
     description,
+  });
+}
+
+function instrument(id, name, cost, weightLb, songs = []) {
+  if (window.DungeonContent.get?.("items", id)) return;
+  const toolId = id.replace(/^instrument-/, "");
+  window.DungeonContent.register("items", id, {
+    name,
+    type: "tool",
+    category: "instrument",
+    cost,
+    weightLb,
+    slots: ["mainHand", "offHand", "belt1", "belt2", "belt3", "belt4", "belt5"],
+    tags: uniqueTags(["tool", "instrument", `proficiency:${toolId}`]),
+    description: `${name} is a musical instrument. A hero proficient with ${name.toLowerCase()} can play prepared pieces from the inventory.`,
+    use: {
+      kind: "instrumentPerformance",
+      resource: "action",
+      consume: false,
+      instrument: toolId,
+      requiredTool: toolId,
+      songs,
+    },
   });
 }
 
@@ -266,11 +345,110 @@ simpleConsumable("sacred-ash", "Sacred Ash", "A pinch of ash from a consecrated 
   status: { id: "sacred-ash", label: "Sacred Ash", acBonus: 1, resistances: ["necrotic"], expiresAtHome: true },
 });
 
+statusPotion("potion-climbing", "Potion of Climbing", "common", gp(75), "Drink this potion to gain a climbing speed-like mobility boost for 1 hour.", {
+  id: "potion-climbing",
+  label: "Climbing",
+  speedBonusFeet: 10,
+  skillBonus: 3,
+  durationHours: 1,
+  conditionDescription: "You climb with ease: +10 ft speed and +3 to mobility or Athletics-style checks for 1 hour.",
+});
+
+statusPotion("potion-water-breathing", "Potion of Water Breathing", "uncommon", gp(150), "Drink this potion to breathe underwater and move through flooded spaces more easily for 1 hour.", {
+  id: "potion-water-breathing",
+  label: "Water Breathing",
+  waterBreathing: true,
+  swimSpeed: true,
+  skillBonus: 2,
+  durationHours: 1,
+  conditionDescription: "You can breathe underwater and handle flooded movement more easily for 1 hour.",
+});
+
+["acid", "cold", "fire", "force", "lightning", "necrotic", "poison", "psychic", "radiant", "thunder"].forEach((type) => resistancePotion(type));
+
+breathPotion("acid", "dex", "line");
+breathPotion("cold", "con", "cone");
+breathPotion("fire", "dex", "cone");
+breathPotion("lightning", "dex", "line");
+breathPotion("poison", "con", "cone");
+breathPotion("force", "dex", "cone");
+breathPotion("necrotic", "dex", "cone");
+breathPotion("psychic", "dex", "cone");
+breathPotion("radiant", "dex", "cone");
+breathPotion("thunder", "dex", "cone");
+
+[
+  ["hill", 21, "uncommon", 500],
+  ["frost", 23, "rare", 900],
+  ["stone", 23, "rare", 900],
+  ["fire", 25, "rare", 1400],
+  ["cloud", 27, "very-rare", 5000],
+  ["storm", 29, "legendary", 25000],
+].forEach(([giant, score, rarity, value]) => {
+  const label = `${giant[0].toUpperCase()}${giant.slice(1)} Giant Strength`;
+  statusPotion(`potion-${giant}-giant-strength`, `Potion of ${label}`, rarity, gp(value), `Drink this potion to set your Strength to ${score} for 1 hour if it is lower.`, {
+    id: `potion-${giant}-giant-strength`,
+    label,
+    abilityScoreMinimums: { str: score },
+    durationHours: 1,
+    conditionDescription: `Your Strength is ${score} for 1 hour unless it is already higher.`,
+  });
+});
+
+statusPotion("potion-giant-strength", "Potion of Giant Strength", "uncommon", gp(500), "Drink this potion to gain hill giant strength: Strength 21 for 1 hour if your Strength is lower.", {
+  id: "potion-giant-strength",
+  label: "Hill Giant Strength",
+  abilityScoreMinimums: { str: 21 },
+  durationHours: 1,
+  conditionDescription: "Your Strength is 21 for 1 hour unless it is already higher.",
+});
+
+statusPotion("potion-speed", "Potion of Speed", "very-rare", gp(5000), "Drink this potion to gain haste-like speed for 1 minute.", {
+  id: "potion-speed",
+  label: "Speed",
+  acBonus: 2,
+  speedMultiplier: 2,
+  attackBonus: 1,
+  durationMinutes: 1,
+  conditionDescription: "Haste-like acceleration: doubled speed, +2 AC, and a small attack edge for 1 minute.",
+});
+
+statusPotion("potion-heroism", "Potion of Heroism", "rare", gp(1000), "Drink this potion to gain 10 temporary HP and a bless-like bonus for 1 hour.", {
+  id: "potion-heroism",
+  label: "Heroism",
+  tempHp: 10,
+  attackBonus: 2,
+  saveBonus: 2,
+  durationHours: 1,
+  conditionDescription: "You gain 10 temporary HP and a bless-like +2 to attacks and saving throws for 1 hour.",
+});
+
+statusPotion("potion-invisibility", "Potion of Invisibility", "very-rare", gp(5000), "Drink this potion to become invisible for 1 hour or until revealed by the dungeon's invisibility rules.", {
+  id: "invisible",
+  label: "Invisible",
+  condition: "invisible",
+  ignoredByMonsters: true,
+  attackAdvantage: true,
+  stealthAdvantage: true,
+  durationHours: 1,
+  conditionDescription: "Invisible for 1 hour; the visibility system treats you as hidden from creatures that cannot see invisibility.",
+});
+
+statusPotion("potion-flying", "Potion of Flying", "very-rare", gp(5000), "Drink this potion to gain flight for 1 hour.", {
+  id: "potion-flying",
+  label: "Flying",
+  flying: true,
+  speedOverrideFeet: 30,
+  durationHours: 1,
+  conditionDescription: "You gain a flying speed for 1 hour and can pass many floor obstacles.",
+});
+
 lightGear("torch", "Torch", cp(1), 1, { brightRadiusFeet: 20, dimRadiusFeet: 40, color: "#ffb35c" }, "A pitch-wrapped torch. It must be held in one hand while lit, sheds bright light for 20 ft and dim light for another 20 ft, and burns for 1 hour.", {
   slots: ["mainHand", "offHand"],
   requiredSlots: ["mainHand", "offHand"],
   durationHours: 1,
   consumeItemOnExpire: true,
+  stackable: true,
 });
 lightGear("hooded-lantern", "Lantern", gp(5), 2, { brightRadiusFeet: 30, dimRadiusFeet: 60, color: "#ffd27a" }, "A lantern with a shuttered hood. It can be held or worn on the belt, sheds bright light for 30 ft and dim light for another 30 ft, and consumes one flask of lantern oil per hour.", {
   slots: ["mainHand", "offHand", "belt1", "belt2", "belt3", "belt4", "belt5"],
@@ -281,6 +459,47 @@ lightGear("hooded-lantern", "Lantern", gp(5), 2, { brightRadiusFeet: 30, dimRadi
 });
 lightGear("bullseye-lantern", "Bullseye Lantern", gp(10), 2, { brightRadiusFeet: 60, dimRadiusFeet: 120, color: "#ffe0a3" }, "A focused lantern. The cone is approximated as a longer light radius in the dungeon view.");
 adventuringSupply("lantern-oil", "Lantern Oil", sp(1), 1, "A flask of lantern oil. A hooded lantern consumes one flask for each hour of light.", { category: "light", tags: ["light", "fuel"] });
+
+instrument("instrument-bagpipes", "Bagpipes", gp(30), 6, [
+  { id: "bagpipes-barley-roar", name: "Barley Roar", src: "assets/sounds/music/instruments/bagpipes-Barley Roar.mp3" },
+  { id: "bagpipes-step-up", name: "Step Up", src: "assets/sounds/music/instruments/bagpipes-Step up.mp3" },
+]);
+instrument("instrument-drum", "Drum", gp(6), 3, [
+  { id: "drum-casket-percussion", name: "Casket Percussion", src: "assets/sounds/music/instruments/drums-Casket Percussion.mp3" },
+  { id: "drum-rhythm-of-the-night", name: "Rhythm of the Night", src: "assets/sounds/music/instruments/drums-Rythm of the Night.mp3" },
+]);
+instrument("instrument-dulcimer", "Dulcimer", gp(25), 10, [
+  { id: "dulcimer-mountain-travel", name: "Mountain Travel", src: "assets/sounds/music/instruments/dulcimer-Mountain Travel.mp3" },
+  { id: "dulcimer-summit", name: "Summit", src: "assets/sounds/music/instruments/dulcimer-Summit.mp3" },
+]);
+instrument("instrument-flute", "Flute", gp(2), 1, [
+  { id: "flute-enchanted-forest", name: "Enchanted Forest", src: "assets/sounds/music/instruments/flute-Enchanted Forest.mp3" },
+  { id: "flute-pinewood-grist", name: "Pinewood Grist", src: "assets/sounds/music/instruments/flute-Pinewood Grist.mp3" },
+]);
+instrument("instrument-lute", "Lute", gp(35), 2, [
+  { id: "lute-caskfire-jigs", name: "Caskfire Jigs", src: "assets/sounds/music/instruments/lute-Caskfire Jigs.mp3" },
+  { id: "lute-slow-dance", name: "Slow Dance", src: "assets/sounds/music/instruments/lute-Slow Dance.mp3" },
+]);
+instrument("instrument-lyre", "Lyre", gp(30), 2, [
+  { id: "lyre-fire-song", name: "Fire Song", src: "assets/sounds/music/instruments/lyre-Fire Song.mp3" },
+  { id: "lyre-nightly-flames", name: "Nightly Flames", src: "assets/sounds/music/instruments/lyre-Nightly Flames.mp3" },
+]);
+instrument("instrument-horn", "Horn", gp(3), 2, [
+  { id: "horn-battle-orchestra", name: "Battle Orchestra", src: "assets/sounds/music/instruments/horn-Battle Orchestra.mp3" },
+  { id: "horn-warband", name: "Warband", src: "assets/sounds/music/instruments/horn-Warband.mp3" },
+]);
+instrument("instrument-pan-flute", "Pan Flute", gp(12), 2, [
+  { id: "pan-flute-get-charmed", name: "Get Charmed", src: "assets/sounds/music/instruments/panflute-Get Charmed.mp3" },
+  { id: "pan-flute-holy-forest", name: "Holy Forest", src: "assets/sounds/music/instruments/panflute-Holy Forest.mp3" },
+]);
+instrument("instrument-shawm", "Shawm", gp(2), 1, [
+  { id: "shawm-i-play-along", name: "I Play Along", src: "assets/sounds/music/instruments/shawm-I play along.mp3" },
+  { id: "shawm-lets-go", name: "Lets Go", src: "assets/sounds/music/instruments/shawm-Lets Go.mp3" },
+]);
+instrument("instrument-viol", "Viol", gp(30), 1, [
+  { id: "viol-velvet-bowglass", name: "Velvet Bowglass", src: "assets/sounds/music/instruments/violin-Velvet Bowglass.mp3" },
+  { id: "viol-velvet-flow", name: "Velvet Flow", src: "assets/sounds/music/instruments/violin-Velvet Flow.mp3" },
+]);
 
 window.DungeonContent.register("equipmentPacks", "standardEquipment", {
   name: "Standard Weapons and Armor",

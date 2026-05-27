@@ -173,14 +173,14 @@ function decor(id, name, livingClass, tags, options = {}) {
   ["squalid-clay-cup-shelf", "Clay Cup Shelf", ["shelf", "clay", "kitchen"], { weight: 35, description: "A crude shelf holding mismatched clay cups and chipped bowls." }],
   ["squalid-ash-bucket", "Ash Bucket", ["hearth", "bucket", "ash"], { weight: 18, description: "A scorched bucket for ash, coal ends, and other unlovely necessities." }],
   ["squalid-splinter-crate-seat", "Splinter Crate Seat", ["seat", "crate", "wood"], { weight: 18, description: "A splintering crate turned upside down and called a chair by optimism." }],
-  ["squalid-rope-line", "Rope Drying Line", ["rope", "laundry", "utility"], { blocksMovement: false, description: "A rope line stretched between hooks for drying damp clothes and wraps." }],
+  ["squalid-rope-line", "Rope Drying Line", ["rope", "laundry", "utility"], { width: 2, blocksMovement: false, description: "A rope line stretched between hooks for drying damp clothes and wraps." }],
   ["squalid-chipped-oil-lamp", "Chipped Oil Lamp", ["lamp", "light", "oil"], { weight: 4, components: [light(3, "#dca85d", 1, "smoky-oil")], description: "A chipped lamp that still gives off a stubborn little light." }],
   ["squalid-burlap-bundle", "Burlap Bundle", ["cloth", "storage", "bundle"], { weight: 25, description: "A tied bundle of burlap and spare rags, lumpy but useful." }],
 ].forEach(([id, name, tags, options]) => decor(id, name, "squalid", tags, options));
 
 [
   ["poor-pine-chair", "Poor Pine Chair", ["seat", "wood", "pine"], { weight: 20, description: "A plain pine chair, sanded enough to be safe and little more." }],
-  ["poor-wool-blanket", "Threadbare Wool Blanket", ["bedding", "cloth", "wool"], { blocksMovement: false, description: "A thin wool blanket that has survived many cold nights." }],
+  ["poor-wool-blanket", "Threadbare Wool Blanket", ["bedding", "cloth", "wool"], { width: 2, blocksMovement: false, description: "A thin wool blanket that has survived many cold nights." }],
   ["poor-small-washstand", "Small Washstand", ["wash", "stand", "wood"], { weight: 55, description: "A small washstand with a cloudy pitcher and a shallow bowl." }],
   ["poor-peg-rack", "Simple Peg Rack", ["rack", "clothing", "wood"], { weight: 25, description: "A row of wooden pegs for cloaks, packs, and the day's worries." }],
   ["poor-candle-box", "Candle Box", ["light", "candle", "box"], { weight: 8, components: [light(3, "#f0c37a", 1, "candle-amber")], description: "A small box with candles and stubs sorted carefully by length." }],
@@ -188,7 +188,7 @@ function decor(id, name, livingClass, tags, options = {}) {
   ["poor-plain-nightstand", "Plain Nightstand", ["table", "bedside", "wood"], { weight: 30, description: "A plain little table just large enough for a cup, a knife, and a candle." }],
   ["poor-clothes-trunk", "Poor Clothes Trunk", ["trunk", "clothing", "storage"], { weight: 70, description: "A battered trunk for clothing and personal scraps." }],
   ["poor-copper-kettle", "Copper Kettle", ["kitchen", "hearth", "copper"], { weight: 8, description: "A dented copper kettle polished where hands grip it most." }],
-  ["poor-reed-screen", "Reed Privacy Screen", ["screen", "privacy", "reed"], { blocksLineOfSight: true, weight: 35, description: "A reed screen that separates sleeping space from the rest of the room." }],
+  ["poor-reed-screen", "Reed Privacy Screen", ["screen", "privacy", "reed"], { width: 2, blocksLineOfSight: true, weight: 35, description: "A reed screen that separates sleeping space from the rest of the room." }],
 ].forEach(([id, name, tags, options]) => decor(id, name, "poor", tags, options));
 
 [
@@ -197,10 +197,10 @@ function decor(id, name, livingClass, tags, options = {}) {
   ["modest-writing-desk", "Modest Writing Desk", ["desk", "writing", "wood"], { width: 2, description: "A useful writing desk with a drawer for ink, wax, and folded notes." }],
   ["modest-linen-chest", "Linen Chest", ["chest", "linen", "storage"], { weight: 85, description: "A clean chest for folded linens and spare blankets." }],
   ["modest-brass-lantern", "Brass Lantern", ["lamp", "light", "brass"], { weight: 10, components: [light(4, "#f2c46d", 2, "lantern-amber")], description: "A brass lantern with polished panes and a steady handle." }],
-  ["modest-wall-shelf", "Modest Wall Shelf", ["shelf", "display", "wood"], { weight: 35, description: "A neat wall shelf for small trophies, tools, and keepsakes." }],
+  ["modest-wall-shelf", "Modest Wall Shelf", ["shelf", "display", "wood"], { width: 2, weight: 35, description: "A neat wall shelf for small trophies, tools, and keepsakes." }],
   ["modest-breakfast-table", "Small Breakfast Table", ["table", "kitchen", "wood"], { width: 2, description: "A small table suited for breakfast, maps, or quiet card games." }],
   ["modest-ceramic-vase", "Ceramic Flower Vase", ["vase", "flowers", "ceramic"], { weight: 18, description: "A glazed vase ready for fresh flowers or dried herbs." }],
-  ["modest-folding-screen", "Modest Folding Screen", ["screen", "privacy", "cloth"], { blocksLineOfSight: true, weight: 55, description: "A folding screen painted with simple geometric panels." }],
+  ["modest-folding-screen", "Modest Folding Screen", ["screen", "privacy", "cloth"], { width: 2, blocksLineOfSight: true, weight: 55, description: "A folding screen painted with simple geometric panels." }],
   ["modest-wool-hanging", "Wool Wall Hanging", ["wall", "cloth", "hanging"], { blocksMovement: false, description: "A wool hanging that adds warmth and muffles echoes." }],
 ].forEach(([id, name, tags, options]) => decor(id, name, "modest", tags, options));
 
@@ -211,10 +211,10 @@ function decor(id, name, livingClass, tags, options = {}) {
   ["comfortable-bedside-cabinet", "Bedside Cabinet", ["cabinet", "bedside", "wood"], { weight: 70, description: "A polished bedside cabinet with a small lock and brass pull." }],
   ["comfortable-reading-lamp", "Reading Lamp", ["lamp", "light", "brass"], { weight: 12, components: [light(4, "#f4d28a", 2, "reading-warm")], description: "A focused lamp with a warm shade, perfect for late-night notes." }],
   ["comfortable-tea-table", "Tea Table", ["table", "tea", "social"], { width: 2, description: "A low table for tea, bread, cards, and quiet conversations." }],
-  ["comfortable-cushion-pile", "Cushion Pile", ["cushion", "cloth", "rest"], { blocksMovement: false, description: "A pile of soft cushions in complementary colors." }],
+  ["comfortable-cushion-pile", "Cushion Pile", ["cushion", "cloth", "rest"], { width: 2, blocksMovement: false, description: "A pile of soft cushions in complementary colors." }],
   ["comfortable-wall-mirror", "Framed Wall Mirror", ["mirror", "wall", "glass"], { weight: 45, description: "A clear mirror in a tasteful frame, useful before formal trouble." }],
   ["comfortable-bookcase", "Comfortable Bookcase", ["books", "shelf", "library"], { weight: 220, description: "A respectable bookcase with practical manuals and a few indulgences." }],
-  ["comfortable-privacy-drape", "Heavy Privacy Drape", ["curtain", "privacy", "cloth"], { blocksMovement: false, blocksLineOfSight: true, description: "A heavy drape that makes a room feel quieter and more personal." }],
+  ["comfortable-privacy-drape", "Heavy Privacy Drape", ["curtain", "privacy", "cloth"], { width: 2, blocksMovement: false, blocksLineOfSight: true, description: "A heavy drape that makes a room feel quieter and more personal." }],
 ].forEach(([id, name, tags, options]) => decor(id, name, "comfortable", tags, options));
 
 [
@@ -238,7 +238,26 @@ function decor(id, name, livingClass, tags, options = {}) {
   ["aristocratic-silk-wall-panels", "Silk Wall Panels", ["wall", "silk", "panel"], { width: 2, blocksMovement: false, description: "Silk wall panels that make even dungeon stone look deliberate." }],
   ["aristocratic-marble-statue", "Marble Hero Statue", ["statue", "marble", "art"], { weight: 4000, description: "A marble statue of a heroic figure with tasteful exaggerations." }],
   ["aristocratic-jeweled-lamp", "Jeweled Oil Lamp", ["lamp", "jewel", "light"], { weight: 25, components: [light(4, "#ffd1f0", 2, "jeweled-rose")], description: "A jeweled lamp whose fittings cost more than many horses." }],
-  ["aristocratic-grand-piano", "Grand Piano", ["instrument", "music", "luxury"], { width: 2, description: "A grand piano with dark polish and a voice fit for noble halls." }],
+  [
+    "aristocratic-grand-piano",
+    "Grand Piano",
+    ["instrument", "music", "luxury"],
+    {
+      width: 2,
+      description: "A grand piano with dark polish and a voice fit for noble halls.",
+      components: [
+        {
+          type: "playableInstrument",
+          instrument: "piano",
+          requiredTool: "piano",
+          songs: [
+            { id: "piano-ivory-taxonomy", name: "Ivory Taxonomy", src: "assets/sounds/music/instruments/piano-Ivory Taxonomy.mp3" },
+            { id: "piano-rest", name: "Rest", src: "assets/sounds/music/instruments/piano-Rest.mp3" },
+          ],
+        },
+      ],
+    },
+  ],
   ["aristocratic-velvet-throne", "Velvet Throne Chair", ["seat", "throne", "velvet"], { weight: 120, description: "A throne-like chair for someone with either authority or excellent posture." }],
   ["aristocratic-fountain-basin", "Indoor Fountain Basin", ["fountain", "water", "marble"], { width: 2, description: "A marble basin with a quiet fountain, extravagant and soothing." }],
 ].forEach(([id, name, tags, options]) => decor(id, name, "aristocratic", tags, options));

@@ -81,12 +81,14 @@ function registerMagicWeapon(id, baseItemId, name, rarity, priceGp, magic = {}) 
   const attackBonus = magic.attackBonus ?? magic.enhancementBonus ?? 0;
   const damageBonus = magic.damageBonus ?? magic.enhancementBonus ?? 0;
   const extraDamage = Array.isArray(magic.extraDamage) ? magic.extraDamage : magic.extraDamage ? [magic.extraDamage] : [];
+  const attunementFields = magic.requiresAttunement == null ? {} : { requiresAttunement: Boolean(magic.requiresAttunement) };
 
   window.DungeonContent.register("items", id, {
     ...base,
     name,
     type: "weapon",
     cost: gp(priceGp),
+    ...attunementFields,
     baseEquipmentId: baseItemId,
     tags: uniqueTags([
       ...(base.tags ?? []),
@@ -120,6 +122,7 @@ function registerMagicWeapon(id, baseItemId, name, rarity, priceGp, magic = {}) 
       attackBonus,
       damageBonus,
       extraDamage,
+      ...attunementFields,
       resistances: magic.resistances ?? [],
       vulnerabilities: magic.vulnerabilities ?? [],
       properties: magic.properties ?? [],
@@ -136,12 +139,14 @@ function registerMagicArmor(id, baseItemId, name, rarity, priceGp, magic = {}) {
   const acBonus = magic.acBonus ?? magic.enhancementBonus ?? 0;
   const resistances = magic.resistances ?? [];
   const vulnerabilities = magic.vulnerabilities ?? [];
+  const attunementFields = magic.requiresAttunement == null ? {} : { requiresAttunement: Boolean(magic.requiresAttunement) };
 
   window.DungeonContent.register("items", id, {
     ...base,
     name,
     type: "armor",
     cost: gp(priceGp),
+    ...attunementFields,
     armor: boostedArmor(base.armor, acBonus),
     baseEquipmentId: baseItemId,
     tags: uniqueTags([
@@ -175,6 +180,7 @@ function registerMagicArmor(id, baseItemId, name, rarity, priceGp, magic = {}) {
       kind: "armor",
       rarity,
       priceGp,
+      ...attunementFields,
       acBonusAppliedToArmor: acBonus,
       resistances,
       vulnerabilities,
@@ -210,6 +216,7 @@ registerMagicWeapon("magic-longbow-plus-2", "longbow", "Longbow +2", "rare", 850
 registerMagicWeapon("magic-warhammer-plus-1", "warhammer", "Warhammer +1", "uncommon", 850, { enhancementBonus: 1 });
 registerMagicWeapon("magic-warhammer-plus-2", "warhammer", "Warhammer +2", "rare", 6500, { enhancementBonus: 2 });
 registerMagicWeapon("magic-embervein-claim-hammer", "warhammer", "Embervein Claim Hammer", "uncommon", 500, {
+  requiresAttunement: true,
   attackBonus: 1,
   damageBonus: 0,
   extraDamage: d4("fire"),
@@ -221,21 +228,25 @@ registerMagicWeapon("magic-embervein-claim-hammer", "warhammer", "Embervein Clai
 
 // Magic weapons: elemental and themed weapons.
 registerMagicWeapon("magic-acid-dagger", "dagger", "Acid Dagger", "uncommon", 850, {
+  requiresAttunement: true,
   extraDamage: d4("acid"),
   description: "Deals its normal dagger damage plus 1d4 acid damage.",
 });
 
 registerMagicWeapon("magic-ember-dagger", "dagger", "Ember Dagger", "uncommon", 850, {
+  requiresAttunement: true,
   extraDamage: d4("fire"),
   description: "Deals its normal dagger damage plus 1d4 fire damage.",
 });
 
 registerMagicWeapon("magic-frost-knife", "dagger", "Frost Knife", "uncommon", 850, {
+  requiresAttunement: true,
   extraDamage: d4("cold"),
   description: "Deals its normal dagger damage plus 1d4 cold damage.",
 });
 
 registerMagicWeapon("magic-venom-rapier", "rapier", "Venom Rapier", "rare", 6500, {
+  requiresAttunement: true,
   attackBonus: 1,
   damageBonus: 1,
   extraDamage: d6("poison"),
@@ -243,6 +254,7 @@ registerMagicWeapon("magic-venom-rapier", "rapier", "Venom Rapier", "rare", 6500
 });
 
 registerMagicWeapon("magic-thunder-maul", "maul", "Thunder Maul", "rare", 7000, {
+  requiresAttunement: true,
   attackBonus: 1,
   damageBonus: 1,
   extraDamage: d6("thunder"),
@@ -250,6 +262,7 @@ registerMagicWeapon("magic-thunder-maul", "maul", "Thunder Maul", "rare", 7000, 
 });
 
 registerMagicWeapon("magic-sunspark-mace", "mace", "Sunspark Mace", "rare", 6200, {
+  requiresAttunement: true,
   attackBonus: 1,
   damageBonus: 1,
   extraDamage: d6("radiant"),
@@ -257,6 +270,7 @@ registerMagicWeapon("magic-sunspark-mace", "mace", "Sunspark Mace", "rare", 6200
 });
 
 registerMagicWeapon("magic-gravecold-battleaxe", "battleaxe", "Gravecold Battleaxe", "rare", 7000, {
+  requiresAttunement: true,
   attackBonus: 1,
   damageBonus: 1,
   extraDamage: d6("cold"),
@@ -264,6 +278,7 @@ registerMagicWeapon("magic-gravecold-battleaxe", "battleaxe", "Gravecold Battlea
 });
 
 registerMagicWeapon("magic-stormstring-longbow", "longbow", "Stormstring Longbow", "rare", 8000, {
+  requiresAttunement: true,
   attackBonus: 1,
   damageBonus: 1,
   extraDamage: d6("lightning"),
@@ -271,6 +286,7 @@ registerMagicWeapon("magic-stormstring-longbow", "longbow", "Stormstring Longbow
 });
 
 registerMagicWeapon("magic-coalsoul-greatsword", "greatsword", "Coalsoul Greatsword", "rare", 9500, {
+  requiresAttunement: true,
   attackBonus: 1,
   damageBonus: 1,
   extraDamage: twoD6("fire"),
@@ -278,6 +294,7 @@ registerMagicWeapon("magic-coalsoul-greatsword", "greatsword", "Coalsoul Greatsw
 });
 
 registerMagicWeapon("magic-voidglass-shortsword", "shortsword", "Voidglass Shortsword", "rare", 6800, {
+  requiresAttunement: true,
   attackBonus: 1,
   damageBonus: 1,
   extraDamage: d6("necrotic"),
@@ -285,6 +302,7 @@ registerMagicWeapon("magic-voidglass-shortsword", "shortsword", "Voidglass Short
 });
 
 registerMagicWeapon("magic-forcebreaker-pike", "pike", "Forcebreaker Pike", "very rare", 32000, {
+  requiresAttunement: true,
   attackBonus: 2,
   damageBonus: 2,
   extraDamage: d8("force"),
@@ -292,6 +310,7 @@ registerMagicWeapon("magic-forcebreaker-pike", "pike", "Forcebreaker Pike", "ver
 });
 
 registerMagicWeapon("magic-dragonfang-greatsword", "greatsword", "Dragonfang Greatsword", "very rare", 45000, {
+  requiresAttunement: true,
   attackBonus: 2,
   damageBonus: 2,
   extraDamage: twoD6("fire"),
@@ -299,6 +318,7 @@ registerMagicWeapon("magic-dragonfang-greatsword", "greatsword", "Dragonfang Gre
 });
 
 registerMagicWeapon("magic-starfall-halberd", "halberd", "Starfall Halberd", "legendary", 180000, {
+  requiresAttunement: true,
   attackBonus: 3,
   damageBonus: 3,
   extraDamage: d8("radiant"),
@@ -307,6 +327,7 @@ registerMagicWeapon("magic-starfall-halberd", "halberd", "Starfall Halberd", "le
 
 // Cursed weapons.
 registerMagicWeapon("magic-hungering-sickle", "sickle", "Hungering Sickle", "uncommon", 650, {
+  requiresAttunement: true,
   attackBonus: 1,
   damageBonus: 1,
   extraDamage: d4("necrotic"),
@@ -319,6 +340,7 @@ registerMagicWeapon("magic-hungering-sickle", "sickle", "Hungering Sickle", "unc
 });
 
 registerMagicWeapon("magic-glass-edge-scimitar", "scimitar", "Glass-Edge Scimitar", "rare", 4200, {
+  requiresAttunement: true,
   attackBonus: 2,
   damageBonus: 2,
   vulnerabilities: ["bludgeoning"],
@@ -349,37 +371,44 @@ registerMagicArmor("magic-shield-plus-3", "shield", "Shield +3", "very rare", 38
 // Resistance armor.
 // These are metadata for now until your later combat hook reads magic.resistances.
 registerMagicArmor("magic-leather-of-acid-resistance", "leather", "Leather Armor of Acid Resistance", "rare", 7500, {
+  requiresAttunement: true,
   resistances: ["acid"],
   description: "Light armor that grants resistance to acid damage.",
 });
 
 registerMagicArmor("magic-studded-leather-of-fire-resistance", "studded-leather", "Studded Leather of Fire Resistance", "rare", 9000, {
+  requiresAttunement: true,
   resistances: ["fire"],
   description: "Light armor that grants resistance to fire damage.",
 });
 
 registerMagicArmor("magic-chain-mail-of-cold-resistance", "chain-mail", "Chain Mail of Cold Resistance", "rare", 8500, {
+  requiresAttunement: true,
   resistances: ["cold"],
   description: "Heavy armor that grants resistance to cold damage.",
 });
 
 registerMagicArmor("magic-breastplate-of-lightning-resistance", "breastplate", "Breastplate of Lightning Resistance", "rare", 8500, {
+  requiresAttunement: true,
   resistances: ["lightning"],
   description: "Medium armor that grants resistance to lightning damage.",
 });
 
 registerMagicArmor("magic-plate-of-necrotic-resistance", "plate", "Plate Armor of Necrotic Resistance", "very rare", 35000, {
+  requiresAttunement: true,
   resistances: ["necrotic"],
   description: "Heavy armor that grants resistance to necrotic damage.",
 });
 
 registerMagicArmor("magic-shield-of-force-resistance", "shield", "Shield of Force Resistance", "very rare", 32000, {
+  requiresAttunement: true,
   resistances: ["force"],
   description: "A shield that grants resistance to force damage.",
 });
 
 // Cursed armor with upside and downside.
 registerMagicArmor("magic-frostfire-mail", "chain-mail", "Frostfire Mail", "rare", 6000, {
+  requiresAttunement: true,
   resistances: ["cold", "fire"],
   vulnerabilities: ["slashing"],
   curse: {
@@ -390,6 +419,7 @@ registerMagicArmor("magic-frostfire-mail", "chain-mail", "Frostfire Mail", "rare
 });
 
 registerMagicArmor("magic-stonehide-breastplate", "breastplate", "Stonehide Breastplate", "rare", 6500, {
+  requiresAttunement: true,
   acBonus: 1,
   resistances: ["bludgeoning"],
   vulnerabilities: ["lightning"],
@@ -401,6 +431,7 @@ registerMagicArmor("magic-stonehide-breastplate", "breastplate", "Stonehide Brea
 });
 
 registerMagicArmor("magic-needle-shield", "shield", "Needle Shield", "uncommon", 900, {
+  requiresAttunement: true,
   resistances: ["piercing"],
   vulnerabilities: ["fire"],
   curse: {
@@ -411,6 +442,7 @@ registerMagicArmor("magic-needle-shield", "shield", "Needle Shield", "uncommon",
 });
 
 registerMagicArmor("magic-sable-plate", "plate", "Sable Plate", "very rare", 30000, {
+  requiresAttunement: true,
   acBonus: 1,
   resistances: ["necrotic", "cold"],
   vulnerabilities: ["radiant"],

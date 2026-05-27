@@ -549,6 +549,20 @@
         resize: vertical;
       }
 
+      .creator-form select option,
+      .creator-section select option,
+      .creator-disclosure select option {
+        background: #1a1518;
+        color: #fff6e8;
+      }
+
+      .creator-form select option:checked,
+      .creator-section select option:checked,
+      .creator-disclosure select option:checked {
+        background: #36536f;
+        color: #ffffff;
+      }
+
       .creator-row {
         display: grid;
         gap: 8px;
@@ -688,6 +702,114 @@
         border: 1px solid var(--line);
         border-radius: 6px;
         padding: 10px;
+      }
+
+      .creator-inline-list {
+        display: grid;
+        gap: 5px;
+        margin: 6px 0;
+      }
+
+      .creator-inline-entry {
+        align-items: center;
+        display: flex;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .creator-inline-entry span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .creator-catalogue-entry {
+        align-items: stretch;
+        display: grid;
+        gap: 6px;
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+
+      .creator-catalogue-entry > .creator-info-button {
+        align-self: center;
+      }
+
+      .creator-info-button {
+        align-items: center;
+        border-radius: 999px;
+        display: inline-flex;
+        flex: 0 0 auto;
+        font-size: 0.7rem;
+        font-weight: 900;
+        height: 20px;
+        justify-content: center;
+        min-height: 20px;
+        min-width: 20px;
+        padding: 0;
+        width: 20px;
+      }
+
+      .creator-info-modal {
+        align-items: center;
+        background: rgba(0, 0, 0, 0.62);
+        display: flex;
+        inset: 0;
+        justify-content: center;
+        padding: 20px;
+        position: fixed;
+        z-index: 50;
+      }
+
+      .creator-info-modal.hidden {
+        display: none;
+      }
+
+      .creator-info-panel {
+        background: color-mix(in srgb, var(--panel) 94%, #000 6%);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
+        color: var(--text);
+        display: grid;
+        gap: 10px;
+        max-height: min(82vh, 720px);
+        max-width: min(680px, 96vw);
+        overflow: auto;
+        padding: 14px;
+        width: 100%;
+      }
+
+      .creator-info-panel header {
+        align-items: start;
+        border-bottom: 1px solid var(--line);
+        display: grid;
+        gap: 8px;
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding-bottom: 8px;
+      }
+
+      .creator-info-panel h3 {
+        font-size: 1rem;
+        margin: 0;
+      }
+
+      .creator-info-panel dl {
+        display: grid;
+        gap: 6px 10px;
+        grid-template-columns: max-content minmax(0, 1fr);
+        margin: 0;
+      }
+
+      .creator-info-panel dt {
+        color: var(--muted);
+        font-weight: 900;
+      }
+
+      .creator-info-panel dd {
+        margin: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
       }
 
       .small-note {
@@ -1060,14 +1182,14 @@
               <div id="saved-dungeons" class="creator-list"></div>
               <div id="one-shot-dungeons" class="creator-list"></div>
               <div id="campaign-dungeons" class="creator-list"></div>
-              <button id="save-dungeon" type="button">Save Dungeon For Game</button>
+              <button id="save-dungeon" type="button">Save Copy For Home Door</button>
               <button id="calc-xp" type="button" class="ghost-button">Calc XP</button>
               <p id="creator-status" class="creator-status"></p>
             </section>
 
             <section class="creator-section">
               <h2>Source Override</h2>
-              <button id="save-campaign-override" type="button" class="ghost-button" disabled>Save Campaign Override</button>
+              <button id="save-campaign-override" type="button" class="ghost-button" disabled>Overwrite Loaded Source</button>
             </section>
 
             <section class="creator-section">
@@ -1200,6 +1322,14 @@
                   <select id="item-tag-filter"></select>
                 </label>
                 <label>
+                  Scroll level
+                  <select id="scroll-spell-level-filter"></select>
+                </label>
+                <label>
+                  Scroll class
+                  <select id="scroll-spell-class-filter"></select>
+                </label>
+                <label>
                   Sort
                   <select id="item-sort">
                     <option value="name">Name</option>
@@ -1214,6 +1344,7 @@
                 Add loot item
                 <select id="loot-item"></select>
               </label>
+              <button id="inspect-loot-item" type="button" class="creator-info-button" title="Inspect selected loot item" aria-label="Inspect selected loot item">i</button>
               <div id="custom-bibliography-items" class="catalogue custom-bibliography-items"></div>
               <button id="add-loot" type="button">Add Loot To Selected</button>
               <button id="delete-selected" class="ghost-button" type="button">Delete Selected</button>
@@ -1239,6 +1370,7 @@
               <div class="creator-row">
                 <button id="create-custom-item" type="button">Create Local Item</button>
                 <a class="ghost-button" href="custom-item-creator.html">Open Custom Item Creator</a>
+                <a class="ghost-button" href="recruit-creator.html">Open Recruit Creator</a>
               </div>
             </div>
           </section>
@@ -1287,6 +1419,7 @@
     <script src="src/scripts/content/monsters/elemental-air-pack.js" defer></script>
     <script src="src/scripts/content/monsters/elemental-earth-pack.js" defer></script>
     <script src="src/scripts/content/monsters/elemental-water-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/summons-pack.js" defer></script>
     <script src="src/scripts/content/monsters/forest-beast-pack.js" defer></script>
     <script src="src/scripts/content/monsters/beast-biome-pack.js" defer></script>
     <script src="src/scripts/content/monsters/beast-biome-high-tier-pack.js" defer></script>

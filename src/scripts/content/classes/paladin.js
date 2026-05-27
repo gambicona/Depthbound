@@ -22,7 +22,7 @@ window.DungeonContent.register("classes", "paladin", {
   weaponProficiencies: ["simple", "martial"],
   spellcastingAbility: "cha",
   spellPointProgression: halfCasterSpellPoints,
-  spellList: ["bless", "cure_wounds", "divine_favor", "shield_of_faith", "compelled_duel", "command", "heroism", "thunderous_smite", "wrathful_smite", "searing-smite", "aid", "branding_smite", "find-steed", "lesser-restoration", "magic-weapon", "protection-from-poison", "remove-curse", "daylight", "aura-of-vitality", "blinding-smite", "crusaders-mantle", "elemental-weapon", "revivify", "aura-of-life", "aura-of-purity", "banishment", "death-ward", "staggering-smite", "banishing-smite", "circle-of-power", "destructive-wave", "dispel-evil-and-good", "raise-dead", "dispel_magic"],
+  spellList: ["bless", "cure_wounds", "divine_favor", "shield_of_faith", "compelled_duel", "command", "heroism", "thunderous_smite", "wrathful_smite", "searing-smite", "aid", "branding_smite", "find-steed", "lesser-restoration", "magic-weapon", "protection-from-poison", "remove-curse", "daylight", "aura-of-vitality", "blinding-smite", "crusaders-mantle", "elemental-weapon", "revivify", "aura-of-life", "aura-of-purity", "banishment", "death-ward", "find-greater-steed", "staggering-smite", "banishing-smite", "circle-of-power", "destructive-wave", "dispel-evil-and-good", "raise-dead", "dispel_magic"],
   spells: [],
   token: "P",
   classFeatures: [

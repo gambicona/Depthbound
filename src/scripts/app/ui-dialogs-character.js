@@ -514,13 +514,14 @@ function showTwoChoiceDialog({ title, message, primaryText, secondaryText, progr
   });
 }
 
-function showHeroIdentityDialog({ title, message, nameValue, tokenArt = "", confirmText = "OK", cancelText = "Cancel", progress = null }) {
+function showHeroIdentityDialog({ title, message, nameValue, tokenArt = "", confirmText = "OK", cancelText = "Cancel", backText = "", progress = null }) {
   return new Promise((resolve) => {
     els.gameDialogTitle.textContent = title;
     els.gameDialogMessage.innerHTML = dialogPlainMessageMarkup(message, progress);
     els.gameDialogField.classList.remove("hidden");
     els.gameDialogActions.innerHTML = `
       <button type="submit" data-dialog-action="confirm">${escapeHtml(confirmText)}</button>
+      ${backText ? `<button type="button" class="ghost-button" data-dialog-action="back">${escapeHtml(backText)}</button>` : ""}
       <button type="button" class="ghost-button" data-dialog-action="cancel">${escapeHtml(cancelText)}</button>
     `;
 
@@ -546,6 +547,9 @@ function showHeroIdentityDialog({ title, message, nameValue, tokenArt = "", conf
 
     const renderField = () => {
       const options = heroTokenArtOptions();
+      if (tokenArt && !tokenArt?.type && !options.some((option) => option.value === tokenArt)) {
+        options.splice(1, 0, { label: "Default picture", value: tokenArt, custom: false });
+      }
       const names = suggestedNames();
       if (!options.some((option) => option.value === selectedValue)) selectedValue = noHeroTokenArtValue;
       const resolvedArt = resolveHeroTokenArtSelection(selectedValue);
@@ -692,8 +696,9 @@ function showHeroIdentityDialog({ title, message, nameValue, tokenArt = "", conf
 
     const handleActionClick = (event) => {
       const button = event.target.closest("[data-dialog-action]");
-      if (!button || button.dataset.dialogAction !== "cancel") return;
-      cleanup(null);
+      if (!button) return;
+      if (button.dataset.dialogAction === "cancel") cleanup(null);
+      if (button.dataset.dialogAction === "back") cleanup(dialogBackValue);
     };
 
     const handleFieldChange = (event) => {
@@ -832,6 +837,8 @@ function showChoiceDialog({ title, message, choices, actor = null, progress = nu
       .map(
         (choice) =>
           `<button type="button" class="${choice.value === dialogBackValue ? "ghost-button" : ""} ${choice.description || choice.info ? "choice-with-description" : ""}" data-choice="${escapeAttribute(choice.value)}" ${
+            choice.disabled ? "disabled" : ""
+          } ${
             choice.description ? `title="${escapeAttribute(choice.description)}"` : ""
           }>
             <b>${escapeHtml(choice.label)}${choice.info ? ` <span class="choice-info-glyph" title="${escapeAttribute(choice.info)}" aria-label="More information">i</span>` : ""}</b>
@@ -850,14 +857,14 @@ function showChoiceDialog({ title, message, choices, actor = null, progress = nu
 
     const handleClick = (event) => {
       const button = event.target.closest("[data-choice]");
-      if (!button) return;
+      if (!button || button.disabled) return;
       cleanup(button.dataset.choice);
     };
 
     els.gameDialogActions.addEventListener("click", handleClick);
     activeDialogCancel = () => cleanup(null);
     els.gameDialog.classList.remove("hidden");
-    els.gameDialogActions.querySelector("[data-choice]")?.focus();
+    els.gameDialogActions.querySelector("[data-choice]:not(:disabled)")?.focus();
   });
 }
 
@@ -1436,8 +1443,13 @@ const baseStartingGearWeaponIds = new Set([
 ]);
 
 function startingGearItemPool(pool) {
-  return window.DungeonContent
-    .list("items")
+  const items = window.DungeonContent.list("items");
+  if (pool === "musicalInstruments") {
+    return items
+      .filter((item) => item.type === "tool" && item.category === "instrument")
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  return items
     .filter((item) => item.type === "weapon")
     .filter((item) => baseStartingGearWeaponIds.has(item.id))
     .filter((item) => {
@@ -3076,6 +3088,7 @@ async function chooseDungeonSizeChoice(themeId) {
 }
 
 async function startDungeonChoiceWithHero(choice) {
+  normalizeActivePartyOwnerBindings();
   const partyIds = state.party?.heroIds ?? ["hero"];
   const partyMembers = partyIds.map((id) => state.fighters[id]).filter((hero) => hero && !hero.dead);
   if (partyMembers.length === 0) {

@@ -602,6 +602,8 @@ function createCustomDungeonObject(templateObject, index) {
     ...(specialLock ? { specialLock } : {}),
     ...(!specialLock && lockDc ? { lockDc } : {}),
     ...(typeof locked === "boolean" ? { locked } : {}),
+    ...(templateObject.spawner ? { spawner: cloneData(templateObject.spawner) } : {}),
+    ...(templateObject.recruit ? { recruit: cloneData(templateObject.recruit) } : {}),
     items: itemInstancesFromIds(templateObject.items ?? [], "object"),
   };
 }
@@ -772,6 +774,237 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
 
 function createCustomDungeonStateForParty(partyMembers, previousState, customDungeonId) {
   return createCustomDungeonStateFromTemplate(partyMembers, previousState, window.DungeonCustom?.get(customDungeonId));
+}
+
+function roomForDungeonPosition(position, dungeon = state?.dungeon) {
+  return (dungeon?.rooms ?? []).find((room) => roomHasCell(room, position)) ?? null;
+}
+
+function dungeonRecruitParseOverrides(config = {}) {
+  if (config.overrides && typeof config.overrides === "object") return cloneData(config.overrides);
+  if (!config.overridesText) return {};
+  try {
+    const parsed = JSON.parse(config.overridesText);
+    if (parsed?.overrides && typeof parsed.overrides === "object") return cloneData(parsed.overrides);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function dungeonRecruitParseFullConfig(config = {}) {
+  if (!config.overridesText) return {};
+  try {
+    const parsed = JSON.parse(config.overridesText);
+    return parsed?.kind === "hero" && parsed?.overrides && typeof parsed.overrides === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function dungeonSpawnBlockedKeys() {
+  return new Set([
+    ...blockingObjectKeys(),
+    ...Object.values(state?.fighters ?? {})
+      .filter((fighter) => fighter.alive)
+      .flatMap((fighter) => window.DungeonGrid.fighterCells(fighter).map(positionKey)),
+  ]);
+}
+
+function nearestDungeonSpawnPosition(originObject, footprintSource = null) {
+  const room = roomForDungeonPosition(originObject?.position);
+  const blockedKeys = dungeonSpawnBlockedKeys();
+  const floorKeys = spawnFloorKeysForDungeon();
+  const startCells = objectCells(originObject);
+  const queue = startCells.flatMap((cell) => adjacentCells(cell));
+  const visited = new Set(startCells.map(positionKey));
+  while (queue.length) {
+    const position = queue.shift();
+    const key = positionKey(position);
+    if (visited.has(key)) continue;
+    visited.add(key);
+    const fits = window.DungeonGrid.fighterCells(footprintSource ?? {}, position).every((cell) =>
+      window.DungeonGrid.isInsideGrid(cell, currentGridSize()) &&
+        floorKeys.has(positionKey(cell)) &&
+        (!room || roomHasCell(room, cell)) &&
+        !blockedKeys.has(positionKey(cell)),
+    );
+    if (fits) return position;
+    adjacentCells(position)
+      .filter((cell) => !visited.has(positionKey(cell)) && window.DungeonGrid.isInsideGrid(cell, currentGridSize()))
+      .forEach((cell) => queue.push(cell));
+  }
+  if (room) {
+    const roomPosition = safeRoomSpawnCell(room, originObject.position, blockedKeys, currentGridSize(), floorKeys, footprintSource);
+    if (roomPosition) return roomPosition;
+  }
+  return null;
+}
+
+function addRuntimeFighterToDungeon(fighter) {
+  if (!fighter?.id) return false;
+  state.fighters[fighter.id] = fighter;
+  if (state.mode === "combat" && typeof addMonsterToInitiative === "function") addMonsterToInitiative(fighter);
+  return true;
+}
+
+function spawnMonsterFromContinuousSpawner(object, monsterId) {
+  const template = getMonsterTemplate(monsterId);
+  if (!template) return null;
+  const position = nearestDungeonSpawnPosition(object, template);
+  if (!position) return null;
+  const monster = createCombatant({
+    ...template,
+    id: `spawner-${object.id}-${monsterId}-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+    name: template.name,
+    position,
+  });
+  applyMonsterCategoryScaling(monster, activeHero());
+  monster.baseMonsterId = template.id;
+  monster.templateId = template.id;
+  monster.spawnedBySpawnerId = object.id;
+  monster.roomId = roomForDungeonPosition(position)?.id ?? roomForDungeonPosition(object.position)?.id ?? "spawner";
+  addRuntimeFighterToDungeon(monster);
+  return monster;
+}
+
+function processContinuousSpawnerObject(object, nowSeconds) {
+  if (!object?.spawner || object.spent) return 0;
+  const room = roomForDungeonPosition(object.position);
+  const roomRevealed = dungeonRoomRevealed(room);
+  if (!roomRevealed) return 0;
+  const config = object.spawner;
+  if (!config.startedAtSeconds) {
+    config.startedAtSeconds = nowSeconds;
+    config.lastSpawnAtSeconds = nowSeconds;
+    return 0;
+  }
+  const monsterIds = (Array.isArray(config.monsterIds) ? config.monsterIds : String(config.monsterIds ?? "").split(/[,;\n]/))
+    .map((entry) => String(entry).trim())
+    .filter((monsterId) => getMonsterTemplate(monsterId));
+  if (!monsterIds.length) return 0;
+  const interval = Math.max(6, Math.floor(Number(config.intervalSeconds) || 60));
+  const count = Math.max(1, Math.floor(Number(config.count) || 1));
+  const maxAlive = Math.max(1, Math.floor(Number(config.maxAlive) || 8));
+  const lastSpawnAt = Number(config.lastSpawnAtSeconds ?? 0) || 0;
+  if (nowSeconds - lastSpawnAt < interval) return 0;
+  const livingFromSpawner = Object.values(state.fighters ?? {}).filter((fighter) => fighter.spawnedBySpawnerId === object.id && fighter.alive && !fighter.dead).length;
+  let remaining = Math.max(0, maxAlive - livingFromSpawner);
+  if (remaining <= 0) {
+    config.lastSpawnAtSeconds = nowSeconds;
+    return 0;
+  }
+  const batches = Math.min(10, Math.floor((nowSeconds - lastSpawnAt) / interval));
+  let spawned = 0;
+  for (let batch = 0; batch < batches && remaining > 0; batch += 1) {
+    for (let index = 0; index < count && remaining > 0; index += 1) {
+      const monsterId = monsterIds[(batch + index + Math.floor(Math.random() * monsterIds.length)) % monsterIds.length];
+      if (spawnMonsterFromContinuousSpawner(object, monsterId)) {
+        spawned += 1;
+        remaining -= 1;
+      }
+    }
+  }
+  config.lastSpawnAtSeconds = lastSpawnAt + batches * interval;
+  if (spawned) addLog(`${spawned} creature${spawned === 1 ? "" : "s"} emerge nearby.`, "important");
+  return spawned;
+}
+
+function dungeonRoomRevealed(room) {
+  if (showDungeonLayout || !room) return true;
+  if ((state.exploration?.discoveredRoomIds ?? []).includes(room.id)) return true;
+  return (state.party?.heroIds ?? []).some((id) => {
+    const hero = state.fighters?.[id];
+    return hero?.alive && roomHasCell(room, hero.position);
+  });
+}
+
+function createDungeonRecruitHero(object, config, position) {
+  const fullConfig = dungeonRecruitParseFullConfig(config);
+  const classId = fullConfig.classId || config.classId || defaultContent.heroClass;
+  const template = getHeroTemplate(classId);
+  const overrides = fullConfig.overrides ? cloneData(fullConfig.overrides) : dungeonRecruitParseOverrides(config);
+  const level = Math.max(1, Math.min(20, Math.floor(Number(fullConfig.level ?? config.level ?? overrides.level ?? 1) || 1)));
+  const baseMaxHp = overrides.baseMaxHp ?? overrides.maxHp ?? Math.max(template.baseMaxHp ?? template.maxHp ?? 8, (template.baseMaxHp ?? template.maxHp ?? 8) + (level - 1) * 6);
+  const hero = createCombatant({
+    ...template,
+    ...overrides,
+    id: overrides.id ?? `recruit-hero-${object.id}-${Date.now()}`,
+    name: fullConfig.name || config.name || overrides.name || template.name || "New Hero",
+    classId,
+    className: template.className ?? template.name,
+    level,
+    baseMaxHp,
+    maxHp: baseMaxHp,
+    hp: baseMaxHp,
+    tokenArt: fullConfig.tokenArt || config.tokenArt || overrides.tokenArt || template.tokenArt,
+    position,
+    partyMemberKind: "hero",
+    dungeonRecruit: true,
+    dungeonRecruitWaiting: true,
+    team: "heroes",
+    friendly: true,
+  });
+  hero.token = tokenFromName(hero.name, hero.token);
+  hero.partyRole = hero.partyRole ?? defaultPartyRoleForHero(hero);
+  return hero;
+}
+
+function spawnRecruitMarkerObject(object) {
+  if (!object?.recruit || object.recruited || object.spent || object.recruitSpawnedId) return false;
+  const room = roomForDungeonPosition(object.position);
+  if (!dungeonRoomRevealed(room)) return false;
+  const config = object.recruit;
+  let recruit = null;
+  if (config.kind === "hero") {
+    const fullConfig = dungeonRecruitParseFullConfig(config);
+    const position = nearestDungeonSpawnPosition(object, getHeroTemplate(fullConfig.classId || config.classId || defaultContent.heroClass));
+    if (!position) return false;
+    recruit = createDungeonRecruitHero(object, config, position);
+  } else {
+    const monsterId = config.monsterId;
+    const template = getMonsterTemplate(monsterId);
+    if (!template) return false;
+    const position = nearestDungeonSpawnPosition(object, template);
+    if (!position) return false;
+    recruit = createFriendlyBeastFromMonster(monsterId, {
+      id: `recruit-ally-${object.id}-${Date.now()}`,
+      name: config.name || template.name,
+      position,
+      kind: config.companionKind === "companion" ? "companion" : "ally",
+      control: config.control === "player" ? "player" : "ai",
+      className: config.companionKind === "companion" ? "Companion" : "Dungeon Ally",
+    });
+  }
+  if (!recruit) return false;
+  recruit.roomId = roomForDungeonPosition(recruit.position)?.id ?? roomForDungeonPosition(object.position)?.id ?? "recruit";
+  recruit.recruitMarkerId = object.id;
+  recruit.dungeonRecruit = true;
+  recruit.dungeonRecruitWaiting = true;
+  recruit.team = "heroes";
+  recruit.friendly = true;
+  recruit.recruitDialogue = {
+    title: config.dialogueTitle ?? "A Stranger Waits",
+    text: config.dialogueText ?? "The recruit looks ready to join your expedition.",
+    recruitLabel: config.recruitLabel ?? "Recruit",
+    backLabel: config.backLabel ?? "Back",
+  };
+  state.fighters[recruit.id] = recruit;
+  object.recruitSpawnedId = recruit.id;
+  addLog(`${recruit.name} waits nearby.`, "important");
+  return true;
+}
+
+function processDungeonPassiveObjects() {
+  if (!gameHasStarted || state?.mode === "home" || state?.completed) return { spawned: 0, recruited: 0 };
+  const nowSeconds = dungeonElapsedSeconds({ sync: true });
+  let spawned = 0;
+  let recruited = 0;
+  for (const object of state.dungeonObjects ?? []) {
+    spawned += processContinuousSpawnerObject(object, nowSeconds);
+    if (spawnRecruitMarkerObject(object)) recruited += 1;
+  }
+  return { spawned, recruited };
 }
 
 function homeHeroPositions(heroIds) {
@@ -1083,10 +1316,7 @@ function conditionDefinitions() {
     },
     exhaustion: {
       label: "Exhaustion",
-      attackBonus: -1,
-      saveBonus: -1,
-      skillBonus: -1,
-      conditionDescription: "Fatigued: reduced attacks, saves, and skill checks.",
+      conditionDescription: "Fatigued. Exhaustion is cumulative: checks suffer first, then speed, attacks/saves, maximum HP, and finally movement.",
     },
     frightened: {
       label: "Frightened",
@@ -1117,6 +1347,8 @@ function conditionDefinitions() {
       actionLocked: true,
       incomingAttackAdvantage: true,
       saveBonus: -2,
+      autoFailSaves: ["str", "dex"],
+      meleeAutoCritical: true,
       conditionDescription: "Cannot move or act. Attackers gain advantage; save penalties approximate failed STR/DEX saves.",
     },
     petrified: {
@@ -1125,6 +1357,7 @@ function conditionDefinitions() {
       actionLocked: true,
       incomingAttackAdvantage: true,
       acBonus: 2,
+      autoFailSaves: ["str", "dex"],
       resistances: ["bludgeoning", "piercing", "slashing"],
       conditionDescription: "Turned to stone: cannot act or move, harder to damage physically, but attackers gain advantage.",
     },
@@ -1148,6 +1381,7 @@ function conditionDefinitions() {
       attackBonus: -2,
       incomingAttackAdvantage: true,
       saveBonus: -1,
+      saveDisadvantageAbilities: ["dex"],
       conditionDescription: "Held in place: speed is 0, attacks are penalized, attackers gain advantage, and saves are slightly reduced.",
     },
     stunned: {
@@ -1156,6 +1390,7 @@ function conditionDefinitions() {
       actionLocked: true,
       incomingAttackAdvantage: true,
       saveBonus: -2,
+      autoFailSaves: ["str", "dex"],
       conditionDescription: "Cannot move or act. Attackers gain advantage; save penalties approximate failed STR/DEX saves.",
     },
     unconscious: {
@@ -1164,6 +1399,8 @@ function conditionDefinitions() {
       actionLocked: true,
       incomingAttackAdvantage: true,
       prone: true,
+      autoFailSaves: ["str", "dex"],
+      meleeAutoCritical: true,
       conditionDescription: "Helpless and prone: cannot move or act, and attackers gain advantage.",
     },
   };
@@ -1189,6 +1426,7 @@ function conditionAliasMap() {
     frightened: "frightened",
     grapple: "grappled",
     grappled: "grappled",
+    held: "paralyzed",
     incapacitated: "incapacitated",
     invisible: "invisible",
     invisibility: "invisible",
@@ -1271,11 +1509,50 @@ function mergedConditionNumber(current, baseline) {
   return current;
 }
 
+function exhaustionLevelForEffect(effect = {}) {
+  return Math.max(1, Math.min(6, Math.floor(Number(effect.exhaustionLevel ?? effect.level ?? effect.stacks ?? 1) || 1)));
+}
+
+function exhaustionDefinitionForLevel(level = 1) {
+  const definition = { ...conditionDefinitions().exhaustion };
+  const parts = [];
+  if (level >= 1) {
+    definition.skillBonus = -2;
+    parts.push("ability checks are penalized");
+  }
+  if (level >= 2) {
+    definition.speedMultiplier = 0.5;
+    parts.push("speed is halved");
+  }
+  if (level >= 3) {
+    definition.attackBonus = -2;
+    definition.saveBonus = -2;
+    parts.push("attacks and saves are penalized");
+  }
+  if (level >= 4) {
+    definition.maxHpMultiplier = 0.5;
+    parts.push("maximum HP is halved");
+  }
+  if (level >= 5) {
+    definition.speedLocked = true;
+    parts.push("speed becomes 0");
+  }
+  if (level >= 6) {
+    definition.actionLocked = true;
+    definition.incomingAttackAdvantage = true;
+    parts.push("collapse is fatal in tabletop rules");
+  }
+  definition.label = `Exhaustion ${level}`;
+  definition.conditionDescription = `Exhaustion level ${level}: ${parts.join(", ")}.`;
+  return definition;
+}
+
 function normalizeConditionEffect(effect = {}) {
   if (!effect || typeof effect !== "object") return effect;
   const conditionId = inferConditionIdFromEffect(effect);
   if (!conditionId) return { ...effect };
-  const definition = conditionDefinitions()[conditionId];
+  const exhaustionLevel = conditionId === "exhaustion" ? exhaustionLevelForEffect(effect) : null;
+  const definition = conditionId === "exhaustion" ? exhaustionDefinitionForLevel(exhaustionLevel) : conditionDefinitions()[conditionId];
   if (!definition) return { ...effect };
   const normalized = {
     ...effect,
@@ -1283,15 +1560,22 @@ function normalizeConditionEffect(effect = {}) {
     conditionLabel: definition.label,
     conditionDescription: effect.conditionDescription ?? definition.conditionDescription,
   };
+  if (exhaustionLevel) normalized.exhaustionLevel = exhaustionLevel;
   if (!normalized.label) normalized.label = definition.label;
+  if (conditionId === "exhaustion") normalized.label = definition.label;
   for (const key of ["acBonus", "attackBonus", "damageBonus", "saveBonus", "skillBonus", "speedBonusFeet"]) {
     normalized[key] = mergedConditionNumber(normalized[key], definition[key]);
   }
-  for (const key of ["actionLocked", "attackAdvantage", "ignoredByMonsters", "incomingAttackAdvantage", "prone", "speedLocked", "stealthAdvantage"]) {
+  for (const key of ["maxHpMultiplier", "speedMultiplier"]) {
+    if (definition[key] != null && normalized[key] == null) normalized[key] = definition[key];
+  }
+  for (const key of ["actionLocked", "attackAdvantage", "ignoredByMonsters", "incomingAttackAdvantage", "meleeAutoCritical", "prone", "speedLocked", "stealthAdvantage"]) {
     if (definition[key] && normalized[key] == null) normalized[key] = true;
   }
   if (definition.resistances?.length) normalized.resistances = mergeConditionLists(normalized.resistances, definition.resistances);
   if (definition.vulnerabilities?.length) normalized.vulnerabilities = mergeConditionLists(normalized.vulnerabilities, definition.vulnerabilities);
+  if (definition.autoFailSaves?.length) normalized.autoFailSaves = mergeConditionLists(normalized.autoFailSaves, definition.autoFailSaves);
+  if (definition.saveDisadvantageAbilities?.length) normalized.saveDisadvantageAbilities = mergeConditionLists(normalized.saveDisadvantageAbilities, definition.saveDisadvantageAbilities);
   return normalized;
 }
 
@@ -1344,11 +1628,8 @@ function expireTimedEffectsForFighter(fighter, nowSeconds = dungeonElapsedSecond
     if (!effect.consumeLightItemOnExpire || !effect.lightItemId) continue;
     const item = itemForId(fighter, effect.lightItemId);
     if (!item) continue;
-    fighter.inventory.items = (fighter.inventory.items ?? []).filter((entry) => entry.id !== effect.lightItemId);
-    for (const slot of equipmentSlots) {
-      if (fighter.equipment?.[slot.id] === effect.lightItemId) fighter.equipment[slot.id] = null;
-    }
-    addLog(`${fighter.name}'s ${item.name} burns out.`, "important");
+    consumeInventoryItemQuantity(fighter, effect.lightItemId, 1);
+    addLog(`${fighter.name}'s ${item.name} burns out${item.stackable && (item.quantity ?? 0) > 0 ? ` (${item.quantity} left)` : ""}.`, "important");
   }
   if (expired.length) {
     refreshDerivedStats(fighter);
@@ -1676,6 +1957,10 @@ function isRangerBeastCompanion(fighter) {
   return Boolean(fighter?.rangerCompanionOwnerId && fighter?.rangerCompanion === true);
 }
 
+function isSpellBoundSummon(fighter) {
+  return Boolean(fighter?.summonedByHeroId || fighter?.summonedBySpellId || fighter?.summonMemoryKey);
+}
+
 function isSidekickWarrior(fighter) {
   return (isPlayerControlledCompanion(fighter) || isRangerBeastCompanion(fighter)) && fighter?.classId === "sidekick-warrior";
 }
@@ -1693,7 +1978,7 @@ function isTrainedSidekick(fighter) {
 }
 
 function canTrainAsSidekick(fighter) {
-  return isPlayerControlledCompanion(fighter) && !isTrainedSidekick(fighter) && !fighter.dead;
+  return isPlayerControlledCompanion(fighter) && !isSpellBoundSummon(fighter) && !isTrainedSidekick(fighter) && !fighter.dead;
 }
 
 function fighterSpeaksLanguage(fighter) {
@@ -1710,6 +1995,47 @@ function isPlayerControlledPartyFighter(fighter) {
 
 function activeClassHeroIds(ids = state?.party?.heroIds ?? []) {
   return ids.filter((id) => isClassHeroId(id));
+}
+
+function boundCompanionOwnerId(fighter) {
+  return fighter?.rangerCompanionOwnerId ?? fighter?.summonedByHeroId ?? fighter?.companionOwnerId ?? null;
+}
+
+function isBoundCompanion(fighter) {
+  return Boolean(fighter && partyMemberKind(fighter) === "companion" && boundCompanionOwnerId(fighter));
+}
+
+function boundCompanionsForOwner(ownerId, gameState = state) {
+  if (!ownerId) return [];
+  return Object.values(gameState?.fighters ?? {}).filter((fighter) => boundCompanionOwnerId(fighter) === ownerId && !fighter.dead);
+}
+
+function activeClassHeroLimit(gameState = state) {
+  return Math.max(4, Math.min(5, Math.floor(Number(gameState?.party?.maxActiveHeroSlots ?? 4) || 4)));
+}
+
+function normalizeActivePartyOwnerBindings(gameState = state) {
+  if (!gameState?.party?.heroIds?.length) return [];
+  const active = new Set(gameState.party.heroIds);
+  const removed = [];
+  for (const id of [...active]) {
+    const fighter = gameState.fighters?.[id];
+    const ownerId = boundCompanionOwnerId(fighter);
+    if (!ownerId || active.has(ownerId)) continue;
+    active.delete(id);
+    removed.push(id);
+  }
+  if (removed.length) {
+    gameState.party.heroIds = gameState.party.heroIds.filter((id) => !removed.includes(id));
+    if (!gameState.party.heroIds.length) {
+      const fallback = (gameState.party.rosterIds ?? []).find((id) => isClassHero(gameState.fighters?.[id]) && !gameState.fighters[id].dead);
+      if (fallback) gameState.party.heroIds = [fallback];
+    }
+    if (!gameState.party.heroIds.includes(gameState.party.activeHeroId)) {
+      gameState.party.activeHeroId = gameState.party.heroIds.find((id) => !isAutonomousAlly(gameState.fighters[id])) ?? gameState.party.heroIds[0];
+    }
+  }
+  return removed;
 }
 
 function rangerCompanionOwner(fighter) {
@@ -2463,6 +2789,21 @@ function fighterAbilityDefinitions(fighter = state?.fighters?.hero) {
     ...(subclass?.abilities ?? []),
     ...featAbilityDefinitions(fighter),
   ];
+  for (const effect of fighter?.statusEffects ?? []) {
+    if (!effect?.potionBreath?.type) continue;
+    const remaining = Number(effect.potionBreath.uses ?? 0) || 0;
+    if (remaining <= 0) continue;
+    const type = effect.potionBreath.type;
+    source.push({
+      id: `potionBreath:${effect.id}`,
+      name: effect.label ?? `${type[0].toUpperCase()}${type.slice(1)} Breath`,
+      description: `Exhale a 15 ft ${effect.potionBreath.shape ?? "cone"} for 4d6 ${type} damage. ${remaining} use${remaining === 1 ? "" : "s"} remaining.`,
+      resource: "action",
+      refresh: "status",
+      uses: 99,
+      potionBreathAction: { statusId: effect.id, spellId: `potion-breath-${type}` },
+    });
+  }
   if (fighter?.racialTraits?.dragonDamageType && !source.some((ability) => ability.id === "dragonbornBreath")) {
     source.push({ id: "dragonbornBreath", name: "Breath Weapon", description: "Ancestral 15 ft cone. DEX/CON save by ancestry, half damage on success.", resource: "action", refresh: "shortRest", uses: 1 });
   }
@@ -2851,6 +3192,9 @@ function ensureSpellPointState(fighter) {
 
 function resetFighterAbilityUses(fighter, refresh = "all") {
   fighter.abilityUses = refresh === "all" ? {} : { ...(fighter.abilityUses ?? {}) };
+  fighter.itemPowerUses = refresh === "all"
+    ? {}
+    : Object.fromEntries(Object.entries(fighter.itemPowerUses ?? {}).filter(([, entry]) => entry?.refresh !== refresh && entry?.refresh !== "turn"));
   if (fighter.classId === "barbarian" && (refresh === "all" || refresh === "shortRest" || refresh === "longRest")) fighter.relentlessRageDc = 10;
   for (const ability of fighterAbilityDefinitions(fighter)) {
     const abilityRefresh = abilityRefreshForFighter(fighter, ability);
@@ -3176,10 +3520,16 @@ function mergeSenses(...senseSources) {
 function fighterEffectiveSenses(fighter) {
   if (!fighter) return {};
   const statusSenses = (fighter.statusEffects ?? []).map((effect) => effect.senses ?? effect.grantsSenses).filter(Boolean);
-  const itemSenses = [
-    ...(Array.isArray(fighter.inventory) ? fighter.inventory : fighter.inventory?.items ?? []),
-    ...Object.values(fighter.equipment ?? {}).filter(Boolean),
-  ].map((item) => item.senses ?? item.grantsSenses).filter(Boolean);
+  const seen = new Set();
+  const itemSenses = equipmentSlots
+    .map((slot) => equippedItem(fighter, slot.id))
+    .filter((item) => {
+      if (!item || seen.has(item.id) || !fighterIsAttunedToItem(fighter, item)) return false;
+      seen.add(item.id);
+      return true;
+    })
+    .map((item) => item.senses ?? item.grantsSenses)
+    .filter(Boolean);
   return mergeSenses(fighter.racialSenses, fighter.senses, ...statusSenses, ...itemSenses);
 }
 
@@ -3196,7 +3546,12 @@ function inferredCreatureSenses(fighter = {}) {
   if (tags.has("aberration") || tags.has("monstrosity") || tags.has("elemental") || tags.has("fey")) addDarkvision(60);
   if (tags.has("ooze")) senses.blindsight = Math.max(Number(senses.blindsight ?? 0) || 0, 60);
   if (tags.has("construct") && /horror|guardian|sentinel|golem|engine|gear|forge|arcane/.test(haystack)) addDarkvision(60);
-  if (tags.has("beast") && /bat|rat|spider|cave|underdark|night|nocturnal|deep|shadow|wolf spider|blind/.test(haystack)) addDarkvision(60);
+  if (
+    tags.has("beast") &&
+    /bat|rat|spider|cave|underground|underdark|night|nocturnal|deep|shadow|blind|cat|panther|lion|tiger|leopard|jaguar|lynx|wolf|hound|fox|jackal|hyena|owl|crocodile|alligator|gator|snake|viper|serpent|lizard/.test(haystack)
+  ) {
+    addDarkvision(60);
+  }
   if (/bat/.test(haystack)) senses.blindsight = Math.max(Number(senses.blindsight ?? 0) || 0, 60);
   return senses;
 }
@@ -3383,6 +3738,11 @@ function applyThemePalette() {
 }
 
 function soundPathForMusic(key) {
+  if (String(key ?? "").startsWith("instrument:")) {
+    const songId = String(key).slice("instrument:".length);
+    const song = activeInstrumentPerformance?.songs?.find((entry) => entry.id === songId) ?? null;
+    if (song?.src) return song.src;
+  }
   if (key === "mainmenu") return `${soundAssetRoot}/music/mainmenu.mp3`;
   if (key === "home") return `${soundAssetRoot}/music/home.mp3`;
   const theme = getContentDefinition("themes", currentThemeId());
@@ -3405,12 +3765,36 @@ function playSoundEffect(id) {
 
 function desiredMusicKey() {
   if (!gameHasStarted || !els.mainMenu?.classList.contains("hidden")) return "mainmenu";
+  const instrumentKey = activeInstrumentMusicKey();
+  if (instrumentKey) return instrumentKey;
   if (!state) return "";
   if (state.mode === "home") return "home";
   if (state.mode === "combat") {
     return combatMonsters().some((monster) => monster.id?.startsWith("boss-")) ? "boss-combat" : "combat";
   }
   return state.mode === "exploration" ? "exploration" : "";
+}
+
+function activeInstrumentMusicKey() {
+  if (!activeInstrumentPerformance || !state || state.mode === "combat") {
+    activeInstrumentPerformance = null;
+    return "";
+  }
+  const hero = state.fighters?.[activeInstrumentPerformance.heroId];
+  const object = activeInstrumentPerformance.objectId ? (state.dungeonObjects ?? []).find((entry) => entry.id === activeInstrumentPerformance.objectId) : null;
+  const samePosition =
+    !activeInstrumentPerformance.startPosition ||
+    (hero?.position?.x === activeInstrumentPerformance.startPosition.x && hero?.position?.y === activeInstrumentPerformance.startPosition.y);
+  if (!hero || hero.dead || (object ? !instrumentPerformerAdjacent(hero, object) : !samePosition)) {
+    activeInstrumentPerformance = null;
+    return "";
+  }
+  return `instrument:${activeInstrumentPerformance.songId}`;
+}
+
+function instrumentPerformerAdjacent(hero, object) {
+  if (!hero?.position || !object?.position) return false;
+  return objectCells(object).some((cell) => Math.max(Math.abs(hero.position.x - cell.x), Math.abs(hero.position.y - cell.y)) === 1);
 }
 
 function updateBackgroundMusic() {
@@ -4814,18 +5198,20 @@ function normalizeItem(item) {
 }
 
 function starterEquipmentItem(itemId) {
-  return {
+  const item = {
     id: itemId,
     itemId,
     starterEquipment: true,
     sell: { valueCp: 0, rate: 0 },
   };
+  if (itemId === "torch") item.quantity = 10;
+  return item;
 }
 
 function starterEquipmentItems(itemIds = []) {
   return [
     ...itemIds.map((itemId) => (typeof itemId === "string" ? starterEquipmentItem(itemId) : { ...itemId, starterEquipment: true, sell: { ...(itemId.sell ?? {}), valueCp: 0, rate: 0 } })),
-    ...Array.from({ length: 10 }, () => starterEquipmentItem("torch")),
+    starterEquipmentItem("torch"),
   ];
 }
 
@@ -4872,6 +5258,33 @@ function normalizeInventory(template = {}) {
   }
   
   return { money, heroTokens, items };
+}
+
+function compactStackableInventoryItems(fighter) {
+  if (!fighter?.inventory?.items?.length) return fighter?.inventory;
+  const equippedIds = new Set(Object.values(fighter.equipment ?? {}).filter(Boolean));
+  const groups = new Map();
+  const keep = [];
+  for (const item of fighter.inventory.items) {
+    if (!item?.stackable) {
+      keep.push(item);
+      continue;
+    }
+    const key = `${item.baseItemId ?? item.itemId ?? item.id}:${Boolean(item.starterEquipment)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  for (const group of groups.values()) {
+    const primary = group.find((item) => equippedIds.has(item.id)) ?? group[0];
+    primary.quantity = group.reduce((sum, item) => sum + Math.max(1, Math.floor(Number(item.quantity) || 1)), 0);
+    const groupIds = new Set(group.map((item) => item.id));
+    for (const slot of equipmentSlots) {
+      if (groupIds.has(fighter.equipment?.[slot.id])) fighter.equipment[slot.id] = primary.id;
+    }
+    keep.push(primary);
+  }
+  fighter.inventory.items = keep;
+  return fighter.inventory;
 }
 
 function moneyToCp(money = {}) {
@@ -4923,6 +5336,20 @@ function addItemToInventory(fighter, item, prefix = "stack") {
     addPartyTomeItem(item);
     return [item];
   }
+  if (item.stackable) {
+    const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    const templateId = item.baseItemId ?? item.itemId ?? item.id;
+    const stack = fighter.inventory.items.find(
+      (entry) => entry.stackable && (entry.baseItemId ?? entry.itemId ?? entry.id) === templateId && Boolean(entry.starterEquipment) === Boolean(item.starterEquipment),
+    );
+    if (stack) {
+      stack.quantity = Math.max(1, Math.floor(Number(stack.quantity) || 1)) + quantity;
+      return [stack];
+    }
+    item.quantity = quantity;
+    fighter.inventory.items.push(item);
+    return [item];
+  }
   if (item.type !== "ammunition" || !item.ammo?.kind) {
     fighter.inventory.items.push(item);
     return [item];
@@ -4958,6 +5385,23 @@ function addItemToInventory(fighter, item, prefix = "stack") {
   }
 
   return added;
+}
+
+function consumeInventoryItemQuantity(fighter, itemId, quantity = 1) {
+  if (!fighter || !itemId) return null;
+  const item = itemForId(fighter, itemId);
+  if (!item) return null;
+  const amount = Math.max(1, Math.floor(Number(quantity) || 1));
+  const currentQuantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+  if (item.stackable && currentQuantity > amount) {
+    item.quantity = currentQuantity - amount;
+    return item;
+  }
+  fighter.inventory.items = (fighter.inventory.items ?? []).filter((entry) => entry.id !== itemId);
+  for (const slot of equipmentSlots) {
+    if (fighter.equipment?.[slot.id] === itemId) fighter.equipment[slot.id] = null;
+  }
+  return item;
 }
 
 function spendMoney(money, cpAmount) {
@@ -5004,6 +5448,46 @@ function itemForId(fighter, itemId) {
   const item = ensureItemCharges(normalizeItem(fighter.inventory.items[itemIndex]));
   fighter.inventory.items[itemIndex] = item;
   return item;
+}
+
+const attunementLimit = 3;
+
+function itemRequiresAttunement(item) {
+  return Boolean(item?.requiresAttunement ?? item?.attunementRequired ?? item?.magic?.requiresAttunement ?? false);
+}
+
+function attunedItemIds(fighter) {
+  if (!fighter) return [];
+  const source = Array.isArray(fighter.attunement?.itemIds)
+    ? fighter.attunement.itemIds
+    : Array.isArray(fighter.attunedItemIds)
+      ? fighter.attunedItemIds
+      : [];
+  return uniqueValues(source.filter(Boolean));
+}
+
+function normalizeAttunementState(fighter) {
+  if (!fighter) return [];
+  const carriedIds = new Set((fighter.inventory?.items ?? []).map((item) => item.id).filter(Boolean));
+  const itemIds = attunedItemIds(fighter)
+    .filter((itemId) => carriedIds.has(itemId))
+    .slice(0, attunementLimit);
+  fighter.attunement = { ...(fighter.attunement ?? {}), itemIds };
+  delete fighter.attunedItemIds;
+  return itemIds;
+}
+
+function fighterIsAttunedToItem(fighter, item) {
+  if (!itemRequiresAttunement(item)) return true;
+  return attunedItemIds(fighter).includes(item?.id);
+}
+
+function itemMagicActive(fighter, item) {
+  return Boolean(item?.magic && fighterIsAttunedToItem(fighter, item));
+}
+
+function activeItemMagic(fighter, item) {
+  return itemMagicActive(fighter, item) ? item.magic : null;
 }
 
 function chestItemForId(itemId) {
@@ -5075,11 +5559,12 @@ function equippedItem(fighter, slotId) {
 
 function equippedMagicItems(fighter) {
   if (!fighter?.equipment) return [];
+  normalizeAttunementState(fighter);
   const seen = new Set();
   return equipmentSlots
     .map((slot) => equippedItem(fighter, slot.id))
     .filter((item) => {
-      if (!item?.magic || seen.has(item.id)) return false;
+      if (!itemMagicActive(fighter, item) || seen.has(item.id)) return false;
       seen.add(item.id);
       return true;
     });
@@ -5176,9 +5661,13 @@ function abilityMod(fighter, ability) {
 function abilityScore(fighter, ability) {
   if (isWildShaped(fighter)) return baseAbilityScore(fighter, ability);
   const effects = magicEffects(fighter);
+  const statusEffects = fighter?.statusEffects ?? [];
+  const statusBonus = statusEffects.reduce((sum, effect) => sum + (effect.abilityScoreBonuses?.[ability] ?? 0) + (effect.abilityScorePenalties?.[ability] ?? 0), 0);
+  const statusMinimum = statusEffects.reduce((minimum, effect) => Math.max(minimum, effect.abilityScoreMinimums?.[ability] ?? 0), 0);
+  const statusCap = statusEffects.reduce((cap, effect) => Math.max(cap, effect.abilityScoreCaps?.[ability] ?? 0), 0);
   const primalChampion = fighter?.classId === "barbarian" && (fighter.level ?? 1) >= 20 && ["str", "con"].includes(ability) ? 4 : 0;
-  const value = baseAbilityScore(fighter, ability) + primalChampion + (effects.abilityScoreBonuses[ability] ?? 0) + (effects.abilityScorePenalties[ability] ?? 0);
-  const cap = effects.abilityScoreCaps[ability];
+  const value = Math.max(statusMinimum, baseAbilityScore(fighter, ability) + primalChampion + (effects.abilityScoreBonuses[ability] ?? 0) + (effects.abilityScorePenalties[ability] ?? 0) + statusBonus);
+  const cap = Math.max(effects.abilityScoreCaps[ability] ?? 0, statusCap);
   return cap ? Math.min(cap, value) : value;
 }
 
@@ -5265,7 +5754,8 @@ function attackBonusForWeapon(fighter, weapon = activeWeapon(fighter)) {
   const unarmed = !weapon?.damage;
   const attackAbility = isRangerBeastCompanion(fighter) ? fighter.companionAttackAbility ?? "str" : unarmed ? attackAbilityForUnarmed(fighter) : attackAbilityForWeapon(weapon, fighter);
   const ability = abilityMod(fighter, attackAbility);
-  const magicBonus = (weapon?.magic?.attackBonus ?? 0) + magicEffects(fighter).attackBonus + statusBonus + sidekickAttackBonus + sidekickProficiencyBonus;
+  const weaponMagic = activeItemMagic(fighter, weapon);
+  const magicBonus = (weaponMagic?.attackBonus ?? 0) + magicEffects(fighter).attackBonus + statusBonus + sidekickAttackBonus + sidekickProficiencyBonus;
   const styleBonus = fighterHasStyle(fighter, "archery") && weaponIsRanged(weapon) ? 2 : 0;
   if (isRangerBeastCompanion(fighter)) {
     return ability + rangerCompanionProficiencyBonus(fighter) + magicBonus + styleBonus;
@@ -5484,6 +5974,7 @@ function unarmedDamageProfileWithOptions(fighter, options = {}) {
 
 function damageProfile(fighter, options = {}) {
   const weapon = options.weapon ?? activeWeapon(fighter);
+  const weaponMagic = activeItemMagic(fighter, weapon);
   const includeDamageModifier = options.includeDamageModifier !== false;
   const statusDamageBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.damageBonus ?? 0), 0);
   if (isWildShaped(fighter)) {
@@ -5496,12 +5987,12 @@ function damageProfile(fighter, options = {}) {
   if (!options.forceThrown && (!isPartyHeroId(fighter?.id) || !isClassHero(fighter)) && weapon?.properties?.includes("thrown") && weapon.range?.kind === "thrown" && !monsterCanThrowWeapon(fighter, weapon)) {
     return {
       ...weapon.damage,
-      bonus: (includeDamageModifier ? abilityMod(fighter, "str") : 0) + (weapon.magic?.damageBonus ?? 0) + magicEffects(fighter).damageBonus + statusDamageBonus,
+      bonus: (includeDamageModifier ? abilityMod(fighter, "str") : 0) + (weaponMagic?.damageBonus ?? 0) + magicEffects(fighter).damageBonus + statusDamageBonus,
       range: { kind: "melee", feet: 5 },
-      extraDamage: [...(weapon.magic?.extraDamage ?? []), ...magicEffects(fighter).extraDamage],
+      extraDamage: [...(weaponMagic?.extraDamage ?? []), ...magicEffects(fighter).extraDamage],
       label: formatDamage({
         ...weapon.damage,
-        bonus: (includeDamageModifier ? abilityMod(fighter, "str") : 0) + (weapon.magic?.damageBonus ?? 0) + magicEffects(fighter).damageBonus + statusDamageBonus,
+        bonus: (includeDamageModifier ? abilityMod(fighter, "str") : 0) + (weaponMagic?.damageBonus ?? 0) + magicEffects(fighter).damageBonus + statusDamageBonus,
       }),
     };
   }
@@ -5550,10 +6041,10 @@ function damageProfile(fighter, options = {}) {
     flat: damageDice.flat,
     count: damageDice.count ?? 0,
     sides: damageDice.sides ?? 0,
-    bonus: bonus + duelingBonus + greatWeaponBonus + (weapon.magic?.damageBonus ?? 0) + magicEffects(fighter).damageBonus + statusDamageBonus,
+    bonus: bonus + duelingBonus + greatWeaponBonus + (weaponMagic?.damageBonus ?? 0) + magicEffects(fighter).damageBonus + statusDamageBonus,
     type: weapon.damage.type,
     range: weapon.range ?? { kind: "melee", feet: 5 },
-    extraDamage: [...(weapon.magic?.extraDamage ?? []), ...magicEffects(fighter).extraDamage],
+    extraDamage: [...(weaponMagic?.extraDamage ?? []), ...magicEffects(fighter).extraDamage],
   };
   return { ...damage, label: formatDamage(damage) };
 }
@@ -5695,9 +6186,9 @@ function armorClass(fighter) {
     return (fighter.baseAc ?? fighter.ac ?? 10) + rangerCompanionProficiencyBonus(fighter) + magicAc + statusAc + sidekickDefenseBonus;
   }
   const torso = equippedItem(fighter, "torso");
-  const armor = armorStrengthRequirementMet(fighter, torso) && heroHasArmorProficiency(fighter, torso) ? torso?.armor : null;
+  const armor = armorStrengthRequirementMet(fighter, torso) && heroHasArmorProficiency(fighter, torso) ? activeArmorData(fighter, torso) : null;
   const shield = equippedItem(fighter, "offHand");
-  const shieldBonus = heroHasArmorProficiency(fighter, shield) ? shield?.armor?.bonus ?? 0 : 0;
+  const shieldBonus = heroHasArmorProficiency(fighter, shield) ? activeArmorData(fighter, shield)?.bonus ?? 0 : 0;
   const magicAc = magicEffects(fighter).acBonus;
   const statusAc = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.acBonus ?? 0), 0);
   const styleAc = fighterHasStyle(fighter, "defense") && Boolean(torso?.armor?.base) ? 1 : 0;
@@ -5719,6 +6210,17 @@ function armorClass(fighter) {
   const mediumArmorCap = fighterHasFeat(fighter, "medium-armor-master") ? 3 : 2;
   const dexBonus = armor.dex === "full" ? dex : armor.dex === "max2" ? Math.min(mediumArmorCap, dex) : 0;
   return armor.base + dexBonus + shieldBonus + magicAc + statusAc + styleAc + dualWielderAc + sidekickDefenseBonus;
+}
+
+function activeArmorData(fighter, item) {
+  if (!item?.armor) return null;
+  const inactiveAttunementBonus = fighterIsAttunedToItem(fighter, item) ? 0 : item.magic?.acBonusAppliedToArmor ?? 0;
+  if (!inactiveAttunementBonus) return item.armor;
+  return {
+    ...item.armor,
+    base: item.armor.base != null ? Math.max(0, item.armor.base - inactiveAttunementBonus) : item.armor.base,
+    bonus: item.armor.bonus != null ? Math.max(0, item.armor.bonus - inactiveAttunementBonus) : item.armor.bonus,
+  };
 }
 
 function itemRequiresTwoHands(item) {
@@ -5774,13 +6276,20 @@ function classMovementSpeedBonus(fighter) {
 }
 
 function refreshDerivedStats(fighter) {
+  if (!fighter) return fighter;
   fighter.baseMaxHp = fighter.baseMaxHp ?? fighter.maxHp ?? 1;
   if (fighter?.classId && isClassHero(fighter)) normalizeHeroRacialSenses(fighter);
   fighter.statusEffects = normalizeStatusEffectsForFighter(fighter);
+  normalizeAttunementState(fighter);
   syncRangerBeastCompanionStats(fighter);
   const effects = magicEffects(fighter);
   const statusSpeedBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.speedBonusFeet ?? 0), 0);
   const statusSpeedOverride = (fighter.statusEffects ?? []).reduce((speed, effect) => Math.max(speed, effect.speedOverrideFeet ?? 0), 0);
+  const statusSpeedMultiplier = (fighter.statusEffects ?? []).reduce((multiplier, effect) => {
+    if (effect.speedMultiplier != null) return multiplier * Math.max(0, Number(effect.speedMultiplier) || 0);
+    if (effect.speedPenaltyPercent != null) return multiplier * Math.max(0, 1 - (Number(effect.speedPenaltyPercent) || 0) / 100);
+    return multiplier;
+  }, 1);
   const statusMaxHpBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.maxHpBonus ?? 0), 0);
   const statusMaxHpMultiplier = (fighter.statusEffects ?? []).reduce((multiplier, effect) => {
     if (effect.maxHpMultiplier != null) return multiplier * Math.max(0, Number(effect.maxHpMultiplier) || 0);
@@ -5790,9 +6299,10 @@ function refreshDerivedStats(fighter) {
   const rawMaxHp = isWildShaped(fighter) ? fighter.baseMaxHp + statusMaxHpBonus : fighter.baseMaxHp + (effects.maxHpBonus ?? 0) + statusMaxHpBonus;
   fighter.maxHp = Math.max(1, Math.floor(rawMaxHp * statusMaxHpMultiplier));
   if (fighter.hp > fighter.maxHp) fighter.hp = fighter.maxHp;
-  const derivedSpeedFeet = isWildShaped(fighter)
+  const baseDerivedSpeedFeet = isWildShaped(fighter)
     ? Math.max(5, (fighter.baseSpeedFeet ?? fighter.speedFeet ?? 30) + statusSpeedBonus)
     : Math.max(5, (fighter.baseSpeedFeet ?? fighter.speedFeet ?? 30) + (effects.speedBonusFeet ?? 0) + classMovementSpeedBonus(fighter) + statusSpeedBonus);
+  const derivedSpeedFeet = Math.max(0, Math.floor(baseDerivedSpeedFeet * statusSpeedMultiplier));
   fighter.speedFeet = statusSpeedOverride ? Math.max(derivedSpeedFeet, statusSpeedOverride) : derivedSpeedFeet;
   if (fighter.abilityScores) {
     fighter.abilityMods = abilityModsFromScores(fighter.abilityScores);
@@ -6125,6 +6635,7 @@ function normalizeLoadedState(loadedState) {
     party: {
       activeHeroId: loadedState.party?.activeHeroId ?? "hero",
       heroIds: Array.isArray(loadedState.party?.heroIds) && loadedState.party.heroIds.length ? loadedState.party.heroIds : ["hero"],
+      maxActiveHeroSlots: activeClassHeroLimit(loadedState),
       rosterIds:
         Array.isArray(loadedState.party?.rosterIds) && loadedState.party.rosterIds.length
           ? loadedState.party.rosterIds
@@ -6255,6 +6766,7 @@ function normalizeLoadedState(loadedState) {
   if (!normalized.party.rosterIds.includes("hero") && normalized.fighters.hero) normalized.party.rosterIds.unshift("hero");
   normalized.party.heroIds = normalized.party.heroIds.filter((id) => normalized.fighters[id]);
   if (normalized.party.heroIds.length === 0 && normalized.fighters.hero) normalized.party.heroIds = ["hero"];
+  normalizeActivePartyOwnerBindings(normalized);
   if (!normalized.fighters[normalized.party.activeHeroId] || isAutonomousAlly(normalized.fighters[normalized.party.activeHeroId])) {
     normalized.party.activeHeroId = normalized.party.heroIds.find((id) => normalized.fighters[id] && !isAutonomousAlly(normalized.fighters[id])) ?? "hero";
   }
@@ -6279,6 +6791,7 @@ function normalizeLoadedState(loadedState) {
       fighter.hitDiceRemaining = fighter.hitDiceRemaining ?? fighter.level ?? 1;
       fighter.equipment = normalizeEquipment(fighter.equipment);
       fighter.inventory = canFighterReceiveInventory(fighter) ? normalizeInventory(fighter.inventory) : normalizeInventory({ money: {}, items: [], heroTokens: 0 });
+      compactStackableInventoryItems(fighter);
       ensureFighterAbilityState(fighter);
       ensureSpellPointState(fighter);
       fighter.hasBonusAction = fighter.hasBonusAction ?? true;
@@ -6359,6 +6872,7 @@ function normalizeLoadedState(loadedState) {
     fighter.hitDiceRemaining = fighter.hitDiceRemaining ?? fighter.level ?? 1;
     fighter.equipment = normalizeEquipment(fighter.equipment);
     fighter.inventory = normalizeInventory(fighter.inventory);
+    compactStackableInventoryItems(fighter);
     ensureFighterAbilityState(fighter);
     ensureSpellPointState(fighter);
     fighter.hasBonusAction = fighter.hasBonusAction ?? true;
