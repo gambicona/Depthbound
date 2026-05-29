@@ -1201,6 +1201,7 @@ function renderRoom() {
       source.sourceType !== "darkness" &&
       !source.magicalDarkness &&
       Math.max(source.brightRadius ?? 0, source.dimRadius ?? 0) > 0 &&
+      sourceIsVisibleForLightingLayer(source, visibleLightTileKeys) &&
       !renderedLightingSourcesByOwner.has(source.ownerId)
     ) {
       renderedLightingSourcesByOwner.set(source.ownerId, source);
@@ -1622,6 +1623,12 @@ function litTileKeysForLightingMap(lightingMap, visibleLightTileKeys = new Set()
   return keys;
 }
 
+function sourceIsVisibleForLightingLayer(source, visibleLightTileKeys = new Set()) {
+  if (showDungeonLayout) return true;
+  if (source?.origin && visibleLightTileKeys.has(positionKey(source.origin))) return true;
+  return (source?.cells ?? []).some((cell) => visibleLightTileKeys.has(positionKey(cell)));
+}
+
 function renderLightingLayer(lightingMap, scaledTileSizePx, visibleLightTileKeys = new Set()) {
   const layer = els.room.querySelector(".lighting-layer");
   if (!layer) return;
@@ -1643,6 +1650,7 @@ function renderLightingLayer(lightingMap, scaledTileSizePx, visibleLightTileKeys
   const darknessGradients = [];
   for (const source of lightingMap.sources ?? []) {
     if (!source || source.sourceType === "ambient") continue;
+    if (!sourceIsVisibleForLightingLayer(source, visibleLightTileKeys)) continue;
     const target = source.magicalDarkness ? darknessGradients : lightGradients;
     if (source.cells?.length) {
       if (!source.magicalDarkness && source.origin) {
@@ -8056,6 +8064,55 @@ function availableOneShotDungeons() {
   return window.DungeonOneShots?.list?.() ?? [];
 }
 
+const dungeonDifficultyLabelCache = new Map();
+
+function partyLevelLabelForDungeonCategory(category) {
+  const rounded = Math.max(1, Math.min(10, Math.round(Number(category) || 1)));
+  const minLevel = rounded * 2 - 1;
+  const maxLevel = Math.min(20, minLevel + 1);
+  return maxLevel > minLevel ? `Party Level ${minLevel}-${maxLevel}` : `Party Level ${minLevel}`;
+}
+
+function monsterCategoryForDungeonEntry(entry) {
+  const explicit = Number(entry?.overrides?.category ?? entry?.category ?? entry?.cat);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const template = getContentDefinition("monsters", entry?.monsterId ?? entry?.type ?? entry?.id);
+  const category = Number(template ? monsterCategory(template) : NaN);
+  return Number.isFinite(category) && category > 0 ? category : null;
+}
+
+function dungeonDifficultyLabelForTemplate(template) {
+  const categories = (template?.monsters ?? [])
+    .map(monsterCategoryForDungeonEntry)
+    .filter((category) => Number.isFinite(category) && category > 0);
+  if (!categories.length) return "";
+  const average = categories.reduce((sum, category) => sum + category, 0) / categories.length;
+  return `(${partyLevelLabelForDungeonCategory(average)})`;
+}
+
+function oneShotDungeonDifficultyLabel(dungeonId) {
+  if (!dungeonId) return Promise.resolve("");
+  if (!dungeonDifficultyLabelCache.has(dungeonId)) {
+    dungeonDifficultyLabelCache.set(
+      dungeonId,
+      window.DungeonOneShots?.get?.(dungeonId)
+        .then(dungeonDifficultyLabelForTemplate)
+        .catch(() => ""),
+    );
+  }
+  return dungeonDifficultyLabelCache.get(dungeonId);
+}
+
+function refreshOneShotDungeonDifficultyLabels() {
+  const labels = Array.from(els.homeOneShotDungeonActions?.querySelectorAll("[data-one-shot-difficulty-id]") ?? []);
+  labels.forEach((label) => {
+    const dungeonId = label.dataset.oneShotDifficultyId;
+    void oneShotDungeonDifficultyLabel(dungeonId).then((text) => {
+      if (label.isConnected && label.dataset.oneShotDifficultyId === dungeonId) label.textContent = text ? ` ${text}` : "";
+    });
+  });
+}
+
 function completedOneShotDungeons() {
   const completed = state.questFlags?.oneShotDungeonCompletions;
   return completed && typeof completed === "object" && !Array.isArray(completed) ? completed : {};
@@ -8125,12 +8182,13 @@ function renderHomeAdventurePanels() {
       ${oneShotDungeons
         .map((dungeon) => {
           const completed = Boolean(oneShotCompletions[dungeon.id]);
-          return `<button type="button" data-one-shot-dungeon-id="${escapeAttribute(dungeon.id)}"><span>${escapeHtml(dungeon.name)}</span>${completed ? "<small>✓</small>" : ""}</button>`;
+          return `<button type="button" data-one-shot-dungeon-id="${escapeAttribute(dungeon.id)}"><span>${escapeHtml(dungeon.name)}<small class="dungeon-difficulty-label" data-one-shot-difficulty-id="${escapeAttribute(dungeon.id)}"></small></span>${completed ? "<small>&#10003;</small>" : ""}</button>`;
         })
         .join("")}
       <hr />
       <button type="button" data-home-menu="adventure">Back</button>
     `;
+    refreshOneShotDungeonDifficultyLabels();
   }
 
   if (els.homeRandomDungeonActions) {

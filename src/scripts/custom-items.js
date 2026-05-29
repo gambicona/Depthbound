@@ -1,5 +1,9 @@
 (() => {
 const storageKey = "depthbound.customItems.v1";
+const registryFile = "creator-custom-items.json";
+let registryItems = [];
+let registryLoaded = false;
+let registryVersion = 0;
 
 function clone(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
@@ -38,15 +42,47 @@ function normalizeCustomItem(item = {}, index = 0) {
 }
 
 function load() {
-  return safeParse(window.localStorage?.getItem(storageKey), [])
+  const source = registryLoaded ? registryItems : safeParse(window.localStorage?.getItem(storageKey), []);
+  return source
     .map(normalizeCustomItem)
     .filter(Boolean);
 }
 
 function save(items = []) {
   const normalized = items.map(normalizeCustomItem).filter(Boolean);
-  window.localStorage?.setItem(storageKey, JSON.stringify(normalized));
+  registryItems = normalized;
+  registryLoaded = true;
+  registryVersion += 1;
   return normalized;
+}
+
+async function refreshFromFile() {
+  const response = await fetch(`${registryFile}?v=${Date.now()}`, { cache: "no-store" }).catch(() => null);
+  const entries = response?.ok ? await response.json().catch(() => []) : [];
+  registryItems = Array.isArray(entries) ? entries.map(normalizeCustomItem).filter(Boolean) : [];
+  registryLoaded = true;
+  registryVersion += 1;
+  window.localStorage?.removeItem(storageKey);
+  registerAll();
+  return load();
+}
+
+async function saveFile(items = []) {
+  const normalized = items.map(normalizeCustomItem).filter(Boolean);
+  const response = await fetch("/save-helper-registry", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: "custom-items", entries: normalized }),
+  }).catch(() => null);
+  if (!response?.ok) return null;
+  const result = await response.json().catch(() => null);
+  if (!result?.saved) return null;
+  registryItems = normalized;
+  registryLoaded = true;
+  registryVersion += 1;
+  window.localStorage?.removeItem(storageKey);
+  registerAll();
+  return load();
 }
 
 function registerAll() {
@@ -55,6 +91,11 @@ function registerAll() {
   }
 }
 
-window.DungeonCustomItems = { storageKey, load, save, normalizeCustomItem, registerAll };
+function signature() {
+  return `${registryVersion}:${JSON.stringify(load().map((item) => item.id))}`;
+}
+
+window.DungeonCustomItems = { storageKey, registryFile, load, save, saveFile, refreshFromFile, normalizeCustomItem, registerAll, signature };
 registerAll();
+void refreshFromFile();
 })();

@@ -4391,13 +4391,12 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Thorncrown Treant",
       "id": "m1",
-      "monsterId": "thorncrownTreant",
+      "monsterId": "deepMycelialOvermind",
       "roomId": "room-2",
       "position": {
         "x": 19,
-        "y": 23
+        "y": 22
       }
     },
     {
@@ -4405,9 +4404,8 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Glowspore Sovereign",
       "id": "m2",
-      "monsterId": "glowsporeSovereign",
+      "monsterId": "primevalTreantOfSeasons",
       "roomId": "room-3",
       "position": {
         "x": 33,
@@ -4419,9 +4417,8 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Jungle Greenheart Colossus",
       "id": "m3",
-      "monsterId": "jungleGreenheartColossus",
+      "monsterId": "thousandMawGodflower",
       "roomId": "room-4",
       "position": {
         "x": 33,
@@ -4429,13 +4426,12 @@
       }
     },
     {
-      "isBoss": false,
+      "isBoss": true,
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Eldergrove Avatar",
-      "id": "m4",
-      "monsterId": "eldergroveAvatar",
+      "id": "boss",
+      "monsterId": "rootOfTheFirstForest",
       "roomId": "room-5",
       "position": {
         "x": 47,
@@ -4443,15 +4439,14 @@
       }
     },
     {
-      "isBoss": true,
+      "isBoss": false,
       "extraLoot": [
         "one-shot-cat10-first-seed"
       ],
       "overrides": {},
       "customized": false,
-      "name": "Root of the First Forest",
-      "id": "boss",
-      "monsterId": "rootOfTheFirstForest",
+      "id": "m5",
+      "monsterId": "highTierGreenEclipseRoc",
       "roomId": "room-5",
       "position": {
         "x": 50,
@@ -4459,102 +4454,69 @@
       }
     },
     {
-      "id": "m5",
-      "monsterId": "corpseFlowerRegent",
+      "id": "m6",
+      "monsterId": "highTierWorldwoodMammoth",
       "roomId": "room-6",
       "position": {
-        "x": 19,
+        "x": 20,
         "y": 33
       },
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Corpse Flower Regent"
+      "customized": false
     },
     {
-      "id": "m6",
-      "monsterId": "sporeTitanOfTheDeep",
-      "roomId": "room-7",
-      "position": {
-        "x": 49,
-        "y": 34
-      },
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Spore Titan of the Deep"
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Glowspore Sovereign",
-      "id": "reinforcement-room-2-1",
-      "monsterId": "glowsporeSovereign",
-      "roomId": "room-2",
+      "id": "companion-room-2",
+      "monsterId": "primevalTreantOfSeasons",
       "position": {
         "x": 18,
-        "y": 22
-      }
-    },
-    {
+        "y": 23
+      },
+      "roomId": "room-2",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Thorncrown Treant",
-      "id": "reinforcement-room-3-2",
-      "monsterId": "thorncrownTreant",
+      "customized": false
+    },
+    {
+      "id": "companion-room-3",
+      "monsterId": "deepMycelialOvermind",
+      "position": {
+        "x": 32,
+        "y": 12
+      },
       "roomId": "room-3",
-      "position": {
-        "x": 34,
-        "y": 11
-      }
-    },
-    {
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Thorncrown Treant",
-      "id": "reinforcement-room-4-3",
-      "monsterId": "thorncrownTreant",
+      "customized": false
+    },
+    {
+      "id": "companion-room-4",
+      "monsterId": "thousandMawGodflower",
+      "position": {
+        "x": 30,
+        "y": 34
+      },
       "roomId": "room-4",
-      "position": {
-        "x": 31,
-        "y": 34
-      }
-    },
-    {
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Thorncrown Treant",
-      "id": "reinforcement-room-6-4",
-      "monsterId": "thorncrownTreant",
-      "roomId": "room-6",
+      "customized": false
+    },
+    {
+      "id": "companion-room-6",
+      "monsterId": "highTierGreenEclipseRoc",
       "position": {
-        "x": 17,
+        "x": 16,
         "y": 33
-      }
-    },
-    {
+      },
+      "roomId": "room-6",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Thorncrown Treant",
-      "id": "reinforcement-room-7-5",
-      "monsterId": "thorncrownTreant",
-      "roomId": "room-7",
-      "position": {
-        "x": 47,
-        "y": 34
-      }
+      "customized": false
     }
   ],
   "customItems": [

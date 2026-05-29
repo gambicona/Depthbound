@@ -4755,6 +4755,13 @@ button[data-ui-icon]::before,
   text-align: left;
 }
 
+.dungeon-difficulty-label {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .home-actions button[data-home-menu="main"],
 .home-actions button[data-home-menu="adventure"] {
   background: rgba(19, 13, 13, 0.34);

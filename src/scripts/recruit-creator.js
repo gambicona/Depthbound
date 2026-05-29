@@ -243,28 +243,20 @@ async function buildHeroWithDialogs() {
 }
 
 async function saveRecruitJson() {
-  const text = $("#recruit-output").value;
-  const suggestedName = `${buildRecruit().id || "recruit-hero"}.json`;
-  if (window.showSaveFilePicker) {
-    const handle = await window.showSaveFilePicker({
-      suggestedName,
-      types: [{ description: "JSON", accept: { "application/json": [".json"] } }],
-    });
-    const writable = await handle.createWritable();
-    await writable.write(text);
-    await writable.close();
+  const recruit = JSON.parse($("#recruit-output").value || "{}");
+  const next = window.DungeonRecruitRegistry.upsert(recruit);
+  const saved = await window.DungeonRecruitRegistry.saveFile(next);
+  const status = $("#recruit-save-status");
+  if (!saved) {
+    if (status) status.textContent = "Could not save creator-recruits.json. Run through playtest-server.js so Recruit Creator can write game files.";
     return;
   }
-  const blob = new Blob([text], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = suggestedName;
-  link.click();
-  URL.revokeObjectURL(url);
+  if (status) status.textContent = `Saved ${recruit.name ?? recruit.id} to creator-recruits.json.`;
 }
 
-function init() {
+async function init() {
+  await window.DungeonCustomItems?.refreshFromFile?.();
+  await window.DungeonRecruitRegistry?.refreshFromFile?.();
   const datalist = document.createElement("datalist");
   datalist.id = "recruit-item-options";
   datalist.innerHTML = window.DungeonContent
@@ -305,5 +297,5 @@ function init() {
   renderItems();
 }
 
-window.addEventListener("DOMContentLoaded", init);
+window.addEventListener("DOMContentLoaded", () => void init());
 })();

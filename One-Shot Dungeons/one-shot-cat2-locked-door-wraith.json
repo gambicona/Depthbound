@@ -3,6 +3,8 @@
   "name": "Cat 2 - The Door That Remembered",
   "themeId": "desertRuins",
   "gridSize": 44,
+  "oneShotDungeon": true,
+  "oneShotDungeonId": "one-shot-cat2-locked-door-wraith",
   "dungeon": {
     "id": "one-shot-cat2-locked-door-wraith",
     "gridSize": 44,
@@ -1872,16 +1874,6 @@
         "roomId": "room-2"
       },
       {
-        "x": 23,
-        "y": 9,
-        "corridor": {
-          "x": 22,
-          "y": 9
-        },
-        "to": "room-2",
-        "roomId": "room-3"
-      },
-      {
         "x": 19,
         "y": 18,
         "corridor": {
@@ -1890,6 +1882,16 @@
         },
         "to": "room-4",
         "roomId": "room-2"
+      },
+      {
+        "x": 23,
+        "y": 9,
+        "corridor": {
+          "x": 22,
+          "y": 9
+        },
+        "to": "room-2",
+        "roomId": "room-3"
       },
       {
         "x": 23,
@@ -1918,16 +1920,6 @@
         "roomId": "room-4"
       },
       {
-        "x": 34,
-        "y": 17,
-        "corridor": {
-          "x": 33,
-          "y": 17
-        },
-        "to": "room-4",
-        "roomId": "room-5"
-      },
-      {
         "x": 23,
         "y": 21,
         "corridor": {
@@ -1938,14 +1930,14 @@
         "roomId": "room-4"
       },
       {
-        "x": 18,
-        "y": 29,
+        "x": 34,
+        "y": 17,
         "corridor": {
-          "x": 19,
-          "y": 29
+          "x": 33,
+          "y": 17
         },
         "to": "room-4",
-        "roomId": "room-6"
+        "roomId": "room-5"
       },
       {
         "x": 37,
@@ -1956,6 +1948,16 @@
         },
         "to": "room-7",
         "roomId": "room-5"
+      },
+      {
+        "x": 18,
+        "y": 29,
+        "corridor": {
+          "x": 19,
+          "y": 29
+        },
+        "to": "room-4",
+        "roomId": "room-6"
       },
       {
         "x": 37,
@@ -3301,7 +3303,12 @@
     "entranceRoomId": "room-1",
     "entranceDoor": {
       "x": 8,
-      "y": 18
+      "y": 18,
+      "corridor": {
+        "x": 9,
+        "y": 18
+      },
+      "to": "room-2"
     },
     "startPosition": {
       "x": 3,
@@ -3317,71 +3324,64 @@
   },
   "objects": [
     {
-      "items": [],
       "id": "gate-statue",
       "type": "cracked-statue",
-      "roomId": "room-1",
       "position": {
         "x": 5,
         "y": 17
-      }
+      },
+      "items": []
     },
     {
-      "items": [],
       "id": "key-table",
       "type": "table",
-      "roomId": "room-2",
       "position": {
         "x": 15,
         "y": 18
-      }
+      },
+      "items": []
     },
     {
-      "items": [
-        "one-shot-cat2-last-door-name"
-      ],
       "id": "scribe-books",
       "type": "bookshelf",
-      "roomId": "room-3",
       "position": {
         "x": 26,
         "y": 9
-      }
+      },
+      "items": [
+        "one-shot-cat2-last-door-name"
+      ]
     },
     {
-      "items": [],
       "id": "key-rack",
       "type": "weapon-rack",
-      "roomId": "room-4",
       "position": {
         "x": 26,
         "y": 20
-      }
+      },
+      "items": []
     },
     {
-      "items": [],
       "id": "door-altar",
       "type": "ritual-altar",
-      "roomId": "room-5",
       "position": {
         "x": 37,
         "y": 17
-      }
+      },
+      "items": []
     },
     {
-      "items": [],
       "id": "ally-crate",
       "type": "undead-crate",
-      "roomId": "room-4",
       "position": {
         "x": 29,
-        "y": 21
-      }
+        "y": 23
+      },
+      "items": []
     },
     {
       "id": "pantry-table",
       "type": "table",
-      "roomId": "room-6",
       "position": {
         "x": 15,
         "y": 29
@@ -3391,7 +3391,6 @@
     {
       "id": "court-statue",
       "type": "cracked-statue",
-      "roomId": "room-7",
       "position": {
         "x": 37,
         "y": 27
@@ -3401,172 +3400,172 @@
   ],
   "monsters": [
     {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Hollow-Wail Spirit",
       "id": "m1",
       "monsterId": "hollowWailSpirit",
-      "roomId": "room-2",
+      "name": "Hollow-Wail Spirit",
       "position": {
         "x": 16,
         "y": 18
-      }
-    },
-    {
+      },
+      "roomId": "room-2",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Chainbound Phantom",
+      "customized": false
+    },
+    {
       "id": "m2",
       "monsterId": "chainboundPhantom",
-      "roomId": "room-3",
+      "name": "Chainbound Phantom",
       "position": {
         "x": 26,
         "y": 9
-      }
-    },
-    {
+      },
+      "roomId": "room-3",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Candleflame Wisp",
+      "customized": false
+    },
+    {
       "id": "m3",
       "monsterId": "candleflameWisp",
-      "roomId": "room-4",
+      "name": "Candleflame Wisp",
       "position": {
         "x": 26,
         "y": 21
-      }
-    },
-    {
-      "isBoss": true,
+      },
+      "roomId": "room-4",
+      "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Wraith of the Locked Door",
+      "customized": false
+    },
+    {
       "id": "boss",
       "monsterId": "wraithOfTheLockedDoor",
-      "roomId": "room-5",
+      "name": "Wraith of the Locked Door",
       "position": {
         "x": 37,
         "y": 17
-      }
+      },
+      "roomId": "room-5",
+      "isBoss": true,
+      "extraLoot": [],
+      "overrides": {},
+      "customized": false
     },
     {
       "id": "m4",
       "monsterId": "mourningApparition",
-      "roomId": "room-6",
+      "name": "Mourning Apparition",
       "position": {
         "x": 15,
         "y": 29
       },
+      "roomId": "room-6",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Mourning Apparition"
+      "customized": false
     },
     {
       "id": "m5",
       "monsterId": "whisperingShade",
-      "roomId": "room-7",
+      "name": "Whispering Shade",
       "position": {
         "x": 37,
         "y": 27
       },
+      "roomId": "room-7",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Whispering Shade"
+      "customized": false
     },
     {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Chainbound Phantom",
       "id": "reinforcement-room-2-1",
       "monsterId": "chainboundPhantom",
-      "roomId": "room-2",
+      "name": "Chainbound Phantom",
       "position": {
         "x": 15,
         "y": 17
-      }
-    },
-    {
+      },
+      "roomId": "room-2",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Hollow-Wail Spirit",
+      "customized": false
+    },
+    {
       "id": "reinforcement-room-3-2",
       "monsterId": "hollowWailSpirit",
-      "roomId": "room-3",
+      "name": "Hollow-Wail Spirit",
       "position": {
         "x": 25,
         "y": 8
-      }
-    },
-    {
+      },
+      "roomId": "room-3",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Hollow-Wail Spirit",
+      "customized": false
+    },
+    {
       "id": "reinforcement-room-4-3",
       "monsterId": "hollowWailSpirit",
-      "roomId": "room-4",
+      "name": "Hollow-Wail Spirit",
       "position": {
         "x": 25,
         "y": 20
-      }
-    },
-    {
+      },
+      "roomId": "room-4",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Hollow-Wail Spirit",
+      "customized": false
+    },
+    {
       "id": "reinforcement-room-5-4",
       "monsterId": "hollowWailSpirit",
-      "roomId": "room-5",
+      "name": "Hollow-Wail Spirit",
       "position": {
         "x": 36,
         "y": 16
-      }
-    },
-    {
+      },
+      "roomId": "room-5",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Hollow-Wail Spirit",
+      "customized": false
+    },
+    {
       "id": "reinforcement-room-6-5",
       "monsterId": "hollowWailSpirit",
-      "roomId": "room-6",
+      "name": "Hollow-Wail Spirit",
       "position": {
         "x": 14,
         "y": 28
-      }
-    },
-    {
+      },
+      "roomId": "room-6",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Hollow-Wail Spirit",
+      "customized": false
+    },
+    {
       "id": "reinforcement-room-7-6",
       "monsterId": "hollowWailSpirit",
-      "roomId": "room-7",
+      "name": "Hollow-Wail Spirit",
       "position": {
         "x": 36,
         "y": 26
-      }
+      },
+      "roomId": "room-7",
+      "isBoss": false,
+      "extraLoot": [],
+      "overrides": {},
+      "customized": false
     }
   ],
   "customItems": [
@@ -3606,47 +3605,46 @@
       "event": "enterRoom",
       "targetId": "room-1",
       "title": "A Gate Without Hinges",
-      "once": true,
-      "text": "The gatehouse arch has no door, only hinge scars and a brass keyhole set into empty air."
+      "text": "The gatehouse arch has no door, only hinge scars and a brass keyhole set into empty air.",
+      "images": [],
+      "once": true
     },
     {
       "id": "s2",
       "event": "enterRoom",
       "targetId": "room-2",
       "title": "Unused Keys",
-      "once": true,
-      "text": "Hundreds of keys hang here. None fit anything. All of them are labeled with people names."
+      "text": "Hundreds of keys hang here. None fit anything. All of them are labeled with people names.",
+      "images": [],
+      "once": true
     },
     {
       "id": "s3",
       "event": "openObject",
       "targetId": "scribe-books",
       "title": "Elowen",
-      "once": true,
-      "text": "A brittle ledger says the warden loved a door so much she named it Elowen and stood behind it when raiders came."
+      "text": "A brittle ledger says the warden loved a door so much she named it Elowen and stood behind it when raiders came.",
+      "images": [],
+      "once": true
     },
     {
       "id": "s4",
       "event": "enterRoom",
       "targetId": "room-5",
       "title": "The Door Wakes",
-      "once": true,
-      "text": "A wraith peels itself from the final door. It does not attack immediately. It listens for its name."
+      "text": "A wraith peels itself from the final door. It does not attack immediately. It listens for its name.",
+      "images": [],
+      "once": true
     },
     {
       "id": "s5",
       "event": "killMonster",
       "targetId": "boss",
       "title": "Memory Unlatched",
-      "once": true,
-      "text": "The wraith breaks into key-shaped sparks. The door remains, but now it remembers how to open."
+      "text": "The wraith breaks into key-shaped sparks. The door remains, but now it remembers how to open.",
+      "images": [],
+      "once": true
     }
   ],
-  "designNotes": {
-    "category": 2,
-    "bossMonster": "Wraith of the Locked Door",
-    "goalMix": "reachExit",
-    "specialLocks": "Final door requires Elowen, discoverable in the scribe niche.",
-    "revision": "Expanded to seven rooms and roughly 5-8 encounter rooms; hidden doors are one-sided from reachable rooms only."
-  }
+  "updatedAt": "2026-05-29T11:33:03.180Z"
 }

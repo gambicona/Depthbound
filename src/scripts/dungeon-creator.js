@@ -545,6 +545,19 @@ function updateObjectRecruitFromCard(object, changedField = "") {
     object.recruit.monsterId = state.selectedMonsterId;
     renderSelected();
   }
+  if (changedField === "recruitUseSaved") {
+    const recruitId = readSelectedLockField("data-object-field='savedRecruitId'")?.value ?? "";
+    const recruit = savedRecruitEntries().find((entry) => entry.id === recruitId);
+    if (recruit) {
+      object.recruit.kind = recruit.kind ?? "hero";
+      object.recruit.name = recruit.name ?? "";
+      object.recruit.classId = recruit.classId ?? "fighter";
+      object.recruit.level = recruit.level ?? 1;
+      object.recruit.tokenArt = recruit.tokenArt ?? "";
+      object.recruit.overridesText = recruitOverridesText(recruit);
+    }
+    renderSelected();
+  }
   if (changedField === "recruitKind") renderSelected();
 }
 
@@ -1093,6 +1106,24 @@ function customBibliographyItems() {
   return window.DungeonCustomItems?.load?.() ?? [];
 }
 
+function savedRecruitEntries() {
+  return window.DungeonRecruitRegistry?.load?.() ?? [];
+}
+
+function savedRecruitOptions(selectedId = "") {
+  const entries = savedRecruitEntries();
+  if (!entries.length) return `<option value="">No saved recruits</option>`;
+  return `<option value="">Choose saved recruit</option>${entries
+    .sort((a, b) => String(a.name ?? a.id).localeCompare(String(b.name ?? b.id)))
+    .map((recruit) => `<option value="${escapeAttribute(recruit.id)}" ${recruit.id === selectedId ? "selected" : ""}>${escapeHtml(recruit.name ?? recruit.id)} (Level ${escapeHtml(recruit.level ?? "?")})</option>`)
+    .join("")}`;
+}
+
+function recruitOverridesText(recruit) {
+  if (!recruit) return "{}";
+  return JSON.stringify(recruit, null, 2);
+}
+
 function filteredCustomBibliographyItems(excludedIds = new Set()) {
   const scrollLevelFilter = els.scrollSpellLevelFilter?.value ?? "";
   const scrollClassFilter = els.scrollSpellClassFilter?.value ?? "";
@@ -1165,9 +1196,7 @@ function renderItemSelects() {
 let customBibliographySignature = "";
 
 function currentCustomBibliographySignature() {
-  const key = window.DungeonCustomItems?.storageKey;
-  if (!key) return "";
-  return window.localStorage?.getItem(key) ?? "";
+  return window.DungeonCustomItems?.signature?.() ?? "";
 }
 
 function syncCustomBibliographyItems(force = false) {
@@ -1758,8 +1787,12 @@ function renderSelected() {
                <label>Recruit button <input data-object-field="recruitLabel" value="${escapeAttribute(recruit.recruitLabel)}" /></label>
                <label>Back button <input data-object-field="recruitBackLabel" value="${escapeAttribute(recruit.backLabel)}" /></label>
              </div>
+             <div class="creator-row">
+               <label>Saved recruit <select data-object-field="savedRecruitId">${savedRecruitOptions()}</select></label>
+               <button type="button" data-action="recruit-use-saved">Use saved recruit</button>
+             </div>
              <label>Recruit JSON <textarea data-object-field="recruitOverridesText" rows="8">${escapeHtml(recruit.overridesText || "{}")}</textarea></label>
-             <small>Paste JSON from the Recruit Creator. The recruit appears when this room is revealed, then joins only if clicked and recruited.</small>`
+             <small>Pick a saved recruit from creator-recruits.json or paste JSON from the Recruit Creator. The recruit appears when this room is revealed, then joins only if clicked and recruited.</small>`
           : ""
       }
       ${
@@ -2485,29 +2518,31 @@ async function saveCampaignOverride() {
     return;
   }
   if (state.oneShotSource) {
-    const saved = window.DungeonOneShots?.saveOverride?.(
+    const template = templateFromState({ includeOneShotSource: true });
+    const saved = await window.DungeonOneShots?.saveSource?.(
       state.oneShotSource.id,
-      templateFromState({ includeOneShotSource: true }),
+      template,
     );
     if (!saved) {
-      setStatus("Could not save the one-shot override.");
+      setStatus("Could not save the one-shot dungeon file. Run through playtest-server.js so Dungeon Creator can write game files.");
       return;
     }
-    setStatus(`Saved override for ${state.oneShotSource.name ?? state.oneShotSource.id}.`);
+    setStatus(`Saved ${state.oneShotSource.name ?? state.oneShotSource.id} to its game file.`);
     renderOneShotDungeons();
     renderAll();
     return;
   }
-  const saved = window.DungeonCampaigns?.saveOverride?.(
+  const template = templateFromState({ includeCampaignSource: true });
+  const saved = await window.DungeonCampaigns?.saveSource?.(
     state.campaignSource.campaignId,
     state.campaignSource.campaignIndex,
-    templateFromState({ includeCampaignSource: true }),
+    template,
   );
   if (!saved) {
-    setStatus("Could not save the campaign override.");
+    setStatus("Could not save the campaign dungeon file. Run through playtest-server.js so Dungeon Creator can write game files.");
     return;
   }
-  setStatus(`Saved override for ${state.campaignSource.campaignName ?? state.campaignSource.campaignId} Dungeon ${state.campaignSource.campaignIndex}.`);
+  setStatus(`Saved ${state.campaignSource.campaignName ?? state.campaignSource.campaignId} Dungeon ${state.campaignSource.campaignIndex} to its game file.`);
   await renderCampaignDungeons();
   renderAll();
 }
@@ -2682,7 +2717,9 @@ function generateRandomLayout() {
   renderAll();
 }
 
-function init() {
+async function init() {
+  await window.DungeonCustomItems?.refreshFromFile?.();
+  await window.DungeonRecruitRegistry?.refreshFromFile?.();
   const importedCustomItems = importCustomItemsFromHash();
   renderThemes();
   syncCustomBibliographyItems(true);
@@ -2743,9 +2780,15 @@ function init() {
   window.addEventListener("storage", (event) => {
     if (event.key === window.DungeonCustomItems?.storageKey) syncCustomBibliographyItems(true);
   });
-  window.addEventListener("focus", () => syncCustomBibliographyItems());
+  window.addEventListener("focus", () => {
+    void window.DungeonCustomItems?.refreshFromFile?.().then(() => syncCustomBibliographyItems(true));
+    void window.DungeonRecruitRegistry?.refreshFromFile?.().then(() => renderSelected());
+  });
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") syncCustomBibliographyItems();
+    if (document.visibilityState === "visible") {
+      void window.DungeonCustomItems?.refreshFromFile?.().then(() => syncCustomBibliographyItems(true));
+      void window.DungeonRecruitRegistry?.refreshFromFile?.().then(() => renderSelected());
+    }
   });
   els.roomList.addEventListener("click", (event) => {
     const button = event.target.closest("[data-room-select]");
@@ -2870,6 +2913,10 @@ function init() {
     }
     if (button.dataset.action === "recruit-use-selected-monster" && selected?.type) {
       updateObjectRecruitFromCard(selected, "recruitUseSelectedMonster");
+      renderExport();
+    }
+    if (button.dataset.action === "recruit-use-saved" && selected?.type) {
+      updateObjectRecruitFromCard(selected, "recruitUseSaved");
       renderExport();
     }
   });
@@ -3049,5 +3096,5 @@ function init() {
   });
 }
 
-window.addEventListener("DOMContentLoaded", init);
+window.addEventListener("DOMContentLoaded", () => void init());
 })();

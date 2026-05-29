@@ -305,20 +305,23 @@ function buildItem() {
   };
 }
 
-function saveItem() {
+async function saveItem() {
   const item = buildItem();
   const next = customItems().filter((entry) => entry.id !== item.id);
   next.push(item);
-  window.DungeonCustomItems.save(next);
-  window.DungeonCustomItems.registerAll();
+  const saved = await window.DungeonCustomItems.saveFile(next);
+  if (!saved) {
+    els.status.textContent = "Could not save the item file. Run through playtest-server.js so Custom Item Creator can write game files.";
+    return;
+  }
   els.id.value = item.id;
-  els.status.textContent = `Saved ${item.name}. Reopen or refresh the game to see it in the admin vault.`;
+  els.status.textContent = `Saved ${item.name} to creator-custom-items.json.`;
   renderBibliography();
 }
 
-function deleteItem(itemId) {
-  window.DungeonCustomItems.save(customItems().filter((entry) => entry.id !== itemId));
-  els.status.textContent = "Deleted custom item.";
+async function deleteItem(itemId) {
+  const saved = await window.DungeonCustomItems.saveFile(customItems().filter((entry) => entry.id !== itemId));
+  els.status.textContent = saved ? "Deleted custom item from creator-custom-items.json." : "Could not update the item file.";
   renderBibliography();
 }
 
@@ -365,22 +368,23 @@ function renderBibliography() {
   `).join("") : `<p class="small-note">No custom items saved yet.</p>`;
 }
 
-function init() {
+async function init() {
+  await window.DungeonCustomItems?.refreshFromFile?.();
   els.template.innerHTML = templates().map((item) => `<option value="${item.id}">${item.name}</option>`).join("");
   els.magicExtraType.innerHTML = damageTypes.map((type) => `<option value="${type}">${type || "None"}</option>`).join("");
   renderCurses();
   fillFromTemplate();
   renderBibliography();
   els.template.addEventListener("change", fillFromTemplate);
-  els.save.addEventListener("click", saveItem);
+  els.save.addEventListener("click", () => void saveItem());
   els.fresh.addEventListener("click", fillFromTemplate);
   els.bibliography.addEventListener("click", (event) => {
     const edit = event.target.closest("[data-edit]");
     const del = event.target.closest("[data-delete]");
     if (edit) fillFromItem(customItems().find((item) => item.id === edit.dataset.edit));
-    if (del) deleteItem(del.dataset.delete);
+    if (del) void deleteItem(del.dataset.delete);
   });
 }
 
-init();
+void init();
 })();

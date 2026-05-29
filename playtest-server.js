@@ -21,6 +21,31 @@ const maxEventLogEntries = 100;
 const largeSnapshotWarnBytes = 1024 * 1024;
 const maxSnapshotBacklogBytes = 2 * 1024 * 1024;
 
+const writableOneShotDungeons = new Map([
+  ["one-shot-cat1-lantern-that-lies", "one-shot-cat1-lantern-that-lies.json"],
+  ["one-shot-cat2-locked-door-wraith", "one-shot-cat2-locked-door-wraith.json"],
+  ["one-shot-cat3-tempest-choir", "one-shot-cat3-tempest-choir.json"],
+  ["one-shot-cat4-slagmaw-cooling-line", "one-shot-cat4-slagmaw-cooling-line.json"],
+  ["one-shot-cat5-corpse-flower-regent", "one-shot-cat5-corpse-flower-regent.json"],
+  ["one-shot-cat6-broken-gears", "one-shot-cat6-broken-gears.json"],
+  ["one-shot-cat7-blade-queen", "one-shot-cat7-blade-queen.json"],
+  ["one-shot-cat8-crushing-deep", "one-shot-cat8-crushing-deep.json"],
+  ["one-shot-cat9-cinders-and-chains", "one-shot-cat9-cinders-and-chains.json"],
+  ["one-shot-cat10-root-first-forest", "one-shot-cat10-root-first-forest.json"],
+]);
+
+const writableCampaignDungeons = new Map([
+  ["barrow-crown", { folder: "campaigns/the-barrow-crown", count: 7 }],
+  ["thornwood-pact", { folder: "campaigns/the-thornwood-pact", count: 8 }],
+  ["embervein-first-claim", { folder: "campaigns/the-first-claim-of-embervein", count: 1 }],
+  ["dwarven-smithy-ember-oath", { folder: "campaigns/the-dwarven-smithy-ember-oath", count: 8 }],
+]);
+
+const writableHelperRegistries = new Map([
+  ["custom-items", "creator-custom-items.json"],
+  ["recruits", "creator-recruits.json"],
+]);
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -76,6 +101,33 @@ function safePath(urlPath) {
   const clean = decoded === "/" ? "/index.html" : decoded;
   const resolved = path.resolve(root, `.${clean}`);
   return resolved.startsWith(root) ? resolved : null;
+}
+
+function writableSourcePath(payload) {
+  if (payload?.kind === "one-shot") {
+    const file = writableOneShotDungeons.get(payload.id);
+    return file ? path.resolve(root, "One-Shot Dungeons", file) : null;
+  }
+  if (payload?.kind === "campaign") {
+    const campaign = writableCampaignDungeons.get(payload.campaignId);
+    const index = Math.floor(Number(payload.index));
+    if (!campaign || index < 1 || index > campaign.count) return null;
+    return path.resolve(root, campaign.folder, `Dungeon${index}.json`);
+  }
+  return null;
+}
+
+function writableHelperRegistryPath(kind) {
+  const file = writableHelperRegistries.get(kind);
+  return file ? path.resolve(root, file) : null;
+}
+
+function sendJson(response, status, payload) {
+  response.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-cache",
+  });
+  response.end(JSON.stringify(payload));
 }
 
 function send(ws, payload) {
@@ -388,6 +440,80 @@ const server = http.createServer((request, response) => {
         logEvent("warn", "Invalid snapshot POST JSON", { bytes: Buffer.byteLength(body, "utf8"), error: error.message });
         response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
         response.end(JSON.stringify({ accepted: false, error: "Invalid JSON" }));
+      }
+    });
+    return;
+  }
+
+  if (request.method === "POST" && request.url?.startsWith("/save-source-dungeon")) {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 50 * 1024 * 1024) request.destroy();
+    });
+    request.on("end", () => {
+      try {
+        const payload = JSON.parse(body);
+        const filePath = writableSourcePath(payload);
+        if (!filePath || !filePath.startsWith(root)) {
+          sendJson(response, 403, { saved: false, error: "Source dungeon is not writable." });
+          return;
+        }
+        if (!payload.template || typeof payload.template !== "object" || Array.isArray(payload.template)) {
+          sendJson(response, 400, { saved: false, error: "Missing template object." });
+          return;
+        }
+        const json = `${JSON.stringify(payload.template, null, 2)}\n`;
+        fs.writeFile(filePath, json, "utf8", (error) => {
+          if (error) {
+            logEvent("error", "Failed to save source dungeon", { filePath, error: error.message });
+            sendJson(response, 500, { saved: false, error: "Write failed." });
+            return;
+          }
+          logEvent("info", "Saved source dungeon", { filePath: path.relative(root, filePath) });
+          sendJson(response, 200, { saved: true, file: path.relative(root, filePath).replace(/\\/g, "/") });
+        });
+      } catch (error) {
+        logEvent("warn", "Invalid source dungeon save JSON", { bytes: Buffer.byteLength(body, "utf8"), error: error.message });
+        sendJson(response, 400, { saved: false, error: "Invalid JSON" });
+      }
+    });
+    return;
+  }
+
+  if (request.method === "POST" && request.url?.startsWith("/save-helper-registry")) {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 20 * 1024 * 1024) request.destroy();
+    });
+    request.on("end", () => {
+      try {
+        const payload = JSON.parse(body);
+        const filePath = writableHelperRegistryPath(payload?.kind);
+        if (!filePath || !filePath.startsWith(root)) {
+          sendJson(response, 403, { saved: false, error: "Registry is not writable." });
+          return;
+        }
+        if (!Array.isArray(payload.entries)) {
+          sendJson(response, 400, { saved: false, error: "Missing entries array." });
+          return;
+        }
+        const json = `${JSON.stringify(payload.entries, null, 2)}\n`;
+        fs.writeFile(filePath, json, "utf8", (error) => {
+          if (error) {
+            logEvent("error", "Failed to save helper registry", { filePath, error: error.message });
+            sendJson(response, 500, { saved: false, error: "Write failed." });
+            return;
+          }
+          logEvent("info", "Saved helper registry", { kind: payload.kind, filePath: path.relative(root, filePath) });
+          sendJson(response, 200, { saved: true, file: path.relative(root, filePath).replace(/\\/g, "/") });
+        });
+      } catch (error) {
+        logEvent("warn", "Invalid helper registry save JSON", { bytes: Buffer.byteLength(body, "utf8"), error: error.message });
+        sendJson(response, 400, { saved: false, error: "Invalid JSON" });
       }
     });
     return;

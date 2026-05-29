@@ -3566,9 +3566,8 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Coal-Dust Goblin",
       "id": "m1",
-      "monsterId": "coalDustGoblin",
+      "monsterId": "brokenGearHorror",
       "roomId": "room-2",
       "position": {
         "x": 16,
@@ -3580,9 +3579,8 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Furnace Mephit",
       "id": "m2",
-      "monsterId": "furnaceMephit",
+      "monsterId": "powderKegSaboteur",
       "roomId": "room-3",
       "position": {
         "x": 26,
@@ -3594,9 +3592,8 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Bent-Gear Scarab",
       "id": "m3",
-      "monsterId": "bentGearScarab",
+      "monsterId": "salamanderFlameguard",
       "roomId": "room-4",
       "position": {
         "x": 27,
@@ -3604,13 +3601,12 @@
       }
     },
     {
-      "isBoss": false,
+      "isBoss": true,
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Furnace-Ward Guardian",
-      "id": "m4",
-      "monsterId": "furnaceWardGuardian",
+      "id": "boss",
+      "monsterId": "slagmawBrute",
       "roomId": "room-5",
       "position": {
         "x": 38,
@@ -3618,13 +3614,12 @@
       }
     },
     {
-      "isBoss": true,
+      "isBoss": false,
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Slagmaw Brute",
-      "id": "boss",
-      "monsterId": "slagmawBrute",
+      "id": "m5",
+      "monsterId": "cinderstormDancer",
       "roomId": "room-5",
       "position": {
         "x": 41,
@@ -3632,102 +3627,69 @@
       }
     },
     {
-      "id": "m5",
-      "monsterId": "sootTunnelRat",
+      "id": "m6",
+      "monsterId": "ashenPyreLord",
       "roomId": "room-6",
       "position": {
         "x": 16,
-        "y": 29
+        "y": 28
       },
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Soot-Tunnel Rat"
+      "customized": false
     },
     {
-      "id": "m6",
-      "monsterId": "animatedAnvil",
-      "roomId": "room-7",
-      "position": {
-        "x": 40,
-        "y": 29
-      },
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Animated Anvil"
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Furnace Mephit",
-      "id": "reinforcement-room-2-1",
-      "monsterId": "furnaceMephit",
-      "roomId": "room-2",
+      "id": "companion-room-2",
+      "monsterId": "obsidianSmelter",
       "position": {
         "x": 15,
-        "y": 17
-      }
-    },
-    {
+        "y": 18
+      },
+      "roomId": "room-2",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Coal-Dust Goblin",
-      "id": "reinforcement-room-3-2",
-      "monsterId": "coalDustGoblin",
-      "roomId": "room-3",
+      "customized": false
+    },
+    {
+      "id": "companion-room-3",
+      "monsterId": "magmaVeinLoper",
       "position": {
         "x": 25,
-        "y": 10
-      }
-    },
-    {
+        "y": 11
+      },
+      "roomId": "room-3",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Coal-Dust Goblin",
-      "id": "reinforcement-room-4-3",
-      "monsterId": "coalDustGoblin",
-      "roomId": "room-4",
+      "customized": false
+    },
+    {
+      "id": "companion-room-4",
+      "monsterId": "chaosFlameBinder",
       "position": {
         "x": 26,
-        "y": 22
-      }
-    },
-    {
+        "y": 23
+      },
+      "roomId": "room-4",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Coal-Dust Goblin",
-      "id": "reinforcement-room-6-4",
-      "monsterId": "coalDustGoblin",
-      "roomId": "room-6",
+      "customized": false
+    },
+    {
+      "id": "companion-room-6",
+      "monsterId": "pressureRiftHorror",
       "position": {
         "x": 15,
-        "y": 28
-      }
-    },
-    {
+        "y": 29
+      },
+      "roomId": "room-6",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Coal-Dust Goblin",
-      "id": "reinforcement-room-7-5",
-      "monsterId": "coalDustGoblin",
-      "roomId": "room-7",
-      "position": {
-        "x": 39,
-        "y": 28
-      }
+      "customized": false
     }
   ],
   "customItems": [

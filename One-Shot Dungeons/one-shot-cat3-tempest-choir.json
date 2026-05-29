@@ -3,6 +3,8 @@
   "name": "Cat 3 - The Tempest Choir Rehearsal",
   "themeId": "crucibleOfStorms",
   "gridSize": 46,
+  "oneShotDungeon": true,
+  "oneShotDungeonId": "one-shot-cat3-tempest-choir",
   "dungeon": {
     "id": "one-shot-cat3-tempest-choir",
     "gridSize": 46,
@@ -1970,16 +1972,6 @@
         "roomId": "room-2"
       },
       {
-        "x": 23,
-        "y": 11,
-        "corridor": {
-          "x": 22,
-          "y": 11
-        },
-        "to": "room-2",
-        "roomId": "room-3"
-      },
-      {
         "x": 19,
         "y": 18,
         "corridor": {
@@ -1988,16 +1980,6 @@
         },
         "to": "room-4",
         "roomId": "room-2"
-      },
-      {
-        "x": 23,
-        "y": 25,
-        "corridor": {
-          "x": 22,
-          "y": 25
-        },
-        "to": "room-2",
-        "roomId": "room-4"
       },
       {
         "x": 19,
@@ -2010,16 +1992,6 @@
         "roomId": "room-2"
       },
       {
-        "x": 34,
-        "y": 19,
-        "corridor": {
-          "x": 33,
-          "y": 19
-        },
-        "to": "room-2",
-        "roomId": "room-5"
-      },
-      {
         "x": 16,
         "y": 21,
         "corridor": {
@@ -2030,14 +2002,34 @@
         "roomId": "room-2"
       },
       {
-        "x": 16,
-        "y": 27,
+        "x": 23,
+        "y": 11,
         "corridor": {
-          "x": 16,
-          "y": 26
+          "x": 22,
+          "y": 11
         },
         "to": "room-2",
-        "roomId": "room-6"
+        "roomId": "room-3"
+      },
+      {
+        "x": 23,
+        "y": 25,
+        "corridor": {
+          "x": 22,
+          "y": 25
+        },
+        "to": "room-2",
+        "roomId": "room-4"
+      },
+      {
+        "x": 34,
+        "y": 19,
+        "corridor": {
+          "x": 33,
+          "y": 19
+        },
+        "to": "room-2",
+        "roomId": "room-5"
       },
       {
         "x": 38,
@@ -2048,6 +2040,16 @@
         },
         "to": "room-7",
         "roomId": "room-5"
+      },
+      {
+        "x": 16,
+        "y": 27,
+        "corridor": {
+          "x": 16,
+          "y": 26
+        },
+        "to": "room-2",
+        "roomId": "room-6"
       },
       {
         "x": 38,
@@ -3477,7 +3479,12 @@
     "entranceRoomId": "room-1",
     "entranceDoor": {
       "x": 8,
-      "y": 19
+      "y": 19,
+      "corridor": {
+        "x": 9,
+        "y": 19
+      },
+      "to": "room-2"
     },
     "startPosition": {
       "x": 3,
@@ -3493,82 +3500,75 @@
   },
   "objects": [
     {
-      "items": [],
       "id": "nave-pillar-a",
       "type": "glyph-carved-pillar",
-      "roomId": "room-2",
       "position": {
         "x": 14,
         "y": 17
-      }
+      },
+      "items": []
     },
     {
-      "items": [],
       "id": "nave-pillar-b",
       "type": "floating-crystal",
-      "roomId": "room-2",
       "position": {
         "x": 18,
         "y": 18
-      }
+      },
+      "items": []
     },
     {
-      "items": [
-        "one-shot-cat3-storm-note"
-      ],
       "id": "left-bell",
       "type": "brazier",
-      "roomId": "room-3",
       "position": {
         "x": 26,
         "y": 10
-      }
-    },
-    {
+      },
       "items": [
         "one-shot-cat3-storm-note"
-      ],
+      ]
+    },
+    {
       "id": "right-bell",
       "type": "rune-circle",
-      "roomId": "room-4",
       "position": {
         "x": 26,
         "y": 25
-      }
-    },
-    {
+      },
       "items": [
         "one-shot-cat3-storm-note"
-      ],
+      ]
+    },
+    {
       "id": "choir-stand",
       "type": "ritual-altar",
-      "roomId": "room-5",
       "position": {
         "x": 37,
         "y": 19
       },
+      "locked": true,
       "specialLock": {
-        "label": "Third Note",
-        "prompt": "Sing the word carved above both bell lungs.",
-        "answer": "hush",
+        "label": "Special Lock",
+        "prompt": "What lies before the bell lungs?",
+        "answer": "Humming Nave",
         "caseSensitive": false
       },
-      "locked": true
+      "items": [
+        "one-shot-cat3-storm-note"
+      ]
     },
     {
-      "items": [],
       "id": "beast-ally",
       "type": "beast-companion-crate",
-      "roomId": "room-1",
       "position": {
         "x": 6,
         "y": 19
-      }
+      },
+      "items": []
     },
     {
       "id": "vestry-crystal",
       "type": "floating-crystal",
-      "roomId": "room-6",
       "position": {
         "x": 16,
         "y": 29
@@ -3578,7 +3578,6 @@
     {
       "id": "loft-pillar",
       "type": "glyph-carved-pillar",
-      "roomId": "room-7",
       "position": {
         "x": 38,
         "y": 29
@@ -3588,172 +3587,82 @@
   ],
   "monsters": [
     {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Gale-Roost Screamer",
       "id": "m1",
-      "monsterId": "galeRoostScreamer",
-      "roomId": "room-2",
+      "monsterId": "cycloneMyrmidon",
       "position": {
         "x": 16,
         "y": 18
-      }
-    },
-    {
+      },
+      "roomId": "room-2",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Sparkwing Mephitling",
+      "customized": false
+    },
+    {
       "id": "m2",
-      "monsterId": "sparkwingMephitling",
-      "roomId": "room-3",
+      "monsterId": "stormEel",
       "position": {
         "x": 25,
         "y": 11
-      }
-    },
-    {
+      },
+      "roomId": "room-3",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Needlewind Skirmisher",
+      "customized": false
+    },
+    {
       "id": "m3",
-      "monsterId": "needlewindSkirmisher",
-      "roomId": "room-4",
+      "monsterId": "siroccoReaver",
       "position": {
         "x": 26,
         "y": 25
-      }
-    },
-    {
+      },
+      "roomId": "room-4",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Storm-Shell Core",
-      "id": "m4",
-      "monsterId": "stormShellCore",
-      "roomId": "room-5",
+      "customized": false
+    },
+    {
+      "id": "boss",
+      "monsterId": "tempestChoirCaller",
       "position": {
         "x": 36,
         "y": 20
-      }
-    },
-    {
+      },
+      "roomId": "room-5",
       "isBoss": true,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Tempest Choir Caller",
-      "id": "boss",
-      "monsterId": "tempestChoirCaller",
-      "roomId": "room-5",
-      "position": {
-        "x": 38,
-        "y": 18
-      }
+      "customized": false
     },
     {
       "id": "m5",
-      "monsterId": "thunderclapSprite",
-      "roomId": "room-6",
+      "monsterId": "lightningLashElemental",
+      "position": {
+        "x": 38,
+        "y": 18
+      },
+      "roomId": "room-5",
+      "isBoss": false,
+      "extraLoot": [],
+      "overrides": {},
+      "customized": false
+    },
+    {
+      "id": "m6",
+      "monsterId": "stormhornStag",
       "position": {
         "x": 16,
         "y": 29
       },
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Thunderclap Sprite"
-    },
-    {
-      "id": "m6",
-      "monsterId": "lightningLashElemental",
-      "roomId": "room-7",
-      "position": {
-        "x": 38,
-        "y": 29
-      },
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Lightning Lash Elemental"
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Sparkwing Mephitling",
-      "id": "reinforcement-room-2-1",
-      "monsterId": "sparkwingMephitling",
-      "roomId": "room-2",
-      "position": {
-        "x": 15,
-        "y": 17
-      }
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Gale-Roost Screamer",
-      "id": "reinforcement-room-3-2",
-      "monsterId": "galeRoostScreamer",
-      "roomId": "room-3",
-      "position": {
-        "x": 24,
-        "y": 10
-      }
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Gale-Roost Screamer",
-      "id": "reinforcement-room-4-3",
-      "monsterId": "galeRoostScreamer",
-      "roomId": "room-4",
-      "position": {
-        "x": 25,
-        "y": 24
-      }
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Gale-Roost Screamer",
-      "id": "reinforcement-room-6-4",
-      "monsterId": "galeRoostScreamer",
       "roomId": "room-6",
-      "position": {
-        "x": 15,
-        "y": 28
-      }
-    },
-    {
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Gale-Roost Screamer",
-      "id": "reinforcement-room-7-5",
-      "monsterId": "galeRoostScreamer",
-      "roomId": "room-7",
-      "position": {
-        "x": 37,
-        "y": 28
-      }
+      "customized": false
     }
   ],
   "customItems": [
@@ -3796,47 +3705,46 @@
       "event": "enterRoom",
       "targetId": "room-1",
       "title": "Dry Rain",
-      "once": true,
-      "text": "Raindrops hang in the air without falling. They tremble whenever anyone breathes."
+      "text": "Raindrops hang in the air without falling. They tremble whenever anyone breathes.",
+      "images": [],
+      "once": true
     },
     {
       "id": "s2",
       "event": "enterRoom",
       "targetId": "room-2",
       "title": "The Humming Nave",
-      "once": true,
-      "text": "The whole room hums one note too low for comfort. Your teeth learn it before your ears do."
+      "text": "The whole room hums one note too low for comfort. Your teeth learn it before your ears do.\nOn one wall there is a mural of notes with the words \"Humming Nave\" above them.",
+      "images": [],
+      "once": true
     },
     {
       "id": "s3",
       "event": "openObject",
       "targetId": "left-bell",
       "title": "First Note",
-      "once": true,
-      "text": "The bell coughs up a sliver of blue metal that still sounds after it stops moving."
+      "text": "The bell coughs up a sliver of blue metal that still sounds after it stops moving.",
+      "images": [],
+      "once": true
     },
     {
       "id": "s4",
       "event": "openObject",
       "targetId": "right-bell",
       "title": "Second Note",
-      "once": true,
-      "text": "The second bell note tries to fly away. It settles only when held near the first."
+      "text": "The second bell note tries to fly away. It settles only when held near the first.",
+      "images": [],
+      "once": true
     },
     {
       "id": "s5",
       "event": "enterRoom",
       "targetId": "room-5",
       "title": "The Caller Conducts",
-      "once": true,
-      "text": "The Tempest Choir Caller lifts both hands. Every loose object in the room rises like an audience about to applaud."
+      "text": "The Tempest Choir Caller lifts both hands. Every loose object in the room rises like an audience about to applaud.",
+      "images": [],
+      "once": true
     }
   ],
-  "designNotes": {
-    "category": 3,
-    "bossMonster": "Tempest Choir Caller",
-    "goalMix": "collectItemCount",
-    "allyCrate": "Beast Companion Crate in the entrance gives a possible rescue/ally moment.",
-    "revision": "Expanded to seven rooms and roughly 5-8 encounter rooms; hidden doors are one-sided from reachable rooms only."
-  }
+  "updatedAt": "2026-05-29T11:37:13.586Z"
 }

@@ -16,6 +16,10 @@ const dungeons = [
 
 const cache = new Map();
 const overrideStorageKey = "depthbound.oneShotDungeonOverrides.v1";
+const categoryLockedOneShotIds = new Map(dungeons.map((entry) => {
+  const category = Number(/^one-shot-cat(\d+)-/.exec(entry.id)?.[1]);
+  return [entry.id, Number.isFinite(category) ? category : null];
+}).filter(([, category]) => category >= 3 && category <= 10));
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -34,12 +38,43 @@ function oneShotById(id) {
 }
 
 function loadOverrides() {
-  const parsed = safeParse(window.localStorage.getItem(overrideStorageKey), {});
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  window.localStorage.removeItem(overrideStorageKey);
+  return {};
 }
 
 function saveOverrides(overrides) {
   window.localStorage.setItem(overrideStorageKey, JSON.stringify(overrides));
+}
+
+function monsterCategoryForTemplateEntry(entry) {
+  const explicit = Number(entry?.overrides?.category ?? entry?.category ?? entry?.cat);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const monster = window.DungeonContent?.get?.("monsters", entry?.monsterId ?? entry?.type ?? entry?.id);
+  const category = Number(monster?.category ?? monster?.cat);
+  return Number.isFinite(category) && category > 0 ? category : null;
+}
+
+function overrideMatchesCategoryLock(id, template) {
+  const expected = categoryLockedOneShotIds.get(id);
+  if (!expected) return true;
+  const categories = (template?.monsters ?? [])
+    .map(monsterCategoryForTemplateEntry)
+    .filter((category) => Number.isFinite(category) && category > 0);
+  if (categories.length < 4 || categories.length > 8) return false;
+  const average = categories.reduce((sum, category) => sum + category, 0) / categories.length;
+  return Math.round(average) === expected;
+}
+
+function pruneStaleCategoryLockedOverrides(overrides) {
+  let changed = false;
+  for (const id of categoryLockedOneShotIds.keys()) {
+    if (!overrides[id] || overrideMatchesCategoryLock(id, overrides[id])) continue;
+    delete overrides[id];
+    cache.delete(id);
+    changed = true;
+  }
+  if (changed) saveOverrides(overrides);
+  return overrides;
 }
 
 function normalizeOverrideTemplate(template, id) {
@@ -58,6 +93,7 @@ function getOverride(id) {
 }
 
 function saveOverride(id, template) {
+  return null;
   if (!oneShotById(id)) return null;
   const normalized = normalizeOverrideTemplate(template, id);
   if (!normalized) return null;
@@ -106,10 +142,34 @@ async function original(id) {
     .catch(() => null);
 }
 
+async function saveSource(id, template) {
+  if (!oneShotById(id) || !template) return null;
+  const normalized = {
+    ...clone(template),
+    id: template.id ?? id,
+    oneShotDungeon: true,
+    oneShotDungeonId: id,
+    updatedAt: new Date().toISOString(),
+  };
+  const response = await fetch("/save-source-dungeon", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: "one-shot", id, template: normalized }),
+  }).catch(() => null);
+  if (!response?.ok) return null;
+  const result = await response.json().catch(() => null);
+  if (!result?.saved) return null;
+  removeOverride(id);
+  cache.delete(id);
+  cache.set(id, Promise.resolve(clone(normalized)));
+  return clone(normalized);
+}
+
 window.DungeonOneShots = {
   list: () => dungeons.map(clone),
   get,
   original,
+  saveSource,
   hasOverride,
   saveOverride,
   removeOverride,

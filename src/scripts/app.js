@@ -680,15 +680,11 @@ els.homeMenu.addEventListener("click", (event) => {
     return;
   }
   const button = event.target.closest("button");
-  if (button?.dataset.homeMenu) {
-    setHomeMenuPanel(button.dataset.homeMenu);
-    return;
-  }
-  if (button?.dataset.action === "open-custom-item-creator") {
-    window.open("custom-item-creator.html", "_blank", "noopener");
-    return;
-  }
-  if (button?.dataset.randomDungeonTheme) {
+    if (button?.dataset.homeMenu) {
+      setHomeMenuPanel(button.dataset.homeMenu);
+      return;
+    }
+    if (button?.dataset.randomDungeonTheme) {
     void startRandomDungeonWithHero(button.dataset.randomDungeonTheme);
     return;
   }

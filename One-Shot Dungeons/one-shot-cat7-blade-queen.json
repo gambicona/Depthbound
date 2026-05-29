@@ -4070,13 +4070,12 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Infernal Gaoler",
       "id": "m1",
-      "monsterId": "infernalGaoler",
+      "monsterId": "sixBladeMarilith",
       "roomId": "room-2",
       "position": {
         "x": 18,
-        "y": 19
+        "y": 18
       }
     },
     {
@@ -4084,9 +4083,8 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Chain Magistrate",
       "id": "m2",
-      "monsterId": "chainMagistrate",
+      "monsterId": "hellchainExarch",
       "roomId": "room-3",
       "position": {
         "x": 30,
@@ -4098,22 +4096,20 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Plague-Belly Hezrou",
       "id": "m3",
-      "monsterId": "plagueBellyHezrou",
+      "monsterId": "ashenErinyes",
       "roomId": "room-4",
       "position": {
         "x": 30,
-        "y": 27
+        "y": 26
       }
     },
     {
-      "isBoss": false,
+      "isBoss": true,
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Inquisitor Malrec",
-      "id": "m4",
+      "id": "boss",
       "monsterId": "inquisitorMalrec",
       "roomId": "room-5",
       "position": {
@@ -4122,12 +4118,11 @@
       }
     },
     {
-      "isBoss": true,
+      "isBoss": false,
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Blade-Queen Sarthyxa",
-      "id": "boss",
+      "id": "m5",
       "monsterId": "bladeQueenSarthyxa",
       "roomId": "room-5",
       "position": {
@@ -4136,102 +4131,69 @@
       }
     },
     {
-      "id": "m5",
-      "monsterId": "brassHornOverseer",
+      "id": "m6",
+      "monsterId": "infernalChainwright",
       "roomId": "room-6",
       "position": {
         "x": 18,
-        "y": 31
+        "y": 30
       },
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Brass-Horn Overseer"
+      "customized": false
     },
     {
-      "id": "m6",
-      "monsterId": "hornedRiftGorger",
-      "roomId": "room-7",
+      "id": "companion-room-2",
+      "monsterId": "hellchainExarch",
       "position": {
-        "x": 45,
-        "y": 31
+        "x": 17,
+        "y": 19
       },
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Horned Rift-Gorger"
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Chain Magistrate",
-      "id": "reinforcement-room-2-1",
-      "monsterId": "chainMagistrate",
       "roomId": "room-2",
-      "position": {
-        "x": 17,
-        "y": 18
-      }
-    },
-    {
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Infernal Gaoler",
-      "id": "reinforcement-room-3-2",
-      "monsterId": "infernalGaoler",
+      "customized": false
+    },
+    {
+      "id": "companion-room-3",
+      "monsterId": "sixBladeMarilith",
+      "position": {
+        "x": 29,
+        "y": 11
+      },
       "roomId": "room-3",
-      "position": {
-        "x": 29,
-        "y": 10
-      }
-    },
-    {
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Infernal Gaoler",
-      "id": "reinforcement-room-4-3",
-      "monsterId": "infernalGaoler",
+      "customized": false
+    },
+    {
+      "id": "companion-room-4",
+      "monsterId": "ashenErinyes",
+      "position": {
+        "x": 29,
+        "y": 27
+      },
       "roomId": "room-4",
-      "position": {
-        "x": 29,
-        "y": 26
-      }
-    },
-    {
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Infernal Gaoler",
-      "id": "reinforcement-room-6-4",
-      "monsterId": "infernalGaoler",
-      "roomId": "room-6",
+      "customized": false
+    },
+    {
+      "id": "companion-room-6",
+      "monsterId": "bladeQueenSarthyxa",
       "position": {
         "x": 17,
-        "y": 30
-      }
-    },
-    {
+        "y": 31
+      },
+      "roomId": "room-6",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Infernal Gaoler",
-      "id": "reinforcement-room-7-5",
-      "monsterId": "infernalGaoler",
-      "roomId": "room-7",
-      "position": {
-        "x": 44,
-        "y": 30
-      }
+      "customized": false
     }
   ],
   "customItems": [

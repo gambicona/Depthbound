@@ -121,8 +121,8 @@ function overrideKey(campaignId, index) {
 }
 
 function loadOverrides() {
-  const parsed = safeParse(window.localStorage.getItem(overrideStorageKey), {});
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  window.localStorage.removeItem(overrideStorageKey);
+  return {};
 }
 
 function saveOverrides(overrides) {
@@ -145,6 +145,7 @@ function getOverride(campaignId, index) {
 }
 
 function saveOverride(campaignId, index, template) {
+  return null;
   const campaign = campaigns.find((entry) => entry.id === campaignId);
   if (!campaign || index < 1 || index > campaign.count) return null;
   const normalized = normalizeOverrideTemplate(template, campaignId, index);
@@ -208,11 +209,34 @@ async function originalDungeon(campaignId, index) {
     .catch(() => null);
 }
 
+async function saveSource(campaignId, index, template) {
+  const campaign = campaigns.find((entry) => entry.id === campaignId);
+  if (!campaign || index < 1 || index > campaign.count || !template) return null;
+  const normalized = {
+    ...clone(template),
+    campaignId,
+    campaignIndex: index,
+    updatedAt: new Date().toISOString(),
+  };
+  const response = await fetch("/save-source-dungeon", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: "campaign", campaignId, index, template: normalized }),
+  }).catch(() => null);
+  if (!response?.ok) return null;
+  const result = await response.json().catch(() => null);
+  if (!result?.saved) return null;
+  removeOverride(campaignId, index);
+  cache.set(overrideKey(campaignId, index), Promise.resolve(clone(normalized)));
+  return clone(normalized);
+}
+
 window.DungeonCampaigns = {
   list: () => campaigns.map((campaign) => ({ ...campaign })),
   get: (id) => campaigns.find((campaign) => campaign.id === id) ?? null,
   dungeon,
   originalDungeon,
+  saveSource,
   isUnlocked,
   hasOverride,
   saveOverride,

@@ -3895,9 +3895,8 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Tidepool Tyrant",
       "id": "m1",
-      "monsterId": "tidepoolTyrant",
+      "monsterId": "coralCathedralBeast",
       "roomId": "room-2",
       "position": {
         "x": 17,
@@ -3909,110 +3908,11 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "River Myrmidon",
       "id": "m2",
-      "monsterId": "riverMyrmidon",
+      "monsterId": "drowningMistArchon",
       "roomId": "room-3",
       "position": {
         "x": 30,
-        "y": 13
-      }
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Rimefin Hunter",
-      "id": "m3",
-      "monsterId": "rimefinHunter",
-      "roomId": "room-4",
-      "position": {
-        "x": 30,
-        "y": 28
-      }
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Blackwater Colossus",
-      "id": "m4",
-      "monsterId": "blackwaterColossus",
-      "roomId": "room-5",
-      "position": {
-        "x": 43,
-        "y": 22
-      }
-    },
-    {
-      "isBoss": true,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Queen of the Crushing Deep",
-      "id": "boss",
-      "monsterId": "queenOfTheCrushingDeep",
-      "roomId": "room-5",
-      "position": {
-        "x": 45,
-        "y": 20
-      }
-    },
-    {
-      "id": "m5",
-      "monsterId": "brineLash",
-      "roomId": "room-6",
-      "position": {
-        "x": 17,
-        "y": 31
-      },
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Brine Lash"
-    },
-    {
-      "id": "m6",
-      "monsterId": "mistveilStrangler",
-      "roomId": "room-7",
-      "position": {
-        "x": 45,
-        "y": 32
-      },
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Mistveil Strangler"
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "River Myrmidon",
-      "id": "reinforcement-room-2-1",
-      "monsterId": "riverMyrmidon",
-      "roomId": "room-2",
-      "position": {
-        "x": 16,
-        "y": 19
-      }
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Tidepool Tyrant",
-      "id": "reinforcement-room-3-2",
-      "monsterId": "tidepoolTyrant",
-      "roomId": "room-3",
-      "position": {
-        "x": 29,
         "y": 12
       }
     },
@@ -4021,13 +3921,25 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Tidepool Tyrant",
-      "id": "reinforcement-room-4-3",
-      "monsterId": "tidepoolTyrant",
+      "id": "m3",
+      "monsterId": "livingGlacier",
       "roomId": "room-4",
       "position": {
-        "x": 29,
-        "y": 27
+        "x": 31,
+        "y": 28
+      }
+    },
+    {
+      "isBoss": true,
+      "extraLoot": [],
+      "overrides": {},
+      "customized": false,
+      "id": "boss",
+      "monsterId": "queenOfTheCrushingDeep",
+      "roomId": "room-5",
+      "position": {
+        "x": 43,
+        "y": 22
       }
     },
     {
@@ -4035,28 +3947,78 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Tidepool Tyrant",
-      "id": "reinforcement-room-6-4",
-      "monsterId": "tidepoolTyrant",
+      "id": "m5",
+      "monsterId": "highTierStormfinManta",
+      "roomId": "room-5",
+      "position": {
+        "x": 45,
+        "y": 20
+      }
+    },
+    {
+      "id": "m6",
+      "monsterId": "highTierLeviathanCalf",
       "roomId": "room-6",
       "position": {
-        "x": 16,
-        "y": 30
-      }
-    },
-    {
+        "x": 17,
+        "y": 31
+      },
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Tidepool Tyrant",
-      "id": "reinforcement-room-7-5",
-      "monsterId": "tidepoolTyrant",
-      "roomId": "room-7",
+      "customized": false
+    },
+    {
+      "id": "companion-room-2",
+      "monsterId": "drowningMistArchon",
       "position": {
-        "x": 44,
+        "x": 16,
+        "y": 20
+      },
+      "roomId": "room-2",
+      "isBoss": false,
+      "extraLoot": [],
+      "overrides": {},
+      "customized": false
+    },
+    {
+      "id": "companion-room-3",
+      "monsterId": "coralCathedralBeast",
+      "position": {
+        "x": 29,
+        "y": 13
+      },
+      "roomId": "room-3",
+      "isBoss": false,
+      "extraLoot": [],
+      "overrides": {},
+      "customized": false
+    },
+    {
+      "id": "companion-room-4",
+      "monsterId": "livingGlacier",
+      "position": {
+        "x": 27,
+        "y": 28
+      },
+      "roomId": "room-4",
+      "isBoss": false,
+      "extraLoot": [],
+      "overrides": {},
+      "customized": false
+    },
+    {
+      "id": "companion-room-6",
+      "monsterId": "highTierStormfinManta",
+      "position": {
+        "x": 15,
         "y": 31
-      }
+      },
+      "roomId": "room-6",
+      "isBoss": false,
+      "extraLoot": [],
+      "overrides": {},
+      "customized": false
     }
   ],
   "customItems": [

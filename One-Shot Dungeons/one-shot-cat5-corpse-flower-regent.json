@@ -3786,9 +3786,8 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Twig Blight Sprinter",
       "id": "m1",
-      "monsterId": "twigBlightSprinter",
+      "monsterId": "ironbarkGuardian",
       "roomId": "room-1",
       "position": {
         "x": 6,
@@ -3800,12 +3799,11 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Thorn Lash Vine",
       "id": "m2",
-      "monsterId": "thornLashVine",
+      "monsterId": "venomBloomMatron",
       "roomId": "room-2",
       "position": {
-        "x": 16,
+        "x": 17,
         "y": 19
       }
     },
@@ -3814,27 +3812,12 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Myconid Sporeguard",
       "id": "m3",
-      "monsterId": "myconidSporeguard",
+      "monsterId": "umberMoldProphet",
       "roomId": "room-3",
       "position": {
         "x": 27,
-        "y": 10
-      }
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Yellow Musk Creeper",
-      "id": "m4",
-      "monsterId": "yellowMuskCreeper",
-      "roomId": "room-4",
-      "position": {
-        "x": 27,
-        "y": 25
+        "y": 9
       }
     },
     {
@@ -3842,18 +3825,30 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Corpse Flower Regent",
       "id": "boss",
       "monsterId": "corpseFlowerRegent",
+      "roomId": "room-4",
+      "position": {
+        "x": 27,
+        "y": 25
+      }
+    },
+    {
+      "isBoss": false,
+      "extraLoot": [],
+      "overrides": {},
+      "customized": false,
+      "id": "m5",
+      "monsterId": "highTierGloomwebBroodmother",
       "roomId": "room-5",
       "position": {
-        "x": 41,
+        "x": 42,
         "y": 19
       }
     },
     {
-      "id": "m5",
-      "monsterId": "shriekerSporecap",
+      "id": "m6",
+      "monsterId": "highTierOakmawCaveBear",
       "roomId": "room-6",
       "position": {
         "x": 17,
@@ -3862,120 +3857,85 @@
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Shrieker Sporecap"
+      "customized": false
     },
     {
-      "id": "m6",
-      "monsterId": "bloodOrchidStalker",
-      "roomId": "room-7",
-      "position": {
-        "x": 41,
-        "y": 30
-      },
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Blood Orchid Stalker"
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Thorn Lash Vine",
-      "id": "reinforcement-room-1-1",
-      "monsterId": "thornLashVine",
-      "roomId": "room-1",
+      "id": "companion-room-1",
+      "monsterId": "venomBloomMatron",
       "position": {
         "x": 5,
-        "y": 19
-      }
-    },
-    {
+        "y": 20
+      },
+      "roomId": "room-1",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Twig Blight Sprinter",
-      "id": "reinforcement-room-2-2",
-      "monsterId": "twigBlightSprinter",
-      "roomId": "room-2",
+      "customized": false
+    },
+    {
+      "id": "companion-room-2",
+      "monsterId": "ironbarkGuardian",
       "position": {
         "x": 15,
-        "y": 18
-      }
-    },
-    {
+        "y": 19
+      },
+      "roomId": "room-2",
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Twig Blight Sprinter",
-      "id": "reinforcement-room-3-3",
-      "monsterId": "twigBlightSprinter",
+      "customized": false
+    },
+    {
+      "id": "companion-room-3",
+      "monsterId": "umberMoldProphet",
+      "position": {
+        "x": 26,
+        "y": 10
+      },
       "roomId": "room-3",
-      "position": {
-        "x": 26,
-        "y": 9
-      }
-    },
-    {
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Twig Blight Sprinter",
-      "id": "reinforcement-room-4-4",
-      "monsterId": "twigBlightSprinter",
+      "customized": false
+    },
+    {
+      "id": "companion-room-4",
+      "monsterId": "corpseFlowerRegent",
+      "position": {
+        "x": 25,
+        "y": 25
+      },
       "roomId": "room-4",
-      "position": {
-        "x": 26,
-        "y": 24
-      }
-    },
-    {
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Twig Blight Sprinter",
-      "id": "reinforcement-room-5-5",
-      "monsterId": "twigBlightSprinter",
+      "customized": false
+    },
+    {
+      "id": "companion-room-5",
+      "monsterId": "highTierGloomwebBroodmother",
+      "position": {
+        "x": 39,
+        "y": 19
+      },
       "roomId": "room-5",
-      "position": {
-        "x": 40,
-        "y": 18
-      }
-    },
-    {
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Twig Blight Sprinter",
-      "id": "reinforcement-room-6-6",
-      "monsterId": "twigBlightSprinter",
+      "customized": false
+    },
+    {
+      "id": "companion-room-6",
+      "monsterId": "highTierOakmawCaveBear",
+      "position": {
+        "x": 15,
+        "y": 30
+      },
       "roomId": "room-6",
-      "position": {
-        "x": 16,
-        "y": 29
-      }
-    },
-    {
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Twig Blight Sprinter",
-      "id": "reinforcement-room-7-7",
-      "monsterId": "twigBlightSprinter",
-      "roomId": "room-7",
-      "position": {
-        "x": 40,
-        "y": 29
-      }
+      "customized": false
     }
   ],
   "customItems": [

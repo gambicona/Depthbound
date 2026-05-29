@@ -3203,7 +3203,8 @@ async function showCampaignMenu(campaignId) {
       .map((entry, index) => {
         const number = index + 1;
         const unlocked = number <= completed + 1;
-        return `<button type="button" data-campaign-dungeon="${number}" ${unlocked ? "" : "disabled"}>${number}. ${escapeHtml(entry?.name ?? `Dungeon ${number}`)}${number <= completed ? " ✓" : unlocked ? "" : " 🔒"}</button>`;
+        const difficulty = typeof dungeonDifficultyLabelForTemplate === "function" ? dungeonDifficultyLabelForTemplate(entry) : "";
+        return `<button type="button" data-campaign-dungeon="${number}" ${unlocked ? "" : "disabled"}>${number}. ${escapeHtml(entry?.name ?? `Dungeon ${number}`)}${difficulty ? ` <small class="dungeon-difficulty-label">${escapeHtml(difficulty)}</small>` : ""}${number <= completed ? " &#10003;" : unlocked ? "" : " [Locked]"}</button>`;
       })
       .join("");
     const cleanup = (value) => {

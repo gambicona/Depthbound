@@ -3812,9 +3812,8 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Bent-Gear Scarab",
-      "id": "gear-a",
-      "monsterId": "bentGearScarab",
+      "id": "m1",
+      "monsterId": "cinderCrownElder",
       "roomId": "room-2",
       "position": {
         "x": 17,
@@ -3826,9 +3825,8 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Bent-Gear Scarab",
-      "id": "gear-b",
-      "monsterId": "bentGearScarab",
+      "id": "m2",
+      "monsterId": "glassfireOracle",
       "roomId": "room-3",
       "position": {
         "x": 29,
@@ -3840,23 +3838,21 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Bent-Gear Scarab",
-      "id": "gear-c",
-      "monsterId": "bentGearScarab",
+      "id": "m3",
+      "monsterId": "hellfireStoker",
       "roomId": "room-4",
       "position": {
         "x": 29,
-        "y": 26
+        "y": 25
       }
     },
     {
-      "isBoss": false,
+      "isBoss": true,
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Deep Dwarf Chain Guard",
-      "id": "m1",
-      "monsterId": "deepDwarfChainGuard",
+      "id": "boss",
+      "monsterId": "masterOfBrokenGears",
       "roomId": "room-2",
       "position": {
         "x": 19,
@@ -3868,9 +3864,8 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Animated Anvil",
-      "id": "m2",
-      "monsterId": "animatedAnvil",
+      "id": "m5",
+      "monsterId": "oreEatingWormling",
       "roomId": "room-5",
       "position": {
         "x": 41,
@@ -3878,13 +3873,12 @@
       }
     },
     {
-      "isBoss": true,
+      "isBoss": false,
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Master of Broken Gears",
-      "id": "boss",
-      "monsterId": "masterOfBrokenGears",
+      "id": "m6",
+      "monsterId": "salamanderForgeNoble",
       "roomId": "room-5",
       "position": {
         "x": 43,
@@ -3892,88 +3886,30 @@
       }
     },
     {
-      "id": "gear-d",
-      "monsterId": "bentGearScarab",
-      "roomId": "room-6",
+      "id": "companion-room-3",
+      "monsterId": "hellfireStoker",
       "position": {
-        "x": 17,
-        "y": 30
+        "x": 28,
+        "y": 11
       },
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Bent-Gear Scarab"
-    },
-    {
-      "id": "m3",
-      "monsterId": "coalDustGoblin",
-      "roomId": "room-7",
-      "position": {
-        "x": 43,
-        "y": 30
-      },
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Coal-Dust Goblin"
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Deep Dwarf Chain Guard",
-      "id": "reinforcement-room-3-1",
-      "monsterId": "deepDwarfChainGuard",
       "roomId": "room-3",
-      "position": {
-        "x": 28,
-        "y": 10
-      }
-    },
-    {
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Deep Dwarf Chain Guard",
-      "id": "reinforcement-room-4-2",
-      "monsterId": "deepDwarfChainGuard",
+      "customized": false
+    },
+    {
+      "id": "companion-room-4",
+      "monsterId": "cinderCrownElder",
+      "position": {
+        "x": 28,
+        "y": 26
+      },
       "roomId": "room-4",
-      "position": {
-        "x": 28,
-        "y": 25
-      }
-    },
-    {
       "isBoss": false,
       "extraLoot": [],
       "overrides": {},
-      "customized": false,
-      "name": "Deep Dwarf Chain Guard",
-      "id": "reinforcement-room-6-3",
-      "monsterId": "deepDwarfChainGuard",
-      "roomId": "room-6",
-      "position": {
-        "x": 16,
-        "y": 29
-      }
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Bent-Gear Scarab",
-      "id": "reinforcement-room-7-4",
-      "monsterId": "bentGearScarab",
-      "roomId": "room-7",
-      "position": {
-        "x": 42,
-        "y": 29
-      }
+      "customized": false
     }
   ],
   "customItems": [],

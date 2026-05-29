@@ -3934,13 +3934,12 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Chain-Hoist Overseer",
       "id": "m1",
-      "monsterId": "chainHoistOverseer",
+      "monsterId": "hellCrownPraetor",
       "roomId": "room-2",
       "position": {
         "x": 18,
-        "y": 21
+        "y": 20
       }
     },
     {
@@ -3948,110 +3947,11 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Chain Magistrate",
       "id": "m2",
-      "monsterId": "chainMagistrate",
+      "monsterId": "infernalSoulReaper",
       "roomId": "room-3",
       "position": {
         "x": 31,
-        "y": 12
-      }
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Red Valve Engine",
-      "id": "m3",
-      "monsterId": "redValveEngine",
-      "roomId": "room-4",
-      "position": {
-        "x": 31,
-        "y": 29
-      }
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Duke of Chains Voragul",
-      "id": "m4",
-      "monsterId": "dukeOfChainsVoragul",
-      "roomId": "room-5",
-      "position": {
-        "x": 45,
-        "y": 22
-      }
-    },
-    {
-      "isBoss": true,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Queen of Cinders and Chains",
-      "id": "boss",
-      "monsterId": "queenOfCindersAndChains",
-      "roomId": "room-5",
-      "position": {
-        "x": 47,
-        "y": 20
-      }
-    },
-    {
-      "id": "m5",
-      "monsterId": "infernalGaoler",
-      "roomId": "room-6",
-      "position": {
-        "x": 18,
-        "y": 31
-      },
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Infernal Gaoler"
-    },
-    {
-      "id": "m6",
-      "monsterId": "hellmarkedAdjudicator",
-      "roomId": "room-7",
-      "position": {
-        "x": 47,
-        "y": 31
-      },
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Hellmarked Adjudicator"
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Chain Magistrate",
-      "id": "reinforcement-room-2-1",
-      "monsterId": "chainMagistrate",
-      "roomId": "room-2",
-      "position": {
-        "x": 17,
-        "y": 20
-      }
-    },
-    {
-      "isBoss": false,
-      "extraLoot": [],
-      "overrides": {},
-      "customized": false,
-      "name": "Chain-Hoist Overseer",
-      "id": "reinforcement-room-3-2",
-      "monsterId": "chainHoistOverseer",
-      "roomId": "room-3",
-      "position": {
-        "x": 30,
         "y": 11
       }
     },
@@ -4060,27 +3960,25 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Chain-Hoist Overseer",
-      "id": "reinforcement-room-4-3",
-      "monsterId": "chainHoistOverseer",
+      "id": "m3",
+      "monsterId": "archdevilsBurningHand",
       "roomId": "room-4",
       "position": {
-        "x": 30,
+        "x": 31,
         "y": 28
       }
     },
     {
-      "isBoss": false,
+      "isBoss": true,
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Chain-Hoist Overseer",
-      "id": "reinforcement-room-6-4",
-      "monsterId": "chainHoistOverseer",
-      "roomId": "room-6",
+      "id": "boss",
+      "monsterId": "dukeOfChainsVoragul",
+      "roomId": "room-5",
       "position": {
-        "x": 17,
-        "y": 30
+        "x": 45,
+        "y": 22
       }
     },
     {
@@ -4088,14 +3986,78 @@
       "extraLoot": [],
       "overrides": {},
       "customized": false,
-      "name": "Chain-Hoist Overseer",
-      "id": "reinforcement-room-7-5",
-      "monsterId": "chainHoistOverseer",
-      "roomId": "room-7",
+      "id": "m5",
+      "monsterId": "queenOfCindersAndChains",
+      "roomId": "room-5",
       "position": {
-        "x": 46,
-        "y": 30
+        "x": 47,
+        "y": 20
       }
+    },
+    {
+      "id": "m6",
+      "monsterId": "emberveinPitEngineer",
+      "roomId": "room-6",
+      "position": {
+        "x": 18,
+        "y": 30
+      },
+      "isBoss": false,
+      "extraLoot": [],
+      "overrides": {},
+      "customized": false
+    },
+    {
+      "id": "companion-room-2",
+      "monsterId": "infernalSoulReaper",
+      "position": {
+        "x": 17,
+        "y": 21
+      },
+      "roomId": "room-2",
+      "isBoss": false,
+      "extraLoot": [],
+      "overrides": {},
+      "customized": false
+    },
+    {
+      "id": "companion-room-3",
+      "monsterId": "hellCrownPraetor",
+      "position": {
+        "x": 30,
+        "y": 12
+      },
+      "roomId": "room-3",
+      "isBoss": false,
+      "extraLoot": [],
+      "overrides": {},
+      "customized": false
+    },
+    {
+      "id": "companion-room-4",
+      "monsterId": "archdevilsBurningHand",
+      "position": {
+        "x": 30,
+        "y": 29
+      },
+      "roomId": "room-4",
+      "isBoss": false,
+      "extraLoot": [],
+      "overrides": {},
+      "customized": false
+    },
+    {
+      "id": "companion-room-6",
+      "monsterId": "queenOfCindersAndChains",
+      "position": {
+        "x": 17,
+        "y": 31
+      },
+      "roomId": "room-6",
+      "isBoss": false,
+      "extraLoot": [],
+      "overrides": {},
+      "customized": false
     }
   ],
   "customItems": [
