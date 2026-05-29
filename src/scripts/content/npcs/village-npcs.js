@@ -56,6 +56,22 @@ const wizardLines = [
   "Yes, yes, tragic doom. Put it on the table.",
 ];
 
+const alchemistLines = [
+  "Potions, yes, yes, but have you considered the educational value of a controlled detonation?",
+  "Flowers are for poets. Brimstone is for discovery.",
+  "Stand behind the yellow line. No, the other yellow line. The first one burned off.",
+  "I buy things that hiss, spark, smoke, pop, or make responsible adults nervous.",
+  "Healing is fine. Fire is faster.",
+];
+
+const arcanistLines = [
+  "Please do not touch the vellum unless you can pronounce vellum.",
+  "Yes, the scrolls are expensive. So is literacy at this level.",
+  "I sell magic. I do not appraise pocket lint, heirloom knives, or whatever that is leaking in your bag.",
+  "A spell scroll is not paper. It is a bottled decision made by someone cleverer than most kings.",
+  "If you must ask whether it is safe to read aloud, begin with a cheaper scroll.",
+];
+
 npc("general-merchant", {
   name: "Sophie",
   title: "General Merchant",
@@ -98,7 +114,7 @@ npc("armorsmith", {
 npc("apothecary", {
   name: "Ilyra Fen",
   title: "Apothecary",
-  portrait: "assets/npcs/alchemist.png",
+  portrait: "assets/npcs/apothecary.jpg",
   token: { fallbackLabel: "AP" },
   village: { unlocked: true, order: 35 },
   dialogue: { entryLines: apothecaryLines },
@@ -111,7 +127,7 @@ npc("apothecary", {
 npc("grumpy-wizard", {
   name: "Old Master Vell",
   title: "Grumpy Old Wizard",
-  portrait: "assets/npcs/alchemist.png",
+  portrait: "assets/npcs/grumpy-wizard.jpg",
   token: { fallbackLabel: "GW" },
   village: { unlocked: true, order: 37 },
   dialogue: { entryLines: wizardLines },
@@ -122,22 +138,238 @@ npc("grumpy-wizard", {
 });
 
 npc("monster-guild", {
-  name: "Monster Guild",
-  title: "Bounties and Contracts",
-  portrait: "assets/npcs/monster-guild.png",
-  token: { fallbackLabel: "MG" },
-  village: { unlocked: false, lockText: "Locked until a later story step.", order: 40 },
-  dialogue: { entryLines: ["The guild hall is shut. Something large scratches at the other side."] },
-  description: "Future monster contracts and bounty chains.",
+  name: "Kessa Briarhook",
+  title: "Huntmaster of the Trophy Lodge",
+  portrait: "assets/npcs/trophy-lodge-npc.jpg",
+  token: { fallbackLabel: "TL" },
+  village: {
+    label: "The Trophy Lodge",
+    unlocked: true,
+    unlockFlag: "flag.village.monsterHunterGuildUnlocked",
+    hiddenUntilUnlocked: true,
+    adminAvailable: true,
+    lockText: "Locked until a later story step.",
+    order: 40,
+  },
+  dialogue: {
+    entryLines: [
+      "If it leaves tracks, teeth, or a smell that scares horses, we can put a price on it.",
+      "Bring proof, not stories. Stories do not tan into leather.",
+      "The board is fresh. Try not to bleed on the ink.",
+      "A monster is only mysterious until someone survives taking notes.",
+      "Good hunters come back with trophies. Great hunters come back with the rest of the party.",
+    ],
+  },
+  inspection:
+    "Kessa Briarhook runs the Trophy Lodge with a ledger, a scarred longknife, and the patience of someone who has heard every exaggerated monster story twice. She pays for clean trophies, posts dangerous contracts, and teaches practical tricks to parties who prove they can return from the dark.",
+  description: "Monster hunting contracts, trophy turn-ins, and hunter reputation.",
+});
+
+npc("gravebinders", {
+  name: "Odran Vellshade",
+  title: "Candlewarden of the Gravebinders",
+  portrait: "assets/npcs/gravebinders-npc.jpg",
+  token: { fallbackLabel: "GB" },
+  village: {
+    label: "The Gravebinders",
+    unlocked: true,
+    unlockFlag: "flag.village.gravebindersUnlocked",
+    hiddenUntilUnlocked: true,
+    adminAvailable: true,
+    lockText: "Locked until a later story step.",
+    order: 45,
+  },
+  dialogue: {
+    entryLines: [
+      "Speak softly. Some debts are old enough to hear their names from under stone.",
+      "Bring ash, wax, bone, or proof the restless have been put down.",
+      "The dead do not need fear. They need boundaries.",
+      "If something followed you home, say so before it learns the door.",
+      "We pay for endings. Clean ones, when possible.",
+    ],
+  },
+  inspection:
+    "Odran Vellshade keeps the Gravebinders' candle-ledger in a case of black oak and tarnished silver. He is pale, precise, and unhurried, with the manner of someone who has argued with ghosts and won by waiting. His order pays for undead work, cursed remains, and materials taken from places where the dead refuse to stay quiet.",
+  description: "Undead contracts, grave-material turn-ins, and quiet warding rewards.",
+});
+
+npc("crucible-collegium", {
+  name: "Tavren Quillflare",
+  title: "Provost of the Crucible Collegium",
+  portrait: "assets/npcs/crucible-collegium-npc.jpg",
+  token: { fallbackLabel: "CC" },
+  village: {
+    label: "Crucible Collegium",
+    unlocked: true,
+    unlockFlag: "flag.village.crucibleCollegiumUnlocked",
+    hiddenUntilUnlocked: true,
+    adminAvailable: true,
+    lockText: "Locked until a later story step.",
+    order: 47,
+  },
+  dialogue: {
+    entryLines: [
+      "Do not call them sparks. Sparks are what apprentices make before paperwork.",
+      "Bring essence, cores, motes, and observations that survived contact with reality.",
+      "If it melted your boots, froze your lantern, or argued with gravity, I want notes.",
+      "The elements are not moods. They are laws with teeth.",
+      "Fizzwick makes noise. We make repeatable noise.",
+    ],
+  },
+  inspection:
+    "Tavren Quillflare is a bright-eyed tiefling scholar with brass spectacles, ink-stained gloves, and a laboratory coat reinforced with scorch plates. He treats elemental violence as a solvable equation, provided someone else is willing to stand close enough to collect data.",
+  description: "Elemental contracts, planar reagents, and Collegium reputation.",
+});
+
+npc("antiquarian-society", {
+  name: "Professor Seraphel Inkglass",
+  title: "Chair of the Antiquarian Society",
+  portrait: "assets/npcs/antiquarian-society-npc.jpg",
+  token: { fallbackLabel: "AQ" },
+  village: {
+    label: "Antiquarian Society",
+    unlocked: true,
+    unlockFlag: "flag.village.antiquarianSocietyUnlocked",
+    hiddenUntilUnlocked: true,
+    adminAvailable: true,
+    lockText: "Locked until a later story step.",
+    order: 48,
+  },
+  dialogue: {
+    entryLines: [
+      "Do not polish the relics. Dirt is context.",
+      "A cracked tablet is still a sentence, if one has the courtesy to listen.",
+      "Treasure is vulgar until cataloged. Then it becomes funding.",
+      "Bring me inscriptions, field notes, old seals, and objects with suspicious provenance.",
+      "If it hums in a dead language, wrap it twice and look smug.",
+    ],
+  },
+  inspection:
+    "Professor Seraphel Inkglass presides over the Antiquarian Society from behind a mobile archive desk stacked with vellum tubes, brass lenses, and more bookmarks than seems structurally safe. She is delighted by old things, unimpressed by shiny things, and ruthless about labeling.",
+  description: "Tome cataloging, relic turn-ins, and scholarly field commissions.",
+});
+
+npc("expedition-board", {
+  name: "Nella Waymark",
+  title: "Expedition Clerk",
+  portrait: "assets/npcs/expedition-board-npc.jpg",
+  token: { fallbackLabel: "EX" },
+  village: {
+    label: "Expedition Board",
+    unlocked: true,
+    unlockFlag: "flag.village.expeditionBoardUnlocked",
+    hiddenUntilUnlocked: true,
+    adminAvailable: true,
+    lockText: "Locked until a later story step.",
+    order: 49,
+  },
+  dialogue: {
+    entryLines: [
+      "Sign the route, bring back a mark on the map, and try not to make me file a missing party notice.",
+      "Successful expeditions get paid. Dramatic expeditions get corrected in red ink.",
+      "The Board wants roads proved, ruins checked, and supply ledgers that do not smell like panic.",
+      "If you found a shortcut, write it down before the bard improves it.",
+      "No, 'very dark and bad' is not a terrain report.",
+    ],
+  },
+  inspection:
+    "Nella Waymark manages the Expedition Board with a wax pencil, pinned route cards, and the expression of someone who has heard too many adventurers call getting lost 'scouting'. She pays for completed delves, mapped routes, recovered supplies, and field reliability.",
+  description: "Dungeon completion contracts, route work, and expedition supply turn-ins.",
+});
+
+npc("boom-club", {
+  name: "Fizzwick Boomwhistle",
+  title: "Founder of Fizzwick's Boom Club",
+  portrait: "assets/npcs/alchemist.jpg",
+  token: { fallbackLabel: "BC" },
+  village: {
+    label: "Fizzwick's Boom Club",
+    unlocked: true,
+    unlockFlag: "flag.village.boomClubUnlocked",
+    hiddenUntilUnlocked: true,
+    adminAvailable: true,
+    lockText: "Locked until a later story step.",
+    order: 51,
+  },
+  dialogue: {
+    entryLines: [
+      "Welcome to the club. The first rule is goggles. The second rule is still goggles, but louder.",
+      "Bring me coal, brimstone, pressure cores, and anything that makes a sensible person step backward.",
+      "We are not reckless. We are aggressively curious with excellent ventilation.",
+      "If a vial whispers, label it. If it screams, label it from farther away.",
+      "Remember: a failed experiment is just a successful warning.",
+    ],
+  },
+  inspection:
+    "Fizzwick's Boom Club is less a club and more a semi-formal waiting list for scorch-resistant curiosity. Fizzwick tracks volatile reagents, field tests, and explosive discoveries with genuine brilliance, dramatic underlining, and several ink blots that may once have been sparks.",
+  description: "Volatile reagent commissions, explosive turn-ins, and lightly singed reputation.",
+});
+
+npc("fighting-pit", {
+  name: "Brakka Ironbell",
+  title: "Pit Marshal",
+  portrait: "assets/npcs/fighting-pit-npc.jpg",
+  token: { fallbackLabel: "FP" },
+  village: {
+    label: "Fighting Pit",
+    unlocked: true,
+    unlockFlag: "flag.village.fightingPitUnlocked",
+    hiddenUntilUnlocked: true,
+    adminAvailable: true,
+    lockText: "Locked until a later story step.",
+    order: 52,
+  },
+  dialogue: {
+    entryLines: [
+      "Step in, stand together, and give the crowd something cleaner than a tavern argument. Blunted steel, medics ready, no funerals.",
+      "Three heats, then a champion. Then the next bracket starts meaner.",
+      "Boss falls, you breathe. Short rest only. No feather beds in my pit.",
+      "The bell rings when you earn it, not when you ask nicely.",
+      "Renown is simple: win where people can see you.",
+    ],
+  },
+  inspection:
+    "Brakka Ironbell runs the Fighting Pit with a brass bell, a ledger of odds, and a voice that carries over steel. The weapons are blunted, medics wait at the rail, and the rules forbid lethal finishes. She keeps the arena fair enough to be sport and dangerous enough to matter. Parties earn coin and renown by surviving escalating waves.",
+  description: "Wave arena battles, boss checkpoints, rewards, and pit renown.",
 });
 
 npc("alchemist", {
-  name: "Alchemist",
-  title: "Potions and Reagents",
-  portrait: "assets/npcs/alchemist.png",
+  name: "Fizzwick Boomwhistle",
+  title: "Master of Volatile Solutions",
+  portrait: "assets/npcs/alchemist.jpg",
   token: { fallbackLabel: "AL" },
-  village: { unlocked: false, lockText: "Locked until a later story step.", order: 50 },
-  dialogue: { entryLines: ["Colored glass bottles glow behind a locked door."] },
-  description: "Future potions, bombs, and reagents.",
+  village: {
+    unlocked: true,
+    unlockFlag: "flag.village.alchemistUnlocked",
+    hiddenUntilUnlocked: true,
+    adminAvailable: true,
+    lockText: "Locked until a later story step.",
+    order: 50,
+  },
+  dialogue: { entryLines: alchemistLines },
+  inspection:
+    "Fizzwick is a soot-smudged gnome alchemist with singed eyebrows, oversized goggles, and a satchel that clinks in a deeply worrying way. He stocks potions because adventurers insist on surviving, but his real joy is anything explosive, volatile, or likely to make a door regret existing.",
+  shop: { type: "alchemist", sellRate: 0.45, acceptsSoldTypes: ["consumable", "component"] },
+  description: "Potions, Alchemist's Fire, and random requests for explosive materials.",
+});
+
+npc("arcanist", {
+  name: "Sarthax Veyrune",
+  title: "Master Arcanist",
+  portrait: "assets/npcs/arcanist.jpg",
+  token: { fallbackLabel: "AR" },
+  village: {
+    unlocked: true,
+    unlockFlag: "flag.village.arcanistUnlocked",
+    hiddenUntilUnlocked: true,
+    adminAvailable: true,
+    lockText: "Locked until a later story step.",
+    order: 55,
+  },
+  dialogue: { entryLines: arcanistLines },
+  inspection:
+    "Sarthax is a crimson-scaled dragonborn arcanist in immaculate robes, each claw tipped with a silver writing cap. He sells carefully sealed spell scrolls at prices he considers reasonable, which is to say prices that imply the buyer should be grateful to be allowed near them.",
+  shop: { type: "arcanist", buyPriceMultiplier: 2, acceptsSoldTypes: [], buysFromParty: false },
+  description: "Expensive spell scrolls. Does not buy party goods.",
 });
 })();

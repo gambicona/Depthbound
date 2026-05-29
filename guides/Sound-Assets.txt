@@ -9,6 +9,18 @@ Background music, MP3, looped automatically:
 - assets/sounds/music/oldGuardroom-combat.mp3
 - assets/sounds/music/oldGuardroom-boss-combat.mp3
 
+Village faction screen music, MP3, looped while that faction board is open:
+- assets/sounds/music/village-trophy-lodge.mp3
+- assets/sounds/music/village-gravebinders.mp3
+- assets/sounds/music/village-crucible-collegium.mp3
+- assets/sounds/music/village-antiquarian-society.mp3
+- assets/sounds/music/village-expedition-board.mp3
+- assets/sounds/music/village-boom-club.mp3
+- assets/sounds/music/village-fighting-pit.mp3
+
+Fighting Pit arena music, MP3, looped during the actual arena run:
+- assets/sounds/music/fighting-pit-arena.mp3
+
 The "oldGuardroom" part is the dungeon theme id. Future themes should use:
 - assets/sounds/music/<themeId>-exploration.mp3
 - assets/sounds/music/<themeId>-combat.mp3

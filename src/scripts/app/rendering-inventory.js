@@ -7048,7 +7048,7 @@ function itemUseConsumesInventory(item) {
 
 function itemUseIsSupported(item) {
   const kind = item?.use?.kind;
-  return Boolean(["healing", "fullHealing", "buff", "weaponBuff", "poison", "light", "special", "spellScroll", "breathPotion", "instrumentPerformance"].includes(kind) || item?.use?.status);
+  return Boolean(["healing", "fullHealing", "buff", "weaponBuff", "poison", "light", "special", "spellScroll", "breathPotion", "instrumentPerformance", "thrownConsumable"].includes(kind) || item?.use?.status);
 }
 
 function canUseBeltItem(fighter, item) {
@@ -8152,6 +8152,7 @@ function villageNpcs() {
 }
 
 function npcIsUnlocked(npc) {
+  if (npc?.village?.adminAvailable && adminEnabled()) return true;
   if (npc?.village?.unlocked === false) return false;
   const flag = npc?.village?.unlockFlag;
   return !flag || Boolean(state?.storyFlags?.[flag] || state?.campaignFlags?.[flag] || state?.questFlags?.[flag]);
@@ -8171,8 +8172,113 @@ function npcPortraitMarkup(npc, className = "npc-portrait", { clickable = true }
   if (!src) return `<${tag} class="${className} ${clickable ? "npc-portrait-button" : ""} empty"${actionAttributes}><span>${escapeHtml(fallback)}</span></${tag}>`;
   return `
     <${tag} class="${className} ${clickable ? "npc-portrait-button" : ""}"${actionAttributes}>
-      <img src="${escapeAttribute(src)}" alt="" onerror="this.remove(); this.parentElement.classList.add('empty'); this.parentElement.innerHTML='<span>${escapeAttribute(fallback)}</span>';" />
+      <img src="${escapeAttribute(src)}" alt="" onerror="const parent=this.parentElement; this.remove(); if(parent){ parent.classList.add('empty'); parent.innerHTML='<span>${escapeAttribute(fallback)}</span>'; }" />
     </${tag}>
+  `;
+}
+
+function villageNpcIconMarkup(npc) {
+  const fallback = npc?.token?.fallbackLabel ?? npc?.name?.slice(0, 2).toUpperCase() ?? "?";
+  const factionSymbol = factionSymbolDefinitions[npc?.id];
+  if (factionSymbol?.src) {
+    return `
+      <span class="village-entry-icon village-faction-symbol" title="${escapeAttribute(factionSymbol.name)} symbol">
+        <img src="${escapeAttribute(factionSymbol.src)}" alt="" onerror="const parent=this.parentElement; this.remove(); if(parent){ parent.classList.add('empty'); parent.textContent='${escapeAttribute(factionSymbol.fallback ?? fallback)}'; }" />
+      </span>
+    `;
+  }
+  const src = npc?.portrait;
+  if (!src) return `<span class="village-entry-icon empty">${escapeHtml(fallback)}</span>`;
+  return `
+    <span class="village-entry-icon">
+      <img src="${escapeAttribute(src)}" alt="" onerror="const parent=this.parentElement; this.remove(); if(parent){ parent.classList.add('empty'); parent.textContent='${escapeAttribute(fallback)}'; }" />
+    </span>
+  `;
+}
+
+function villageNpcGroup(npc) {
+  const id = npc?.id ?? "";
+  if (["monster-guild", "gravebinders", "crucible-collegium", "antiquarian-society", "expedition-board", "boom-club", "fighting-pit"].includes(id)) {
+    return { id: "guilds", title: "Guilds & Boards", note: "Faction boards, arena work, and reputation paths.", order: 30 };
+  }
+  if (["alchemist", "arcanist", "grumpy-wizard", "apothecary"].includes(id)) {
+    return { id: "arcane", title: "Arcane & Care", note: "Magic, alchemy, treatment, and stranger services.", order: 20 };
+  }
+  return { id: "shops", title: "Shops & Services", note: "Everyday gear, weapons, armor, and practical supplies.", order: 10 };
+}
+
+function villageNpcTypeLabel(npc) {
+  if (["monster-guild", "gravebinders", "crucible-collegium", "antiquarian-society", "expedition-board", "boom-club", "fighting-pit"].includes(npc?.id)) return "Faction";
+  if (npc?.shop?.type) return "Shop";
+  return "Service";
+}
+
+function villageMusicKeyForNpc(npcId) {
+  if (!["monster-guild", "gravebinders", "crucible-collegium", "antiquarian-society", "expedition-board", "boom-club", "fighting-pit"].includes(npcId)) return "";
+  return `village:${npcId}`;
+}
+
+function setVillageMusicKey(key = "") {
+  activeVillageMusicKey = key;
+  updateBackgroundMusic();
+}
+
+function resetVillageScroll() {
+  if (els.villageBody) els.villageBody.scrollTop = 0;
+}
+
+function setVillageBackButtonVisible(visible) {
+  els.backVillageList?.classList.toggle("hidden", !visible);
+}
+
+const factionSymbolDefinitions = {
+  "monster-guild": { name: "Trophy Lodge", src: "assets/factions/trophy-lodge-symbol.png", fallback: "TL" },
+  gravebinders: { name: "The Gravebinders", src: "assets/factions/gravebinders-symbol.png", fallback: "GB" },
+  "crucible-collegium": { name: "Crucible Collegium", src: "assets/factions/crucible-collegium-symbol.png", fallback: "CC" },
+  "antiquarian-society": { name: "Antiquarian Society", src: "assets/factions/antiquarian-society-symbol.png", fallback: "AS" },
+  "expedition-board": { name: "Expedition Board", src: "assets/factions/expedition-board-symbol.png", fallback: "EB" },
+  "boom-club": { name: "Fizzwick's Boom Club", src: "assets/factions/boom-club-symbol.png", fallback: "BC" },
+  "fighting-pit": { name: "Fighting Pit", src: "assets/factions/fighting-pit-symbol.png", fallback: "FP" },
+};
+
+function factionSymbolMarkup(factionId, className = "guild-symbol") {
+  const symbol = factionSymbolDefinitions[factionId];
+  const fallback = symbol?.fallback ?? String(factionId ?? "?").slice(0, 2).toUpperCase();
+  const label = symbol?.name ?? "Faction";
+  if (!symbol?.src) return `<div class="${className} empty" title="${escapeAttribute(label)} symbol"><span>${escapeHtml(fallback)}</span></div>`;
+  return `
+    <div class="${className}" title="${escapeAttribute(label)} symbol">
+      <img src="${escapeAttribute(symbol.src)}" alt="" onerror="const parent=this.parentElement; this.remove(); if(parent){ parent.classList.add('empty'); parent.innerHTML='<span>${escapeAttribute(fallback)}</span>'; }" />
+    </div>
+  `;
+}
+
+function guildNpcNameButtonMarkup(npc, fallbackName = "Faction Contact") {
+  const npcId = npc?.id ?? "";
+  const name = npc?.name ?? fallbackName;
+  return `
+    <button class="guild-npc-name-button" type="button" data-action="inspect-npc" data-npc="${escapeAttribute(npcId)}" title="Inspect ${escapeAttribute(name)}">
+      ${escapeHtml(name)}
+    </button>
+  `;
+}
+
+function villageNpcCardMarkup(npc) {
+  const unlocked = npcIsUnlocked(npc);
+  const label = npc.village?.label ?? npc.title ?? npc.name;
+  const description = unlocked ? npc.village?.description ?? npc.description ?? npc.name : npc.village?.lockText ?? "Locked";
+  return `
+    <button class="village-entry-card" type="button" data-action="visit-village-npc" data-npc="${escapeAttribute(npc.id)}" ${unlocked ? "" : "disabled"}>
+      ${villageNpcIconMarkup(npc)}
+      <span class="village-entry-copy">
+        <b>${escapeHtml(label)}</b>
+        <small>${escapeHtml(description)}</small>
+      </span>
+      <span class="village-entry-meta">
+        <em>${escapeHtml(villageNpcTypeLabel(npc))}</em>
+        <i aria-hidden="true">›</i>
+      </span>
+    </button>
   `;
 }
 
@@ -8206,28 +8312,65 @@ function showNpcInspection(npcId = activeStoreNpcId) {
 }
 
 function renderVillageMenu() {
-  els.villageMenu?.classList.remove("npc-chat-open");
+  els.villageMenu?.classList.remove("npc-chat-open", "guild-open");
+  els.villageMenu?.classList.add("village-index-open");
+  setVillageBackButtonVisible(false);
+  setVillageMusicKey("");
   const npcs = villageNpcs();
   const graveyardCount = deadRosterHeroes().length;
+  const groups = new Map();
+  for (const npc of npcs) {
+    const group = villageNpcGroup(npc);
+    if (!groups.has(group.id)) groups.set(group.id, { ...group, entries: [] });
+    groups.get(group.id).entries.push(npc);
+  }
+  const groupedEntries = Array.from(groups.values()).sort((a, b) => a.order - b.order);
   els.villageBody.innerHTML = `
-    <p class="empty-note">Choose who to visit in the village.</p>
-    <button type="button" data-action="open-graveyard">
-      <span>Graveyard</span>
-      <small>${graveyardCount ? `${graveyardCount} dead companion${graveyardCount === 1 ? "" : "s"} in memory or keeping` : "No dead companions"}</small>
-    </button>
-    ${npcs
-      .map((npc) => {
-        const unlocked = npcIsUnlocked(npc);
-        return `
-          <button type="button" data-action="visit-village-npc" data-npc="${escapeAttribute(npc.id)}" ${unlocked ? "" : "disabled"}>
-            <span>${escapeHtml(npc.village?.label ?? npc.title ?? npc.name)}</span>
-            <small>${escapeHtml(unlocked ? npc.village?.description ?? npc.description ?? npc.name : npc.village?.lockText ?? "Locked")}</small>
-          </button>
-        `;
-      })
-      .join("")}
-    <hr />
-    <button type="button" data-action="close-village">Back</button>
+    <section class="village-directory">
+      <header class="village-directory-hero">
+        <div>
+          <span>Village Directory</span>
+          <h3>Choose a place to visit</h3>
+          <p>Shops, healers, guild halls, job boards, and the village records are grouped by what they do.</p>
+        </div>
+        <button type="button" data-action="close-village">Back</button>
+      </header>
+      <section class="village-directory-section village-directory-memorial">
+        <div class="village-section-heading">
+          <div>
+            <span>Records</span>
+            <h3>Memorials</h3>
+          </div>
+          <small>${escapeHtml(graveyardCount ? `${graveyardCount} recorded` : "Clear")}</small>
+        </div>
+        <button class="village-entry-card graveyard-card" type="button" data-action="open-graveyard">
+          <span class="village-entry-icon empty">GY</span>
+          <span class="village-entry-copy">
+            <b>Graveyard</b>
+            <small>${graveyardCount ? `${graveyardCount} dead companion${graveyardCount === 1 ? "" : "s"} in memory or keeping` : "No dead companions"}</small>
+          </span>
+          <span class="village-entry-meta"><em>Records</em><i aria-hidden="true">›</i></span>
+        </button>
+      </section>
+      ${groupedEntries
+        .map(
+          (group) => `
+            <section class="village-directory-section village-group-${escapeAttribute(group.id)}">
+              <div class="village-section-heading">
+                <div>
+                  <span>${escapeHtml(group.note)}</span>
+                  <h3>${escapeHtml(group.title)}</h3>
+                </div>
+                <small>${escapeHtml(group.entries.length)} place${group.entries.length === 1 ? "" : "s"}</small>
+              </div>
+              <div class="village-entry-grid">
+                ${group.entries.map(villageNpcCardMarkup).join("")}
+              </div>
+            </section>
+          `,
+        )
+        .join("")}
+    </section>
   `;
 }
 
@@ -8256,16 +8399,17 @@ function graveyardCorpseMarkup(corpse) {
 }
 
 function renderGraveyardMenu() {
-  els.villageMenu?.classList.remove("npc-chat-open");
+  els.villageMenu?.classList.remove("npc-chat-open", "guild-open", "village-index-open");
+  setVillageBackButtonVisible(true);
+  setVillageMusicKey("");
   const dead = deadRosterHeroes();
   els.villageBody.innerHTML = `
     <p class="empty-note">Dead companions can be preserved, looted, or restored here once their body has been sent home.</p>
     <section class="graveyard-list">
       ${dead.length ? dead.map(graveyardCorpseMarkup).join("") : `<p class="empty-note">No dead companions are recorded.</p>`}
     </section>
-    <hr />
-    <button type="button" data-action="back-to-village-list">Back to Village</button>
   `;
+  resetVillageScroll();
 }
 
 function showVillageMenu() {
@@ -8275,18 +8419,22 @@ function showVillageMenu() {
 }
 
 function hideVillageMenu() {
+  setVillageMusicKey("");
+  setVillageBackButtonVisible(false);
   els.villageMenu.classList.add("hidden");
 }
 
 function visitVillageNpc(npcId) {
   const npc = window.DungeonContent.get("npcs", npcId);
   if (!npc || !npcIsUnlocked(npc)) return;
+  els.villageMenu?.classList.remove("village-index-open");
   if (npc.shop?.type) {
     showStoreMenu(npc.id);
     return;
   }
   const behavior = npcBehavior(npc.id);
   if (behavior?.visit) {
+    setVillageBackButtonVisible(true);
     behavior.visit(npc);
     return;
   }
@@ -8378,6 +8526,3161 @@ function recordNpcMonsterKill(monster) {
   for (const behavior of Object.values(window.DungeonNpcBehaviors ?? {})) behavior.recordMonsterKill?.(monster);
 }
 
+const monsterHunterGuildId = "monster-guild";
+const monsterHunterStateKey = "monsterHunterGuild";
+const monsterHunterRanks = [
+  { name: "Stranger", threshold: 0, reward: "The lodge will post basic beast contracts." },
+  { name: "Associate", threshold: 25, reward: "Hunter notes mark contracted beasts more clearly in the quest log." },
+  { name: "Trusted Hunter", threshold: 75, reward: "Kessa opens better trophy rates and harder warrants." },
+  { name: "Trophy Warden", threshold: 150, reward: "The lodge treats the party as proven monster specialists." },
+  { name: "Guild Agent", threshold: 300, reward: "Reserved for future elite hunts and named monster warrants." },
+];
+const monsterHunterContracts = [
+  {
+    id: "wolf-trouble",
+    name: "Wolf Trouble",
+    group: "Beast Hunts",
+    summary: "Cull dangerous beasts before they learn village roads.",
+    objective: { type: "killTag", tag: "beast", count: 5, label: "Beasts slain" },
+    rewardCp: 7500,
+    reputation: 25,
+    minRank: 0,
+  },
+  {
+    id: "fang-ledger",
+    name: "Fang Ledger",
+    group: "Beast Hunts",
+    summary: "The Lodge wants enough clean kills to compare bite marks, claw marks, and ambush patterns.",
+    objective: { type: "killTag", tag: "beast", count: 10, label: "Beasts documented" },
+    rewardCp: 12500,
+    reputation: 40,
+    minRank: 1,
+  },
+  {
+    id: "big-game-warrant",
+    name: "Big Game Warrant",
+    group: "Warrants",
+    summary: "Bring down elite quarry: bosses, huge beasts, or anything with enough muscle to become a tavern lie.",
+    objective: { type: "killBigGame", count: 2, label: "Large quarry slain" },
+    rewardCp: 22500,
+    reputation: 70,
+    minRank: 2,
+  },
+];
+const monsterHunterTurnIns = [
+  {
+    id: "fangs-and-claws",
+    name: "Fangs and Claws",
+    summary: "Clean points, intact roots, and no campfire scorch marks.",
+    requirement: { type: "component", tagsAll: ["beast"], tagsAny: ["fang", "claw"] },
+    quantity: 4,
+    rewardCp: 3500,
+    reputation: 8,
+  },
+  {
+    id: "good-hides",
+    name: "Good Hides",
+    summary: "Usable hide from beasts that were inconsiderate enough to grow armor.",
+    requirement: { itemId: "beast-hide" },
+    quantity: 3,
+    rewardCp: 4500,
+    reputation: 10,
+  },
+  {
+    id: "venom-proof",
+    name: "Venom Proof",
+    summary: "Sealed glands only. Mara will not pay extra for panic.",
+    requirement: { itemId: "venom-gland" },
+    quantity: 2,
+    rewardCp: 7000,
+    reputation: 14,
+  },
+  {
+    id: "trophy-table",
+    name: "Trophy Table",
+    summary: "Anything suitable for the lodge wall, charm-makers, or a very specific warning label.",
+    requirement: { type: "component", tagsAll: ["monster-part"], tagsAny: ["trophy", "horn", "antler", "scale", "shell"] },
+    quantity: 3,
+    rewardCp: 8000,
+    reputation: 16,
+  },
+];
+
+function monsterHunterProgress() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[monsterHunterStateKey] ??= {};
+  const progress = state.questFlags[monsterHunterStateKey];
+  progress.reputation = Math.max(0, Math.floor(Number(progress.reputation) || 0));
+  progress.contracts ??= {};
+  progress.completedContracts ??= {};
+  progress.turnIns ??= {};
+  return progress;
+}
+
+function monsterHunterRank(progress = monsterHunterProgress()) {
+  const reputation = Math.max(0, Math.floor(Number(progress.reputation) || 0));
+  let rank = 0;
+  monsterHunterRanks.forEach((entry, index) => {
+    if (reputation >= entry.threshold) rank = index;
+  });
+  return rank;
+}
+
+function monsterHunterNextRank(rank = monsterHunterRank()) {
+  return monsterHunterRanks[rank + 1] ?? null;
+}
+
+function monsterHunterContractState(contractId) {
+  const progress = monsterHunterProgress();
+  progress.contracts[contractId] ??= { status: "available", progress: 0 };
+  return progress.contracts[contractId];
+}
+
+function monsterHunterContractReady(contract) {
+  const contractState = monsterHunterContractState(contract.id);
+  const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+  return contractState.status === "accepted" && Math.max(0, Math.floor(Number(contractState.progress) || 0)) >= target;
+}
+
+function monsterHunterContractUnlocked(contract) {
+  return monsterHunterRank() >= Math.max(0, Math.floor(Number(contract.minRank) || 0));
+}
+
+function monsterHunterObjectiveText(contract) {
+  const objective = contract.objective ?? {};
+  const contractState = monsterHunterContractState(contract.id);
+  const target = Math.max(1, Math.floor(Number(objective.count) || 1));
+  const progress = Math.min(target, Math.max(0, Math.floor(Number(contractState.progress) || 0)));
+  return `${objective.label ?? "Objective"}: ${progress}/${target}`;
+}
+
+function monsterHunterTurnInReady(turnIn) {
+  return materialCountForRequirement(turnIn.requirement) >= Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+}
+
+function monsterHunterRankBarMarkup(progress = monsterHunterProgress()) {
+  const rank = monsterHunterRank(progress);
+  const current = monsterHunterRanks[rank] ?? monsterHunterRanks[0];
+  const next = monsterHunterNextRank(rank);
+  const currentThreshold = current?.threshold ?? 0;
+  const nextThreshold = next?.threshold ?? currentThreshold;
+  const span = Math.max(1, nextThreshold - currentThreshold);
+  const filled = next ? Math.min(100, Math.max(0, ((progress.reputation - currentThreshold) / span) * 100)) : 100;
+  return `
+    <section class="guild-status">
+      <div>
+        <span>Rank</span>
+        <b>${escapeHtml(current?.name ?? "Stranger")}</b>
+      </div>
+      <div>
+        <span>Reputation</span>
+        <b>${escapeHtml(progress.reputation)}${next ? ` / ${escapeHtml(next.threshold)}` : "+"}</b>
+      </div>
+      <div class="guild-rep-track" aria-hidden="true"><i style="width: ${escapeAttribute(filled.toFixed(1))}%"></i></div>
+      <p>${escapeHtml(next ? `Next: ${next.name} - ${next.reward}` : current?.reward ?? "The lodge knows your name.")}</p>
+    </section>
+  `;
+}
+
+function monsterHunterContractRow(contract) {
+  const contractState = monsterHunterContractState(contract.id);
+  const unlocked = monsterHunterContractUnlocked(contract);
+  const completed = contractState.status === "completed";
+  const accepted = contractState.status === "accepted";
+  const ready = monsterHunterContractReady(contract);
+  return `
+    <article class="guild-contract-row ${ready ? "ready" : ""}">
+      <div>
+        <b>${escapeHtml(contract.name)}</b>
+        <span>${escapeHtml(contract.summary)}</span>
+        <small>${escapeHtml(monsterHunterObjectiveText(contract))} - ${escapeHtml(priceText(contract.rewardCp))}, ${escapeHtml(contract.reputation)} rep</small>
+      </div>
+      ${
+        !unlocked
+          ? `<button type="button" disabled>Rank ${escapeHtml(contract.minRank)}</button>`
+          : completed
+            ? `<button type="button" disabled>Complete</button>`
+            : accepted
+              ? `<button type="button" data-action="complete-guild-contract" data-npc="${escapeAttribute(monsterHunterGuildId)}" data-contract="${escapeAttribute(contract.id)}" ${ready ? "" : "disabled"}>${ready ? "Claim" : "Hunting"}</button>`
+              : `<button type="button" data-action="accept-guild-contract" data-npc="${escapeAttribute(monsterHunterGuildId)}" data-contract="${escapeAttribute(contract.id)}">Accept</button>`
+      }
+    </article>
+  `;
+}
+
+function monsterHunterContractsMarkup() {
+  const groups = new Map();
+  for (const contract of monsterHunterContracts) {
+    if (!groups.has(contract.group)) groups.set(contract.group, []);
+    groups.get(contract.group).push(contract);
+  }
+  return `
+    <section class="guild-section">
+      <h3>Contracts</h3>
+      <div class="guild-groups">
+        ${Array.from(groups.entries())
+          .map(
+            ([group, contracts]) => `
+              <details class="guild-group" open>
+                <summary>${escapeHtml(group)} <small>${escapeHtml(contracts.length)}</small></summary>
+                <div>${contracts.map(monsterHunterContractRow).join("")}</div>
+              </details>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function monsterHunterTurnInRow(turnIn) {
+  const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+  const have = materialCountForRequirement(turnIn.requirement);
+  const ready = have >= quantity;
+  return `
+    <article class="guild-contract-row ${ready ? "ready" : ""}">
+      <div>
+        <b>${escapeHtml(turnIn.name)}</b>
+        <span>${escapeHtml(turnIn.summary)}</span>
+        <small>Have ${escapeHtml(Math.min(have, quantity))}/${escapeHtml(quantity)} - ${escapeHtml(priceText(turnIn.rewardCp))}, ${escapeHtml(turnIn.reputation)} rep</small>
+      </div>
+      <button type="button" data-action="complete-guild-turn-in" data-npc="${escapeAttribute(monsterHunterGuildId)}" data-turn-in="${escapeAttribute(turnIn.id)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Trophies"}</button>
+    </article>
+  `;
+}
+
+function monsterHunterTurnInsMarkup() {
+  return `
+    <section class="guild-section">
+      <h3>Trophy Turn-Ins</h3>
+      <div class="guild-contract-list">
+        ${monsterHunterTurnIns.map(monsterHunterTurnInRow).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function monsterHunterRankRewardsMarkup() {
+  const rank = monsterHunterRank();
+  return `
+    <section class="guild-section">
+      <h3>Rank Rewards</h3>
+      <div class="guild-rewards">
+        ${monsterHunterRanks
+          .map(
+            (entry, index) => `
+              <div class="${index <= rank ? "unlocked" : ""}">
+                <b>${escapeHtml(entry.name)}</b>
+                <span>${escapeHtml(index <= rank ? entry.reward : `${entry.threshold} reputation required`)}</span>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function monsterHunterBoardStats(progress = monsterHunterProgress()) {
+  const activeContracts = monsterHunterContracts.filter((contract) => monsterHunterContractState(contract.id).status === "accepted").length;
+  const readyContracts = monsterHunterContracts.filter(monsterHunterContractReady).length;
+  const readyTurnIns = monsterHunterTurnIns.filter(monsterHunterTurnInReady).length;
+  return { activeContracts, readyContracts, readyTurnIns, rank: monsterHunterRank(progress) };
+}
+
+function monsterHunterBoardHeaderMarkup(npc, progress) {
+  const stats = monsterHunterBoardStats(progress);
+  return `
+    <section class="guild-hero">
+      ${factionSymbolMarkup(monsterHunterGuildId)}
+      ${npcPortraitMarkup(npc, "guild-portrait", { clickable: false })}
+      <div class="guild-hero-text">
+        <span>The Trophy Lodge</span>
+        <h3>${guildNpcNameButtonMarkup(npc, "Lodge Contact")}</h3>
+        <b>${escapeHtml(npc.title)}</b>
+        <p>${escapeHtml(npcEntryLine(npc) || npc.description || "")}</p>
+      </div>
+      <div class="guild-hero-stats">
+        <div>
+          <span>Active</span>
+          <b>${escapeHtml(stats.activeContracts)}</b>
+        </div>
+        <div>
+          <span>Ready</span>
+          <b>${escapeHtml(stats.readyContracts + stats.readyTurnIns)}</b>
+        </div>
+        <div>
+          <span>Rank</span>
+          <b>${escapeHtml(stats.rank)}</b>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function monsterHunterBoardActionsMarkup() {
+  const readyContracts = monsterHunterContracts.filter(monsterHunterContractReady).length;
+  const readyTurnIns = monsterHunterTurnIns.filter(monsterHunterTurnInReady).length;
+  return `
+    <section class="guild-actions-panel">
+      <h3>Lodge Desk</h3>
+      <button type="button" data-action="show-quest-log">Quest Log</button>
+      <div>
+        <span>${escapeHtml(readyContracts)} contract${readyContracts === 1 ? "" : "s"} ready to claim</span>
+        <span>${escapeHtml(readyTurnIns)} trophy turn-in${readyTurnIns === 1 ? "" : "s"} ready</span>
+      </div>
+    </section>
+  `;
+}
+
+function renderMonsterHunterGuild(npc = window.DungeonContent.get("npcs", monsterHunterGuildId)) {
+  els.villageMenu?.classList.remove("npc-chat-open");
+  els.villageMenu?.classList.add("guild-open");
+  setVillageBackButtonVisible(true);
+  const progress = monsterHunterProgress();
+  els.villageBody.innerHTML = `
+    <section class="guild-board">
+      ${monsterHunterBoardHeaderMarkup(npc, progress)}
+      <div class="guild-board-grid">
+        <aside class="guild-board-side">
+          ${monsterHunterRankBarMarkup(progress)}
+          ${monsterHunterBoardActionsMarkup()}
+        </aside>
+        <main class="guild-board-main">
+          ${monsterHunterContractsMarkup()}
+          ${monsterHunterTurnInsMarkup()}
+        </main>
+        <aside class="guild-board-rewards">
+          ${monsterHunterRankRewardsMarkup()}
+        </aside>
+      </div>
+    </section>
+  `;
+  els.villageMenu.classList.remove("hidden");
+  resetVillageScroll();
+  setVillageMusicKey(villageMusicKeyForNpc(monsterHunterGuildId));
+}
+
+function acceptMonsterHunterContract(contractId) {
+  const contract = monsterHunterContracts.find((entry) => entry.id === contractId);
+  if (!contract || !monsterHunterContractUnlocked(contract)) return;
+  const contractState = monsterHunterContractState(contract.id);
+  if (contractState.status === "completed" || contractState.status === "accepted") return;
+  contractState.status = "accepted";
+  contractState.progress = 0;
+  contractState.acceptedAt = Date.now();
+  addLog(`Kessa Briarhook posts a Trophy Lodge contract: ${contract.name}.`, "important");
+  renderMonsterHunterGuild();
+  renderQuestLogButton();
+}
+
+function completeMonsterHunterContract(contractId) {
+  const contract = monsterHunterContracts.find((entry) => entry.id === contractId);
+  if (!contract || !monsterHunterContractReady(contract)) return;
+  const contractState = monsterHunterContractState(contract.id);
+  contractState.status = "completed";
+  contractState.completedAt = Date.now();
+  addMoney(activeHero().inventory.money, contract.rewardCp);
+  const progress = monsterHunterProgress();
+  progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
+  progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
+  addLog(`The Trophy Lodge pays ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
+  render();
+  renderMonsterHunterGuild();
+}
+
+function completeMonsterHunterTurnIn(turnInId) {
+  const turnIn = monsterHunterTurnIns.find((entry) => entry.id === turnInId);
+  if (!turnIn || !monsterHunterTurnInReady(turnIn)) return;
+  const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+  if (!consumeMaterialsForRequirement(turnIn.requirement, quantity)) return;
+  addMoney(activeHero().inventory.money, turnIn.rewardCp);
+  const progress = monsterHunterProgress();
+  progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
+  progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
+  addLog(`Kessa Briarhook accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Trophy Lodge reputation +${turnIn.reputation}.`, "important");
+  render();
+  renderMonsterHunterGuild();
+}
+
+function cancelMonsterHunterContract(contractId) {
+  const contract = monsterHunterContracts.find((entry) => entry.id === contractId);
+  const contractState = contract ? monsterHunterContractState(contract.id) : null;
+  if (!contract || contractState?.status !== "accepted") return false;
+  contractState.status = "available";
+  contractState.cancelledAt = Date.now();
+  contractState.progress = 0;
+  addLog(`The Trophy Lodge contract ${contract.name} is no longer accepted.`, "important");
+  return true;
+}
+
+function monsterHunterMatchesContract(monster, contract) {
+  const objective = contract?.objective ?? {};
+  const tags = new Set((monster?.tags ?? []).map((tag) => String(tag).toLowerCase()));
+  const text = [monster?.name, monster?.role, monster?.description, monster?.baseMonsterId, monster?.templateId, monster?.id]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (objective.type === "killTag") return tags.has(String(objective.tag ?? "").toLowerCase()) || text.includes(String(objective.tag ?? "").toLowerCase());
+  if (objective.type === "killBigGame") {
+    const category = Math.max(0, Math.floor(Number(monster?.category ?? monster?.monsterCategory ?? 0) || 0));
+    return tags.has("boss") || monster?.customBoss || category >= 2 || /\b(huge|giant|hydra|bear|rhino|boss|matriarch|herdmaster)\b/.test(text);
+  }
+  return false;
+}
+
+function recordMonsterHunterKill(monster) {
+  if (!monster || isPartyHeroId(monster.id)) return;
+  const progress = monsterHunterProgress();
+  let changed = false;
+  for (const contract of monsterHunterContracts) {
+    const contractState = progress.contracts?.[contract.id];
+    if (contractState?.status !== "accepted" || !monsterHunterMatchesContract(monster, contract)) continue;
+    const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+    contractState.progress = Math.min(target, Math.max(0, Math.floor(Number(contractState.progress) || 0)) + 1);
+    changed = true;
+    if (contractState.progress >= target) addLog(`Trophy Lodge contract ready: ${contract.name}.`, "important");
+  }
+  if (changed) renderQuestLogButton();
+}
+
+function monsterHunterQuestLogEntries() {
+  return monsterHunterContracts
+    .filter((contract) => monsterHunterContractState(contract.id).status === "accepted")
+    .map((contract) => {
+      const contractState = monsterHunterContractState(contract.id);
+      const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+      const current = Math.min(target, Math.max(0, Math.floor(Number(contractState.progress) || 0)));
+      return {
+        id: `monster-hunter-${contract.id}`,
+        giver: "Trophy Lodge",
+        title: contract.name,
+        description: contract.summary,
+        ready: current >= target,
+        cancelable: true,
+        cancelType: "monster-hunter",
+        questId: contract.id,
+        objectives: [
+          {
+            label: contract.objective?.label ?? "Contract",
+            progress: current,
+            target,
+          },
+        ],
+      };
+    });
+}
+
+window.DungeonNpcBehaviors ??= {};
+window.DungeonNpcBehaviors[monsterHunterGuildId] = {
+  visit: renderMonsterHunterGuild,
+  returnToVisit: () => renderMonsterHunterGuild(),
+  recordMonsterKill: recordMonsterHunterKill,
+  questLogEntries: monsterHunterQuestLogEntries,
+  cancelQuest: cancelMonsterHunterContract,
+  adminProgressEntries() {
+    const progress = monsterHunterProgress();
+    return [
+      {
+        id: "locked",
+        npcId: monsterHunterGuildId,
+        groupId: monsterHunterGuildId,
+        groupLabel: "Trophy Lodge",
+        label: "Locked",
+        description: "Hide the Trophy Lodge until its story unlock.",
+        active: !state.questFlags?.["flag.village.monsterHunterGuildUnlocked"],
+      },
+      {
+        id: "unlocked",
+        npcId: monsterHunterGuildId,
+        groupId: monsterHunterGuildId,
+        groupLabel: "Trophy Lodge",
+        label: "Unlocked",
+        description: "Show the Trophy Lodge with no extra reputation.",
+        active: Boolean(state.questFlags?.["flag.village.monsterHunterGuildUnlocked"]) && progress.reputation < 75,
+      },
+      {
+        id: "trusted",
+        npcId: monsterHunterGuildId,
+        groupId: monsterHunterGuildId,
+        groupLabel: "Trophy Lodge",
+        label: "Trusted Hunter",
+        description: "Unlock the first tougher Trophy Lodge contracts.",
+        active: progress.reputation >= 75 && progress.reputation < 150,
+      },
+      {
+        id: "warden",
+        npcId: monsterHunterGuildId,
+        groupId: monsterHunterGuildId,
+        groupLabel: "Trophy Lodge",
+        label: "Trophy Warden",
+        description: "Set high reputation for testing advanced guild rewards.",
+        active: progress.reputation >= 150,
+      },
+    ];
+  },
+  setAdminProgress(progressId) {
+    if (!adminEnabled()) return;
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    const progress = monsterHunterProgress();
+    if (progressId === "locked") {
+      delete state.questFlags["flag.village.monsterHunterGuildUnlocked"];
+      progress.reputation = 0;
+    } else {
+      state.questFlags["flag.village.monsterHunterGuildUnlocked"] = true;
+      progress.reputation = progressId === "trusted" ? 75 : progressId === "warden" ? 150 : 0;
+    }
+    addLog(`Admin set Trophy Lodge progress: ${progressId}.`, "important");
+  },
+};
+
+const gravebinderGuildId = "gravebinders";
+const gravebinderStateKey = "gravebinderGuild";
+const gravebinderRanks = [
+  { name: "Unsworn", threshold: 0, reward: "The order will post basic undead contracts." },
+  { name: "Candlebearer", threshold: 30, reward: "Gravebinder notes mark common restless dead more clearly." },
+  { name: "Warden", threshold: 85, reward: "Odran opens sterner haunt warrants and better relic payments." },
+  { name: "Exorcist", threshold: 170, reward: "The order trusts the party with dangerous grave work." },
+  { name: "Grave-Saint", threshold: 330, reward: "Reserved for future elite haunt chains and named restless dead." },
+];
+const gravebinderContracts = [
+  {
+    id: "ashes-that-walk",
+    name: "Ashes That Walk",
+    group: "Restless Dead",
+    summary: "Put down the common dead before their hunger finds living roads.",
+    objective: { type: "killTag", tag: "undead", count: 6, label: "Undead laid to rest" },
+    rewardCp: 9000,
+    reputation: 30,
+    minRank: 0,
+  },
+  {
+    id: "lantern-for-the-lost",
+    name: "Lantern for the Lost",
+    group: "Haunts",
+    summary: "Banish ghosts, wraiths, and other dead things that remember how to hate.",
+    objective: { type: "killGhost", count: 4, label: "Haunts banished" },
+    rewardCp: 14500,
+    reputation: 45,
+    minRank: 1,
+  },
+  {
+    id: "seal-the-open-grave",
+    name: "Seal the Open Grave",
+    group: "Warrants",
+    summary: "Destroy powerful undead, grave lords, and anything too stubborn for ordinary rites.",
+    objective: { type: "killMajorUndead", count: 2, label: "Major dead sealed" },
+    rewardCp: 26000,
+    reputation: 80,
+    minRank: 2,
+  },
+];
+const gravebinderTurnIns = [
+  {
+    id: "bone-ledger",
+    name: "Bone Ledger",
+    summary: "Powdered, cracked, or marked remains for proper cataloging and ward work.",
+    requirement: { type: "component", tagsAny: ["bone", "skull"] },
+    quantity: 5,
+    rewardCp: 4500,
+    reputation: 10,
+  },
+  {
+    id: "grave-wax-candles",
+    name: "Grave-Wax Candles",
+    summary: "Cold wax for binding candles. Keep it wrapped unless you want whispers in your pack.",
+    requirement: { itemId: "grave-wax" },
+    quantity: 3,
+    rewardCp: 6500,
+    reputation: 14,
+  },
+  {
+    id: "ectoplasm-vials",
+    name: "Ectoplasm Vials",
+    summary: "Residue from spirits strong enough to leave fingerprints on the air.",
+    requirement: { itemId: "ectoplasm" },
+    quantity: 3,
+    rewardCp: 9000,
+    reputation: 18,
+  },
+  {
+    id: "unquiet-relics",
+    name: "Unquiet Relics",
+    summary: "Soul echoes, cursed remains, and things that should not be kept beside a bed.",
+    requirement: { type: "component", tagsAll: ["undead"], tagsAny: ["soul", "relic", "flesh", "ghost"] },
+    quantity: 2,
+    rewardCp: 11000,
+    reputation: 22,
+  },
+];
+
+function gravebinderProgress() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[gravebinderStateKey] ??= {};
+  const progress = state.questFlags[gravebinderStateKey];
+  progress.reputation = Math.max(0, Math.floor(Number(progress.reputation) || 0));
+  progress.contracts ??= {};
+  progress.completedContracts ??= {};
+  progress.turnIns ??= {};
+  return progress;
+}
+
+function gravebinderRank(progress = gravebinderProgress()) {
+  const reputation = Math.max(0, Math.floor(Number(progress.reputation) || 0));
+  let rank = 0;
+  gravebinderRanks.forEach((entry, index) => {
+    if (reputation >= entry.threshold) rank = index;
+  });
+  return rank;
+}
+
+function gravebinderNextRank(rank = gravebinderRank()) {
+  return gravebinderRanks[rank + 1] ?? null;
+}
+
+function gravebinderContractState(contractId) {
+  const progress = gravebinderProgress();
+  progress.contracts[contractId] ??= { status: "available", progress: 0 };
+  return progress.contracts[contractId];
+}
+
+function gravebinderContractReady(contract) {
+  const contractState = gravebinderContractState(contract.id);
+  const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+  return contractState.status === "accepted" && Math.max(0, Math.floor(Number(contractState.progress) || 0)) >= target;
+}
+
+function gravebinderContractUnlocked(contract) {
+  return gravebinderRank() >= Math.max(0, Math.floor(Number(contract.minRank) || 0));
+}
+
+function gravebinderObjectiveText(contract) {
+  const objective = contract.objective ?? {};
+  const contractState = gravebinderContractState(contract.id);
+  const target = Math.max(1, Math.floor(Number(objective.count) || 1));
+  const progress = Math.min(target, Math.max(0, Math.floor(Number(contractState.progress) || 0)));
+  return `${objective.label ?? "Objective"}: ${progress}/${target}`;
+}
+
+function gravebinderTurnInReady(turnIn) {
+  return materialCountForRequirement(turnIn.requirement) >= Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+}
+
+function gravebinderRankBarMarkup(progress = gravebinderProgress()) {
+  const rank = gravebinderRank(progress);
+  const current = gravebinderRanks[rank] ?? gravebinderRanks[0];
+  const next = gravebinderNextRank(rank);
+  const currentThreshold = current?.threshold ?? 0;
+  const nextThreshold = next?.threshold ?? currentThreshold;
+  const span = Math.max(1, nextThreshold - currentThreshold);
+  const filled = next ? Math.min(100, Math.max(0, ((progress.reputation - currentThreshold) / span) * 100)) : 100;
+  return `
+    <section class="guild-status">
+      <div>
+        <span>Rank</span>
+        <b>${escapeHtml(current?.name ?? "Unsworn")}</b>
+      </div>
+      <div>
+        <span>Reputation</span>
+        <b>${escapeHtml(progress.reputation)}${next ? ` / ${escapeHtml(next.threshold)}` : "+"}</b>
+      </div>
+      <div class="guild-rep-track" aria-hidden="true"><i style="width: ${escapeAttribute(filled.toFixed(1))}%"></i></div>
+      <p>${escapeHtml(next ? `Next: ${next.name} - ${next.reward}` : current?.reward ?? "The dead know your name.")}</p>
+    </section>
+  `;
+}
+
+function gravebinderContractRow(contract) {
+  const contractState = gravebinderContractState(contract.id);
+  const unlocked = gravebinderContractUnlocked(contract);
+  const completed = contractState.status === "completed";
+  const accepted = contractState.status === "accepted";
+  const ready = gravebinderContractReady(contract);
+  return `
+    <article class="guild-contract-row ${ready ? "ready" : ""}">
+      <div>
+        <b>${escapeHtml(contract.name)}</b>
+        <span>${escapeHtml(contract.summary)}</span>
+        <small>${escapeHtml(gravebinderObjectiveText(contract))} - ${escapeHtml(priceText(contract.rewardCp))}, ${escapeHtml(contract.reputation)} rep</small>
+      </div>
+      ${
+        !unlocked
+          ? `<button type="button" disabled>Rank ${escapeHtml(contract.minRank)}</button>`
+          : completed
+            ? `<button type="button" disabled>Sealed</button>`
+            : accepted
+              ? `<button type="button" data-action="complete-guild-contract" data-npc="${escapeAttribute(gravebinderGuildId)}" data-contract="${escapeAttribute(contract.id)}" ${ready ? "" : "disabled"}>${ready ? "Claim" : "Warding"}</button>`
+              : `<button type="button" data-action="accept-guild-contract" data-npc="${escapeAttribute(gravebinderGuildId)}" data-contract="${escapeAttribute(contract.id)}">Accept</button>`
+      }
+    </article>
+  `;
+}
+
+function gravebinderContractsMarkup() {
+  const groups = new Map();
+  for (const contract of gravebinderContracts) {
+    if (!groups.has(contract.group)) groups.set(contract.group, []);
+    groups.get(contract.group).push(contract);
+  }
+  return `
+    <section class="guild-section">
+      <h3>Contracts</h3>
+      <div class="guild-groups">
+        ${Array.from(groups.entries())
+          .map(
+            ([group, contracts]) => `
+              <details class="guild-group" open>
+                <summary>${escapeHtml(group)} <small>${escapeHtml(contracts.length)}</small></summary>
+                <div>${contracts.map(gravebinderContractRow).join("")}</div>
+              </details>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function gravebinderTurnInRow(turnIn) {
+  const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+  const have = materialCountForRequirement(turnIn.requirement);
+  const ready = have >= quantity;
+  return `
+    <article class="guild-contract-row ${ready ? "ready" : ""}">
+      <div>
+        <b>${escapeHtml(turnIn.name)}</b>
+        <span>${escapeHtml(turnIn.summary)}</span>
+        <small>Have ${escapeHtml(Math.min(have, quantity))}/${escapeHtml(quantity)} - ${escapeHtml(priceText(turnIn.rewardCp))}, ${escapeHtml(turnIn.reputation)} rep</small>
+      </div>
+      <button type="button" data-action="complete-guild-turn-in" data-npc="${escapeAttribute(gravebinderGuildId)}" data-turn-in="${escapeAttribute(turnIn.id)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Remains"}</button>
+    </article>
+  `;
+}
+
+function gravebinderTurnInsMarkup() {
+  return `
+    <section class="guild-section">
+      <h3>Grave Turn-Ins</h3>
+      <div class="guild-contract-list">
+        ${gravebinderTurnIns.map(gravebinderTurnInRow).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function gravebinderRankRewardsMarkup() {
+  const rank = gravebinderRank();
+  return `
+    <section class="guild-section">
+      <h3>Rank Rewards</h3>
+      <div class="guild-rewards">
+        ${gravebinderRanks
+          .map(
+            (entry, index) => `
+              <div class="${index <= rank ? "unlocked" : ""}">
+                <b>${escapeHtml(entry.name)}</b>
+                <span>${escapeHtml(index <= rank ? entry.reward : `${entry.threshold} reputation required`)}</span>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function gravebinderBoardStats(progress = gravebinderProgress()) {
+  const activeContracts = gravebinderContracts.filter((contract) => gravebinderContractState(contract.id).status === "accepted").length;
+  const readyContracts = gravebinderContracts.filter(gravebinderContractReady).length;
+  const readyTurnIns = gravebinderTurnIns.filter(gravebinderTurnInReady).length;
+  return { activeContracts, readyContracts, readyTurnIns, rank: gravebinderRank(progress) };
+}
+
+function gravebinderBoardHeaderMarkup(npc, progress) {
+  const stats = gravebinderBoardStats(progress);
+  return `
+    <section class="guild-hero gravebinder-hero">
+      ${factionSymbolMarkup(gravebinderGuildId)}
+      ${npcPortraitMarkup(npc, "guild-portrait", { clickable: false })}
+      <div class="guild-hero-text">
+        <span>The Gravebinders</span>
+        <h3>${guildNpcNameButtonMarkup(npc, "Gravebinder Contact")}</h3>
+        <b>${escapeHtml(npc.title)}</b>
+        <p>${escapeHtml(npcEntryLine(npc) || npc.description || "")}</p>
+      </div>
+      <div class="guild-hero-stats">
+        <div>
+          <span>Active</span>
+          <b>${escapeHtml(stats.activeContracts)}</b>
+        </div>
+        <div>
+          <span>Ready</span>
+          <b>${escapeHtml(stats.readyContracts + stats.readyTurnIns)}</b>
+        </div>
+        <div>
+          <span>Rank</span>
+          <b>${escapeHtml(stats.rank)}</b>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function gravebinderBoardActionsMarkup() {
+  const readyContracts = gravebinderContracts.filter(gravebinderContractReady).length;
+  const readyTurnIns = gravebinderTurnIns.filter(gravebinderTurnInReady).length;
+  return `
+    <section class="guild-actions-panel">
+      <h3>Candle Desk</h3>
+      <button type="button" data-action="show-quest-log">Quest Log</button>
+      <div>
+        <span>${escapeHtml(readyContracts)} rite${readyContracts === 1 ? "" : "s"} ready to claim</span>
+        <span>${escapeHtml(readyTurnIns)} grave turn-in${readyTurnIns === 1 ? "" : "s"} ready</span>
+      </div>
+    </section>
+  `;
+}
+
+function renderGravebinderGuild(npc = window.DungeonContent.get("npcs", gravebinderGuildId)) {
+  els.villageMenu?.classList.remove("npc-chat-open");
+  els.villageMenu?.classList.add("guild-open");
+  setVillageBackButtonVisible(true);
+  const progress = gravebinderProgress();
+  els.villageBody.innerHTML = `
+    <section class="guild-board gravebinder-board">
+      ${gravebinderBoardHeaderMarkup(npc, progress)}
+      <div class="guild-board-grid">
+        <aside class="guild-board-side">
+          ${gravebinderRankBarMarkup(progress)}
+          ${gravebinderBoardActionsMarkup()}
+        </aside>
+        <main class="guild-board-main">
+          ${gravebinderContractsMarkup()}
+          ${gravebinderTurnInsMarkup()}
+        </main>
+        <aside class="guild-board-rewards">
+          ${gravebinderRankRewardsMarkup()}
+        </aside>
+      </div>
+    </section>
+  `;
+  els.villageMenu.classList.remove("hidden");
+  resetVillageScroll();
+  setVillageMusicKey(villageMusicKeyForNpc(gravebinderGuildId));
+}
+
+function acceptGravebinderContract(contractId) {
+  const contract = gravebinderContracts.find((entry) => entry.id === contractId);
+  if (!contract || !gravebinderContractUnlocked(contract)) return;
+  const contractState = gravebinderContractState(contract.id);
+  if (contractState.status === "completed" || contractState.status === "accepted") return;
+  contractState.status = "accepted";
+  contractState.progress = 0;
+  contractState.acceptedAt = Date.now();
+  addLog(`Odran Vellshade opens a Gravebinder rite: ${contract.name}.`, "important");
+  renderGravebinderGuild();
+  renderQuestLogButton();
+}
+
+function completeGravebinderContract(contractId) {
+  const contract = gravebinderContracts.find((entry) => entry.id === contractId);
+  if (!contract || !gravebinderContractReady(contract)) return;
+  const contractState = gravebinderContractState(contract.id);
+  contractState.status = "completed";
+  contractState.completedAt = Date.now();
+  addMoney(activeHero().inventory.money, contract.rewardCp);
+  const progress = gravebinderProgress();
+  progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
+  progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
+  addLog(`The Gravebinders pay ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
+  render();
+  renderGravebinderGuild();
+}
+
+function completeGravebinderTurnIn(turnInId) {
+  const turnIn = gravebinderTurnIns.find((entry) => entry.id === turnInId);
+  if (!turnIn || !gravebinderTurnInReady(turnIn)) return;
+  const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+  if (!consumeMaterialsForRequirement(turnIn.requirement, quantity)) return;
+  addMoney(activeHero().inventory.money, turnIn.rewardCp);
+  const progress = gravebinderProgress();
+  progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
+  progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
+  addLog(`Odran Vellshade accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Gravebinder reputation +${turnIn.reputation}.`, "important");
+  render();
+  renderGravebinderGuild();
+}
+
+function cancelGravebinderContract(contractId) {
+  const contract = gravebinderContracts.find((entry) => entry.id === contractId);
+  const contractState = contract ? gravebinderContractState(contract.id) : null;
+  if (!contract || contractState?.status !== "accepted") return false;
+  contractState.status = "available";
+  contractState.cancelledAt = Date.now();
+  contractState.progress = 0;
+  addLog(`The Gravebinder rite ${contract.name} is no longer accepted.`, "important");
+  return true;
+}
+
+function gravebinderMatchesContract(monster, contract) {
+  const objective = contract?.objective ?? {};
+  const tags = new Set((monster?.tags ?? []).map((tag) => String(tag).toLowerCase()));
+  const text = [monster?.name, monster?.role, monster?.description, monster?.baseMonsterId, monster?.templateId, monster?.id]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const undead = tags.has("undead") || tags.has("skeletal") || tags.has("skeleton") || tags.has("zombie") || /undead|skeleton|skeletal|zombie|ghoul|wight|mummy|vampire|lich/.test(text);
+  const ghost = tags.has("ghost") || tags.has("specter") || tags.has("wraith") || tags.has("banshee") || tags.has("spirit") || /ghost|specter|spectre|wraith|banshee|spirit|phantom|haunt/.test(text);
+  if (objective.type === "killTag") return undead || tags.has(String(objective.tag ?? "").toLowerCase());
+  if (objective.type === "killGhost") return ghost;
+  if (objective.type === "killMajorUndead") {
+    const category = Math.max(0, Math.floor(Number(monster?.category ?? monster?.monsterCategory ?? 0) || 0));
+    return (undead || ghost) && (tags.has("boss") || monster?.customBoss || category >= 2 || /\b(lord|king|queen|matriarch|champion|ancient|boss)\b/.test(text));
+  }
+  return false;
+}
+
+function recordGravebinderKill(monster) {
+  if (!monster || isPartyHeroId(monster.id)) return;
+  const progress = gravebinderProgress();
+  let changed = false;
+  for (const contract of gravebinderContracts) {
+    const contractState = progress.contracts?.[contract.id];
+    if (contractState?.status !== "accepted" || !gravebinderMatchesContract(monster, contract)) continue;
+    const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+    contractState.progress = Math.min(target, Math.max(0, Math.floor(Number(contractState.progress) || 0)) + 1);
+    changed = true;
+    if (contractState.progress >= target) addLog(`Gravebinder rite ready: ${contract.name}.`, "important");
+  }
+  if (changed) renderQuestLogButton();
+}
+
+function gravebinderQuestLogEntries() {
+  return gravebinderContracts
+    .filter((contract) => gravebinderContractState(contract.id).status === "accepted")
+    .map((contract) => {
+      const contractState = gravebinderContractState(contract.id);
+      const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+      const current = Math.min(target, Math.max(0, Math.floor(Number(contractState.progress) || 0)));
+      return {
+        id: `gravebinder-${contract.id}`,
+        giver: "The Gravebinders",
+        title: contract.name,
+        description: contract.summary,
+        ready: current >= target,
+        cancelable: true,
+        cancelType: "gravebinder",
+        questId: contract.id,
+        objectives: [
+          {
+            label: contract.objective?.label ?? "Rite",
+            progress: current,
+            target,
+          },
+        ],
+      };
+    });
+}
+
+window.DungeonNpcBehaviors[gravebinderGuildId] = {
+  visit: renderGravebinderGuild,
+  returnToVisit: () => renderGravebinderGuild(),
+  recordMonsterKill: recordGravebinderKill,
+  questLogEntries: gravebinderQuestLogEntries,
+  cancelQuest: cancelGravebinderContract,
+  adminProgressEntries() {
+    const progress = gravebinderProgress();
+    return [
+      {
+        id: "locked",
+        npcId: gravebinderGuildId,
+        groupId: gravebinderGuildId,
+        groupLabel: "Gravebinders",
+        label: "Locked",
+        description: "Hide the Gravebinders until their story unlock.",
+        active: !state.questFlags?.["flag.village.gravebindersUnlocked"],
+      },
+      {
+        id: "unlocked",
+        npcId: gravebinderGuildId,
+        groupId: gravebinderGuildId,
+        groupLabel: "Gravebinders",
+        label: "Unlocked",
+        description: "Show the Gravebinders with no extra reputation.",
+        active: Boolean(state.questFlags?.["flag.village.gravebindersUnlocked"]) && progress.reputation < 85,
+      },
+      {
+        id: "warden",
+        npcId: gravebinderGuildId,
+        groupId: gravebinderGuildId,
+        groupLabel: "Gravebinders",
+        label: "Warden",
+        description: "Unlock stronger haunt contracts.",
+        active: progress.reputation >= 85 && progress.reputation < 170,
+      },
+      {
+        id: "exorcist",
+        npcId: gravebinderGuildId,
+        groupId: gravebinderGuildId,
+        groupLabel: "Gravebinders",
+        label: "Exorcist",
+        description: "Set high reputation for testing advanced grave work.",
+        active: progress.reputation >= 170,
+      },
+    ];
+  },
+  setAdminProgress(progressId) {
+    if (!adminEnabled()) return;
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    const progress = gravebinderProgress();
+    if (progressId === "locked") {
+      delete state.questFlags["flag.village.gravebindersUnlocked"];
+      progress.reputation = 0;
+    } else {
+      state.questFlags["flag.village.gravebindersUnlocked"] = true;
+      progress.reputation = progressId === "warden" ? 85 : progressId === "exorcist" ? 170 : 0;
+    }
+    addLog(`Admin set Gravebinders progress: ${progressId}.`, "important");
+  },
+};
+
+const crucibleGuildId = "crucible-collegium";
+const crucibleStateKey = "crucibleCollegium";
+const crucibleRanks = [
+  { name: "Observer", threshold: 0, reward: "The Collegium will post basic elemental field work." },
+  { name: "Field Adept", threshold: 30, reward: "Tavren accepts more refined elemental samples." },
+  { name: "Crucible Fellow", threshold: 90, reward: "Major rift studies and stronger essence payments open." },
+  { name: "Planar Savant", threshold: 180, reward: "The Collegium trusts the party with unstable planar work." },
+  { name: "Chair of Calamities", threshold: 350, reward: "Reserved for future elite rift chains and planar sovereigns." },
+];
+const crucibleContracts = [
+  {
+    id: "motes-in-motion",
+    name: "Motes in Motion",
+    group: "Field Studies",
+    summary: "Break down active elementals and return with observations, preferably not smoking.",
+    objective: { type: "killTag", tag: "elemental", count: 5, label: "Elementals dispersed" },
+    rewardCp: 9500,
+    reputation: 30,
+    minRank: 0,
+  },
+  {
+    id: "fourfold-sample",
+    name: "Fourfold Sample",
+    group: "Elemental Balance",
+    summary: "Collect combat data from fire, air, earth, or water expressions. Tavren insists variety is science.",
+    objective: { type: "killElementalAspect", count: 8, label: "Aspect samples recorded" },
+    rewardCp: 16000,
+    reputation: 50,
+    minRank: 1,
+  },
+  {
+    id: "rift-tempering",
+    name: "Rift Tempering",
+    group: "Rift Warrants",
+    summary: "Disperse powerful elementals, paraelemental champions, or planar cores before the floor becomes a theory.",
+    objective: { type: "killMajorElemental", count: 2, label: "Major elementals dispersed" },
+    rewardCp: 28000,
+    reputation: 85,
+    minRank: 2,
+  },
+];
+const crucibleTurnIns = [
+  {
+    id: "loose-motes",
+    name: "Loose Motes",
+    summary: "Raw elemental knots. Do not store them beside soup, ink, pets, or opinions.",
+    requirement: { itemId: "elemental-mote" },
+    quantity: 4,
+    rewardCp: 6500,
+    reputation: 12,
+  },
+  {
+    id: "balanced-essences",
+    name: "Balanced Essences",
+    summary: "Any refined elemental essence, logged by color, temperature, smell, and level of personal insult.",
+    requirement: { type: "component", tagsAll: ["elemental"], tagsAny: ["fire", "air", "earth", "water", "storm", "ice", "stone"] },
+    quantity: 3,
+    rewardCp: 10500,
+    reputation: 18,
+  },
+  {
+    id: "pressure-and-crystal",
+    name: "Pressure and Crystal",
+    summary: "Stable housings, cracked focuses, and anything that clicks when no one touched it.",
+    requirement: { type: "component", tagsAny: ["pressure", "crystal", "gear", "steam", "arcane-reagent"] },
+    quantity: 3,
+    rewardCp: 9000,
+    reputation: 16,
+  },
+  {
+    id: "primal-core-study",
+    name: "Primal Core Study",
+    summary: "A rare elemental heart for serious research, heavy gloves, and several exits.",
+    requirement: { itemId: "primal-core" },
+    quantity: 1,
+    rewardCp: 14000,
+    reputation: 26,
+  },
+];
+
+function crucibleProgress() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[crucibleStateKey] ??= {};
+  const progress = state.questFlags[crucibleStateKey];
+  progress.reputation = Math.max(0, Math.floor(Number(progress.reputation) || 0));
+  progress.contracts ??= {};
+  progress.completedContracts ??= {};
+  progress.turnIns ??= {};
+  return progress;
+}
+
+function crucibleRank(progress = crucibleProgress()) {
+  const reputation = Math.max(0, Math.floor(Number(progress.reputation) || 0));
+  let rank = 0;
+  crucibleRanks.forEach((entry, index) => {
+    if (reputation >= entry.threshold) rank = index;
+  });
+  return rank;
+}
+
+function crucibleNextRank(rank = crucibleRank()) {
+  return crucibleRanks[rank + 1] ?? null;
+}
+
+function crucibleContractState(contractId) {
+  const progress = crucibleProgress();
+  progress.contracts[contractId] ??= { status: "available", progress: 0 };
+  return progress.contracts[contractId];
+}
+
+function crucibleContractReady(contract) {
+  const contractState = crucibleContractState(contract.id);
+  const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+  return contractState.status === "accepted" && Math.max(0, Math.floor(Number(contractState.progress) || 0)) >= target;
+}
+
+function crucibleContractUnlocked(contract) {
+  return crucibleRank() >= Math.max(0, Math.floor(Number(contract.minRank) || 0));
+}
+
+function crucibleObjectiveText(contract) {
+  const objective = contract.objective ?? {};
+  const contractState = crucibleContractState(contract.id);
+  const target = Math.max(1, Math.floor(Number(objective.count) || 1));
+  const progress = Math.min(target, Math.max(0, Math.floor(Number(contractState.progress) || 0)));
+  return `${objective.label ?? "Objective"}: ${progress}/${target}`;
+}
+
+function crucibleTurnInReady(turnIn) {
+  return materialCountForRequirement(turnIn.requirement) >= Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+}
+
+function crucibleRankBarMarkup(progress = crucibleProgress()) {
+  const rank = crucibleRank(progress);
+  const current = crucibleRanks[rank] ?? crucibleRanks[0];
+  const next = crucibleNextRank(rank);
+  const currentThreshold = current?.threshold ?? 0;
+  const nextThreshold = next?.threshold ?? currentThreshold;
+  const span = Math.max(1, nextThreshold - currentThreshold);
+  const filled = next ? Math.min(100, Math.max(0, ((progress.reputation - currentThreshold) / span) * 100)) : 100;
+  return `
+    <section class="guild-status">
+      <div>
+        <span>Rank</span>
+        <b>${escapeHtml(current?.name ?? "Observer")}</b>
+      </div>
+      <div>
+        <span>Reputation</span>
+        <b>${escapeHtml(progress.reputation)}${next ? ` / ${escapeHtml(next.threshold)}` : "+"}</b>
+      </div>
+      <div class="guild-rep-track" aria-hidden="true"><i style="width: ${escapeAttribute(filled.toFixed(1))}%"></i></div>
+      <p>${escapeHtml(next ? `Next: ${next.name} - ${next.reward}` : current?.reward ?? "The elements know your variables.")}</p>
+    </section>
+  `;
+}
+
+function crucibleContractRow(contract) {
+  const contractState = crucibleContractState(contract.id);
+  const unlocked = crucibleContractUnlocked(contract);
+  const completed = contractState.status === "completed";
+  const accepted = contractState.status === "accepted";
+  const ready = crucibleContractReady(contract);
+  return `
+    <article class="guild-contract-row ${ready ? "ready" : ""}">
+      <div>
+        <b>${escapeHtml(contract.name)}</b>
+        <span>${escapeHtml(contract.summary)}</span>
+        <small>${escapeHtml(crucibleObjectiveText(contract))} - ${escapeHtml(priceText(contract.rewardCp))}, ${escapeHtml(contract.reputation)} rep</small>
+      </div>
+      ${
+        !unlocked
+          ? `<button type="button" disabled>Rank ${escapeHtml(contract.minRank)}</button>`
+          : completed
+            ? `<button type="button" disabled>Filed</button>`
+            : accepted
+              ? `<button type="button" data-action="complete-guild-contract" data-npc="${escapeAttribute(crucibleGuildId)}" data-contract="${escapeAttribute(contract.id)}" ${ready ? "" : "disabled"}>${ready ? "Claim" : "Studying"}</button>`
+              : `<button type="button" data-action="accept-guild-contract" data-npc="${escapeAttribute(crucibleGuildId)}" data-contract="${escapeAttribute(contract.id)}">Accept</button>`
+      }
+    </article>
+  `;
+}
+
+function crucibleContractsMarkup() {
+  const groups = new Map();
+  for (const contract of crucibleContracts) {
+    if (!groups.has(contract.group)) groups.set(contract.group, []);
+    groups.get(contract.group).push(contract);
+  }
+  return `
+    <section class="guild-section">
+      <h3>Contracts</h3>
+      <div class="guild-groups">
+        ${Array.from(groups.entries())
+          .map(
+            ([group, contracts]) => `
+              <details class="guild-group" open>
+                <summary>${escapeHtml(group)} <small>${escapeHtml(contracts.length)}</small></summary>
+                <div>${contracts.map(crucibleContractRow).join("")}</div>
+              </details>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function crucibleTurnInRow(turnIn) {
+  const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+  const have = materialCountForRequirement(turnIn.requirement);
+  const ready = have >= quantity;
+  return `
+    <article class="guild-contract-row ${ready ? "ready" : ""}">
+      <div>
+        <b>${escapeHtml(turnIn.name)}</b>
+        <span>${escapeHtml(turnIn.summary)}</span>
+        <small>Have ${escapeHtml(Math.min(have, quantity))}/${escapeHtml(quantity)} - ${escapeHtml(priceText(turnIn.rewardCp))}, ${escapeHtml(turnIn.reputation)} rep</small>
+      </div>
+      <button type="button" data-action="complete-guild-turn-in" data-npc="${escapeAttribute(crucibleGuildId)}" data-turn-in="${escapeAttribute(turnIn.id)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Samples"}</button>
+    </article>
+  `;
+}
+
+function crucibleTurnInsMarkup() {
+  return `
+    <section class="guild-section">
+      <h3>Sample Turn-Ins</h3>
+      <div class="guild-contract-list">
+        ${crucibleTurnIns.map(crucibleTurnInRow).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function crucibleRankRewardsMarkup() {
+  const rank = crucibleRank();
+  return `
+    <section class="guild-section">
+      <h3>Rank Rewards</h3>
+      <div class="guild-rewards">
+        ${crucibleRanks
+          .map(
+            (entry, index) => `
+              <div class="${index <= rank ? "unlocked" : ""}">
+                <b>${escapeHtml(entry.name)}</b>
+                <span>${escapeHtml(index <= rank ? entry.reward : `${entry.threshold} reputation required`)}</span>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function crucibleBoardStats(progress = crucibleProgress()) {
+  const activeContracts = crucibleContracts.filter((contract) => crucibleContractState(contract.id).status === "accepted").length;
+  const readyContracts = crucibleContracts.filter(crucibleContractReady).length;
+  const readyTurnIns = crucibleTurnIns.filter(crucibleTurnInReady).length;
+  return { activeContracts, readyContracts, readyTurnIns, rank: crucibleRank(progress) };
+}
+
+function crucibleBoardHeaderMarkup(npc, progress) {
+  const stats = crucibleBoardStats(progress);
+  return `
+    <section class="guild-hero crucible-hero">
+      ${factionSymbolMarkup(crucibleGuildId)}
+      ${npcPortraitMarkup(npc, "guild-portrait", { clickable: false })}
+      <div class="guild-hero-text">
+        <span>Crucible Collegium</span>
+        <h3>${guildNpcNameButtonMarkup(npc, "Collegium Contact")}</h3>
+        <b>${escapeHtml(npc.title)}</b>
+        <p>${escapeHtml(npcEntryLine(npc) || npc.description || "")}</p>
+      </div>
+      <div class="guild-hero-stats">
+        <div>
+          <span>Active</span>
+          <b>${escapeHtml(stats.activeContracts)}</b>
+        </div>
+        <div>
+          <span>Ready</span>
+          <b>${escapeHtml(stats.readyContracts + stats.readyTurnIns)}</b>
+        </div>
+        <div>
+          <span>Rank</span>
+          <b>${escapeHtml(stats.rank)}</b>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function crucibleBoardActionsMarkup() {
+  const readyContracts = crucibleContracts.filter(crucibleContractReady).length;
+  const readyTurnIns = crucibleTurnIns.filter(crucibleTurnInReady).length;
+  return `
+    <section class="guild-actions-panel">
+      <h3>Research Desk</h3>
+      <button type="button" data-action="show-quest-log">Quest Log</button>
+      <div>
+        <span>${escapeHtml(readyContracts)} study${readyContracts === 1 ? "" : "ies"} ready to file</span>
+        <span>${escapeHtml(readyTurnIns)} sample turn-in${readyTurnIns === 1 ? "" : "s"} ready</span>
+      </div>
+    </section>
+  `;
+}
+
+function renderCrucibleGuild(npc = window.DungeonContent.get("npcs", crucibleGuildId)) {
+  els.villageMenu?.classList.remove("npc-chat-open");
+  els.villageMenu?.classList.add("guild-open");
+  setVillageBackButtonVisible(true);
+  const progress = crucibleProgress();
+  els.villageBody.innerHTML = `
+    <section class="guild-board crucible-board">
+      ${crucibleBoardHeaderMarkup(npc, progress)}
+      <div class="guild-board-grid">
+        <aside class="guild-board-side">
+          ${crucibleRankBarMarkup(progress)}
+          ${crucibleBoardActionsMarkup()}
+        </aside>
+        <main class="guild-board-main">
+          ${crucibleContractsMarkup()}
+          ${crucibleTurnInsMarkup()}
+        </main>
+        <aside class="guild-board-rewards">
+          ${crucibleRankRewardsMarkup()}
+        </aside>
+      </div>
+    </section>
+  `;
+  els.villageMenu.classList.remove("hidden");
+  resetVillageScroll();
+  setVillageMusicKey(villageMusicKeyForNpc(crucibleGuildId));
+}
+
+function acceptCrucibleContract(contractId) {
+  const contract = crucibleContracts.find((entry) => entry.id === contractId);
+  if (!contract || !crucibleContractUnlocked(contract)) return;
+  const contractState = crucibleContractState(contract.id);
+  if (contractState.status === "completed" || contractState.status === "accepted") return;
+  contractState.status = "accepted";
+  contractState.progress = 0;
+  contractState.acceptedAt = Date.now();
+  addLog(`Tavren Quillflare opens a Collegium study: ${contract.name}.`, "important");
+  renderCrucibleGuild();
+  renderQuestLogButton();
+}
+
+function completeCrucibleContract(contractId) {
+  const contract = crucibleContracts.find((entry) => entry.id === contractId);
+  if (!contract || !crucibleContractReady(contract)) return;
+  const contractState = crucibleContractState(contract.id);
+  contractState.status = "completed";
+  contractState.completedAt = Date.now();
+  addMoney(activeHero().inventory.money, contract.rewardCp);
+  const progress = crucibleProgress();
+  progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
+  progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
+  addLog(`The Crucible Collegium pays ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
+  render();
+  renderCrucibleGuild();
+}
+
+function completeCrucibleTurnIn(turnInId) {
+  const turnIn = crucibleTurnIns.find((entry) => entry.id === turnInId);
+  if (!turnIn || !crucibleTurnInReady(turnIn)) return;
+  const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+  if (!consumeMaterialsForRequirement(turnIn.requirement, quantity)) return;
+  addMoney(activeHero().inventory.money, turnIn.rewardCp);
+  const progress = crucibleProgress();
+  progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
+  progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
+  addLog(`Tavren Quillflare accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Collegium reputation +${turnIn.reputation}.`, "important");
+  render();
+  renderCrucibleGuild();
+}
+
+function cancelCrucibleContract(contractId) {
+  const contract = crucibleContracts.find((entry) => entry.id === contractId);
+  const contractState = contract ? crucibleContractState(contract.id) : null;
+  if (!contract || contractState?.status !== "accepted") return false;
+  contractState.status = "available";
+  contractState.cancelledAt = Date.now();
+  contractState.progress = 0;
+  addLog(`The Collegium study ${contract.name} is no longer accepted.`, "important");
+  return true;
+}
+
+function crucibleMatchesContract(monster, contract) {
+  const objective = contract?.objective ?? {};
+  const tags = new Set((monster?.tags ?? []).map((tag) => String(tag).toLowerCase()));
+  const text = [monster?.name, monster?.role, monster?.description, monster?.baseMonsterId, monster?.templateId, monster?.id]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const elemental = tags.has("elemental") || /elemental|paraelemental|myrmidon|efreeti|salamander|magma|storm|tide|quake|gale/.test(text);
+  const aspect = ["fire", "air", "earth", "water", "ash", "smoke", "storm", "wind", "lightning", "thunder", "stone", "crystal", "mud", "sand", "ice", "frost", "steam", "mist", "magma", "lava"].some((tag) => tags.has(tag) || text.includes(tag));
+  if (objective.type === "killTag") return elemental || tags.has(String(objective.tag ?? "").toLowerCase());
+  if (objective.type === "killElementalAspect") return elemental && aspect;
+  if (objective.type === "killMajorElemental") {
+    const category = Math.max(0, Math.floor(Number(monster?.category ?? monster?.monsterCategory ?? 0) || 0));
+    return elemental && (tags.has("boss") || monster?.customBoss || category >= 2 || /\b(lord|queen|king|regent|sovereign|avatar|colossus|titan|boss|core)\b/.test(text));
+  }
+  return false;
+}
+
+function recordCrucibleKill(monster) {
+  if (!monster || isPartyHeroId(monster.id)) return;
+  const progress = crucibleProgress();
+  let changed = false;
+  for (const contract of crucibleContracts) {
+    const contractState = progress.contracts?.[contract.id];
+    if (contractState?.status !== "accepted" || !crucibleMatchesContract(monster, contract)) continue;
+    const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+    contractState.progress = Math.min(target, Math.max(0, Math.floor(Number(contractState.progress) || 0)) + 1);
+    changed = true;
+    if (contractState.progress >= target) addLog(`Collegium study ready: ${contract.name}.`, "important");
+  }
+  if (changed) renderQuestLogButton();
+}
+
+function crucibleQuestLogEntries() {
+  return crucibleContracts
+    .filter((contract) => crucibleContractState(contract.id).status === "accepted")
+    .map((contract) => {
+      const contractState = crucibleContractState(contract.id);
+      const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+      const current = Math.min(target, Math.max(0, Math.floor(Number(contractState.progress) || 0)));
+      return {
+        id: `crucible-${contract.id}`,
+        giver: "Crucible Collegium",
+        title: contract.name,
+        description: contract.summary,
+        ready: current >= target,
+        cancelable: true,
+        cancelType: "crucible",
+        questId: contract.id,
+        objectives: [
+          {
+            label: contract.objective?.label ?? "Study",
+            progress: current,
+            target,
+          },
+        ],
+      };
+    });
+}
+
+window.DungeonNpcBehaviors[crucibleGuildId] = {
+  visit: renderCrucibleGuild,
+  returnToVisit: () => renderCrucibleGuild(),
+  recordMonsterKill: recordCrucibleKill,
+  questLogEntries: crucibleQuestLogEntries,
+  cancelQuest: cancelCrucibleContract,
+  adminProgressEntries() {
+    const progress = crucibleProgress();
+    return [
+      {
+        id: "locked",
+        npcId: crucibleGuildId,
+        groupId: crucibleGuildId,
+        groupLabel: "Crucible Collegium",
+        label: "Locked",
+        description: "Hide the Crucible Collegium until its story unlock.",
+        active: !state.questFlags?.["flag.village.crucibleCollegiumUnlocked"],
+      },
+      {
+        id: "unlocked",
+        npcId: crucibleGuildId,
+        groupId: crucibleGuildId,
+        groupLabel: "Crucible Collegium",
+        label: "Unlocked",
+        description: "Show the Crucible Collegium with no extra reputation.",
+        active: Boolean(state.questFlags?.["flag.village.crucibleCollegiumUnlocked"]) && progress.reputation < 90,
+      },
+      {
+        id: "fellow",
+        npcId: crucibleGuildId,
+        groupId: crucibleGuildId,
+        groupLabel: "Crucible Collegium",
+        label: "Crucible Fellow",
+        description: "Unlock major elemental studies.",
+        active: progress.reputation >= 90 && progress.reputation < 180,
+      },
+      {
+        id: "savant",
+        npcId: crucibleGuildId,
+        groupId: crucibleGuildId,
+        groupLabel: "Crucible Collegium",
+        label: "Planar Savant",
+        description: "Set high reputation for testing unstable planar work.",
+        active: progress.reputation >= 180,
+      },
+    ];
+  },
+  setAdminProgress(progressId) {
+    if (!adminEnabled()) return;
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    const progress = crucibleProgress();
+    if (progressId === "locked") {
+      delete state.questFlags["flag.village.crucibleCollegiumUnlocked"];
+      progress.reputation = 0;
+    } else {
+      state.questFlags["flag.village.crucibleCollegiumUnlocked"] = true;
+      progress.reputation = progressId === "fellow" ? 90 : progressId === "savant" ? 180 : 0;
+    }
+    addLog(`Admin set Crucible Collegium progress: ${progressId}.`, "important");
+  },
+};
+
+const antiquarianGuildId = "antiquarian-society";
+const antiquarianStateKey = "antiquarianSociety";
+const antiquarianRanks = [
+  { name: "Visitor", threshold: 0, reward: "The Society will accept basic field notes and relic cataloging." },
+  { name: "Cataloger", threshold: 30, reward: "Professor Inkglass accepts better provenance work and fragile finds." },
+  { name: "Archivist", threshold: 90, reward: "Rare relic commissions and stronger appraisal payments open." },
+  { name: "Curator", threshold: 180, reward: "The Society trusts the party with dangerous history." },
+  { name: "Keeper of Lost Rooms", threshold: 350, reward: "Reserved for future archive wings and named relic chains." },
+];
+const antiquarianContracts = [
+  {
+    id: "field-notes",
+    name: "Field Notes",
+    group: "Archive Work",
+    summary: "Recover written fragments, dungeon notes, or ancient tome pages before damp, fire, or adventurers improve them.",
+    objective: { type: "collectTome", count: 2, label: "Tomes or notes cataloged" },
+    rewardCp: 8500,
+    reputation: 30,
+    minRank: 0,
+  },
+  {
+    id: "objects-of-provenance",
+    name: "Objects of Provenance",
+    group: "Relic Surveys",
+    summary: "Bring back art objects, valuables, and cultural pieces with enough context to make scholars argue politely.",
+    objective: { type: "collectTreasure", count: 4, label: "Relic objects cataloged" },
+    rewardCp: 15000,
+    reputation: 50,
+    minRank: 1,
+  },
+  {
+    id: "dangerous-antiquities",
+    name: "Dangerous Antiquities",
+    group: "Rare Finds",
+    summary: "Recover rare, magical, royal, or funerary pieces. If the object resents being observed, note the tone.",
+    objective: { type: "collectMajorRelic", count: 2, label: "Major relics cataloged" },
+    rewardCp: 30000,
+    reputation: 90,
+    minRank: 2,
+  },
+];
+const antiquarianTurnIns = [
+  {
+    id: "tome-pages",
+    name: "Tome Pages",
+    summary: "Readable pages, field notes, inscriptions, and anything that makes the archive smell older.",
+    requirement: { type: "handout", tagsAny: ["ancient-tome", "handout", "journal"] },
+    quantity: 1,
+    rewardCp: 7000,
+    reputation: 14,
+  },
+  {
+    id: "small-antiquities",
+    name: "Small Antiquities",
+    summary: "Art objects and old valuables. Shine is optional. Context is not.",
+    requirement: { type: "treasure", tagsAny: ["art", "art-object", "valuable", "trade-good"] },
+    quantity: 2,
+    rewardCp: 10000,
+    reputation: 18,
+  },
+  {
+    id: "reliquary-cases",
+    name: "Reliquary Cases",
+    summary: "Reliquaries, saint icons, funerary pieces, and other objects people once whispered near.",
+    requirement: { type: "treasure", tagsAny: ["relic", "reliquary", "saint", "funerary", "prayer"] },
+    quantity: 1,
+    rewardCp: 14000,
+    reputation: 24,
+  },
+  {
+    id: "royal-provenance",
+    name: "Royal Provenance",
+    summary: "Crowns, charters, regalia, and objects expensive enough to have caused paperwork in three kingdoms.",
+    requirement: { type: "treasure", tagsAny: ["royal", "crown", "charter", "signet", "coronet"], minValueGp: 250 },
+    quantity: 1,
+    rewardCp: 22000,
+    reputation: 34,
+  },
+];
+
+function antiquarianProgress() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[antiquarianStateKey] ??= {};
+  const progress = state.questFlags[antiquarianStateKey];
+  progress.reputation = Math.max(0, Math.floor(Number(progress.reputation) || 0));
+  progress.contracts ??= {};
+  progress.completedContracts ??= {};
+  progress.turnIns ??= {};
+  return progress;
+}
+
+function antiquarianRank(progress = antiquarianProgress()) {
+  const reputation = Math.max(0, Math.floor(Number(progress.reputation) || 0));
+  let rank = 0;
+  antiquarianRanks.forEach((entry, index) => {
+    if (reputation >= entry.threshold) rank = index;
+  });
+  return rank;
+}
+
+function antiquarianNextRank(rank = antiquarianRank()) {
+  return antiquarianRanks[rank + 1] ?? null;
+}
+
+function antiquarianContractState(contractId) {
+  const progress = antiquarianProgress();
+  progress.contracts[contractId] ??= { status: "available", progress: 0 };
+  return progress.contracts[contractId];
+}
+
+function antiquarianContractReady(contract) {
+  const contractState = antiquarianContractState(contract.id);
+  const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+  return contractState.status === "accepted" && Math.max(0, Math.floor(Number(contractState.progress) || 0)) >= target;
+}
+
+function antiquarianContractUnlocked(contract) {
+  return antiquarianRank() >= Math.max(0, Math.floor(Number(contract.minRank) || 0));
+}
+
+function antiquarianObjectiveText(contract) {
+  const objective = contract.objective ?? {};
+  const contractState = antiquarianContractState(contract.id);
+  const target = Math.max(1, Math.floor(Number(objective.count) || 1));
+  const progress = Math.min(target, Math.max(0, Math.floor(Number(contractState.progress) || 0)));
+  return `${objective.label ?? "Objective"}: ${progress}/${target}`;
+}
+
+function antiquarianTurnInReady(turnIn) {
+  return antiquarianTurnInCount(turnIn) >= Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+}
+
+function antiquarianTurnInUsesTomes(turnIn) {
+  return turnIn?.requirement?.type === "handout";
+}
+
+function antiquarianTomeTurnInEntries(turnIn) {
+  if (!antiquarianTurnInUsesTomes(turnIn)) return [];
+  const requirement = turnIn.requirement ?? {};
+  return normalizePartyTomes(state?.partyTomes ?? []).filter((entry) => {
+    const itemLike = {
+      id: entry.baseItemId || entry.id,
+      type: "handout",
+      tags: ["handout", "journal", ...(entry.tags ?? []), ...(entry.categories ?? []).map((category) => String(category).toLowerCase())],
+      handout: { categories: entry.categories ?? [] },
+    };
+    return itemMatchesRequirement(itemLike, requirement);
+  });
+}
+
+function antiquarianTurnInCount(turnIn) {
+  if (antiquarianTurnInUsesTomes(turnIn)) return antiquarianTomeTurnInEntries(turnIn).length;
+  return materialCountForRequirement(turnIn.requirement);
+}
+
+function consumeAntiquarianTurnIn(turnIn, quantity) {
+  if (!antiquarianTurnInUsesTomes(turnIn)) return consumeMaterialsForRequirement(turnIn.requirement, quantity);
+  const entries = antiquarianTomeTurnInEntries(turnIn).slice(0, quantity);
+  if (entries.length < quantity) return false;
+  const consumedIds = new Set(entries.map((entry) => entry.id));
+  state.partyTomes = normalizePartyTomes(state.partyTomes ?? []).filter((entry) => !consumedIds.has(entry.id));
+  return true;
+}
+
+function antiquarianRankBarMarkup(progress = antiquarianProgress()) {
+  const rank = antiquarianRank(progress);
+  const current = antiquarianRanks[rank] ?? antiquarianRanks[0];
+  const next = antiquarianNextRank(rank);
+  const currentThreshold = current?.threshold ?? 0;
+  const nextThreshold = next?.threshold ?? currentThreshold;
+  const span = Math.max(1, nextThreshold - currentThreshold);
+  const filled = next ? Math.min(100, Math.max(0, ((progress.reputation - currentThreshold) / span) * 100)) : 100;
+  return `
+    <section class="guild-status">
+      <div>
+        <span>Rank</span>
+        <b>${escapeHtml(current?.name ?? "Visitor")}</b>
+      </div>
+      <div>
+        <span>Reputation</span>
+        <b>${escapeHtml(progress.reputation)}${next ? ` / ${escapeHtml(next.threshold)}` : "+"}</b>
+      </div>
+      <div class="guild-rep-track" aria-hidden="true"><i style="width: ${escapeAttribute(filled.toFixed(1))}%"></i></div>
+      <p>${escapeHtml(next ? `Next: ${next.name} - ${next.reward}` : current?.reward ?? "The archive knows your name.")}</p>
+    </section>
+  `;
+}
+
+function antiquarianContractRow(contract) {
+  const contractState = antiquarianContractState(contract.id);
+  const unlocked = antiquarianContractUnlocked(contract);
+  const completed = contractState.status === "completed";
+  const accepted = contractState.status === "accepted";
+  const ready = antiquarianContractReady(contract);
+  return `
+    <article class="guild-contract-row ${ready ? "ready" : ""}">
+      <div>
+        <b>${escapeHtml(contract.name)}</b>
+        <span>${escapeHtml(contract.summary)}</span>
+        <small>${escapeHtml(antiquarianObjectiveText(contract))} - ${escapeHtml(priceText(contract.rewardCp))}, ${escapeHtml(contract.reputation)} rep</small>
+      </div>
+      ${
+        !unlocked
+          ? `<button type="button" disabled>Rank ${escapeHtml(contract.minRank)}</button>`
+          : completed
+            ? `<button type="button" disabled>Filed</button>`
+            : accepted
+              ? `<button type="button" data-action="complete-guild-contract" data-npc="${escapeAttribute(antiquarianGuildId)}" data-contract="${escapeAttribute(contract.id)}" ${ready ? "" : "disabled"}>${ready ? "Claim" : "Cataloging"}</button>`
+              : `<button type="button" data-action="accept-guild-contract" data-npc="${escapeAttribute(antiquarianGuildId)}" data-contract="${escapeAttribute(contract.id)}">Accept</button>`
+      }
+    </article>
+  `;
+}
+
+function antiquarianContractsMarkup() {
+  const groups = new Map();
+  for (const contract of antiquarianContracts) {
+    if (!groups.has(contract.group)) groups.set(contract.group, []);
+    groups.get(contract.group).push(contract);
+  }
+  return `
+    <section class="guild-section">
+      <h3>Commissions</h3>
+      <div class="guild-groups">
+        ${Array.from(groups.entries())
+          .map(
+            ([group, contracts]) => `
+              <details class="guild-group" open>
+                <summary>${escapeHtml(group)} <small>${escapeHtml(contracts.length)}</small></summary>
+                <div>${contracts.map(antiquarianContractRow).join("")}</div>
+              </details>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function antiquarianTurnInRow(turnIn) {
+  const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+  const have = antiquarianTurnInCount(turnIn);
+  const ready = have >= quantity;
+  return `
+    <article class="guild-contract-row ${ready ? "ready" : ""}">
+      <div>
+        <b>${escapeHtml(turnIn.name)}</b>
+        <span>${escapeHtml(turnIn.summary)}</span>
+        <small>Have ${escapeHtml(Math.min(have, quantity))}/${escapeHtml(quantity)} - ${escapeHtml(priceText(turnIn.rewardCp))}, ${escapeHtml(turnIn.reputation)} rep</small>
+      </div>
+      <button type="button" data-action="complete-guild-turn-in" data-npc="${escapeAttribute(antiquarianGuildId)}" data-turn-in="${escapeAttribute(turnIn.id)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Finds"}</button>
+    </article>
+  `;
+}
+
+function antiquarianTurnInsMarkup() {
+  return `
+    <section class="guild-section">
+      <h3>Archive Turn-Ins</h3>
+      <div class="guild-contract-list">
+        ${antiquarianTurnIns.map(antiquarianTurnInRow).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function antiquarianRankRewardsMarkup() {
+  const rank = antiquarianRank();
+  return `
+    <section class="guild-section">
+      <h3>Rank Rewards</h3>
+      <div class="guild-rewards">
+        ${antiquarianRanks
+          .map(
+            (entry, index) => `
+              <div class="${index <= rank ? "unlocked" : ""}">
+                <b>${escapeHtml(entry.name)}</b>
+                <span>${escapeHtml(index <= rank ? entry.reward : `${entry.threshold} reputation required`)}</span>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function antiquarianBoardStats(progress = antiquarianProgress()) {
+  const activeContracts = antiquarianContracts.filter((contract) => antiquarianContractState(contract.id).status === "accepted").length;
+  const readyContracts = antiquarianContracts.filter(antiquarianContractReady).length;
+  const readyTurnIns = antiquarianTurnIns.filter(antiquarianTurnInReady).length;
+  return { activeContracts, readyContracts, readyTurnIns, rank: antiquarianRank(progress) };
+}
+
+function antiquarianBoardHeaderMarkup(npc, progress) {
+  const stats = antiquarianBoardStats(progress);
+  return `
+    <section class="guild-hero antiquarian-hero">
+      ${factionSymbolMarkup(antiquarianGuildId)}
+      ${npcPortraitMarkup(npc, "guild-portrait", { clickable: false })}
+      <div class="guild-hero-text">
+        <span>Antiquarian Society</span>
+        <h3>${guildNpcNameButtonMarkup(npc, "Society Contact")}</h3>
+        <b>${escapeHtml(npc.title)}</b>
+        <p>${escapeHtml(npcEntryLine(npc) || npc.description || "")}</p>
+      </div>
+      <div class="guild-hero-stats">
+        <div>
+          <span>Active</span>
+          <b>${escapeHtml(stats.activeContracts)}</b>
+        </div>
+        <div>
+          <span>Ready</span>
+          <b>${escapeHtml(stats.readyContracts + stats.readyTurnIns)}</b>
+        </div>
+        <div>
+          <span>Rank</span>
+          <b>${escapeHtml(stats.rank)}</b>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function antiquarianBoardActionsMarkup() {
+  const readyContracts = antiquarianContracts.filter(antiquarianContractReady).length;
+  const readyTurnIns = antiquarianTurnIns.filter(antiquarianTurnInReady).length;
+  return `
+    <section class="guild-actions-panel">
+      <h3>Archive Desk</h3>
+      <button type="button" data-action="show-quest-log">Quest Log</button>
+      <div>
+        <span>${escapeHtml(readyContracts)} commission${readyContracts === 1 ? "" : "s"} ready to file</span>
+        <span>${escapeHtml(readyTurnIns)} archive turn-in${readyTurnIns === 1 ? "" : "s"} ready</span>
+      </div>
+    </section>
+  `;
+}
+
+function renderAntiquarianGuild(npc = window.DungeonContent.get("npcs", antiquarianGuildId)) {
+  els.villageMenu?.classList.remove("npc-chat-open");
+  els.villageMenu?.classList.add("guild-open");
+  setVillageBackButtonVisible(true);
+  const progress = antiquarianProgress();
+  els.villageBody.innerHTML = `
+    <section class="guild-board antiquarian-board">
+      ${antiquarianBoardHeaderMarkup(npc, progress)}
+      <div class="guild-board-grid">
+        <aside class="guild-board-side">
+          ${antiquarianRankBarMarkup(progress)}
+          ${antiquarianBoardActionsMarkup()}
+        </aside>
+        <main class="guild-board-main">
+          ${antiquarianContractsMarkup()}
+          ${antiquarianTurnInsMarkup()}
+        </main>
+        <aside class="guild-board-rewards">
+          ${antiquarianRankRewardsMarkup()}
+        </aside>
+      </div>
+    </section>
+  `;
+  els.villageMenu.classList.remove("hidden");
+  resetVillageScroll();
+  setVillageMusicKey(villageMusicKeyForNpc(antiquarianGuildId));
+}
+
+function acceptAntiquarianContract(contractId) {
+  const contract = antiquarianContracts.find((entry) => entry.id === contractId);
+  if (!contract || !antiquarianContractUnlocked(contract)) return;
+  const contractState = antiquarianContractState(contract.id);
+  if (contractState.status === "completed" || contractState.status === "accepted") return;
+  contractState.status = "accepted";
+  contractState.progress = 0;
+  contractState.acceptedAt = Date.now();
+  addLog(`Professor Seraphel Inkglass opens an Antiquarian Society commission: ${contract.name}.`, "important");
+  renderAntiquarianGuild();
+  renderQuestLogButton();
+}
+
+function completeAntiquarianContract(contractId) {
+  const contract = antiquarianContracts.find((entry) => entry.id === contractId);
+  if (!contract || !antiquarianContractReady(contract)) return;
+  const contractState = antiquarianContractState(contract.id);
+  contractState.status = "completed";
+  contractState.completedAt = Date.now();
+  addMoney(activeHero().inventory.money, contract.rewardCp);
+  const progress = antiquarianProgress();
+  progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
+  progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
+  addLog(`The Antiquarian Society pays ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
+  render();
+  renderAntiquarianGuild();
+}
+
+function completeAntiquarianTurnIn(turnInId) {
+  const turnIn = antiquarianTurnIns.find((entry) => entry.id === turnInId);
+  if (!turnIn || !antiquarianTurnInReady(turnIn)) return;
+  const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+  if (!consumeAntiquarianTurnIn(turnIn, quantity)) return;
+  addMoney(activeHero().inventory.money, turnIn.rewardCp);
+  const progress = antiquarianProgress();
+  progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
+  progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
+  addLog(`Professor Seraphel Inkglass accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Antiquarian reputation +${turnIn.reputation}.`, "important");
+  render();
+  renderAntiquarianGuild();
+}
+
+function cancelAntiquarianContract(contractId) {
+  const contract = antiquarianContracts.find((entry) => entry.id === contractId);
+  const contractState = contract ? antiquarianContractState(contract.id) : null;
+  if (!contract || contractState?.status !== "accepted") return false;
+  contractState.status = "available";
+  contractState.cancelledAt = Date.now();
+  contractState.progress = 0;
+  addLog(`The Antiquarian Society commission ${contract.name} is no longer accepted.`, "important");
+  return true;
+}
+
+function antiquarianItemMatchesContract(item, contract) {
+  const objective = contract?.objective ?? {};
+  const tags = new Set((item?.tags ?? []).map((tag) => String(tag).toLowerCase()));
+  const text = [item?.name, item?.description, item?.customDescription, item?.category, item?.treasure?.kind, item?.treasure?.description]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const isTome = itemUsesTomeInventory(item) || item?.type === "handout" || tags.has("ancient-tome") || tags.has("journal");
+  const isTreasure = item?.type === "treasure" || tags.has("treasure");
+  const isRelic = isTreasure && (["art", "art-object", "valuable", "relic", "reliquary", "gem", "gemstone", "trade-good"].some((tag) => tags.has(tag)) || /relic|reliquary|idol|tablet|mask|icon|charter|crown|helm|astrolabe|ancient|royal|saint|funerary/.test(text));
+  const valueGp = Number(item?.treasure?.valueGp ?? item?.treasure?.valueTierGp ?? 0) || itemValueCopper(item) / 100;
+  if (objective.type === "collectTome") return isTome;
+  if (objective.type === "collectTreasure") return isRelic;
+  if (objective.type === "collectMajorRelic") return isRelic && (valueGp >= 250 || /royal|crown|reliquary|charter|funerary|ancient|idol|sapphire|emerald|diamond|ruby/.test(text));
+  return false;
+}
+
+function recordAntiquarianItemCollected(item) {
+  if (!item) return;
+  const progress = antiquarianProgress();
+  let changed = false;
+  for (const contract of antiquarianContracts) {
+    const contractState = progress.contracts?.[contract.id];
+    if (contractState?.status !== "accepted" || !antiquarianItemMatchesContract(item, contract)) continue;
+    const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+    contractState.progress = Math.min(target, Math.max(0, Math.floor(Number(contractState.progress) || 0)) + 1);
+    changed = true;
+    if (contractState.progress >= target) addLog(`Antiquarian commission ready: ${contract.name}.`, "important");
+  }
+  if (changed) renderQuestLogButton();
+}
+
+function antiquarianQuestLogEntries() {
+  return antiquarianContracts
+    .filter((contract) => antiquarianContractState(contract.id).status === "accepted")
+    .map((contract) => {
+      const contractState = antiquarianContractState(contract.id);
+      const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+      const current = Math.min(target, Math.max(0, Math.floor(Number(contractState.progress) || 0)));
+      return {
+        id: `antiquarian-${contract.id}`,
+        giver: "Antiquarian Society",
+        title: contract.name,
+        description: contract.summary,
+        ready: current >= target,
+        cancelable: true,
+        cancelType: "antiquarian",
+        questId: contract.id,
+        objectives: [
+          {
+            label: contract.objective?.label ?? "Commission",
+            progress: current,
+            target,
+          },
+        ],
+      };
+    });
+}
+
+window.DungeonNpcBehaviors[antiquarianGuildId] = {
+  visit: renderAntiquarianGuild,
+  returnToVisit: () => renderAntiquarianGuild(),
+  recordItemCollected: recordAntiquarianItemCollected,
+  questLogEntries: antiquarianQuestLogEntries,
+  cancelQuest: cancelAntiquarianContract,
+  adminProgressEntries() {
+    const progress = antiquarianProgress();
+    return [
+      {
+        id: "locked",
+        npcId: antiquarianGuildId,
+        groupId: antiquarianGuildId,
+        groupLabel: "Antiquarian Society",
+        label: "Locked",
+        description: "Hide the Antiquarian Society until its story unlock.",
+        active: !state.questFlags?.["flag.village.antiquarianSocietyUnlocked"],
+      },
+      {
+        id: "unlocked",
+        npcId: antiquarianGuildId,
+        groupId: antiquarianGuildId,
+        groupLabel: "Antiquarian Society",
+        label: "Unlocked",
+        description: "Show the Antiquarian Society with no extra reputation.",
+        active: Boolean(state.questFlags?.["flag.village.antiquarianSocietyUnlocked"]) && progress.reputation < 90,
+      },
+      {
+        id: "archivist",
+        npcId: antiquarianGuildId,
+        groupId: antiquarianGuildId,
+        groupLabel: "Antiquarian Society",
+        label: "Archivist",
+        description: "Unlock better rare-find commissions.",
+        active: progress.reputation >= 90 && progress.reputation < 180,
+      },
+      {
+        id: "curator",
+        npcId: antiquarianGuildId,
+        groupId: antiquarianGuildId,
+        groupLabel: "Antiquarian Society",
+        label: "Curator",
+        description: "Set high reputation for testing dangerous history.",
+        active: progress.reputation >= 180,
+      },
+    ];
+  },
+  setAdminProgress(progressId) {
+    if (!adminEnabled()) return;
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    const progress = antiquarianProgress();
+    if (progressId === "locked") {
+      delete state.questFlags["flag.village.antiquarianSocietyUnlocked"];
+      progress.reputation = 0;
+    } else {
+      state.questFlags["flag.village.antiquarianSocietyUnlocked"] = true;
+      progress.reputation = progressId === "archivist" ? 90 : progressId === "curator" ? 180 : 0;
+    }
+    addLog(`Admin set Antiquarian Society progress: ${progressId}.`, "important");
+  },
+};
+
+function createCompactGuildBoard(config) {
+  const stateKey = config.stateKey;
+  const ranks = config.ranks ?? [];
+  const contracts = config.contracts ?? [];
+  const turnIns = config.turnIns ?? [];
+
+  function progress() {
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    state.questFlags[stateKey] ??= {};
+    const entry = state.questFlags[stateKey];
+    entry.reputation = Math.max(0, Math.floor(Number(entry.reputation) || 0));
+    entry.contracts ??= {};
+    entry.completedContracts ??= {};
+    entry.turnIns ??= {};
+    return entry;
+  }
+
+  function rank(entry = progress()) {
+    const reputation = Math.max(0, Math.floor(Number(entry.reputation) || 0));
+    let current = 0;
+    ranks.forEach((rankEntry, index) => {
+      if (reputation >= rankEntry.threshold) current = index;
+    });
+    return current;
+  }
+
+  function nextRank(currentRank = rank()) {
+    return ranks[currentRank + 1] ?? null;
+  }
+
+  function contractState(contractId) {
+    const entry = progress();
+    entry.contracts[contractId] ??= { status: "available", progress: 0 };
+    return entry.contracts[contractId];
+  }
+
+  function contractReady(contract) {
+    const entry = contractState(contract.id);
+    const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+    return entry.status === "accepted" && Math.max(0, Math.floor(Number(entry.progress) || 0)) >= target;
+  }
+
+  function contractUnlocked(contract) {
+    return rank() >= Math.max(0, Math.floor(Number(contract.minRank) || 0));
+  }
+
+  function objectiveText(contract) {
+    const objective = contract.objective ?? {};
+    const entry = contractState(contract.id);
+    const target = Math.max(1, Math.floor(Number(objective.count) || 1));
+    const current = Math.min(target, Math.max(0, Math.floor(Number(entry.progress) || 0)));
+    return `${objective.label ?? "Objective"}: ${current}/${target}`;
+  }
+
+  function turnInReady(turnIn) {
+    return materialCountForRequirement(turnIn.requirement) >= Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+  }
+
+  function rankBarMarkup(entry = progress()) {
+    const currentRank = rank(entry);
+    const current = ranks[currentRank] ?? ranks[0];
+    const upcoming = nextRank(currentRank);
+    const currentThreshold = current?.threshold ?? 0;
+    const nextThreshold = upcoming?.threshold ?? currentThreshold;
+    const span = Math.max(1, nextThreshold - currentThreshold);
+    const filled = upcoming ? Math.min(100, Math.max(0, ((entry.reputation - currentThreshold) / span) * 100)) : 100;
+    return `
+      <section class="guild-status">
+        <div>
+          <span>Rank</span>
+          <b>${escapeHtml(current?.name ?? "New")}</b>
+        </div>
+        <div>
+          <span>Reputation</span>
+          <b>${escapeHtml(entry.reputation)}${upcoming ? ` / ${escapeHtml(upcoming.threshold)}` : "+"}</b>
+        </div>
+        <div class="guild-rep-track" aria-hidden="true"><i style="width: ${escapeAttribute(filled.toFixed(1))}%"></i></div>
+        <p>${escapeHtml(upcoming ? `Next: ${upcoming.name} - ${upcoming.reward}` : current?.reward ?? config.completeRewardText ?? "Fully trusted.")}</p>
+      </section>
+    `;
+  }
+
+  function contractRow(contract) {
+    const entry = contractState(contract.id);
+    const unlocked = contractUnlocked(contract);
+    const completed = entry.status === "completed";
+    const accepted = entry.status === "accepted";
+    const ready = contractReady(contract);
+    return `
+      <article class="guild-contract-row ${ready ? "ready" : ""}">
+        <div>
+          <b>${escapeHtml(contract.name)}</b>
+          <span>${escapeHtml(contract.summary)}</span>
+          <small>${escapeHtml(objectiveText(contract))} - ${escapeHtml(priceText(contract.rewardCp))}, ${escapeHtml(contract.reputation)} rep</small>
+        </div>
+        ${
+          !unlocked
+            ? `<button type="button" disabled>Rank ${escapeHtml(contract.minRank)}</button>`
+            : completed
+              ? `<button type="button" disabled>${escapeHtml(config.completedLabel ?? "Complete")}</button>`
+              : accepted
+                ? `<button type="button" data-action="complete-guild-contract" data-npc="${escapeAttribute(config.id)}" data-contract="${escapeAttribute(contract.id)}" ${ready ? "" : "disabled"}>${ready ? escapeHtml(config.claimLabel ?? "Claim") : escapeHtml(config.workingLabel ?? "Working")}</button>`
+                : `<button type="button" data-action="accept-guild-contract" data-npc="${escapeAttribute(config.id)}" data-contract="${escapeAttribute(contract.id)}">Accept</button>`
+        }
+      </article>
+    `;
+  }
+
+  function contractsMarkup() {
+    const groups = new Map();
+    for (const contract of contracts) {
+      if (!groups.has(contract.group)) groups.set(contract.group, []);
+      groups.get(contract.group).push(contract);
+    }
+    return `
+      <section class="guild-section">
+        <h3>${escapeHtml(config.contractsTitle ?? "Contracts")}</h3>
+        <div class="guild-groups">
+          ${Array.from(groups.entries())
+            .map(
+              ([group, entries]) => `
+                <details class="guild-group" open>
+                  <summary>${escapeHtml(group)} <small>${escapeHtml(entries.length)}</small></summary>
+                  <div>${entries.map(contractRow).join("")}</div>
+                </details>
+              `,
+            )
+            .join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function turnInRow(turnIn) {
+    const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+    const have = materialCountForRequirement(turnIn.requirement);
+    const ready = have >= quantity;
+    return `
+      <article class="guild-contract-row ${ready ? "ready" : ""}">
+        <div>
+          <b>${escapeHtml(turnIn.name)}</b>
+          <span>${escapeHtml(turnIn.summary)}</span>
+          <small>Have ${escapeHtml(Math.min(have, quantity))}/${escapeHtml(quantity)} - ${escapeHtml(priceText(turnIn.rewardCp))}, ${escapeHtml(turnIn.reputation)} rep</small>
+        </div>
+        <button type="button" data-action="complete-guild-turn-in" data-npc="${escapeAttribute(config.id)}" data-turn-in="${escapeAttribute(turnIn.id)}" ${ready ? "" : "disabled"}>${ready ? escapeHtml(config.turnInReadyLabel ?? "Hand In") : escapeHtml(config.turnInWaitingLabel ?? "Need Items")}</button>
+      </article>
+    `;
+  }
+
+  function turnInsMarkup() {
+    return `
+      <section class="guild-section">
+        <h3>${escapeHtml(config.turnInsTitle ?? "Turn-Ins")}</h3>
+        <div class="guild-contract-list">
+          ${turnIns.map(turnInRow).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function rankRewardsMarkup() {
+    const currentRank = rank();
+    return `
+      <section class="guild-section">
+        <h3>Rank Rewards</h3>
+        <div class="guild-rewards">
+          ${ranks
+            .map(
+              (entry, index) => `
+                <div class="${index <= currentRank ? "unlocked" : ""}">
+                  <b>${escapeHtml(entry.name)}</b>
+                  <span>${escapeHtml(index <= currentRank ? entry.reward : `${entry.threshold} reputation required`)}</span>
+                </div>
+              `,
+            )
+            .join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function boardStats(entry = progress()) {
+    const activeContracts = contracts.filter((contract) => contractState(contract.id).status === "accepted").length;
+    const readyContracts = contracts.filter(contractReady).length;
+    const readyTurnIns = turnIns.filter(turnInReady).length;
+    return { activeContracts, readyContracts, readyTurnIns, rank: rank(entry) };
+  }
+
+  function headerMarkup(npc, entry) {
+    const stats = boardStats(entry);
+    return `
+      <section class="guild-hero ${escapeAttribute(config.heroClass ?? "")}">
+        ${factionSymbolMarkup(config.id)}
+        ${npcPortraitMarkup(npc, "guild-portrait", { clickable: false })}
+        <div class="guild-hero-text">
+          <span>${escapeHtml(config.label)}</span>
+          <h3>${guildNpcNameButtonMarkup(npc, config.label)}</h3>
+          <b>${escapeHtml(npc?.title ?? "")}</b>
+          <p>${escapeHtml(npcEntryLine(npc) || npc?.description || "")}</p>
+        </div>
+        <div class="guild-hero-stats">
+          <div>
+            <span>Active</span>
+            <b>${escapeHtml(stats.activeContracts)}</b>
+          </div>
+          <div>
+            <span>Ready</span>
+            <b>${escapeHtml(stats.readyContracts + stats.readyTurnIns)}</b>
+          </div>
+          <div>
+            <span>Rank</span>
+            <b>${escapeHtml(stats.rank)}</b>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function actionsMarkup() {
+    const readyContracts = contracts.filter(contractReady).length;
+    const readyTurnIns = turnIns.filter(turnInReady).length;
+    return `
+      <section class="guild-actions-panel">
+        <h3>${escapeHtml(config.actionsTitle ?? "Guild Desk")}</h3>
+        <button type="button" data-action="show-quest-log">Quest Log</button>
+        <div>
+          <span>${escapeHtml(readyContracts)} ${escapeHtml(config.readyContractText ?? "contract")}${readyContracts === 1 ? "" : "s"} ready</span>
+          <span>${escapeHtml(readyTurnIns)} ${escapeHtml(config.readyTurnInText ?? "turn-in")}${readyTurnIns === 1 ? "" : "s"} ready</span>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderGuild(npc = window.DungeonContent.get("npcs", config.id)) {
+    els.villageMenu?.classList.remove("npc-chat-open");
+    els.villageMenu?.classList.add("guild-open");
+    setVillageBackButtonVisible(true);
+    const entry = progress();
+    els.villageBody.innerHTML = `
+      <section class="guild-board ${escapeAttribute(config.boardClass ?? "")}">
+        ${headerMarkup(npc, entry)}
+        <div class="guild-board-grid">
+          <aside class="guild-board-side">
+            ${rankBarMarkup(entry)}
+            ${actionsMarkup()}
+          </aside>
+          <main class="guild-board-main">
+            ${contractsMarkup()}
+            ${turnInsMarkup()}
+          </main>
+          <aside class="guild-board-rewards">
+            ${rankRewardsMarkup()}
+          </aside>
+        </div>
+      </section>
+    `;
+    els.villageMenu.classList.remove("hidden");
+    resetVillageScroll();
+    setVillageMusicKey(villageMusicKeyForNpc(config.id));
+  }
+
+  function acceptContract(contractId) {
+    const contract = contracts.find((entry) => entry.id === contractId);
+    if (!contract || !contractUnlocked(contract)) return;
+    const entry = contractState(contract.id);
+    if (entry.status === "completed" || entry.status === "accepted") return;
+    entry.status = "accepted";
+    entry.progress = 0;
+    entry.acceptedAt = Date.now();
+    addLog(`${config.acceptLogName} opens ${contract.name}.`, "important");
+    renderGuild();
+    renderQuestLogButton();
+  }
+
+  function completeContract(contractId) {
+    const contract = contracts.find((entry) => entry.id === contractId);
+    if (!contract || !contractReady(contract)) return;
+    const entry = contractState(contract.id);
+    entry.status = "completed";
+    entry.completedAt = Date.now();
+    addMoney(activeHero().inventory.money, contract.rewardCp);
+    const guildProgress = progress();
+    guildProgress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
+    guildProgress.completedContracts[contract.id] = (guildProgress.completedContracts[contract.id] ?? 0) + 1;
+    addLog(`${config.payLogName} pays ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
+    render();
+    renderGuild();
+  }
+
+  function completeTurnIn(turnInId) {
+    const turnIn = turnIns.find((entry) => entry.id === turnInId);
+    if (!turnIn || !turnInReady(turnIn)) return;
+    const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
+    if (!consumeMaterialsForRequirement(turnIn.requirement, quantity)) return;
+    addMoney(activeHero().inventory.money, turnIn.rewardCp);
+    const guildProgress = progress();
+    guildProgress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
+    guildProgress.turnIns[turnIn.id] = (guildProgress.turnIns[turnIn.id] ?? 0) + 1;
+    addLog(`${config.turnInLogName} accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Reputation +${turnIn.reputation}.`, "important");
+    render();
+    renderGuild();
+  }
+
+  function cancelContract(contractId) {
+    const contract = contracts.find((entry) => entry.id === contractId);
+    const entry = contract ? contractState(contract.id) : null;
+    if (!contract || entry?.status !== "accepted") return false;
+    entry.status = "available";
+    entry.cancelledAt = Date.now();
+    entry.progress = 0;
+    addLog(`${config.label} contract ${contract.name} is no longer accepted.`, "important");
+    return true;
+  }
+
+  function recordItemCollected(item) {
+    if (!item || typeof config.itemMatchesContract !== "function") return;
+    const guildProgress = progress();
+    let changed = false;
+    for (const contract of contracts) {
+      const entry = guildProgress.contracts?.[contract.id];
+      if (entry?.status !== "accepted" || !config.itemMatchesContract(item, contract)) continue;
+      const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+      entry.progress = Math.min(target, Math.max(0, Math.floor(Number(entry.progress) || 0)) + 1);
+      changed = true;
+      if (entry.progress >= target) addLog(`${config.label} contract ready: ${contract.name}.`, "important");
+    }
+    if (changed) renderQuestLogButton();
+  }
+
+  function onDungeonComplete(context = {}) {
+    if (typeof config.dungeonMatchesContract !== "function") return false;
+    const guildProgress = progress();
+    let changed = false;
+    for (const contract of contracts) {
+      const entry = guildProgress.contracts?.[contract.id];
+      if (entry?.status !== "accepted" || !config.dungeonMatchesContract(context, contract)) continue;
+      const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+      entry.progress = Math.min(target, Math.max(0, Math.floor(Number(entry.progress) || 0)) + 1);
+      changed = true;
+      if (entry.progress >= target) addLog(`${config.label} contract ready: ${contract.name}.`, "important");
+    }
+    if (changed) renderQuestLogButton();
+    return changed;
+  }
+
+  function questLogEntries() {
+    return contracts
+      .filter((contract) => contractState(contract.id).status === "accepted")
+      .map((contract) => {
+        const entry = contractState(contract.id);
+        const target = Math.max(1, Math.floor(Number(contract.objective?.count) || 1));
+        const current = Math.min(target, Math.max(0, Math.floor(Number(entry.progress) || 0)));
+        return {
+          id: `${config.id}-${contract.id}`,
+          giver: config.label,
+          title: contract.name,
+          description: contract.summary,
+          ready: current >= target,
+          cancelable: true,
+          cancelType: config.cancelType,
+          questId: contract.id,
+          objectives: [
+            {
+              label: contract.objective?.label ?? "Contract",
+              progress: current,
+              target,
+            },
+          ],
+        };
+      });
+  }
+
+  function adminProgressEntries() {
+    const entry = progress();
+    return [
+      {
+        id: "locked",
+        npcId: config.id,
+        groupId: config.id,
+        groupLabel: config.label,
+        label: "Locked",
+        description: `Hide ${config.label} until its story unlock.`,
+        active: !state.questFlags?.[config.unlockFlag],
+      },
+      {
+        id: "unlocked",
+        npcId: config.id,
+        groupId: config.id,
+        groupLabel: config.label,
+        label: "Unlocked",
+        description: `Show ${config.label} with no extra reputation.`,
+        active: Boolean(state.questFlags?.[config.unlockFlag]) && entry.reputation < (config.adminMidRep ?? 80),
+      },
+      {
+        id: "trusted",
+        npcId: config.id,
+        groupId: config.id,
+        groupLabel: config.label,
+        label: config.adminMidLabel ?? "Trusted",
+        description: "Set mid reputation for testing better contracts.",
+        active: entry.reputation >= (config.adminMidRep ?? 80) && entry.reputation < (config.adminHighRep ?? 170),
+      },
+      {
+        id: "high",
+        npcId: config.id,
+        groupId: config.id,
+        groupLabel: config.label,
+        label: config.adminHighLabel ?? "High Rank",
+        description: "Set high reputation for testing advanced board rewards.",
+        active: entry.reputation >= (config.adminHighRep ?? 170),
+      },
+    ];
+  }
+
+  function setAdminProgress(progressId) {
+    if (!adminEnabled()) return;
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    const entry = progress();
+    if (progressId === "locked") {
+      delete state.questFlags[config.unlockFlag];
+      entry.reputation = 0;
+    } else {
+      state.questFlags[config.unlockFlag] = true;
+      entry.reputation = progressId === "trusted" ? config.adminMidRep ?? 80 : progressId === "high" ? config.adminHighRep ?? 170 : 0;
+    }
+    addLog(`Admin set ${config.label} progress: ${progressId}.`, "important");
+  }
+
+  window.DungeonNpcBehaviors[config.id] = {
+    visit: renderGuild,
+    returnToVisit: () => renderGuild(),
+    recordItemCollected,
+    onDungeonComplete,
+    questLogEntries,
+    cancelQuest: cancelContract,
+    adminProgressEntries,
+    setAdminProgress,
+  };
+
+  return { renderGuild, acceptContract, completeContract, completeTurnIn, cancelContract, progress, contractReady, turnInReady };
+}
+
+function itemHasAnyTag(item, tags) {
+  const itemTags = new Set((item?.tags ?? []).map((tag) => String(tag).toLowerCase()));
+  return (tags ?? []).some((tag) => itemTags.has(String(tag).toLowerCase()));
+}
+
+function itemSearchText(item) {
+  return [item?.id, item?.baseItemId, item?.name, item?.description, item?.customDescription, item?.category, item?.material, item?.treasure?.kind, item?.treasure?.description]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+const expeditionBoardApi = createCompactGuildBoard({
+  id: "expedition-board",
+  stateKey: "expeditionBoard",
+  label: "Expedition Board",
+  unlockFlag: "flag.village.expeditionBoardUnlocked",
+  boardClass: "expedition-board",
+  heroClass: "expedition-hero",
+  actionsTitle: "Route Desk",
+  contractsTitle: "Postings",
+  turnInsTitle: "Supply Turn-Ins",
+  readyContractText: "posting",
+  readyTurnInText: "supply turn-in",
+  claimLabel: "File Report",
+  workingLabel: "In Field",
+  completedLabel: "Filed",
+  turnInWaitingLabel: "Need Supplies",
+  acceptLogName: "Nella Waymark",
+  payLogName: "The Expedition Board",
+  turnInLogName: "Nella Waymark",
+  adminMidRep: 80,
+  adminHighRep: 170,
+  adminMidLabel: "Route Regular",
+  adminHighLabel: "Trail Captain",
+  cancelType: "expedition-board",
+  ranks: [
+    { name: "New Route", threshold: 0, reward: "The Board will post simple route and delve work." },
+    { name: "Signed Scout", threshold: 30, reward: "Better route claims and useful field notes open." },
+    { name: "Route Regular", threshold: 80, reward: "Nella trusts the party with longer proof-of-route contracts." },
+    { name: "Trail Captain", threshold: 170, reward: "The Board treats the party as reliable expedition leaders." },
+    { name: "Lantern Marshal", threshold: 340, reward: "Reserved for future caravan chains and dangerous route privileges." },
+  ],
+  contracts: [
+    {
+      id: "prove-the-road",
+      name: "Prove the Road",
+      group: "Route Work",
+      summary: "Complete delves and return with enough confidence for Nella to mark the route as survivable.",
+      objective: { type: "dungeonComplete", count: 2, label: "Dungeons completed" },
+      rewardCp: 9000,
+      reputation: 30,
+      minRank: 0,
+    },
+    {
+      id: "campaign-mileposts",
+      name: "Campaign Mileposts",
+      group: "Route Work",
+      summary: "Finish campaign-linked expeditions so the Board can stop calling those roads 'optimistic'.",
+      objective: { type: "campaignDungeon", count: 2, label: "Campaign expeditions completed" },
+      rewardCp: 16000,
+      reputation: 50,
+      minRank: 1,
+    },
+    {
+      id: "long-haul-ledger",
+      name: "Long-Haul Ledger",
+      group: "Reliability",
+      summary: "Complete several expeditions under the same posting. The Board likes boring proof. Boring proof gets paid.",
+      objective: { type: "dungeonComplete", count: 5, label: "Expeditions completed" },
+      rewardCp: 32000,
+      reputation: 90,
+      minRank: 2,
+    },
+  ],
+  turnIns: [
+    {
+      id: "torch-bundles",
+      name: "Torch Bundles",
+      summary: "A route is easier to sell when people can see the floor.",
+      requirement: { itemId: "torch" },
+      quantity: 5,
+      rewardCp: 700,
+      reputation: 5,
+    },
+    {
+      id: "lamp-oil",
+      name: "Lantern Oil",
+      summary: "Clean flasks for long route teams and anyone who believes darkness is negotiable.",
+      requirement: { itemId: "lantern-oil" },
+      quantity: 4,
+      rewardCp: 1200,
+      reputation: 7,
+    },
+    {
+      id: "repair-stock",
+      name: "Repair Stock",
+      summary: "Wood, cloth, leather, and iron for carts, packs, splints, and excuses.",
+      requirement: { type: "component", tagsAny: ["wood", "cloth", "leather", "metal", "crafting"] },
+      quantity: 6,
+      rewardCp: 4500,
+      reputation: 12,
+    },
+  ],
+  dungeonMatchesContract(context, contract) {
+    const objective = contract?.objective ?? {};
+    if (objective.type === "dungeonComplete") return true;
+    if (objective.type === "campaignDungeon") return Boolean(context?.campaignId);
+    return false;
+  },
+});
+
+function acceptExpeditionContract(contractId) {
+  expeditionBoardApi.acceptContract(contractId);
+}
+
+function completeExpeditionContract(contractId) {
+  expeditionBoardApi.completeContract(contractId);
+}
+
+function completeExpeditionTurnIn(turnInId) {
+  expeditionBoardApi.completeTurnIn(turnInId);
+}
+
+function cancelExpeditionContract(contractId) {
+  return expeditionBoardApi.cancelContract(contractId);
+}
+
+const boomClubApi = createCompactGuildBoard({
+  id: "boom-club",
+  stateKey: "boomClub",
+  label: "Fizzwick's Boom Club",
+  unlockFlag: "flag.village.boomClubUnlocked",
+  boardClass: "boom-board",
+  heroClass: "boom-hero",
+  actionsTitle: "Test Bench",
+  contractsTitle: "Experiments",
+  turnInsTitle: "Volatile Turn-Ins",
+  readyContractText: "experiment",
+  readyTurnInText: "sample turn-in",
+  claimLabel: "Present Data",
+  workingLabel: "Testing",
+  completedLabel: "Recorded",
+  turnInReadyLabel: "Submit",
+  turnInWaitingLabel: "Need Sparks",
+  acceptLogName: "Fizzwick Boomwhistle",
+  payLogName: "Fizzwick's Boom Club",
+  turnInLogName: "Fizzwick Boomwhistle",
+  adminMidRep: 70,
+  adminHighRep: 160,
+  adminMidLabel: "Certified Spark",
+  adminHighLabel: "Blast Fellow",
+  cancelType: "boom-club",
+  ranks: [
+    { name: "Observer", threshold: 0, reward: "Fizzwick will accept basic volatile errands." },
+    { name: "Fuse Holder", threshold: 25, reward: "The club posts more interesting reagent tests." },
+    { name: "Certified Spark", threshold: 70, reward: "Fizzwick trusts the party near things with labels like 'probably'." },
+    { name: "Blast Fellow", threshold: 160, reward: "Rare explosive research and better volatile payments open." },
+    { name: "Honorary Crater", threshold: 320, reward: "Reserved for future experimental devices and alarming applause." },
+  ],
+  contracts: [
+    {
+      id: "spark-samples",
+      name: "Spark Samples",
+      group: "Field Tests",
+      summary: "Recover fire, brimstone, coal, or other warm-tempered materials for controlled observations.",
+      objective: { type: "collectFire", count: 4, label: "Hot samples logged" },
+      rewardCp: 8500,
+      reputation: 25,
+      minRank: 0,
+    },
+    {
+      id: "boom-inventory",
+      name: "Boom Inventory",
+      group: "Field Tests",
+      summary: "Bring back explosive tools, alchemical fire, or reagents that make shelves nervous.",
+      objective: { type: "collectExplosive", count: 3, label: "Boom items logged" },
+      rewardCp: 14000,
+      reputation: 45,
+      minRank: 1,
+    },
+    {
+      id: "pressure-and-regret",
+      name: "Pressure and Regret",
+      group: "Advanced Mischief",
+      summary: "Collect pressure cores, primal motes, and volatile planar matter. Fizzwick promises to squint responsibly.",
+      objective: { type: "collectBoom", count: 3, label: "Advanced samples logged" },
+      rewardCp: 28000,
+      reputation: 85,
+      minRank: 2,
+    },
+  ],
+  turnIns: [
+    {
+      id: "coal-and-brimstone",
+      name: "Coal and Brimstone",
+      summary: "The dependable foundation of every lecture that ends with everyone stepping back.",
+      requirement: { type: "component", tagsAny: ["coal", "brimstone", "sulfur"] },
+      quantity: 5,
+      rewardCp: 3500,
+      reputation: 9,
+    },
+    {
+      id: "fire-reagents",
+      name: "Fire Reagents",
+      summary: "Embers, flame essence, hot ash, and similar substances with opinions about furniture.",
+      requirement: { type: "component", tagsAny: ["fire", "ember", "ash", "heat", "lava"] },
+      quantity: 3,
+      rewardCp: 8000,
+      reputation: 16,
+    },
+    {
+      id: "pressure-parts",
+      name: "Pressure Parts",
+      summary: "Cores, gears, slag glass, and crystal bits for safer casings. Safer than last time, anyway.",
+      requirement: { type: "component", tagsAny: ["pressure", "gear", "slag", "glass", "crystal", "arcane-reagent"] },
+      quantity: 4,
+      rewardCp: 11000,
+      reputation: 20,
+    },
+    {
+      id: "infernal-volatiles",
+      name: "Infernal Volatiles",
+      summary: "Hellfire, demon ichor, abyssal bile, and materials best stored in boxes labeled 'no'.",
+      requirement: { type: "component", tagsAny: ["infernal", "abyssal", "hell", "demon", "devil", "chaos"] },
+      quantity: 2,
+      rewardCp: 15000,
+      reputation: 28,
+    },
+  ],
+  itemMatchesContract(item, contract) {
+    const objective = contract?.objective ?? {};
+    const text = itemSearchText(item);
+    const fire = itemHasAnyTag(item, ["fire", "ember", "ash", "heat", "lava", "brimstone", "sulfur", "coal"]) || /\b(fire|ember|ash|heat|lava|brimstone|sulfur|coal)\b/.test(text);
+    const explosive =
+      itemHasAnyTag(item, ["bomb", "explosive", "boom", "alchemy", "volatile"]) ||
+      /\b(alchemist's fire|alchemists-fire|bomb|explosive|volatile|boom)\b/.test(text);
+    const advanced =
+      itemHasAnyTag(item, ["pressure", "primal", "chaos", "infernal", "abyssal", "arcane-reagent", "magic-reagent"]) ||
+      /\b(pressure core|primal|chaos|infernal|abyssal|hellfire|ichor|bile|slag|crystal)\b/.test(text);
+    if (objective.type === "collectFire") return fire;
+    if (objective.type === "collectExplosive") return explosive || item?.id === "alchemists-fire";
+    if (objective.type === "collectBoom") return advanced || (fire && explosive);
+    return false;
+  },
+});
+
+function acceptBoomClubContract(contractId) {
+  boomClubApi.acceptContract(contractId);
+}
+
+function completeBoomClubContract(contractId) {
+  boomClubApi.completeContract(contractId);
+}
+
+function completeBoomClubTurnIn(turnInId) {
+  boomClubApi.completeTurnIn(turnInId);
+}
+
+function cancelBoomClubContract(contractId) {
+  return boomClubApi.cancelContract(contractId);
+}
+
+const fightingPitId = "fighting-pit";
+const fightingPitStateKey = "fightingPit";
+const fightingPitMaxCategory = 10;
+const fightingPitBossInterval = 4;
+const fightingPitShortRestLimit = 5;
+const fightingPitRenownByCategory = 8;
+const fightingPitRewardCpByCategory = 1800;
+
+function fightingPitProgress() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[fightingPitStateKey] ??= {};
+  const progress = state.questFlags[fightingPitStateKey];
+  progress.renown = Math.max(0, Math.floor(Number(progress.renown) || 0));
+  progress.bestWave = Math.max(0, Math.floor(Number(progress.bestWave) || 0));
+  progress.bestCategory = Math.max(0, Math.floor(Number(progress.bestCategory) || 0));
+  progress.totalDefeated = Math.max(0, Math.floor(Number(progress.totalDefeated) || 0));
+  progress.bossesDefeated = Math.max(0, Math.floor(Number(progress.bossesDefeated) || 0));
+  progress.runs = Math.max(0, Math.floor(Number(progress.runs) || 0));
+  return progress;
+}
+
+function fightingPitWaveCategory(wave = 1) {
+  return clamp(Math.ceil(Math.max(1, Math.floor(Number(wave) || 1)) / fightingPitBossInterval), 1, fightingPitMaxCategory);
+}
+
+function fightingPitWaveIsBoss(wave = 1) {
+  return Math.max(1, Math.floor(Number(wave) || 1)) % fightingPitBossInterval === 0;
+}
+
+function fightingPitWaveLabel(wave = 1) {
+  const category = fightingPitWaveCategory(wave);
+  return `Wave ${Math.max(1, Math.floor(Number(wave) || 1))} - Category ${category}${fightingPitWaveIsBoss(wave) ? " Boss" : ""}`;
+}
+
+function fightingPitCurrentRun() {
+  const run = state?.questFlags?.fightingPitRun;
+  return run && typeof run === "object" ? run : null;
+}
+
+function fightingPitMonsterTemplates(category, boss = false) {
+  const desired = Math.max(1, Math.floor(Number(category) || 1));
+  const entries = window.DungeonContent
+    .list("monsters")
+    .filter((monster) => Math.max(1, Math.floor(Number(monsterCategory(monster)) || 1)) === desired)
+    .filter((monster) => {
+      const tags = new Set((monster.tags ?? []).map((tag) => String(tag).toLowerCase()));
+      const text = [monster.id, monster.name, monster.role].filter(Boolean).join(" ").toLowerCase();
+      const isBoss = tags.has("boss") || /\bboss\b|champion|lord|matriarch|overseer/.test(text);
+      return boss ? isBoss : !isBoss;
+    });
+  if (entries.length) return entries;
+  return window.DungeonContent.list("monsters").filter((monster) => Math.max(1, Math.floor(Number(monsterCategory(monster)) || 1)) === desired);
+}
+
+function fightingPitPickMonsterTemplate(category, boss = false, index = 0) {
+  const templates = fightingPitMonsterTemplates(category, boss);
+  return templates[index % Math.max(1, templates.length)] ?? getMonsterTemplate(defaultContent.monster);
+}
+
+function fightingPitArenaTemplate() {
+  const cells = [];
+  for (let y = 5; y <= 20; y += 1) {
+    for (let x = 5; x <= 24; x += 1) cells.push({ x, y });
+  }
+  return {
+    id: "fighting-pit-arena",
+    name: "Fighting Pit",
+    themeId: currentThemeId?.() ?? defaultContent.theme,
+    dungeon: {
+      id: "fighting-pit-arena",
+      roomCount: 1,
+      gridSize: 30,
+      rooms: [{ id: "pit-floor", name: "Pit Floor", cells, doors: [] }],
+      walkable: cells,
+      corridors: [],
+      doors: [],
+      corridorPassages: [],
+      entranceRoomId: "pit-floor",
+      startPosition: { x: 14, y: 13 },
+    },
+    objects: [],
+    monsters: [],
+    exit: { roomId: "pit-floor", position: { x: 14, y: 4 } },
+    goal: { type: "fightingPit" },
+    intro: { text: "", images: [] },
+    outro: { text: "", images: [] },
+  };
+}
+
+function fightingPitSpawnPositions(count) {
+  const positions = [
+    { x: 14, y: 7 },
+    { x: 10, y: 8 },
+    { x: 18, y: 8 },
+    { x: 7, y: 12 },
+    { x: 21, y: 12 },
+    { x: 10, y: 17 },
+    { x: 18, y: 17 },
+    { x: 14, y: 19 },
+  ];
+  const occupied = new Set(partyHeroes().flatMap((hero) => window.DungeonGrid.fighterCells(hero)).map(positionKey));
+  return positions.filter((position) => !occupied.has(positionKey(position))).slice(0, count);
+}
+
+function fightingPitWaveMonsterCount(category, boss = false) {
+  if (boss) return 1;
+  const template = fightingPitPickMonsterTemplate(category, false, 0);
+  const hero = {
+    ...(activeHero() ?? {}),
+    level: Math.max(1, category * 2 - 1),
+    partySize: partyHeroes().length,
+    partyAverageLevel: Math.max(1, category * 2 - 1),
+  };
+  return roomMonsterSpawnCount(template, hero);
+}
+
+function clearFightingPitWaveMonsters() {
+  const partyIds = new Set(state.party?.heroIds ?? ["hero"]);
+  for (const [id, fighter] of Object.entries(state.fighters ?? {})) {
+    if (!partyIds.has(id) && fighter?.fightingPitMonster) delete state.fighters[id];
+  }
+  state.initiative = [];
+  state.activeIndex = 0;
+  state.combatStarted = false;
+  state.mode = "exploration";
+}
+
+async function spawnFightingPitWave() {
+  const run = fightingPitCurrentRun();
+  if (!run || state.completed) return false;
+  clearFightingPitWaveMonsters();
+  const wave = Math.max(1, Math.floor(Number(run.wave) || 1));
+  const category = fightingPitWaveCategory(wave);
+  const boss = fightingPitWaveIsBoss(wave);
+  const hero = {
+    ...(activeHero() ?? {}),
+    level: Math.max(1, category * 2 - 1),
+    partySize: partyHeroes().length,
+    partyAverageLevel: Math.max(1, category * 2 - 1),
+  };
+  const count = fightingPitWaveMonsterCount(category, boss);
+  const positions = fightingPitSpawnPositions(count);
+  const room = state.dungeon?.rooms?.find((entry) => entry.id === "pit-floor") ?? state.dungeon?.rooms?.[0];
+  for (let index = 0; index < positions.length; index += 1) {
+    const template = fightingPitPickMonsterTemplate(category, boss, index);
+    if (!template) continue;
+    const monster = createCombatant({
+      ...template,
+      id: `pit-wave-${wave}-${index + 1}`,
+      name: boss ? `${template.name} of the Pit` : `${template.name}${positions.length > 1 ? ` ${index + 1}` : ""}`,
+      baseMonsterId: template.id,
+      templateId: template.id,
+    });
+    if (boss) {
+      monster.customBoss = true;
+      monster.tags = Array.from(new Set([...(monster.tags ?? []), "boss"]));
+      monster.maxHp = Math.ceil((monster.maxHp ?? 1) * Math.max(1.2, partyHeroes().length * 0.85));
+      monster.hp = monster.maxHp;
+    }
+    applyMonsterCategoryScaling(monster, hero);
+    monster.fightingPitMonster = true;
+    monster.fightingPitWave = wave;
+    monster.roomId = room?.id ?? "pit-floor";
+    monster.position = { ...positions[index] };
+    state.fighters[monster.id] = monster;
+  }
+  run.currentWaveSpawned = positions.length;
+  run.currentWaveBoss = boss;
+  run.currentWaveCategory = category;
+  addLog(`${fightingPitWaveLabel(wave)} begins.`, "important");
+  render();
+  if (positions.length > 0 && typeof rollInitiative === "function") await rollInitiative();
+  return positions.length > 0;
+}
+
+function awardFightingPitWave() {
+  const run = fightingPitCurrentRun();
+  if (!run) return null;
+  const wave = Math.max(1, Math.floor(Number(run.wave) || 1));
+  const category = fightingPitWaveCategory(wave);
+  const boss = fightingPitWaveIsBoss(wave);
+  const defeated = Math.max(0, Math.floor(Number(run.currentWaveSpawned) || 0));
+  const rewardCp = defeated * category * fightingPitRewardCpByCategory + (boss ? category * fightingPitRewardCpByCategory * 2 : 0);
+  const renown = defeated * category * fightingPitRenownByCategory + (boss ? category * 20 : 0);
+  addMoney(activeHero().inventory.money, rewardCp);
+  run.defeated = (run.defeated ?? 0) + defeated;
+  run.renown = (run.renown ?? 0) + renown;
+  run.rewardCp = (run.rewardCp ?? 0) + rewardCp;
+  const progress = fightingPitProgress();
+  progress.renown += renown;
+  progress.totalDefeated += defeated;
+  progress.bestWave = Math.max(progress.bestWave, wave);
+  progress.bestCategory = Math.max(progress.bestCategory, category);
+  if (boss) progress.bossesDefeated += 1;
+  addLog(`The pit pays ${priceText(rewardCp)} and awards ${renown} renown for ${defeated} defeated foe${defeated === 1 ? "" : "s"}.`, "important");
+  return { wave, category, boss, defeated, rewardCp, renown };
+}
+
+async function grantFightingPitBossRest(category) {
+  if ((state.shortRestsUsed ?? 0) >= fightingPitShortRestLimit) {
+    addLog("The pit rest limit is spent. Brakka rings the next bracket in without a rest.", "important");
+    return;
+  }
+  addLog(`Boss checkpoint cleared. The party may take a short rest before Category ${Math.min(fightingPitMaxCategory, category + 1)}, or press on.`, "important");
+  const rested = await showShortRestMenu(false);
+  if (!rested) addLog("The party skips the pit checkpoint rest and presses on.", "important");
+}
+
+async function handleFightingPitWaveClear() {
+  const run = fightingPitCurrentRun();
+  if (!run || state.completed || state.mode === "home") return false;
+  const award = awardFightingPitWave();
+  if (!award) return false;
+  if (award.boss) await grantFightingPitBossRest(award.category);
+  if (award.boss && award.category >= fightingPitMaxCategory) {
+    state.completed = true;
+    run.completedAt = Date.now();
+    addLog("Brakka Ironbell rings the final bell. The Fighting Pit run is complete.", "important");
+    render();
+    return true;
+  }
+  run.wave = Math.max(1, Math.floor(Number(run.wave) || 1)) + 1;
+  await spawnFightingPitWave();
+  render();
+  return true;
+}
+
+function renderFightingPit(npc = window.DungeonContent.get("npcs", fightingPitId)) {
+  els.villageMenu?.classList.remove("npc-chat-open");
+  els.villageMenu?.classList.add("guild-open");
+  setVillageBackButtonVisible(true);
+  const progress = fightingPitProgress();
+  const nextWave = progress.bestWave > 0 ? progress.bestWave + 1 : 1;
+  els.villageBody.innerHTML = `
+    <section class="guild-board fighting-pit-board">
+      <section class="guild-hero fighting-pit-hero">
+        ${factionSymbolMarkup(fightingPitId)}
+        ${npcPortraitMarkup(npc, "guild-portrait", { clickable: false })}
+        <div class="guild-hero-text">
+          <span>Fighting Pit</span>
+          <h3>${guildNpcNameButtonMarkup(npc, "Pit Marshal")}</h3>
+          <b>${escapeHtml(npc?.title ?? "")}</b>
+          <p>${escapeHtml(npcEntryLine(npc) || npc?.description || "")}</p>
+        </div>
+        <div class="guild-hero-stats">
+          <div><span>Renown</span><b>${escapeHtml(progress.renown)}</b></div>
+          <div><span>Best Wave</span><b>${escapeHtml(progress.bestWave)}</b></div>
+          <div><span>Bosses</span><b>${escapeHtml(progress.bossesDefeated)}</b></div>
+        </div>
+      </section>
+      <div class="guild-board-grid">
+        <aside class="guild-board-side">
+          <section class="guild-status">
+            <div><span>Next Bracket</span><b>${escapeHtml(fightingPitWaveLabel(nextWave))}</b></div>
+            <div><span>Short Rests</span><b>0 / ${escapeHtml(fightingPitShortRestLimit)}</b></div>
+            <p>This is a controlled fighting pit: weapons are blunted, medics are ready at the rail, and heroes cannot die here. Three normal waves per category, then a boss. Boss checkpoints offer an optional short rest.</p>
+          </section>
+          <section class="guild-actions-panel">
+            <h3>Pit Gate</h3>
+            <button type="button" data-action="start-fighting-pit">Enter the Pit</button>
+          </section>
+        </aside>
+        <main class="guild-board-main">
+          <section class="guild-section">
+            <h3>Wave Rules</h3>
+            <div class="guild-contract-list">
+              <article class="guild-contract-row"><div><b>Category Ladder</b><span>Category 1 normal waves x3, then a Category 1 boss. The pattern repeats upward through Category ${escapeHtml(fightingPitMaxCategory)}.</span><small>Wave balance scales with active party size.</small></div></article>
+              <article class="guild-contract-row"><div><b>Rewards</b><span>Coin and renown are paid after each cleared wave based on defeated foes and category. Boss waves pay extra.</span><small>Current rate: ${escapeHtml(priceText(fightingPitRewardCpByCategory))} and ${escapeHtml(fightingPitRenownByCategory)} renown per foe per category.</small></div></article>
+              <article class="guild-contract-row"><div><b>Safety Rule</b><span>Blunted weapons and waiting medics make the bout nonlethal. A hero can be battered to the brink, but cannot die in the pit.</span></div></article>
+              <article class="guild-contract-row"><div><b>Rest Rule</b><span>After each boss, the party may take an optional short rest checkpoint. The pit allows up to ${escapeHtml(fightingPitShortRestLimit)} short rests and never grants a long rest mid-run.</span></div></article>
+            </div>
+          </section>
+        </main>
+        <aside class="guild-board-rewards">
+          <section class="guild-section">
+            <h3>Pit Record</h3>
+            <div class="guild-rewards">
+              <div class="unlocked"><b>Total Defeated</b><span>${escapeHtml(progress.totalDefeated)} enemies</span></div>
+              <div class="unlocked"><b>Best Category</b><span>${escapeHtml(progress.bestCategory || 0)}</span></div>
+              <div class="unlocked"><b>Runs Started</b><span>${escapeHtml(progress.runs)}</span></div>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </section>
+  `;
+  els.villageMenu.classList.remove("hidden");
+  resetVillageScroll();
+  setVillageMusicKey(villageMusicKeyForNpc(fightingPitId));
+}
+
+async function startFightingPitRun() {
+  normalizeActivePartyOwnerBindings();
+  const partyIds = state.party?.heroIds ?? ["hero"];
+  const partyMembers = partyIds.map((id) => state.fighters[id]).filter((hero) => hero && !hero.dead);
+  if (partyMembers.length === 0) {
+    addLog("Choose at least one hero before entering the Fighting Pit.", "important");
+    return;
+  }
+  const previousState = state;
+  state = createCustomDungeonStateFromTemplate(partyMembers, state, fightingPitArenaTemplate());
+  if (!state) {
+    state = previousState;
+    addLog("The Fighting Pit could not be prepared.", "important");
+    return;
+  }
+  state.shortRestLimit = fightingPitShortRestLimit;
+  state.questFlags.fightingPitRun = {
+    active: true,
+    wave: 1,
+    defeated: 0,
+    renown: 0,
+    rewardCp: 0,
+    startedAt: Date.now(),
+  };
+  fightingPitProgress().runs += 1;
+  roomIsBuilt = false;
+  hideVillageMenu();
+  hideHomeMenu();
+  render();
+  window.DepthboundPlaytest?.syncNow?.();
+  centerViewOnHero();
+  await spawnFightingPitWave();
+}
+
+window.DungeonNpcBehaviors[fightingPitId] = {
+  visit: renderFightingPit,
+  returnToVisit: () => renderFightingPit(),
+  adminProgressEntries() {
+    const progress = fightingPitProgress();
+    return [
+      {
+        id: "locked",
+        npcId: fightingPitId,
+        groupId: fightingPitId,
+        groupLabel: "Fighting Pit",
+        label: "Locked",
+        description: "Hide the Fighting Pit until its story unlock.",
+        active: !state.questFlags?.["flag.village.fightingPitUnlocked"],
+      },
+      {
+        id: "unlocked",
+        npcId: fightingPitId,
+        groupId: fightingPitId,
+        groupLabel: "Fighting Pit",
+        label: "Unlocked",
+        description: "Show the Fighting Pit with no renown.",
+        active: Boolean(state.questFlags?.["flag.village.fightingPitUnlocked"]) && progress.renown < 200,
+      },
+      {
+        id: "renowned",
+        npcId: fightingPitId,
+        groupId: fightingPitId,
+        groupLabel: "Fighting Pit",
+        label: "Renowned",
+        description: "Set renown for testing pit record displays.",
+        active: progress.renown >= 200,
+      },
+    ];
+  },
+  setAdminProgress(progressId) {
+    if (!adminEnabled()) return;
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    const progress = fightingPitProgress();
+    if (progressId === "locked") {
+      delete state.questFlags["flag.village.fightingPitUnlocked"];
+      progress.renown = 0;
+      progress.bestWave = 0;
+      progress.bestCategory = 0;
+    } else {
+      state.questFlags["flag.village.fightingPitUnlocked"] = true;
+      if (progressId === "renowned") {
+        progress.renown = 200;
+        progress.bestWave = Math.max(progress.bestWave, 8);
+        progress.bestCategory = Math.max(progress.bestCategory, 2);
+      }
+    }
+    addLog(`Admin set Fighting Pit progress: ${progressId}.`, "important");
+  },
+};
+
 const nonMetalWeaponIds = new Set(["club", "greatclub", "quarterstaff", "shortbow", "longbow", "sling", "blowgun", "crossbow-light", "crossbow-hand", "crossbow-heavy", "hoopak"]);
 
 function itemIsStandardNonMagic(item) {
@@ -8396,9 +11699,31 @@ function itemIsGeneralMerchantStock(item) {
   return itemIsStandardNonMagic(item) && (item.type === "ammunition" || item.id === "potion-healing" || ["torch", "hooded-lantern", "lantern-oil"].includes(item.id));
 }
 
+function itemIsAlchemistStock(item) {
+  if (!item || item.store?.buyable === false || item.tags?.includes("loot:magic") || item.type === "treasure") return false;
+  if (item.type !== "consumable") return false;
+  const tags = new Set((item.tags ?? []).map((tag) => String(tag).toLowerCase()));
+  return item.category === "potion" || item.id === "alchemists-fire" || tags.has("potion") || tags.has("bomb") || tags.has("explosive");
+}
+
+function itemIsArcanistStock(item) {
+  return Boolean(item?.type === "consumable" && item.use?.kind === "spellScroll" && item.tags?.includes("spell-scroll"));
+}
+
+function storeBuysFromParty(npc = storeNpcDefinition()) {
+  return npc?.shop?.buysFromParty !== false;
+}
+
 function storeAcceptsSoldItem(item, npc = storeNpcDefinition()) {
+  if (!storeBuysFromParty(npc)) return false;
   const acceptedTypes = npc?.shop?.acceptsSoldTypes ?? ["any"];
   return acceptedTypes.includes("any") || acceptedTypes.includes(item?.type);
+}
+
+function storeItemBuyValueCp(item, npc = storeNpcDefinition()) {
+  const base = itemValueCp(item);
+  const multiplier = Math.max(0, Number(npc?.shop?.buyPriceMultiplier ?? 1) || 1);
+  return Math.max(0, Math.floor(base * multiplier));
 }
 
 function storeItemSellValueCp(item, npc = storeNpcDefinition()) {
@@ -8910,6 +12235,12 @@ function ancientTomeMarkup() {
 function cancelQuestLogEntry(entry) {
   if (!entry?.cancelable) return false;
   if (entry.cancelType === "npc") return cancelNpcQuest(entry.npcId, entry.questId);
+  if (entry.cancelType === "monster-hunter") return cancelMonsterHunterContract(entry.questId);
+  if (entry.cancelType === "gravebinder") return cancelGravebinderContract(entry.questId);
+  if (entry.cancelType === "crucible") return cancelCrucibleContract(entry.questId);
+  if (entry.cancelType === "antiquarian") return cancelAntiquarianContract(entry.questId);
+  if (entry.cancelType === "expedition-board") return cancelExpeditionContract(entry.questId);
+  if (entry.cancelType === "boom-club") return cancelBoomClubContract(entry.questId);
   if (entry.cancelType === "commission") return cancelSmithMaterialCommission(entry.npcId);
   if (entry.cancelType === "borren-claim-hammer") {
     const quest = borrenClaimHammerState();
@@ -9035,10 +12366,64 @@ function storeStockItems(npc = storeNpcDefinition()) {
         ? itemIsWeaponsmithStock(item)
         : shopType === "armorsmith"
           ? itemIsArmorsmithStock(item)
-          : itemIsGeneralMerchantStock(item),
+          : shopType === "alchemist"
+            ? itemIsAlchemistStock(item)
+            : shopType === "arcanist"
+              ? itemIsArcanistStock(item)
+              : itemIsGeneralMerchantStock(item),
     )
     .filter((item) => !query || searchableItemText(item).includes(query) || itemDetails(item).toLowerCase().includes(query))
-    .sort((a, b) => itemCategoryLabel(a).localeCompare(itemCategoryLabel(b)) || a.name.localeCompare(b.name));
+    .sort((a, b) =>
+      shopType === "arcanist"
+        ? (a.scroll?.level ?? a.use?.castLevel ?? 0) - (b.scroll?.level ?? b.use?.castLevel ?? 0) || a.name.localeCompare(b.name)
+        : itemCategoryLabel(a).localeCompare(itemCategoryLabel(b)) || a.name.localeCompare(b.name),
+    );
+}
+
+function storeBuyRowMarkup(item, npc, hero) {
+  const price = storeItemBuyValueCp(item, npc);
+  return `
+    <div class="store-row">
+      <div>
+        <b>${escapeHtml(item.name)}</b>
+        <span>${escapeHtml(itemDetails(item))} - ${escapeHtml(priceText(price))}</span>
+      </div>
+      <button type="button" data-action="buy-store-item" data-item="${item.id}" ${moneyToCp(hero.inventory.money) >= price ? "" : "disabled"}>Buy</button>
+    </div>
+  `;
+}
+
+function arcanistScrollBuyMarkup(items, npc, hero) {
+  if (!items.length) return `<p class="empty-note">Nothing for sale here yet.</p>`;
+  const groups = new Map();
+  for (const item of items) {
+    const level = Math.max(0, Math.floor(Number(item.scroll?.level ?? item.use?.castLevel ?? 0) || 0));
+    if (!groups.has(level)) groups.set(level, []);
+    groups.get(level).push(item);
+  }
+  return `
+    <div class="store-scroll-groups">
+      ${Array.from(groups.entries())
+        .sort(([a], [b]) => a - b)
+        .map(
+          ([level, levelItems]) => `
+            <details class="store-scroll-level" ${storeSearch.trim() ? "open" : ""}>
+              <summary>${escapeHtml(spellLevelLabel(level))} <small>${levelItems.length}</small></summary>
+              <div class="store-scroll-items">
+                ${levelItems.map((item) => storeBuyRowMarkup(item, npc, hero)).join("")}
+              </div>
+            </details>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function storeBuyMarkup(npc, hero) {
+  const items = storeStockItems(npc);
+  if (npc?.shop?.type === "arcanist") return arcanistScrollBuyMarkup(items, npc, hero);
+  return items.map((item) => storeBuyRowMarkup(item, npc, hero)).join("") || `<p class="empty-note">Nothing for sale here yet.</p>`;
 }
 
 function diseaseCurePriceCp(diseaseId) {
@@ -9178,6 +12563,7 @@ function renderStoreMenu() {
     .filter((item) => !equippedIds.has(item.id))
     .filter((item) => storeAcceptsSoldItem(item, npc))
     .filter((item) => !query || searchableItemText(item).includes(query) || itemDetails(item).toLowerCase().includes(query));
+  const buysFromParty = storeBuysFromParty(npc);
   els.storeBody.innerHTML = `
     <section class="npc-card">
       ${npcPortraitMarkup(npc)}
@@ -9199,46 +12585,40 @@ function renderStoreMenu() {
     <section class="store-section">
       <h3>Buy</h3>
       <div class="store-list">
-        ${storeStockItems(npc)
-          .map((item) => {
-            const price = itemValueCp(item);
-            return `
-              <div class="store-row">
-                <div>
-                  <b>${escapeHtml(item.name)}</b>
-                  <span>${escapeHtml(itemDetails(item))} - ${escapeHtml(priceText(price))}</span>
-                </div>
-                <button type="button" data-action="buy-store-item" data-item="${item.id}" ${moneyToCp(hero.inventory.money) >= price ? "" : "disabled"}>Buy</button>
-              </div>
-            `;
-          })
-          .join("") || `<p class="empty-note">Nothing for sale here yet.</p>`}
+        ${storeBuyMarkup(npc, hero)}
       </div>
     </section>
-    <section class="store-section">
-      <h3>Sell</h3>
-      <div class="store-list">
-        ${
-          sellableItems.length
-            ? sellableItems
-                .map((item) => {
-                  const price = storeItemSellValueCp(item, npc);
-                  const starterWarning = item.starterEquipment ? " - starter gear has no resale value" : "";
-                  return `
-                    <div class="store-row">
-                      <div>
-                        <b>${escapeHtml(item.name)}</b>
-                        <span>${escapeHtml(itemDetails(item))} - ${escapeHtml(priceText(price))}${escapeHtml(starterWarning)}</span>
-                      </div>
-                      <button type="button" data-action="sell-store-item" data-item="${item.id}">Sell</button>
-                    </div>
-                  `;
-                })
-                .join("")
-            : `<p class="empty-note">No carried items this merchant will buy.</p>`
-        }
-      </div>
-    </section>
+    ${
+      buysFromParty
+        ? `<section class="store-section">
+            <h3>Sell</h3>
+            <div class="store-list">
+              ${
+                sellableItems.length
+                  ? sellableItems
+                      .map((item) => {
+                        const price = storeItemSellValueCp(item, npc);
+                        const starterWarning = item.starterEquipment ? " - starter gear has no resale value" : "";
+                        return `
+                          <div class="store-row">
+                            <div>
+                              <b>${escapeHtml(item.name)}</b>
+                              <span>${escapeHtml(itemDetails(item))} - ${escapeHtml(priceText(price))}${escapeHtml(starterWarning)}</span>
+                            </div>
+                            <button type="button" data-action="sell-store-item" data-item="${item.id}">Sell</button>
+                          </div>
+                        `;
+                      })
+                      .join("")
+                  : `<p class="empty-note">No carried items this merchant will buy.</p>`
+              }
+            </div>
+          </section>`
+        : `<section class="store-section">
+            <h3>Buying Policy</h3>
+            <p class="empty-note">${escapeHtml(npc.name ?? "This merchant")} does not buy party goods.</p>
+          </section>`
+    }
   `;
 }
 
@@ -9260,9 +12640,10 @@ function buyStoreItem(itemId) {
   const template = getItemTemplate(itemId);
   if (!template) return;
 
-  const price = itemValueCp(template);
-  if (template.store?.buyable === false || template.tags?.includes("loot:magic") || template.type === "treasure") return;
-  if (!storeStockItems().some((item) => item.id === itemId)) return;
+  const npc = storeNpcDefinition();
+  if (!storeStockItems(npc).some((item) => item.id === itemId)) return;
+  if (npc?.shop?.type !== "arcanist" && (template.store?.buyable === false || template.tags?.includes("loot:magic") || template.type === "treasure")) return;
+  const price = storeItemBuyValueCp(template, npc);
   if (!spendMoney(hero.inventory.money, price)) return;
   addItemToInventory(hero, createItemInstance(itemId, "store"), "store-stack");
   addLog(`${hero.name} buys ${template.name}.`, "important");
@@ -11102,6 +14483,81 @@ function applyHealingToHero(target, healing) {
   return target.hp - before;
 }
 
+function thrownConsumableTargets(hero, item) {
+  if (state.mode !== "combat" || !hero) return [];
+  const rangeSquares = Math.max(1, Math.floor(Number(item?.use?.rangeFeet ?? 20) / feetPerSquare));
+  return visibleMonsters()
+    .filter((monster) => monster.alive && hostileTo(hero, monster))
+    .filter((monster) => fightersWithinSquares(hero, monster, rangeSquares) && hasClearLineOfSightBetweenFighters(hero, monster))
+    .sort((a, b) => attackGridDistanceBetweenFighters(hero, a) - attackGridDistanceBetweenFighters(hero, b) || a.name.localeCompare(b.name));
+}
+
+function thrownConsumableTarget(hero, item) {
+  const targets = thrownConsumableTargets(hero, item);
+  if (!targets.length) return null;
+  const selected = state.fighters?.[selectedAttackTargetId];
+  if (selected && targets.some((target) => target.id === selected.id)) return selected;
+  return targets[0];
+}
+
+function refundItemUseResource(hero, item) {
+  if (state.mode !== "combat" || !hero) return;
+  if (itemUseResource(item) === "bonusAction") hero.hasBonusAction = true;
+  else hero.hasAction = true;
+}
+
+function useThrownConsumable(hero, item, itemId) {
+  if (state.mode !== "combat") {
+    refundItemUseResource(hero, item);
+    addLog(`${hero.name} needs a combat target before throwing ${item.name}.`, "important");
+    return false;
+  }
+  const target = thrownConsumableTarget(hero, item);
+  if (!target) {
+    refundItemUseResource(hero, item);
+    addLog(`${hero.name} needs a visible enemy within ${item.use?.rangeFeet ?? 20} feet for ${item.name}.`, "important");
+    return false;
+  }
+  if (!spendItemCharge(item)) {
+    refundItemUseResource(hero, item);
+    return false;
+  }
+  const ability = item.use?.attackAbility ?? "dex";
+  const attackRollResult = rollD20ForFighter(hero);
+  const attackRoll = attackRollResult.roll;
+  const attackBonusValue = abilityMod(hero, ability) + proficiencyBonus(hero) + magicEffects(hero).attackBonus;
+  const totalAttack = attackRoll + attackBonusValue;
+  const targetAc = armorClass(target);
+  addLog(`${hero.name} throws ${item.name} at ${target.name}: d20 ${attackRollResult.rolls.length > 1 ? `${attackRollResult.rolls.join(" / ")} -> ${attackRoll}` : attackRoll} ${abilityLabel(attackBonusValue)} = ${totalAttack} vs AC ${targetAc}.`, "important");
+  addAdminLog(`${hero.name} thrown consumable breakdown vs ${target.name}: ${d20RollDetail(attackRollResult)} + ${ability.toUpperCase()} throw ${abilityLabel(attackBonusValue)} = ${totalAttack}; target AC ${targetAc}.`);
+  if (typeof recordD20OutcomeForFighter === "function") recordD20OutcomeForFighter(hero, attackRoll !== 1 && totalAttack >= targetAc);
+  if (attackRoll === 1 || totalAttack < targetAc) {
+    addLog(`${item.name} shatters wide of ${target.name}.`, "important");
+  } else {
+    const dice = item.use?.damage ?? { count: 1, sides: 4, type: "fire" };
+    const roll = rollDice(dice.count ?? 1, dice.sides ?? 4);
+    const damage = Math.max(1, roll.total + (dice.bonus ?? 0));
+    applySpecialDamage(hero, target, damage, dice.type ?? "fire", item.name);
+    if (target.alive && item.use?.burning) {
+      const repeat = item.use.burning;
+      applyStatusEffect(target, {
+        id: `${item.id}-burning-${hero.id}`,
+        label: "Burning",
+        burningRepeat: {
+          sourceId: hero.id,
+          sourceName: hero.name,
+          label: item.name,
+          damage: repeat.damage ?? { count: 1, sides: 4, type: "fire" },
+        },
+        durationRounds: repeat.durationRounds ?? 3,
+      });
+      addLog(`${target.name} is burning from ${item.name}.`, "important");
+    }
+  }
+  if (itemUseConsumesInventory(item)) consumeEquippedItem(itemId);
+  return true;
+}
+
 async function useUsableInventoryItem(itemId, targetId = null, options = {}) {
   const hero = state.mode === "combat" ? activeFighter() : activeHero();
   const item = itemForId(hero, itemId);
@@ -11215,6 +14671,8 @@ async function useUsableInventoryItem(itemId, targetId = null, options = {}) {
       await applyPoisonExposure?.(hero, poisonTarget, poison, { label: item.name, directUse: true });
     }
     if (itemUseConsumesInventory(item)) consumeEquippedItem(itemId);
+  } else if (item.use?.kind === "thrownConsumable") {
+    useThrownConsumable(hero, item, itemId);
   } else if (item.use?.kind === "spellScroll") {
     const spell = typeof spellForScrollItem === "function" ? spellForScrollItem(item) : null;
     if (!spell || !canCastSpell(hero, spell)) {
@@ -12759,7 +16217,7 @@ function renderShortRestDialogBody(spentAny = false) {
         .map((hero) => {
           const conMod = abilityMod(hero, "con");
           hero.hitDiceRemaining = hero.hitDiceRemaining ?? hero.level ?? 1;
-          const canSpend = spentAny && hero.hp > 0 && (hero.hitDiceRemaining ?? 0) > 0 && hero.hp < hero.maxHp;
+          const canSpend = spentAny && (hero.hp > 0 || heroIsStableAtZero(hero)) && (hero.hitDiceRemaining ?? 0) > 0 && hero.hp < hero.maxHp;
           const status = heroIsStableAtZero(hero) ? " - stable; wakes at rest end" : "";
           return `
             <div class="rest-hero-row">
@@ -12779,12 +16237,12 @@ function renderShortRestDialogBody(spentAny = false) {
   `;
 }
 
-function showShortRestMenu() {
+function showShortRestMenu(initialSpentAny = false) {
   return new Promise((resolve) => {
     els.gameDialogTitle.textContent = "Short Rest";
     els.gameDialogField.classList.add("hidden");
     els.gameDialogForm.classList.add("wide-dialog");
-    let spentAny = false;
+    let spentAny = Boolean(initialSpentAny);
 
     const cleanup = () => {
       els.gameDialogActions.removeEventListener("click", handleClick);

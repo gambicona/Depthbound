@@ -262,6 +262,7 @@ function addPartyTomeItem(item) {
   const existing = state.partyTomes.find((tome) => `${tome.baseItemId}|${tome.title}|${tome.text}|${(tome.categories ?? []).join(",")}|${tome.temporary ? "temporary" : "permanent"}` === signature);
   if (existing) return existing;
   state.partyTomes.push(entry);
+  for (const behavior of Object.values(window.DungeonNpcBehaviors ?? {})) behavior.recordItemCollected?.(item);
   return entry;
 }
 
@@ -331,6 +332,15 @@ const smithMaterialCommissionRequests = {
     { itemId: "cloth-scrap", label: "Cloth Scraps", requestText: "{npc} needs {quantity} Cloth Scraps for bandages and supply bundles.", quantityRange: [8, 14] },
     { itemId: "wood-bundle", label: "Wood Bundles", requestText: "{npc} needs {quantity} Wood Bundles for arrow shafts and crate repairs.", quantityRange: [4, 8] },
     { label: "Cooking Herbs", requestText: "{npc} needs {quantity} Cooking Herbs for travel meals.", requirement: { type: "component", tagsAll: ["herb", "food"] }, quantityRange: [4, 8] },
+  ],
+  alchemist: [
+    { itemId: "coal-chunk", label: "Coal Chunks", requestText: "{npc} needs {quantity} Coal Chunks for extremely responsible blast tests.", quantityRange: [4, 8] },
+    { itemId: "brimstone-chunk", label: "Brimstone Chunks", requestText: "{npc} needs {quantity} Brimstone Chunks because sulfur is comedy with consequences.", quantityRange: [2, 5] },
+    { itemId: "hellfire-ember", label: "Hellfire Embers", requestText: "{npc} needs {quantity} Hellfire Embers for the exciting shelf.", quantityRange: [1, 3] },
+    { itemId: "slag-glass", label: "Slag Glass", requestText: "{npc} needs {quantity} Slag Glass shards for shrapnel-safe, mostly-safe casings.", quantityRange: [3, 6] },
+    { itemId: "crystal-shard", label: "Crystal Shards", requestText: "{npc} needs {quantity} Crystal Shards for spark focus experiments.", quantityRange: [2, 5] },
+    { label: "Fire Reagents", requestText: "{npc} needs {quantity} Fire Reagents. Fire is a color too.", requirement: { type: "component", tagsAny: ["fire", "sulfur", "brimstone", "ember", "ash", "heat"] }, quantityRange: [3, 7] },
+    { label: "Volatile Alchemical Materials", requestText: "{npc} needs {quantity} Volatile Alchemical Materials for boom research.", requirement: { type: "component", tagsAll: ["alchemy"], tagsAny: ["fire", "acid", "poison", "venom", "infernal", "abyssal", "arcane-reagent", "magic-reagent"] }, quantityRange: [3, 6] },
   ],
   weaponsmith: [
     { itemId: "coal-chunk", label: "packs of coal", requestText: "{npc} needs {quantity} packs of coal for his forge.", quantityRange: [4, 7] },
@@ -3743,6 +3753,17 @@ function soundPathForMusic(key) {
     const song = activeInstrumentPerformance?.songs?.find((entry) => entry.id === songId) ?? null;
     if (song?.src) return song.src;
   }
+  const fixedMusicPaths = {
+    "village:monster-guild": `${soundAssetRoot}/music/village-trophy-lodge.mp3`,
+    "village:gravebinders": `${soundAssetRoot}/music/village-gravebinders.mp3`,
+    "village:crucible-collegium": `${soundAssetRoot}/music/village-crucible-collegium.mp3`,
+    "village:antiquarian-society": `${soundAssetRoot}/music/village-antiquarian-society.mp3`,
+    "village:expedition-board": `${soundAssetRoot}/music/village-expedition-board.mp3`,
+    "village:boom-club": `${soundAssetRoot}/music/village-boom-club.mp3`,
+    "village:fighting-pit": `${soundAssetRoot}/music/village-fighting-pit.mp3`,
+    "fighting-pit-arena": `${soundAssetRoot}/music/fighting-pit-arena.mp3`,
+  };
+  if (fixedMusicPaths[key]) return fixedMusicPaths[key];
   if (key === "mainmenu") return `${soundAssetRoot}/music/mainmenu.mp3`;
   if (key === "home") return `${soundAssetRoot}/music/home.mp3`;
   const theme = getContentDefinition("themes", currentThemeId());
@@ -3768,6 +3789,8 @@ function desiredMusicKey() {
   const instrumentKey = activeInstrumentMusicKey();
   if (instrumentKey) return instrumentKey;
   if (!state) return "";
+  if (state?.questFlags?.fightingPitRun?.active && state.mode !== "home") return "fighting-pit-arena";
+  if (activeVillageMusicKey && !els.villageMenu?.classList.contains("hidden")) return activeVillageMusicKey;
   if (state.mode === "home") return "home";
   if (state.mode === "combat") {
     return combatMonsters().some((monster) => monster.id?.startsWith("boss-")) ? "boss-combat" : "combat";
@@ -5330,12 +5353,14 @@ function addItemToInventory(fighter, item, prefix = "stack") {
   item = ensureItemCharges(normalizeItem(item));
   if (itemUsesPartyResourceInventory(item)) {
     addPartyResourceItem(item, item.quantity ?? 1);
+    for (const behavior of Object.values(window.DungeonNpcBehaviors ?? {})) behavior.recordItemCollected?.(item);
     return [item];
   }
   if (itemUsesTomeInventory(item)) {
     addPartyTomeItem(item);
     return [item];
   }
+  for (const behavior of Object.values(window.DungeonNpcBehaviors ?? {})) behavior.recordItemCollected?.(item);
   if (item.stackable) {
     const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
     const templateId = item.baseItemId ?? item.itemId ?? item.id;

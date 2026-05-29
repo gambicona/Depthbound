@@ -1,0 +1,30 @@
+Faction image asset wiring
+==========================
+
+Faction board symbols, PNG:
+- assets/factions/trophy-lodge-symbol.png
+- assets/factions/gravebinders-symbol.png
+- assets/factions/crucible-collegium-symbol.png
+- assets/factions/antiquarian-society-symbol.png
+- assets/factions/expedition-board-symbol.png
+- assets/factions/boom-club-symbol.png
+- assets/factions/fighting-pit-symbol.png
+
+These appear on the faction/guild board headers. Main NPC portraits remain separate and are used for inspect/talk views.
+
+Faction main NPC portraits:
+- Trophy Lodge: assets/npcs/trophy-lodge-npc.jpg
+- Gravebinders: assets/npcs/gravebinders-npc.jpg
+- Crucible Collegium: assets/npcs/crucible-collegium-npc.jpg
+- Antiquarian Society: assets/npcs/antiquarian-society-npc.jpg
+- Expedition Board: assets/npcs/expedition-board-npc.jpg
+- Fizzwick's Boom Club: assets/npcs/alchemist.jpg
+- Fighting Pit: assets/npcs/fighting-pit-npc.jpg
+
+Fizzwick's Boom Club deliberately reuses the alchemist portrait because Fizzwick Boomwhistle is the same NPC.
+
+Non-faction NPC portraits:
+- Apothecary / Ilyra Fen: assets/npcs/apothecary.jpg
+- Grumpy Old Wizard / Old Master Vell: assets/npcs/grumpy-wizard.jpg
+- Alchemist / Fizzwick Boomwhistle: assets/npcs/alchemist.jpg
+- Master Arcanist / Sarthax Veyrune: assets/npcs/arcanist.jpg

@@ -713,7 +713,7 @@ const oldLadyNpc = {
     unlocked: true,
     unlockFlag: "oldLadyAvailable",
     label: "Old Lady's Hut",
-    description: "Mara's warm, suspiciously well-stocked quest hut.",
+    description: "Mara's warm, suspiciously well-stocked hut.",
     hiddenUntilUnlocked: true,
     order: 60,
     lockText: "Someone may come calling after the first Thornwood errand.",
@@ -1054,8 +1054,6 @@ window.DungeonNpcBehaviors.oldLady = (() => {
           : `<p class="empty-note">Mara has no errands today.</p>`
       }
       ${chatMarkup(chat)}
-      <hr />
-      <button type="button" data-action="back-to-village-list">Back to Village</button>
     `;
     els.villageMenu.classList.remove("hidden");
   }

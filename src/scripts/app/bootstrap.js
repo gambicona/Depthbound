@@ -42,6 +42,7 @@ let adminItemInstanceCounter = 0;
 let activeDialogCancel = null;
 let currentMusicKey = "";
 let currentMusic = null;
+let activeVillageMusicKey = "";
 let activeInstrumentPerformance = null;
 let soundVolume = Number(window.localStorage.getItem("dungeonCrawler.soundVolume.v1") ?? 0.5);
 let buttonTheme = window.localStorage.getItem("dungeonCrawler.buttonTheme.v1") || "verdigris";
@@ -572,6 +573,7 @@ const els = {
   goAdventure: document.querySelector("#go-adventure"),
   villageMenu: document.querySelector("#village-menu"),
   villageBody: document.querySelector("#village-body"),
+  backVillageList: document.querySelector("#back-village-list"),
   closeVillage: document.querySelector("#close-village"),
   buildHome: document.querySelector("#build-home"),
   goBarrowCrown: document.querySelector("#go-barrow-crown"),

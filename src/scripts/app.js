@@ -707,6 +707,36 @@ els.villageMenu?.addEventListener("click", (event) => {
   if (button?.dataset.action === "complete-npc-quest") {
     completeNpcQuest(button.dataset.npc, button.dataset.quest);
   }
+  if (button?.dataset.action === "accept-guild-contract") {
+    if (button.dataset.npc === "monster-guild") acceptMonsterHunterContract(button.dataset.contract);
+    if (button.dataset.npc === "gravebinders") acceptGravebinderContract(button.dataset.contract);
+    if (button.dataset.npc === "crucible-collegium") acceptCrucibleContract(button.dataset.contract);
+    if (button.dataset.npc === "antiquarian-society") acceptAntiquarianContract(button.dataset.contract);
+    if (button.dataset.npc === "expedition-board") acceptExpeditionContract(button.dataset.contract);
+    if (button.dataset.npc === "boom-club") acceptBoomClubContract(button.dataset.contract);
+  }
+  if (button?.dataset.action === "complete-guild-contract") {
+    if (button.dataset.npc === "monster-guild") completeMonsterHunterContract(button.dataset.contract);
+    if (button.dataset.npc === "gravebinders") completeGravebinderContract(button.dataset.contract);
+    if (button.dataset.npc === "crucible-collegium") completeCrucibleContract(button.dataset.contract);
+    if (button.dataset.npc === "antiquarian-society") completeAntiquarianContract(button.dataset.contract);
+    if (button.dataset.npc === "expedition-board") completeExpeditionContract(button.dataset.contract);
+    if (button.dataset.npc === "boom-club") completeBoomClubContract(button.dataset.contract);
+  }
+  if (button?.dataset.action === "complete-guild-turn-in") {
+    if (button.dataset.npc === "monster-guild") completeMonsterHunterTurnIn(button.dataset.turnIn);
+    if (button.dataset.npc === "gravebinders") completeGravebinderTurnIn(button.dataset.turnIn);
+    if (button.dataset.npc === "crucible-collegium") completeCrucibleTurnIn(button.dataset.turnIn);
+    if (button.dataset.npc === "antiquarian-society") completeAntiquarianTurnIn(button.dataset.turnIn);
+    if (button.dataset.npc === "expedition-board") completeExpeditionTurnIn(button.dataset.turnIn);
+    if (button.dataset.npc === "boom-club") completeBoomClubTurnIn(button.dataset.turnIn);
+  }
+  if (button?.dataset.action === "show-quest-log") {
+    showQuestLog();
+  }
+  if (button?.dataset.action === "start-fighting-pit") {
+    void startFightingPitRun();
+  }
   if (button?.dataset.action === "start-npc-chat") {
     startNpcChat(button.dataset.npc, button.dataset.chatState);
   }

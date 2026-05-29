@@ -41,7 +41,19 @@ function downHero(hero) {
   hero.movementLeft = 0;
 }
 
+function fightingPitSafetyActive() {
+  return typeof fightingPitCurrentRun === "function" && Boolean(fightingPitCurrentRun());
+}
+
 function killHero(hero) {
+  if (isPartyHeroId(hero?.id) && fightingPitSafetyActive()) {
+    hero.hp = 0;
+    hero.alive = true;
+    hero.dead = false;
+    markFighterStableAtZero(hero);
+    addLog(`${hero.name} is pulled back by pit medics before the bout can turn lethal.`, "important");
+    return;
+  }
   hero.hp = 0;
   hero.alive = false;
   hero.dead = true;
@@ -101,6 +113,17 @@ function applyDamageToFighter(defender, damage) {
     return;
   }
   playSoundEffect("characterDamage");
+  if (fightingPitSafetyActive() && defender.hp <= 0) {
+    defender.hp = 0;
+    defender.alive = true;
+    defender.dead = false;
+    markFighterStableAtZero(defender);
+    defender.hasAction = false;
+    defender.hasBonusAction = false;
+    defender.movementLeft = 0;
+    addLog(`${defender.name} drops to 0 HP, but blunted pit weapons and ready medics stabilize them immediately.`, "important");
+    return;
+  }
   if (
     defender.hp <= 0 &&
     previousHp > 0 &&
@@ -2094,6 +2117,13 @@ function maybeTriggerDiseaseOnDamage(fighter) {
 async function applyActivePoisonsAtTurnStart(fighter) {
   if (!fighter?.alive || !fighter.statusEffects?.length) return;
   for (const effect of [...fighter.statusEffects]) {
+    if (effect.burningRepeat) {
+      const repeat = effect.burningRepeat;
+      const source = state.fighters?.[repeat.sourceId] ?? fighter;
+      const dice = repeat.damage ?? {};
+      const roll = dice.count && dice.sides ? rollDice(dice.count, dice.sides) : { total: 0, rolls: [] };
+      if (roll.total > 0) applySpecialDamage(source, fighter, Math.max(1, roll.total + (dice.bonus ?? 0)), dice.type ?? "fire", repeat.label ?? effect.label ?? "Burning");
+    }
     if (effect.poisonRepeat) {
       const repeat = effect.poisonRepeat;
       const save = await rollSavingThrow(fighter, "con", repeat.saveDc ?? 10, `${effect.label ?? "Poison"} continues in ${fighter.name}'s system.`);
@@ -3694,9 +3724,10 @@ async function finishEncounterAfterLastMonsterFalls() {
         fighter.alive = false;
         fighter.dead = true;
         addLog(`${fighter.name} turns to dust as the Crownshard's stolen command ends.`, "important");
-      });
+    });
     endCurrentEncounter();
     addLog("The room falls quiet. Exploration resumes.", "important");
+    if (typeof handleFightingPitWaveClear === "function" && typeof fightingPitCurrentRun === "function" && fightingPitCurrentRun()) await handleFightingPitWaveClear();
   }
   return true;
 }

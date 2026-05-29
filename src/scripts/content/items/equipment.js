@@ -135,6 +135,26 @@ function simpleConsumable(id, name, description, use = {}) {
   });
 }
 
+function thrownConsumable(id, name, description, cost, use = {}) {
+  if (window.DungeonContent.get?.("items", id)) return;
+  window.DungeonContent.register("items", id, {
+    name,
+    type: "consumable",
+    category: use.category ?? "thrown flask",
+    cost,
+    weightLb: use.weightLb ?? 1,
+    slots: ["belt1", "belt2", "belt3", "belt4", "belt5"],
+    tags: uniqueTags(["consumable", "thrown", "alchemical", "alchemist", ...(use.tags ?? [])]),
+    description,
+    use: {
+      kind: "thrownConsumable",
+      resource: "action",
+      consume: true,
+      ...use,
+    },
+  });
+}
+
 function magicPotion(id, name, rarity, cost, description, use) {
   if (window.DungeonContent.get?.("items", id)) return;
   window.DungeonContent.register("items", id, {
@@ -169,7 +189,7 @@ function resistancePotion(type, name = null) {
     `potion-${type}-resistance`,
     `Potion of ${label}`,
     "uncommon",
-    gp(300),
+    gp(500),
     `Drink this potion to gain resistance to ${type} damage for 1 hour.`,
     { id: `potion-${type}-resistance`, label: label, resistances: [type], durationHours: 1 },
   );
@@ -177,7 +197,7 @@ function resistancePotion(type, name = null) {
 
 function breathPotion(type, saveAbility = "dex", shape = "cone") {
   const label = `${type[0].toUpperCase()}${type.slice(1)} Breath`;
-  magicPotion(`potion-${type}-breath`, `Potion of ${label}`, "uncommon", gp(150), `Drink this potion to gain three ${type} breath exhalations within 1 hour. Each exhalation is a 15 ft ${shape} for 4d6 ${type} damage, ${saveAbility.toUpperCase()} save for half.`, {
+  magicPotion(`potion-${type}-breath`, `Potion of ${label}`, "uncommon", gp(350), `Drink this potion to gain three ${type} breath exhalations within 1 hour. Each exhalation is a 15 ft ${shape} for 4d6 ${type} damage, ${saveAbility.toUpperCase()} save for half.`, {
     kind: "breathPotion",
     resource: "bonusAction",
     status: {
@@ -320,6 +340,14 @@ healingPotion("potion-healing", "Potion of Healing", { count: 2, sides: 4 }, 2, 
 healingPotion("potion-greater-healing", "Potion of Greater Healing", { count: 4, sides: 4 }, 4, gp(100));
 healingPotion("potion-superior-healing", "Potion of Superior Healing", { count: 8, sides: 4 }, 8, gp(500));
 healingPotion("potion-supreme-healing", "Potion of Supreme Healing", { count: 10, sides: 4 }, 20, gp(5000));
+thrownConsumable("alchemists-fire", "Alchemist's Fire", "A sticky flask of volatile fire. Throw it at a visible enemy within 20 ft: on a hit it deals 1d4 fire damage and leaves the target burning briefly.", gp(50), {
+  category: "bomb",
+  tags: ["bomb", "fire", "explosive", "boom"],
+  rangeFeet: 20,
+  attackAbility: "dex",
+  damage: { count: 1, sides: 4, type: "fire" },
+  burning: { durationRounds: 3, damage: { count: 1, sides: 4, type: "fire" } },
+});
 
 simpleConsumable("berry", "Berry", "A small edible berry. It heals 1 HP when used.", { kind: "healing", resource: "bonusAction", dice: { count: 1, sides: 1 } });
 simpleConsumable("medicinal-herb", "Medicinal Herb", "A field herb that heals 1d4 HP when used.", { kind: "healing", dice: { count: 1, sides: 4 } });
@@ -345,7 +373,7 @@ simpleConsumable("sacred-ash", "Sacred Ash", "A pinch of ash from a consecrated 
   status: { id: "sacred-ash", label: "Sacred Ash", acBonus: 1, resistances: ["necrotic"], expiresAtHome: true },
 });
 
-statusPotion("potion-climbing", "Potion of Climbing", "common", gp(75), "Drink this potion to gain a climbing speed-like mobility boost for 1 hour.", {
+statusPotion("potion-climbing", "Potion of Climbing", "common", gp(150), "Drink this potion to gain a climbing speed-like mobility boost for 1 hour.", {
   id: "potion-climbing",
   label: "Climbing",
   speedBonusFeet: 10,
@@ -354,7 +382,7 @@ statusPotion("potion-climbing", "Potion of Climbing", "common", gp(75), "Drink t
   conditionDescription: "You climb with ease: +10 ft speed and +3 to mobility or Athletics-style checks for 1 hour.",
 });
 
-statusPotion("potion-water-breathing", "Potion of Water Breathing", "uncommon", gp(150), "Drink this potion to breathe underwater and move through flooded spaces more easily for 1 hour.", {
+statusPotion("potion-water-breathing", "Potion of Water Breathing", "uncommon", gp(300), "Drink this potion to breathe underwater and move through flooded spaces more easily for 1 hour.", {
   id: "potion-water-breathing",
   label: "Water Breathing",
   waterBreathing: true,
@@ -378,12 +406,12 @@ breathPotion("radiant", "dex", "cone");
 breathPotion("thunder", "dex", "cone");
 
 [
-  ["hill", 21, "uncommon", 500],
-  ["frost", 23, "rare", 900],
-  ["stone", 23, "rare", 900],
-  ["fire", 25, "rare", 1400],
-  ["cloud", 27, "very-rare", 5000],
-  ["storm", 29, "legendary", 25000],
+  ["hill", 21, "uncommon", 1000],
+  ["frost", 23, "rare", 1800],
+  ["stone", 23, "rare", 1800],
+  ["fire", 25, "rare", 2800],
+  ["cloud", 27, "very-rare", 10000],
+  ["storm", 29, "legendary", 50000],
 ].forEach(([giant, score, rarity, value]) => {
   const label = `${giant[0].toUpperCase()}${giant.slice(1)} Giant Strength`;
   statusPotion(`potion-${giant}-giant-strength`, `Potion of ${label}`, rarity, gp(value), `Drink this potion to set your Strength to ${score} for 1 hour if it is lower.`, {
@@ -395,7 +423,7 @@ breathPotion("thunder", "dex", "cone");
   });
 });
 
-statusPotion("potion-giant-strength", "Potion of Giant Strength", "uncommon", gp(500), "Drink this potion to gain hill giant strength: Strength 21 for 1 hour if your Strength is lower.", {
+statusPotion("potion-giant-strength", "Potion of Giant Strength", "uncommon", gp(1000), "Drink this potion to gain hill giant strength: Strength 21 for 1 hour if your Strength is lower.", {
   id: "potion-giant-strength",
   label: "Hill Giant Strength",
   abilityScoreMinimums: { str: 21 },
@@ -403,7 +431,7 @@ statusPotion("potion-giant-strength", "Potion of Giant Strength", "uncommon", gp
   conditionDescription: "Your Strength is 21 for 1 hour unless it is already higher.",
 });
 
-statusPotion("potion-speed", "Potion of Speed", "very-rare", gp(5000), "Drink this potion to gain haste-like speed for 1 minute.", {
+statusPotion("potion-speed", "Potion of Speed", "very-rare", gp(10000), "Drink this potion to gain haste-like speed for 1 minute.", {
   id: "potion-speed",
   label: "Speed",
   acBonus: 2,
@@ -413,7 +441,7 @@ statusPotion("potion-speed", "Potion of Speed", "very-rare", gp(5000), "Drink th
   conditionDescription: "Haste-like acceleration: doubled speed, +2 AC, and a small attack edge for 1 minute.",
 });
 
-statusPotion("potion-heroism", "Potion of Heroism", "rare", gp(1000), "Drink this potion to gain 10 temporary HP and a bless-like bonus for 1 hour.", {
+statusPotion("potion-heroism", "Potion of Heroism", "rare", gp(2500), "Drink this potion to gain 10 temporary HP and a bless-like bonus for 1 hour.", {
   id: "potion-heroism",
   label: "Heroism",
   tempHp: 10,
@@ -423,7 +451,7 @@ statusPotion("potion-heroism", "Potion of Heroism", "rare", gp(1000), "Drink thi
   conditionDescription: "You gain 10 temporary HP and a bless-like +2 to attacks and saving throws for 1 hour.",
 });
 
-statusPotion("potion-invisibility", "Potion of Invisibility", "very-rare", gp(5000), "Drink this potion to become invisible for 1 hour or until revealed by the dungeon's invisibility rules.", {
+statusPotion("potion-invisibility", "Potion of Invisibility", "very-rare", gp(10000), "Drink this potion to become invisible for 1 hour or until revealed by the dungeon's invisibility rules.", {
   id: "invisible",
   label: "Invisible",
   condition: "invisible",
@@ -434,7 +462,7 @@ statusPotion("potion-invisibility", "Potion of Invisibility", "very-rare", gp(50
   conditionDescription: "Invisible for 1 hour; the visibility system treats you as hidden from creatures that cannot see invisibility.",
 });
 
-statusPotion("potion-flying", "Potion of Flying", "very-rare", gp(5000), "Drink this potion to gain flight for 1 hour.", {
+statusPotion("potion-flying", "Potion of Flying", "very-rare", gp(10000), "Drink this potion to gain flight for 1 hour.", {
   id: "potion-flying",
   label: "Flying",
   flying: true,
