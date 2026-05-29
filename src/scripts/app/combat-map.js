@@ -52,6 +52,9 @@ function killHero(hero) {
     hero.dead = false;
     markFighterStableAtZero(hero);
     addLog(`${hero.name} is pulled back by pit medics before the bout can turn lethal.`, "important");
+    if (typeof fightingPitPartyIsDown === "function" && fightingPitPartyIsDown() && typeof endFightingPitRunDefeat === "function") {
+      endFightingPitRunDefeat();
+    }
     return;
   }
   hero.hp = 0;
@@ -122,6 +125,9 @@ function applyDamageToFighter(defender, damage) {
     defender.hasBonusAction = false;
     defender.movementLeft = 0;
     addLog(`${defender.name} drops to 0 HP, but blunted pit weapons and ready medics stabilize them immediately.`, "important");
+    if (typeof fightingPitPartyIsDown === "function" && fightingPitPartyIsDown() && typeof endFightingPitRunDefeat === "function") {
+      endFightingPitRunDefeat();
+    }
     return;
   }
   if (
@@ -4436,6 +4442,7 @@ function randomEquipmentDrop() {
 
 function dropLootForMonster(monster) {
   recordNpcMonsterKill(monster);
+  if (monster?.fightingPitMonster) return;
   addMonsterMaterialDrops(monster);
   const loot = createLootForMonster(monster);
   const resolvedLoot = resolveMonsterLootDrop(monster, loot);
@@ -4563,7 +4570,7 @@ function dropLootForHero(hero) {
 
 function awardMonsterXp(monster) {
   recordMonsterKill(monster);
-  const xp = monster.xp ?? 50;
+  const xp = monster?.fightingPitMonster ? Math.ceil((monster.xp ?? 50) / 2) : (monster.xp ?? 50);
   const participants = partyHeroes();
   const recipients = participants.filter((fighter) => isClassHero(fighter) || isTrainedSidekick(fighter));
   const lostShares = participants.length - recipients.length;
@@ -5227,9 +5234,18 @@ function debugKillVisibleMonsters() {
     monster.hp = 0;
     monster.alive = false;
   });
+  const shouldClearFightingPitWave =
+    typeof handleFightingPitWaveClear === "function" &&
+    typeof fightingPitCurrentRun === "function" &&
+    fightingPitCurrentRun() &&
+    !aliveMonsters().some((monster) => monster.fightingPitMonster);
   endCurrentEncounter();
   addLog(`Debug: removed ${targets.length} visible monster${targets.length === 1 ? "" : "s"}.`, "important");
-  render();
+  if (shouldClearFightingPitWave) {
+    void handleFightingPitWaveClear();
+  } else {
+    render();
+  }
 }
 
 async function rollInitiative() {

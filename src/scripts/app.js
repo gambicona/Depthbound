@@ -351,7 +351,23 @@ function handleAdminQuickAction(action) {
 els.topAdminActions?.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
+  if (button.dataset.action === "toggle-admin-monsters") {
+    adminMonsterCatalogOpen = !adminMonsterCatalogOpen;
+    renderControls();
+    event.preventDefault();
+    return;
+  }
+  if (button.dataset.action === "spawn-admin-monster") {
+    spawnAdminMonster(button.dataset.monster);
+    event.preventDefault();
+    return;
+  }
   if (handleAdminQuickAction(button.dataset.action)) event.preventDefault();
+});
+els.topAdminActions?.addEventListener("input", (event) => {
+  if (event.target.id !== "admin-monster-search") return;
+  adminMonsterSearch = event.target.value;
+  renderControls();
 });
 els.debugKill.addEventListener("click", debugKillVisibleMonsters);
 els.saveGame.addEventListener("click", () => void saveAdventure(state.saveSlotId ?? activeSaveSlot));

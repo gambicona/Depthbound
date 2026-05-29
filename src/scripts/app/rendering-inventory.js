@@ -11488,7 +11488,108 @@ function fightingPitWaveLabel(wave = 1) {
 
 function fightingPitCurrentRun() {
   const run = state?.questFlags?.fightingPitRun;
-  return run && typeof run === "object" ? run : null;
+  return run && typeof run === "object" && run.active !== false ? run : null;
+}
+
+function fightingPitPlayerControlledFighters() {
+  return partyHeroes().filter((fighter) => isPlayerControlledPartyFighter(fighter));
+}
+
+function fightingPitPartyIsDown() {
+  const controlled = fightingPitPlayerControlledFighters();
+  return controlled.length > 0 && controlled.every((fighter) => (fighter.hp ?? 0) <= 0 || fighter.dead);
+}
+
+function fightingPitMainHero() {
+  return state?.fighters?.hero ?? partyHeroes().find((hero) => isClassHero(hero) && !isAutonomousAlly(hero)) ?? activeHero();
+}
+
+function payFightingPitRewardToMainHero(run = fightingPitCurrentRun()) {
+  const rewardCp = Math.max(0, Math.floor(Number(run?.rewardCp) || 0));
+  const paidCp = Math.max(0, Math.floor(Number(run?.rewardPaidCp) || 0));
+  const unpaidCp = Math.max(0, rewardCp - paidCp);
+  const hero = fightingPitMainHero();
+  if (unpaidCp > 0 && hero) {
+    hero.inventory = normalizeInventory(hero.inventory);
+    addMoney(hero.inventory.money, unpaidCp);
+    run.rewardPaidCp = paidCp + unpaidCp;
+    addLog(`${hero.name} receives the Fighting Pit purse: ${priceText(unpaidCp)}.`, "important");
+  }
+  return { hero, paidCp: unpaidCp };
+}
+
+function fightingPitReturnToArenaMenu() {
+  const saveSlotId = state.saveSlotId ?? activeSaveSlot;
+  state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, {
+    ...state.party,
+    worldDay: normalizeWorldDay(state.worldDay),
+    campaignProgress: state.campaignProgress ?? {},
+    questFlags: state.questFlags ?? {},
+    partyResources: state.partyResources ?? {},
+    partyTomes: state.partyTomes ?? [],
+    home: state.home,
+    monsterCompendium: state.monsterCompendium,
+  });
+  state.saveSlotId = saveSlotId;
+  roomIsBuilt = false;
+  render();
+  renderFightingPit();
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+async function showFightingPitDefeatSummary(run) {
+  const wavesDefeated = Math.max(0, Math.floor(Number(run?.clearedWaves ?? ((run?.wave ?? 1) - 1)) || 0));
+  const foesDefeated = Math.max(0, Math.floor(Number(run?.defeated) || 0));
+  const rewardCp = Math.max(0, Math.floor(Number(run?.rewardCp) || 0));
+  const renown = Math.max(0, Math.floor(Number(run?.renown) || 0));
+  await new Promise((resolve) => {
+    restoreDialogInputField();
+    els.gameDialogTitle.textContent = "Fighting Pit Run Ended";
+    els.gameDialogMessage.innerHTML = dialogPlainMessageMarkup([
+      "The stop bell rings. The fight is over.",
+      `Waves defeated: ${wavesDefeated}`,
+      `Foes defeated: ${foesDefeated}`,
+      `Reward purse: ${priceText(rewardCp)}`,
+      `Renown earned: ${renown}`,
+    ].join("\n"));
+    els.gameDialogField.classList.add("hidden");
+    els.gameDialogActions.innerHTML = `<button type="button" data-pit-summary-continue>Continue</button>`;
+    const cleanup = () => {
+      els.gameDialogActions.removeEventListener("click", handleClick);
+      els.gameDialog.classList.add("hidden");
+      activeDialogCancel = null;
+      resolve();
+    };
+    const handleClick = (event) => {
+      if (!event.target.closest("[data-pit-summary-continue]")) return;
+      cleanup();
+    };
+    els.gameDialogActions.addEventListener("click", handleClick);
+    activeDialogCancel = cleanup;
+    els.gameDialog.classList.remove("hidden");
+    els.gameDialogActions.querySelector("[data-pit-summary-continue]")?.focus();
+  });
+  payFightingPitRewardToMainHero(run);
+  fightingPitReturnToArenaMenu();
+}
+
+function endFightingPitRunDefeat() {
+  const run = fightingPitCurrentRun();
+  if (!run || run.endedAt || state.completed || run.defeatSummaryOpen) return false;
+  run.defeatSummaryOpen = true;
+  run.endedAt = Date.now();
+  run.defeatedAt = Date.now();
+  run.active = false;
+  state.completed = true;
+  state.mode = "exploration";
+  state.combatStarted = false;
+  state.initiative = [];
+  state.activeIndex = 0;
+  clearFightingPitWaveMonsters();
+  addLog("Brakka Ironbell rings the stop bell. Every player-controlled fighter is down, so the Fighting Pit run ends.", "important");
+  render();
+  void showFightingPitDefeatSummary(run);
+  return true;
 }
 
 function fightingPitMonsterTemplates(category, boss = false) {
@@ -11499,6 +11600,11 @@ function fightingPitMonsterTemplates(category, boss = false) {
     .filter((monster) => {
       const tags = new Set((monster.tags ?? []).map((tag) => String(tag).toLowerCase()));
       const text = [monster.id, monster.name, monster.role].filter(Boolean).join(" ").toLowerCase();
+      return !tags.has("summon") && !tags.has("familiar") && !tags.has("companion") && !/^summon/.test(String(monster.id ?? "")) && !/\bfamiliar\b|\bsteed\b|\bcompanion\b/.test(text);
+    })
+    .filter((monster) => {
+      const tags = new Set((monster.tags ?? []).map((tag) => String(tag).toLowerCase()));
+      const text = [monster.id, monster.name, monster.role].filter(Boolean).join(" ").toLowerCase();
       const isBoss = tags.has("boss") || /\bboss\b|champion|lord|matriarch|overseer/.test(text);
       return boss ? isBoss : !isBoss;
     });
@@ -11506,28 +11612,80 @@ function fightingPitMonsterTemplates(category, boss = false) {
   return window.DungeonContent.list("monsters").filter((monster) => Math.max(1, Math.floor(Number(monsterCategory(monster)) || 1)) === desired);
 }
 
-function fightingPitPickMonsterTemplate(category, boss = false, index = 0) {
+function fightingPitPickMonsterTemplate(category, boss = false, excludeIds = []) {
   const templates = fightingPitMonsterTemplates(category, boss);
-  return templates[index % Math.max(1, templates.length)] ?? getMonsterTemplate(defaultContent.monster);
+  const excluded = new Set(excludeIds);
+  const pool = templates.filter((template) => !excluded.has(template.id));
+  const choices = pool.length ? pool : templates;
+  return choices[Math.floor(Math.random() * Math.max(1, choices.length))] ?? getMonsterTemplate(defaultContent.monster);
+}
+
+function fightingPitPickWaveMonsterTemplates(category, boss, count, run) {
+  const picked = [];
+  const recent = Array.isArray(run?.recentMonsterIds) ? run.recentMonsterIds.slice(-6) : [];
+  for (let index = 0; index < count; index += 1) {
+    const excludeIds = [...recent, ...picked.map((template) => template.id)];
+    picked.push(fightingPitPickMonsterTemplate(category, boss, excludeIds));
+  }
+  run.recentMonsterIds = [...recent, ...picked.map((template) => template.id)].slice(-8);
+  return picked;
+}
+
+const fightingPitArenaGates = [
+  { id: "north", edge: "north", cells: [{ x: 14, y: 4 }, { x: 15, y: 4 }], spawnOrigin: { x: 14, y: 5 } },
+  { id: "east", edge: "east", cells: [{ x: 25, y: 13 }, { x: 25, y: 14 }], spawnOrigin: { x: 24, y: 13 } },
+  { id: "south", edge: "south", cells: [{ x: 14, y: 22 }, { x: 15, y: 22 }], spawnOrigin: { x: 14, y: 21 } },
+  { id: "west", edge: "west", cells: [{ x: 4, y: 13 }, { x: 4, y: 14 }], spawnOrigin: { x: 5, y: 13 } },
+];
+
+function fightingPitArenaCells() {
+  const cells = [];
+  const centerX = 14.5;
+  const centerY = 13;
+  const radiusX = 10.5;
+  const radiusY = 9.5;
+  for (let y = 4; y <= 22; y += 1) {
+    for (let x = 4; x <= 25; x += 1) {
+      const normalized = ((x - centerX) / radiusX) ** 2 + ((y - centerY) / radiusY) ** 2;
+      if (normalized <= 1) cells.push({ x, y });
+    }
+  }
+  const byKey = new Map(cells.map((cell) => [positionKey(cell), cell]));
+  fightingPitArenaGates.flatMap((gate) => gate.cells).forEach((cell) => {
+    if (!byKey.has(positionKey(cell))) byKey.set(positionKey(cell), { ...cell });
+  });
+  return Array.from(byKey.values()).sort((a, b) => a.y - b.y || a.x - b.x);
+}
+
+function fightingPitArenaDoors() {
+  return fightingPitArenaGates.flatMap((gate) =>
+    gate.cells.map((cell, index) => ({
+      ...cell,
+      id: `pit-${gate.id}-gate-${index + 1}`,
+      roomId: "pit-floor",
+      edge: gate.edge,
+      to: `pit-${gate.id}-gate`,
+      open: true,
+    })),
+  );
 }
 
 function fightingPitArenaTemplate() {
-  const cells = [];
-  for (let y = 5; y <= 20; y += 1) {
-    for (let x = 5; x <= 24; x += 1) cells.push({ x, y });
-  }
+  const cells = fightingPitArenaCells();
+  const doors = fightingPitArenaDoors();
   return {
     id: "fighting-pit-arena",
     name: "Fighting Pit",
-    themeId: currentThemeId?.() ?? defaultContent.theme,
+    themeId: "desertRuins",
     dungeon: {
       id: "fighting-pit-arena",
       roomCount: 1,
       gridSize: 30,
-      rooms: [{ id: "pit-floor", name: "Pit Floor", cells, doors: [] }],
+      ambientLight: "bright",
+      rooms: [{ id: "pit-floor", name: "Pit Floor", cells, doors, ambientLight: "bright" }],
       walkable: cells,
       corridors: [],
-      doors: [],
+      doors,
       corridorPassages: [],
       entranceRoomId: "pit-floor",
       startPosition: { x: 14, y: 13 },
@@ -11541,24 +11699,65 @@ function fightingPitArenaTemplate() {
   };
 }
 
-function fightingPitSpawnPositions(count) {
-  const positions = [
-    { x: 14, y: 7 },
-    { x: 10, y: 8 },
-    { x: 18, y: 8 },
-    { x: 7, y: 12 },
-    { x: 21, y: 12 },
-    { x: 10, y: 17 },
-    { x: 18, y: 17 },
-    { x: 14, y: 19 },
+function fightingPitGateSpawnCandidates(gate, room) {
+  const roomKeys = new Set((room?.cells ?? []).map(positionKey));
+  const candidates = [];
+  for (const cell of room?.cells ?? []) {
+    const fromGate = Math.abs(cell.x - gate.spawnOrigin.x) + Math.abs(cell.y - gate.spawnOrigin.y);
+    const onGateLine =
+      gate.edge === "north" ? cell.y >= gate.spawnOrigin.y :
+      gate.edge === "south" ? cell.y <= gate.spawnOrigin.y :
+      gate.edge === "west" ? cell.x >= gate.spawnOrigin.x :
+      cell.x <= gate.spawnOrigin.x;
+    if (onGateLine && fromGate <= 7) candidates.push({ ...cell, fromGate });
+  }
+  return candidates
+    .filter((cell) => roomKeys.has(positionKey(cell)))
+    .sort((a, b) => a.fromGate - b.fromGate || Math.abs(a.x - gate.spawnOrigin.x) - Math.abs(b.x - gate.spawnOrigin.x) || Math.abs(a.y - gate.spawnOrigin.y) - Math.abs(b.y - gate.spawnOrigin.y))
+    .map(({ fromGate: _fromGate, ...cell }) => cell);
+}
+
+function fightingPitCanPlaceMonster(monster, position, walkableKeys, occupiedKeys) {
+  return window.DungeonGrid.fighterCells(monster, position).every((cell) =>
+    window.DungeonGrid.isInsideGrid(cell, currentGridSize()) &&
+      walkableKeys.has(positionKey(cell)) &&
+      !occupiedKeys.has(positionKey(cell)),
+  );
+}
+
+function fightingPitMarkOccupied(monster, position, occupiedKeys) {
+  window.DungeonGrid.fighterCells(monster, position).forEach((cell) => occupiedKeys.add(positionKey(cell)));
+}
+
+function fightingPitSpawnGateOrder(count) {
+  if (count <= 1 || Math.random() < 0.5) {
+    return [fightingPitArenaGates[Math.floor(Math.random() * fightingPitArenaGates.length)]];
+  }
+  return shuffledCopy(fightingPitArenaGates);
+}
+
+function fightingPitSpawnPosition(monster, gate, room, walkableKeys, occupiedKeys) {
+  const gateKeys = new Set(fightingPitArenaGates.flatMap((entry) => entry.cells).map(positionKey));
+  const candidates = [
+    ...fightingPitGateSpawnCandidates(gate, room),
+    ...(room?.cells ?? [])
+      .map((cell) => ({ ...cell, fromGate: Math.abs(cell.x - gate.spawnOrigin.x) + Math.abs(cell.y - gate.spawnOrigin.y) }))
+      .sort((a, b) => a.fromGate - b.fromGate)
+      .map(({ fromGate: _fromGate, ...cell }) => cell),
   ];
-  const occupied = new Set(partyHeroes().flatMap((hero) => window.DungeonGrid.fighterCells(hero)).map(positionKey));
-  return positions.filter((position) => !occupied.has(positionKey(position))).slice(0, count);
+  const seen = new Set();
+  for (const candidate of candidates) {
+    const key = positionKey(candidate);
+    if (seen.has(key) || gateKeys.has(key)) continue;
+    seen.add(key);
+    if (fightingPitCanPlaceMonster(monster, candidate, walkableKeys, occupiedKeys)) return candidate;
+  }
+  return null;
 }
 
 function fightingPitWaveMonsterCount(category, boss = false) {
   if (boss) return 1;
-  const template = fightingPitPickMonsterTemplate(category, false, 0);
+  const template = fightingPitPickMonsterTemplate(category, false);
   const hero = {
     ...(activeHero() ?? {}),
     level: Math.max(1, category * 2 - 1),
@@ -11593,15 +11792,20 @@ async function spawnFightingPitWave() {
     partyAverageLevel: Math.max(1, category * 2 - 1),
   };
   const count = fightingPitWaveMonsterCount(category, boss);
-  const positions = fightingPitSpawnPositions(count);
   const room = state.dungeon?.rooms?.find((entry) => entry.id === "pit-floor") ?? state.dungeon?.rooms?.[0];
-  for (let index = 0; index < positions.length; index += 1) {
-    const template = fightingPitPickMonsterTemplate(category, boss, index);
+  const walkableKeys = new Set((state.dungeon?.walkable ?? []).map(positionKey));
+  const occupiedKeys = new Set(partyHeroes().flatMap((hero) => window.DungeonGrid.fighterCells(hero)).map(positionKey));
+  fightingPitArenaGates.flatMap((gate) => gate.cells).forEach((cell) => occupiedKeys.add(positionKey(cell)));
+  const gateOrder = fightingPitSpawnGateOrder(count);
+  const waveTemplates = fightingPitPickWaveMonsterTemplates(category, boss, count, run);
+  let spawned = 0;
+  for (let index = 0; index < count; index += 1) {
+    const template = waveTemplates[index];
     if (!template) continue;
     const monster = createCombatant({
       ...template,
       id: `pit-wave-${wave}-${index + 1}`,
-      name: boss ? `${template.name} of the Pit` : `${template.name}${positions.length > 1 ? ` ${index + 1}` : ""}`,
+      name: boss ? `${template.name} of the Pit` : `${template.name}${count > 1 ? ` ${index + 1}` : ""}`,
       baseMonsterId: template.id,
       templateId: template.id,
     });
@@ -11612,19 +11816,24 @@ async function spawnFightingPitWave() {
       monster.hp = monster.maxHp;
     }
     applyMonsterCategoryScaling(monster, hero);
+    const gate = gateOrder[index % gateOrder.length];
+    const position = fightingPitSpawnPosition(monster, gate, room, walkableKeys, occupiedKeys);
+    if (!position) continue;
     monster.fightingPitMonster = true;
     monster.fightingPitWave = wave;
     monster.roomId = room?.id ?? "pit-floor";
-    monster.position = { ...positions[index] };
+    monster.position = { ...position };
     state.fighters[monster.id] = monster;
+    fightingPitMarkOccupied(monster, position, occupiedKeys);
+    spawned += 1;
   }
-  run.currentWaveSpawned = positions.length;
+  run.currentWaveSpawned = spawned;
   run.currentWaveBoss = boss;
   run.currentWaveCategory = category;
   addLog(`${fightingPitWaveLabel(wave)} begins.`, "important");
   render();
-  if (positions.length > 0 && typeof rollInitiative === "function") await rollInitiative();
-  return positions.length > 0;
+  if (spawned > 0 && typeof rollInitiative === "function") await rollInitiative();
+  return spawned > 0;
 }
 
 function awardFightingPitWave() {
@@ -11636,26 +11845,28 @@ function awardFightingPitWave() {
   const defeated = Math.max(0, Math.floor(Number(run.currentWaveSpawned) || 0));
   const rewardCp = defeated * category * fightingPitRewardCpByCategory + (boss ? category * fightingPitRewardCpByCategory * 2 : 0);
   const renown = defeated * category * fightingPitRenownByCategory + (boss ? category * 20 : 0);
-  addMoney(activeHero().inventory.money, rewardCp);
   run.defeated = (run.defeated ?? 0) + defeated;
   run.renown = (run.renown ?? 0) + renown;
   run.rewardCp = (run.rewardCp ?? 0) + rewardCp;
+  run.rewardPaidCp = Math.max(0, Math.floor(Number(run.rewardPaidCp) || 0));
+  run.clearedWaves = Math.max(0, Math.floor(Number(run.clearedWaves) || 0)) + 1;
   const progress = fightingPitProgress();
   progress.renown += renown;
   progress.totalDefeated += defeated;
   progress.bestWave = Math.max(progress.bestWave, wave);
   progress.bestCategory = Math.max(progress.bestCategory, category);
   if (boss) progress.bossesDefeated += 1;
-  addLog(`The pit pays ${priceText(rewardCp)} and awards ${renown} renown for ${defeated} defeated foe${defeated === 1 ? "" : "s"}.`, "important");
+  addLog(`The pit adds ${priceText(rewardCp)} to the reward purse and awards ${renown} renown for ${defeated} defeated foe${defeated === 1 ? "" : "s"}.`, "important");
   return { wave, category, boss, defeated, rewardCp, renown };
 }
 
-async function grantFightingPitBossRest(category) {
+async function grantFightingPitWaveRest(award) {
   if ((state.shortRestsUsed ?? 0) >= fightingPitShortRestLimit) {
     addLog("The pit rest limit is spent. Brakka rings the next bracket in without a rest.", "important");
     return;
   }
-  addLog(`Boss checkpoint cleared. The party may take a short rest before Category ${Math.min(fightingPitMaxCategory, category + 1)}, or press on.`, "important");
+  const nextWave = Math.max(1, Math.floor(Number(award?.wave) || 1)) + 1;
+  addLog(`${fightingPitWaveLabel(award?.wave)} cleared. The party may take a short rest before ${fightingPitWaveLabel(nextWave)}, or press on.`, "important");
   const rested = await showShortRestMenu(false);
   if (!rested) addLog("The party skips the pit checkpoint rest and presses on.", "important");
 }
@@ -11663,16 +11874,20 @@ async function grantFightingPitBossRest(category) {
 async function handleFightingPitWaveClear() {
   const run = fightingPitCurrentRun();
   if (!run || state.completed || state.mode === "home") return false;
+  if (fightingPitPartyIsDown()) return endFightingPitRunDefeat();
   const award = awardFightingPitWave();
   if (!award) return false;
-  if (award.boss) await grantFightingPitBossRest(award.category);
   if (award.boss && award.category >= fightingPitMaxCategory) {
     state.completed = true;
+    payFightingPitRewardToMainHero(run);
     run.completedAt = Date.now();
+    run.active = false;
     addLog("Brakka Ironbell rings the final bell. The Fighting Pit run is complete.", "important");
     render();
     return true;
   }
+  await grantFightingPitWaveRest(award);
+  if (fightingPitPartyIsDown()) return endFightingPitRunDefeat();
   run.wave = Math.max(1, Math.floor(Number(run.wave) || 1)) + 1;
   await spawnFightingPitWave();
   render();
@@ -11707,7 +11922,7 @@ function renderFightingPit(npc = window.DungeonContent.get("npcs", fightingPitId
           <section class="guild-status">
             <div><span>Next Bracket</span><b>${escapeHtml(fightingPitWaveLabel(nextWave))}</b></div>
             <div><span>Short Rests</span><b>0 / ${escapeHtml(fightingPitShortRestLimit)}</b></div>
-            <p>This is a controlled fighting pit: weapons are blunted, medics are ready at the rail, and heroes cannot die here. Three normal waves per category, then a boss. Boss checkpoints offer an optional short rest.</p>
+            <p>This is a controlled fighting pit: weapons are blunted, medics are ready at the rail, and heroes cannot die here. Three normal waves per category, then a boss. Cleared waves offer an optional short rest.</p>
           </section>
           <section class="guild-actions-panel">
             <h3>Pit Gate</h3>
@@ -11721,7 +11936,7 @@ function renderFightingPit(npc = window.DungeonContent.get("npcs", fightingPitId
               <article class="guild-contract-row"><div><b>Category Ladder</b><span>Category 1 normal waves x3, then a Category 1 boss. The pattern repeats upward through Category ${escapeHtml(fightingPitMaxCategory)}.</span><small>Wave balance scales with active party size.</small></div></article>
               <article class="guild-contract-row"><div><b>Rewards</b><span>Coin and renown are paid after each cleared wave based on defeated foes and category. Boss waves pay extra.</span><small>Current rate: ${escapeHtml(priceText(fightingPitRewardCpByCategory))} and ${escapeHtml(fightingPitRenownByCategory)} renown per foe per category.</small></div></article>
               <article class="guild-contract-row"><div><b>Safety Rule</b><span>Blunted weapons and waiting medics make the bout nonlethal. A hero can be battered to the brink, but cannot die in the pit.</span></div></article>
-              <article class="guild-contract-row"><div><b>Rest Rule</b><span>After each boss, the party may take an optional short rest checkpoint. The pit allows up to ${escapeHtml(fightingPitShortRestLimit)} short rests and never grants a long rest mid-run.</span></div></article>
+              <article class="guild-contract-row"><div><b>Rest Rule</b><span>After each cleared wave, the party may take an optional short rest checkpoint. The pit allows up to ${escapeHtml(fightingPitShortRestLimit)} short rests and never grants a long rest mid-run.</span></div></article>
             </div>
           </section>
         </main>
@@ -11765,6 +11980,8 @@ async function startFightingPitRun() {
     defeated: 0,
     renown: 0,
     rewardCp: 0,
+    rewardPaidCp: 0,
+    clearedWaves: 0,
     startedAt: Date.now(),
   };
   fightingPitProgress().runs += 1;
@@ -13998,7 +14215,7 @@ const beastMasterCompanionOptions = [
     id: "hawk",
     monsterId: "talonHawk",
     name: "Talon Hawk",
-    description: "Ranged skirmisher. Keeps distance and harasses enemies from the air.",
+    description: "Flying melee striker. Dives into close range and tears at enemies with its talons.",
     attackAbility: "dex",
     abilityScores: { str: 6, dex: 16, con: 10, int: 3, wis: 14, cha: 7 },
     savingThrowProficiencies: ["dex"],
@@ -16863,6 +17080,9 @@ function renderControls() {
   els.toggleLayout.disabled = !adminEnabled();
   if (els.topAdminActions) {
     els.topAdminActions.classList.toggle("hidden", !adminEnabled());
+    if (els.topAdminMonsterCatalog) {
+      els.topAdminMonsterCatalog.innerHTML = adminEnabled() ? renderAdminMonsterCatalog() : "";
+    }
     const teleport = els.topAdminActions.querySelector("[data-action='toggle-admin-teleport']");
     const god = els.topAdminActions.querySelector("[data-action='toggle-admin-god']");
     if (teleport) {

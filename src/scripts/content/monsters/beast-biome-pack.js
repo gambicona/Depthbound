@@ -3623,16 +3623,13 @@
       attackType: "weapon",
       label: "1d6 + 2 slashing",
       range: {
-        kind: "ranged",
-        normal: 40,
-        long: 120,
-        feet: 40
+        kind: "melee",
       }
     },
     initiativeBonus: 2,
     speedFeet: 30,
     flying: true,
-    behavior: "rangedKiter",
+    behavior: "melee",
     token: "T",
     tokenArt: "assets/tokens/talon-hawk.jpg",
   });

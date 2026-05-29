@@ -942,6 +942,14 @@ h1 {
   width: 100%;
 }
 
+.top-admin-monster-catalog {
+  grid-column: 1 / -1;
+}
+
+.top-admin-monster-catalog .admin-catalog {
+  max-height: 240px;
+}
+
 .zoom-controls {
   align-items: center;
   background: rgba(12, 10, 10, 0.2);
