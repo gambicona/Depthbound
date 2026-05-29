@@ -3191,6 +3191,27 @@ button[data-ui-icon]::before,
   width: 180px;
 }
 
+[data-combatant-art] {
+  cursor: zoom-in;
+}
+
+.combatant-art-preview {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: min(76vh, 720px);
+  padding: 10px;
+}
+
+.combatant-art-preview img {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.46);
+  max-height: min(72vh, 720px);
+  max-width: min(82vw, 820px);
+  object-fit: contain;
+}
+
 .initiative-art {
   height: 28px;
   width: 28px;
@@ -5366,6 +5387,16 @@ button[data-ui-icon]::before,
   width: 168px;
 }
 
+.npc-art-button {
+  cursor: zoom-in;
+  padding: 0;
+}
+
+.npc-art-button:hover:not(:disabled) {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(215, 168, 79, 0.16);
+}
+
 .npc-inspection-portrait img {
   height: 100%;
   object-fit: cover;
@@ -5394,6 +5425,47 @@ button[data-ui-icon]::before,
   line-height: 1.45;
   margin: 0;
   max-width: 46rem;
+}
+
+.art-lightbox {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 120;
+}
+
+.art-lightbox-panel {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  max-height: 92vh;
+  max-width: min(88vw, 920px);
+  position: relative;
+}
+
+.art-lightbox-panel img {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 18px 70px rgba(0, 0, 0, 0.55);
+  max-height: 82vh;
+  max-width: min(88vw, 920px);
+  object-fit: contain;
+}
+
+.art-lightbox-panel b {
+  color: var(--text);
+  text-align: center;
+}
+
+.art-lightbox-close {
+  position: absolute;
+  right: 10px;
+  top: 10px;
 }
 
 .store-search {

@@ -159,6 +159,12 @@ els.initiativeList?.addEventListener("click", (event) => {
 els.selectParty?.addEventListener("click", selectActivePartyForMovement);
 els.selectPartyRoster?.addEventListener("click", selectActivePartyForMovement);
 els.partyRoster?.addEventListener("click", (event) => {
+  const art = event.target.closest("[data-combatant-art]");
+  if (art && fighterInfoMatches(art.dataset.combatantArt) && showCombatantArtDialog(art.dataset.combatantArt)) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   const entry = event.target.closest("[data-party-hero]");
   if (!entry) return;
   const heroId = entry.dataset.partyHero;
@@ -199,6 +205,13 @@ els.endTurn.addEventListener("click", endTurn);
 els.heroCard.addEventListener("contextmenu", (event) => {
   event.preventDefault();
   showCombatantInfo(activeHero());
+});
+els.heroCard.addEventListener("click", (event) => {
+  const art = event.target.closest("[data-combatant-art]");
+  if (art && fighterInfoMatches(art.dataset.combatantArt) && showCombatantArtDialog(art.dataset.combatantArt)) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
 });
 els.newGame.addEventListener("click", () => {
   showMainMenu();
@@ -384,6 +397,13 @@ els.closeFighterInfo.addEventListener("click", hideFighterInfo);
 els.fighterInfo.addEventListener("click", (event) => {
   if (event.target === els.fighterInfo) {
     hideFighterInfo();
+    return;
+  }
+
+  const art = event.target.closest("[data-combatant-art]");
+  if (art && showCombatantArtDialog(art.dataset.combatantArt)) {
+    event.preventDefault();
+    event.stopPropagation();
     return;
   }
 

@@ -3754,16 +3754,18 @@ function soundPathForMusic(key) {
     if (song?.src) return song.src;
   }
   const fixedMusicPaths = {
-    "village:monster-guild": `${soundAssetRoot}/music/village-trophy-lodge.mp3`,
-    "village:gravebinders": `${soundAssetRoot}/music/village-gravebinders.mp3`,
-    "village:crucible-collegium": `${soundAssetRoot}/music/village-crucible-collegium.mp3`,
-    "village:antiquarian-society": `${soundAssetRoot}/music/village-antiquarian-society.mp3`,
-    "village:expedition-board": `${soundAssetRoot}/music/village-expedition-board.mp3`,
-    "village:boom-club": `${soundAssetRoot}/music/village-boom-club.mp3`,
-    "village:fighting-pit": `${soundAssetRoot}/music/village-fighting-pit.mp3`,
+    "village:monster-guild": [`${soundAssetRoot}/music/village-trophy-lodge.mp3`],
+    "village:gravebinders": [`${soundAssetRoot}/music/village-gravebinders.mp3`, `${soundAssetRoot}/music/village-gravebinders-2.mp3`],
+    "village:crucible-collegium": [`${soundAssetRoot}/music/village-crucible-collegium.mp3`, `${soundAssetRoot}/music/village-crucible-collegium-2.mp3`],
+    "village:antiquarian-society": [`${soundAssetRoot}/music/village-antiquarian-society.mp3`, `${soundAssetRoot}/music/village-antiquarian-society-2.mp3`],
+    "village:expedition-board": [`${soundAssetRoot}/music/village-expedition-board.mp3`, `${soundAssetRoot}/music/village-expedition-board-2.mp3`],
+    "village:boom-club": [`${soundAssetRoot}/music/village-boom-club.mp3`, `${soundAssetRoot}/music/village-boom-club-2.mp3`],
+    "village:fighting-pit": [`${soundAssetRoot}/music/village-fighting-pit.mp3`, `${soundAssetRoot}/music/village-fighting-pit-2.mp3`],
     "fighting-pit-arena": `${soundAssetRoot}/music/fighting-pit-arena.mp3`,
   };
-  if (fixedMusicPaths[key]) return fixedMusicPaths[key];
+  const fixedPath = fixedMusicPaths[key];
+  if (Array.isArray(fixedPath)) return fixedPath[Math.floor(Math.random() * fixedPath.length)] ?? fixedPath[0];
+  if (fixedPath) return fixedPath;
   if (key === "mainmenu") return `${soundAssetRoot}/music/mainmenu.mp3`;
   if (key === "home") return `${soundAssetRoot}/music/home.mp3`;
   const theme = getContentDefinition("themes", currentThemeId());

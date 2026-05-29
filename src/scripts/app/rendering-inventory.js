@@ -415,10 +415,51 @@ function combatantTokenArt(fighter) {
 
 function combatantArtworkMarkup(fighter, className = "combatant-art") {
   const art = combatantTokenArt(fighter);
+  const action = fighter?.id ? ` data-combatant-art="${escapeAttribute(fighter.id)}" title="View ${escapeAttribute(fighter.name ?? "character")} picture"` : "";
   if (art) {
-    return `<div class="${className}"><img src="${escapeAttribute(art)}" alt="${escapeAttribute(fighter.name)} artwork" /></div>`;
+    return `<div class="${className}"${action}><img src="${escapeAttribute(art)}" alt="${escapeAttribute(fighter.name)} artwork" /></div>`;
   }
-  return `<div class="${className} empty"><span>${escapeHtml(fighter.token ?? tokenFromName(fighter.name, "M"))}</span></div>`;
+  return `<div class="${className} empty"${action}><span>${escapeHtml(fighter.token ?? tokenFromName(fighter.name, "M"))}</span></div>`;
+}
+
+function fighterInfoMatches(fighterId) {
+  const panelArt = els.fighterInfoBody?.querySelector(".inspect-art[data-combatant-art]");
+  return Boolean(
+    fighterId &&
+      !els.fighterInfo.classList.contains("hidden") &&
+      els.fighterInfo.dataset.fighterId === fighterId &&
+      panelArt?.dataset.combatantArt === fighterId,
+  );
+}
+
+function showCombatantArtDialog(fighterId) {
+  const fighter = state.fighters?.[fighterId];
+  if (!fighter) return false;
+  const art = combatantTokenArt(fighter);
+  if (!art) return false;
+  els.gameDialogTitle.textContent = `${fighter.name} Portrait`;
+  els.gameDialogField.classList.add("hidden");
+  els.gameDialogForm.classList.add("wide-dialog", "art-preview-dialog");
+  els.gameDialogMessage.innerHTML = `
+    <section class="combatant-art-preview">
+      <img src="${escapeAttribute(art)}" alt="${escapeAttribute(fighter.name)} portrait" />
+    </section>
+  `;
+  els.gameDialogActions.innerHTML = `<button type="button" data-dialog-action="close-combatant-art">Close</button>`;
+  const cleanup = () => {
+    els.gameDialogActions.removeEventListener("click", handleClick);
+    els.gameDialog.classList.add("hidden");
+    els.gameDialogForm.classList.remove("wide-dialog", "art-preview-dialog");
+    els.gameDialogMessage.innerHTML = "";
+    activeDialogCancel = null;
+  };
+  const handleClick = (event) => {
+    if (event.target.closest("[data-dialog-action='close-combatant-art']")) cleanup();
+  };
+  els.gameDialogActions.addEventListener("click", handleClick);
+  activeDialogCancel = cleanup;
+  els.gameDialog.classList.remove("hidden");
+  return true;
 }
 
 function furnitureArtworkMarkup(template, object) {
@@ -2302,6 +2343,7 @@ function corpseInfoMarkup(corpseHero) {
 
 function showCombatantInfo(fighter) {
   els.fighterInfo.classList.remove("home-builder-dock");
+  els.fighterInfo.dataset.fighterId = fighter.id ?? "";
   refreshDerivedStats(fighter);
   const heroView = (isClassHero(fighter) || isSidekickWarrior(fighter)) && (isPartyHeroId(fighter.id) || isRosterHeroId(fighter.id));
   const hpPercent = Math.max(0, Math.round((fighter.hp / fighter.maxHp) * 100));
@@ -5430,6 +5472,7 @@ function hideFighterInfo() {
   const wasHomeBuilderOpen = isHomeBuilderOpen();
   els.fighterInfo.classList.remove("home-builder-dock");
   els.fighterInfo.classList.add("hidden");
+  delete els.fighterInfo.dataset.fighterId;
   if (wasHomeBuilderOpen) {
     homeBuildTool = null;
     homeMoveSelection = null;
@@ -8177,6 +8220,48 @@ function npcPortraitMarkup(npc, className = "npc-portrait", { clickable = true }
   `;
 }
 
+function npcInspectionPortraitMarkup(npc) {
+  const fallback = npc?.token?.fallbackLabel ?? npc?.name?.slice(0, 2).toUpperCase() ?? "?";
+  const src = npc?.portrait;
+  if (!src) return `<div class="npc-inspection-portrait empty"><span>${escapeHtml(fallback)}</span></div>`;
+  return `
+    <button class="npc-inspection-portrait npc-art-button" type="button" data-dialog-action="view-npc-art" data-npc="${escapeAttribute(npc.id)}" title="View ${escapeAttribute(npc.name ?? "NPC")} portrait">
+      <img src="${escapeAttribute(src)}" alt="${escapeAttribute(npc.name ?? "NPC")} portrait" onerror="const parent=this.parentElement; this.remove(); if(parent){ parent.classList.add('empty'); parent.innerHTML='<span>${escapeAttribute(fallback)}</span>'; }" />
+    </button>
+  `;
+}
+
+function showNpcArtPreview(npcId) {
+  const npc = window.DungeonContent.get("npcs", npcId);
+  if (!npc?.portrait) return false;
+  const overlay = document.createElement("div");
+  overlay.className = "art-lightbox";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-label", `${npc.name ?? "NPC"} portrait`);
+  overlay.innerHTML = `
+    <div class="art-lightbox-panel">
+      <button class="icon-button art-lightbox-close" type="button" title="Close" aria-label="Close">x</button>
+      <img src="${escapeAttribute(npc.portrait)}" alt="${escapeAttribute(npc.name ?? "NPC")} portrait" />
+      <b>${escapeHtml(npc.title ?? npc.name ?? "NPC")}</b>
+    </div>
+  `;
+  const close = () => {
+    document.removeEventListener("keydown", handleKeydown);
+    overlay.remove();
+  };
+  const handleKeydown = (event) => {
+    if (event.key === "Escape") close();
+  };
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay || event.target.closest(".art-lightbox-close")) close();
+  });
+  document.addEventListener("keydown", handleKeydown);
+  document.body.append(overlay);
+  overlay.querySelector(".art-lightbox-close")?.focus();
+  return true;
+}
+
 function villageNpcIconMarkup(npc) {
   const fallback = npc?.token?.fallbackLabel ?? npc?.name?.slice(0, 2).toUpperCase() ?? "?";
   const factionSymbol = factionSymbolDefinitions[npc?.id];
@@ -8288,7 +8373,7 @@ function showNpcInspection(npcId = activeStoreNpcId) {
   els.gameDialogTitle.textContent = npc.title ?? npc.name ?? "Merchant";
   els.gameDialogMessage.innerHTML = `
     <section class="npc-inspection">
-      ${npcPortraitMarkup(npc, "npc-inspection-portrait", { clickable: false })}
+      ${npcInspectionPortraitMarkup(npc)}
       <div>
         <b>${escapeHtml(npc.title ?? "Merchant")}</b>
         <span>Name: ${escapeHtml(npc.name ?? "Unknown")}</span>
@@ -8298,15 +8383,24 @@ function showNpcInspection(npcId = activeStoreNpcId) {
   `;
   els.gameDialogField.classList.add("hidden");
   els.gameDialogActions.innerHTML = `<button type="button" data-dialog-action="close-npc-inspection">Close</button>`;
-  const cleanup = () => {
-    els.gameDialogActions.removeEventListener("click", handleClick);
-    els.gameDialog.classList.add("hidden");
-    activeDialogCancel = null;
-  };
   const handleClick = (event) => {
     if (event.target.closest("[data-dialog-action='close-npc-inspection']")) cleanup();
   };
+  const handleMessageClick = (event) => {
+    const button = event.target.closest("[data-dialog-action='view-npc-art']");
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    showNpcArtPreview(button.dataset.npc);
+  };
+  const cleanup = () => {
+    els.gameDialogActions.removeEventListener("click", handleClick);
+    els.gameDialogMessage.removeEventListener("click", handleMessageClick);
+    els.gameDialog.classList.add("hidden");
+    activeDialogCancel = null;
+  };
   els.gameDialogActions.addEventListener("click", handleClick);
+  els.gameDialogMessage.addEventListener("click", handleMessageClick);
   activeDialogCancel = cleanup;
   els.gameDialog.classList.remove("hidden");
 }
