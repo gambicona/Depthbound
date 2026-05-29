@@ -101,6 +101,7 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
     completed: false,
     d20Mode: heroOptions.d20Mode ?? defaultD20Mode,
     d20FailureStreak: 0,
+    saveRollMode: normalizeSaveRollMode(heroOptions.saveRollMode ?? "manual"),
     shortRestsUsed: 0,
     shortRestLimit: shortRestLimitForTheme(theme, 3),
     dungeonClock: createDungeonClock(),
@@ -551,6 +552,7 @@ function createDungeonStateForParty(partyMembers, previousState, themeId = defau
   nextState.monsterCompendium = normalizeMonsterCompendium(previousState?.monsterCompendium);
   nextState.d20Mode = normalizeD20Mode(previousState?.d20Mode);
   nextState.d20FailureStreak = previousState?.d20FailureStreak ?? 0;
+  nextState.saveRollMode = normalizeSaveRollMode(previousState?.saveRollMode ?? "manual");
   nextState.worldDay = normalizeWorldDay(previousState?.worldDay);
   nextState.campaignProgress = cloneData(previousState?.campaignProgress ?? {});
   nextState.questFlags = cloneData(previousState?.questFlags ?? {});
@@ -748,6 +750,7 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
     completed: false,
     d20Mode: normalizeD20Mode(previousState?.d20Mode),
     d20FailureStreak: previousState?.d20FailureStreak ?? 0,
+    saveRollMode: normalizeSaveRollMode(previousState?.saveRollMode ?? "manual"),
     worldDay: normalizeWorldDay(previousState?.worldDay),
     shortRestsUsed: 0,
     shortRestLimit: shortRestLimitForTheme(theme, 3),
@@ -2287,6 +2290,7 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
     completed: false,
     d20Mode: normalizeD20Mode(normalizedPartyData?.d20Mode ?? state?.d20Mode ?? defaultD20Mode),
     d20FailureStreak: normalizedPartyData?.d20FailureStreak ?? state?.d20FailureStreak ?? 0,
+    saveRollMode: normalizeSaveRollMode(normalizedPartyData?.saveRollMode ?? state?.saveRollMode ?? "manual"),
     shortRestsUsed: 0,
     shortRestLimit: shortRestLimitForTheme(null, 3),
     chest,
@@ -6678,6 +6682,7 @@ function normalizeLoadedState(loadedState) {
     completed: Boolean(loadedState.completed),
     d20Mode: normalizeD20Mode(loadedState.d20Mode ?? freshState.d20Mode),
     d20FailureStreak: Math.max(0, Math.floor(loadedState.d20FailureStreak ?? freshState.d20FailureStreak ?? 0)),
+    saveRollMode: normalizeSaveRollMode(loadedState.saveRollMode ?? freshState.saveRollMode ?? "manual"),
     worldDay: normalizeWorldDay(loadedState.worldDay ?? freshState.worldDay),
     shortRestsUsed: loadedState.shortRestsUsed ?? (loadedState.shortRestUsed ? 1 : 0),
     shortRestLimit: loadedState.shortRestLimit ?? shortRestLimitForTheme(null, 3),

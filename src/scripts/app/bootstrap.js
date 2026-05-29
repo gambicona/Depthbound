@@ -46,6 +46,7 @@ let activeVillageMusicKey = "";
 let activeInstrumentPerformance = null;
 let soundVolume = Number(window.localStorage.getItem("dungeonCrawler.soundVolume.v1") ?? 0.5);
 let buttonTheme = window.localStorage.getItem("dungeonCrawler.buttonTheme.v1") || "verdigris";
+let saveRollMode = "manual";
 let selectedAttackTargetId = null;
 let selectedHeroIds = new Set();
 let suppressNextHeroClick = false;
@@ -114,6 +115,15 @@ const d20ModeDescriptions = {
   random: "Pure d20 rolls with no hidden help.",
   karmic: "A friendlier mode that nudges long bad streaks back toward hope.",
   tymora: "Swingier rolls with occasional lucky second chances.",
+};
+const saveRollModes = new Set(["manual", "auto"]);
+const saveRollModeLabels = {
+  manual: "Manual",
+  auto: "Auto",
+};
+const saveRollModeDescriptions = {
+  manual: "Saving throws open a popup and wait for you to roll.",
+  auto: "Saving throws roll immediately, apply consequences, and write the result to the combat log.",
 };
 const defaultRaceSelection = { raceId: "human", subraceId: "standard-human", dragonAncestryId: "red", abilityChoices: [] };
 const dragonAncestries = {
@@ -622,6 +632,7 @@ const els = {
   volumeSliders: Array.from(document.querySelectorAll(".volume-slider")),
   volumeLabels: Array.from(document.querySelectorAll(".volume-label")),
   buttonThemeSelect: document.querySelector("#button-theme-select"),
+  saveRollModeSelect: document.querySelector("#save-roll-mode-select"),
   manageTokenArt: document.querySelector("#manage-token-art"),
   debugKill: document.querySelector("#debug-kill"),
   expandLog: document.querySelector("#expand-log"),

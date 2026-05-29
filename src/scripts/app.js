@@ -305,6 +305,11 @@ els.buttonThemeSelect?.addEventListener("change", (event) => {
   applyButtonTheme(event.target.value);
   renderControls();
 });
+els.saveRollModeSelect?.addEventListener("change", (event) => {
+  applySaveRollMode(event.target.value);
+  addLog(`Roll save mode set to ${saveRollModeLabels[normalizeSaveRollMode(state?.saveRollMode ?? saveRollMode)]}.`, "important");
+  renderControls();
+});
 els.manageTokenArt?.addEventListener("click", showTokenArtManager);
 function handleAdminQuickAction(action) {
   if (!adminEnabled()) return false;
@@ -576,6 +581,12 @@ els.fighterInfo.addEventListener("change", (event) => {
   const d20Select = event.target.closest("select[data-action='d20-mode']");
   if (d20Select) {
     setD20Mode(d20Select.value);
+    showPlanningTableInfo();
+    return;
+  }
+  const saveRollSelect = event.target.closest("select[data-action='save-roll-mode']");
+  if (saveRollSelect) {
+    setSaveRollMode(saveRollSelect.value);
     showPlanningTableInfo();
     return;
   }
@@ -1201,6 +1212,7 @@ Promise.allSettled([window.DungeonSave.ready, loadPredefinedHeroTokenArt()]).fin
   updateSaveStatus();
 });
 applyButtonTheme(buttonTheme);
+applySaveRollMode(saveRollMode);
 state = createInitialState();
 render();
 showMainMenu();

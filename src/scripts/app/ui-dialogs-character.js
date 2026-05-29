@@ -206,6 +206,24 @@ function applyButtonTheme(theme = buttonTheme) {
   if (els.buttonThemeSelect) els.buttonThemeSelect.value = buttonTheme;
 }
 
+function normalizeSaveRollMode(mode = saveRollMode) {
+  return saveRollModes.has(mode) ? mode : "manual";
+}
+
+function saveRollModeOptionsMarkup(selectedMode = saveRollMode) {
+  const selected = normalizeSaveRollMode(selectedMode);
+  return Object.entries(saveRollModeLabels)
+    .map(([value, label]) => `<option value="${value}" ${value === selected ? "selected" : ""}>${escapeHtml(label)}</option>`)
+    .join("");
+}
+
+function applySaveRollMode(mode = saveRollMode) {
+  saveRollMode = normalizeSaveRollMode(mode);
+  if (state) state.saveRollMode = saveRollMode;
+  window.localStorage.removeItem("dungeonCrawler.saveRollMode.v1");
+  if (els.saveRollModeSelect) els.saveRollModeSelect.value = saveRollMode;
+}
+
 function showMainMenuRoot() {
   els.menuActions?.classList.remove("hidden");
   els.mainMenuBack?.classList.add("hidden");
@@ -2992,6 +3010,7 @@ async function startNewAdventure() {
     }
   }
   heroOptions.d20Mode = normalizeD20Mode(d20Mode);
+  heroOptions.saveRollMode = "manual";
   heroOptions.classId = classId;
   heroOptions.tokenArt = chosenTokenArt;
   heroOptions.raceSelection = raceSelection;

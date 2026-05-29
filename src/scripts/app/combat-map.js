@@ -6499,12 +6499,15 @@ function showSavingThrowMenu({ target, ability, dc, message, explanation = null 
 }
 
 async function rollSavingThrow(target, ability, dc, message, explanation = null) {
-  if (!isPartyHeroId(target?.id)) {
+  const manualPlayerSave = isPartyHeroId(target?.id) && normalizeSaveRollMode(state?.saveRollMode ?? saveRollMode) === "manual";
+  if (!manualPlayerSave) {
+    if (isPartyHeroId(target?.id)) addLog(message, "important");
     const save = savingThrow(target, ability, dc);
     if (save.indomitable) addLog(`${target.name} uses Indomitable and rerolls ${save.indomitable.roll}.`, "important");
     const rollText = save.indomitable ? `${save.roll} -> ${save.indomitable.roll}` : save.roll;
     const conditionNote = save.autoFailed ? " (automatic failure)" : save.saveDisadvantage ? " with disadvantage" : "";
     addLog(`${target.name} rolls ${ability.toUpperCase()} save${conditionNote}: ${rollText} ${abilityLabel(save.bonus)} = ${save.total} vs DC ${dc}${save.success ? " (success)" : " (failure)"}.`, save.success ? "" : "important");
+    addAdminLog(`${target.name} ${ability.toUpperCase()} save breakdown: ${d20RollDetail(save.rollResult)} + ability ${abilityLabel(abilityMod(target, ability))}${save.proficiency ? ` + proficiency ${save.proficiency}` : ""}${save.statusBonus ? ` + status ${save.statusBonus}` : ""}${save.auraBonus ? ` + aura ${save.auraBonus}` : ""}${save.autoFailed ? "; condition forces automatic failure" : save.saveDisadvantage ? "; condition imposes disadvantage" : ""}${save.indomitable ? `; Indomitable ${d20RollDetail(save.indomitable.rollResult)} => ${save.indomitable.total}` : ""} = ${save.total} vs DC ${dc}.`);
     return save;
   }
   addLog(message, "important");

@@ -911,7 +911,8 @@ h1 {
 }
 
 .top-actions .zoom-controls,
-.top-actions .volume-controls {
+.top-actions .volume-controls,
+.top-actions .top-tool-setting {
   grid-column: 1 / -1;
 }
 

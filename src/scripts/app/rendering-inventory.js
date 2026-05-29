@@ -4239,6 +4239,11 @@ function showPlanningTableInfo() {
         <select data-action="d20-mode">${d20ModeOptionsMarkup()}</select>
       </label>
       <p class="planning-helper">${escapeHtml(d20ModeDescriptions[normalizeD20Mode(state.d20Mode)] ?? "")}</p>
+      <label class="inline-transfer">
+        <span>Roll save mode</span>
+        <select data-action="save-roll-mode">${saveRollModeOptionsMarkup(state.saveRollMode ?? saveRollMode)}</select>
+      </label>
+      <p class="planning-helper">${escapeHtml(saveRollModeDescriptions[normalizeSaveRollMode(state.saveRollMode ?? saveRollMode)] ?? "")}</p>
     </section>
     <section class="planning-party">
       <h3>Active Class Heroes</h3>
@@ -4457,6 +4462,14 @@ function setD20Mode(mode) {
   state.d20Mode = nextMode;
   state.d20FailureStreak = 0;
   addLog(`Dice feel set to ${d20ModeLabels[nextMode]}.`, "important");
+  render();
+}
+
+function setSaveRollMode(mode) {
+  const nextMode = normalizeSaveRollMode(mode);
+  applySaveRollMode(nextMode);
+  state.saveRollMode = nextMode;
+  addLog(`Roll save mode set to ${saveRollModeLabels[nextMode]}.`, "important");
   render();
 }
 
@@ -17105,6 +17118,7 @@ function renderControls() {
     label.textContent = `${Math.round(soundVolume * 100)}%`;
   });
   if (els.buttonThemeSelect) els.buttonThemeSelect.value = buttonTheme;
+  if (els.saveRollModeSelect) els.saveRollModeSelect.value = normalizeSaveRollMode(state?.saveRollMode ?? saveRollMode);
   els.debugKill.disabled = !adminEnabled() || visibleMonsters().length === 0;
   const canTrain = gameHasStarted && state.mode === "home" && canTrainAsSidekick(hero);
   const canReplaceCompanion = gameHasStarted && state.mode === "home" && canReplaceDeadBeastMasterCompanion(hero);
