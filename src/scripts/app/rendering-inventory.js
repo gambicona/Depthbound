@@ -2349,6 +2349,26 @@ function corpseInfoMarkup(corpseHero) {
   `;
 }
 
+function activeFactionSetBonusMarkup(fighter) {
+  const bonuses = activeFactionSetBonuses(fighter);
+  if (!bonuses.length) return "";
+  return inspectDetailsMarkup({
+    title: "Active Set Bonuses",
+    meta: `${bonuses.length}`,
+    open: true,
+    body: bonuses
+      .map(
+        (bonus) => `
+          <p>
+            <b>${escapeHtml(`${bonus.name}: ${bonus.label}`)}</b>
+            ${bonus.description ? ` ${escapeHtml(bonus.description)}` : ""}
+          </p>
+        `,
+      )
+      .join(""),
+  });
+}
+
 function showCombatantInfo(fighter) {
   els.fighterInfo.classList.remove("home-builder-dock");
   els.fighterInfo.dataset.fighterId = fighter.id ?? "";
@@ -2438,6 +2458,7 @@ function showCombatantInfo(fighter) {
             meta: "Class and training",
             body: heroProficienciesMarkup(fighter, heroTemplate),
           })}
+          ${activeFactionSetBonusMarkup(fighter)}
           ${inspectDetailsMarkup({
             title: "Class Features",
             meta: classFeatures.length ? `${classFeatures.length}` : "",
@@ -5617,6 +5638,7 @@ function itemDetails(item) {
   if (!item) return "Empty";
   const cost = item.cost?.text ? `; ${item.cost.text}` : "";
   const weight = item.weightLb || item.weightLb === 0 ? `; ${item.weightLb} lb.` : "";
+  const boundText = item.boundHeroId ? `; bound to ${itemBoundOwnerName(item) || "hero"}` : "";
   const quantityText = item.stackable ? `x${Math.max(1, Math.floor(Number(item.quantity) || 1))}; ` : "";
   const magicText = item.magic ? magicItemDetails(item) : "";
   const chargeText = item.use?.charges ? `; charges ${item.use.charges.remaining ?? item.use.charges.max}/${item.use.charges.max} (${item.use.charges.refresh})` : "";
@@ -5628,14 +5650,14 @@ function itemDetails(item) {
     const range = item.range ? `${item.range.kind}${item.range.feet ? ` ${item.range.feet} ft` : ""}` : "melee";
     const propertyText = item.properties?.length ? `; ${item.properties.join(", ")}` : "";
     const proficiencyText = missingProficiencyText(activeHero(), item);
-    return `${damage}, ${range}${propertyText}${magicText}${cost}${weight}${starterText}${proficiencyText ? `; ${proficiencyText}` : ""}`;
+    return `${damage}, ${range}${propertyText}${magicText}${cost}${weight}${boundText}${starterText}${proficiencyText ? `; ${proficiencyText}` : ""}`;
   }
   if (item.type === "armor") {
     const ac = item.armor?.bonus ? `+${item.armor.bonus} AC` : `AC ${item.armor?.base ?? "?"}`;
     const req = item.requirements?.strength ? `; Str ${item.requirements.strength}` : "";
     const stealth = item.stealthDisadvantage ? "; stealth disadvantage" : "";
     const proficiencyText = missingProficiencyText(activeHero(), item);
-    return `${ac}${req}${stealth}${magicText}${cost}${weight}${starterText}${proficiencyText ? `; ${proficiencyText}` : ""}`;
+    return `${ac}${req}${stealth}${magicText}${cost}${weight}${boundText}${starterText}${proficiencyText ? `; ${proficiencyText}` : ""}`;
   }
   if (item.type === "ammunition") {
     return `${item.ammo?.quantity ?? 0} ${item.ammo?.kind ?? "ammo"}${cost}${weight}${starterText}`;
@@ -5672,7 +5694,7 @@ function itemDetails(item) {
     }
     return `${quantityText}${item.category ?? "Consumable"}; ${item.use?.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
   }
-  if (item.type === "accessory") return `${magicText.replace(/^; /, "") || item.loot?.rarity || "magic"}${chargeText}${cost}${weight}${starterText}`;
+  if (item.type === "accessory") return `${magicText.replace(/^; /, "") || item.loot?.rarity || "magic"}${chargeText}${cost}${weight}${boundText}${starterText}`;
   if (item.type === "tool") {
     const proficiency = item.use?.requiredTool ?? item.use?.instrument ?? item.id;
     const songText = item.use?.kind === "instrumentPerformance" ? `; ${(item.use.songs ?? []).length} piece${(item.use.songs ?? []).length === 1 ? "" : "s"}` : "";
@@ -5972,6 +5994,11 @@ function renderAdminItemCatalog() {
         <button type="button" data-action="add-admin-coins" data-cp="10000">+100 gp</button>
         <button type="button" data-action="add-admin-coins" data-cp="100000">+1000 gp</button>
       </div>
+      <div class="admin-coin-row" aria-label="Admin hero tokens">
+        <button type="button" data-action="add-admin-hero-tokens" data-tokens="1">+1 Hero Token</button>
+        <button type="button" data-action="add-admin-hero-tokens" data-tokens="5">+5 Hero Tokens</button>
+        <button type="button" data-action="add-admin-hero-tokens" data-tokens="10">+10 Hero Tokens</button>
+      </div>
       <div class="admin-coin-row" aria-label="Admin experience">
         <button type="button" data-action="add-admin-xp" data-xp="50">+50 XP</button>
         <button type="button" data-action="add-admin-xp" data-xp="300">+300 XP</button>
@@ -5986,6 +6013,15 @@ function renderAdminItemCatalog() {
 function addAdminCoins(cpAmount) {
   addMoney(activeHero().inventory.money, cpAmount);
   addLog(`Added ${moneyText(cpToMoney(cpAmount))}.`, "important");
+  render();
+  renderInventoryMenu();
+}
+
+function addAdminHeroTokens(tokenAmount) {
+  const hero = activeHero();
+  const amount = Math.max(0, Math.floor(Number(tokenAmount) || 0));
+  hero.inventory.heroTokens = Math.max(0, Math.floor(Number(hero.inventory.heroTokens) || 0)) + amount;
+  addLog(`Added ${amount} Hero Token${amount === 1 ? "" : "s"} to ${hero.name}.`, "important");
   render();
   renderInventoryMenu();
 }
@@ -6199,12 +6235,15 @@ function addAdminItemToSlot(templateId, slotId) {
 function equipActionForItem(fighter, item) {
   const usableSlots = equipmentSlots.filter((slot) => itemCanUseSlot(item, slot.id));
   if (!usableSlots.length) return "";
+  const boundReason = itemBoundToOtherHero(fighter, item) ? `Bound to ${itemBoundOwnerName(item) || "another hero"}` : "";
 
   return usableSlots
     .map((slot) => {
       const occupied = Boolean(fighter.equipment?.[slot.id]);
       const disabledReason =
-        item.type === "armor" && !armorStrengthRequirementMet(fighter, item)
+        boundReason
+          ? boundReason
+          : item.type === "armor" && !armorStrengthRequirementMet(fighter, item)
           ? `Requires STR ${item.requirements.strength}`
           : item.type === "armor" && !heroHasArmorProficiency(fighter, item)
             ? "Missing proficiency"
@@ -6459,24 +6498,56 @@ function attunementCount(fighter) {
   return attunedItemIds(fighter).length;
 }
 
+function factionSetAttunementBlockerText(fighter, item) {
+  const set = factionSetInfo(item);
+  if (!set || fighterIsAttunedToItem(fighter, item) || itemCanUseFreeSetAttunement(fighter, item)) return "";
+  const definition = window.DungeonContent?.get?.("factionSets", set.setId);
+  let sameSetCount = 0;
+  for (const itemId of attunedItemIds(fighter)) {
+    const otherSet = factionSetInfo(itemForId(fighter, itemId));
+    if (otherSet?.setId === set.setId) sameSetCount += 1;
+  }
+  if (attunementCount(fighter) >= attunementLimit && sameSetCount < 3) return `Needs 3 other ${definition?.name ?? set.setName ?? "set"} pieces attuned first`;
+  return "";
+}
+
 function attunementStatusText(fighter, item) {
   if (!itemRequiresAttunement(item)) return "";
-  return fighterIsAttunedToItem(fighter, item) ? "Attuned" : "Requires attunement";
+  const set = factionSetInfo(item);
+  if (fighterIsAttunedToItem(fighter, item)) {
+    const setActive = set && activeFactionSetBonuses(fighter).some((bonus) => bonus.setId === set.setId);
+    return setActive ? "Attuned - set active" : "Attuned";
+  }
+  const blocker = factionSetAttunementBlockerText(fighter, item);
+  if (blocker) return blocker;
+  if (itemCanUseFreeSetAttunement(fighter, item)) return "Free set attunement available";
+  return "Requires attunement";
 }
 
 function attunementActionForItem(fighter, item, options = {}) {
   if (!itemRequiresAttunement(item)) return "";
   const isAttuned = fighterIsAttunedToItem(fighter, item);
   const count = attunementCount(fighter);
-  const atLimit = !isAttuned && count >= attunementLimit;
-  const allowed = canChangeAttunementNow() && !atLimit;
-  const reason = atLimit ? `Attunement limit ${attunementLimit}/${attunementLimit}` : state.mode === "home" ? "" : "Available during a short rest";
+  const bound = itemBoundToOtherHero(fighter, item);
+  const freeSetAttunement = !isAttuned && count >= attunementLimit && itemCanUseFreeSetAttunement(fighter, item);
+  const atLimit = !isAttuned && count >= attunementLimit && !freeSetAttunement;
+  const allowed = canChangeAttunementNow() && !atLimit && !bound;
+  const setBlocker = factionSetAttunementBlockerText(fighter, item);
+  const reason = bound
+    ? `Bound to ${itemBoundOwnerName(item) || "another hero"}`
+    : atLimit
+      ? setBlocker || `Attunement limit ${attunementLimit}/${attunementLimit}`
+      : state.mode === "home"
+        ? freeSetAttunement
+          ? "Free fourth set attunement"
+          : ""
+        : "Available during a short rest";
   const action = isAttuned ? "unattune-item" : "attune-item";
   const actionAttributes = options.rest
     ? `data-rest-action="${escapeAttribute(action)}" data-hero="${escapeAttribute(fighter.id)}"`
     : `data-action="${escapeAttribute(action)}"`;
   return `
-    <span class="attunement-status">${escapeHtml(attunementStatusText(fighter, item))}</span>
+    <span class="attunement-status ${freeSetAttunement ? "set-attunement-ready" : ""}">${escapeHtml(attunementStatusText(fighter, item))}</span>
     <button type="button" class="small-action-button" ${actionAttributes} data-item="${escapeAttribute(item.id)}" ${allowed ? "" : "disabled"} title="${escapeAttribute(reason)}">
       ${isAttuned ? "Unattune" : "Attune"}
     </button>
@@ -6485,7 +6556,9 @@ function attunementActionForItem(fighter, item, options = {}) {
 
 function attunementSummaryMarkup(fighter) {
   normalizeAttunementState(fighter);
-  return `<div class="stat-pill"><b>${attunementCount(fighter)}/${attunementLimit}</b><span>Attuned</span></div>`;
+  const count = attunementCount(fighter);
+  const activeSets = activeFactionSetBonuses(fighter);
+  return `<div class="stat-pill"><b>${count}/${attunementLimit}</b><span>${activeSets.length ? "Set active" : count > attunementLimit ? "Attuned, set complete" : "Attuned"}</span></div>`;
 }
 
 function changeItemAttunement(fighter, itemId, shouldAttune, options = {}) {
@@ -6498,16 +6571,22 @@ function changeItemAttunement(fighter, itemId, shouldAttune, options = {}) {
   }
   const item = itemForId(fighter, itemId);
   if (!item || !itemRequiresAttunement(item)) return false;
+  if (itemBoundToOtherHero(fighter, item)) {
+    addLog(`${item.name} is bound to ${itemBoundOwnerName(item) || "another hero"} and cannot attune to ${fighter.name}.`, "important");
+    renderLog();
+    return false;
+  }
   const ids = new Set(attunedItemIds(fighter));
   if (shouldAttune) {
     if (ids.has(item.id)) return false;
-    if (ids.size >= attunementLimit) {
+    const freeSetAttunement = ids.size >= attunementLimit && itemCanUseFreeSetAttunement(fighter, item, Array.from(ids));
+    if (ids.size >= attunementLimit && !freeSetAttunement) {
       addLog(`${fighter.name} already has ${attunementLimit} attuned items.`, "important");
       renderLog();
       return false;
     }
     ids.add(item.id);
-    addLog(`${fighter.name} attunes to ${item.name}.`, "important");
+    addLog(`${fighter.name} attunes to ${item.name}${freeSetAttunement ? " as the free fourth piece of its set" : ""}.`, "important");
   } else {
     if (!ids.has(item.id)) return false;
     if (typeof itemHasBindingCurse === "function" && itemHasBindingCurse(item)) {
@@ -6518,7 +6597,7 @@ function changeItemAttunement(fighter, itemId, shouldAttune, options = {}) {
     ids.delete(item.id);
     addLog(`${fighter.name} ends attunement to ${item.name}.`, "important");
   }
-  fighter.attunement = { ...(fighter.attunement ?? {}), itemIds: Array.from(ids).slice(0, attunementLimit) };
+  fighter.attunement = { ...(fighter.attunement ?? {}), itemIds: normalizeAttunementIdsWithSetOverflow(fighter, Array.from(ids)) };
   refreshDerivedStats(fighter);
   render();
   renderInventoryMenu();
@@ -6661,8 +6740,16 @@ function renderInventoryMenu() {
                 ${item ? "" : `<small>Empty</small>`}
               </div>
               ${draggableItemCard(item, slot.id)}
-              ${item ? attunementActionForItem(fighter, item) : ""}
-              ${item ? `<button type="button" data-action="unequip" data-slot="${slot.id}">Unequip</button>` : ""}
+              ${
+                item
+                  ? `
+                    <div class="equipment-slot-actions">
+                      ${attunementActionForItem(fighter, item)}
+                      <button type="button" data-action="unequip" data-slot="${slot.id}">Unequip</button>
+                    </div>
+                  `
+                  : ""
+              }
             </div>
           `;
         })
@@ -8663,6 +8750,48 @@ function setNpcAdminProgress(npcId, progressId) {
   npcBehavior(npcId)?.setAdminProgress?.(progressId);
 }
 
+function factionRankIndexFromDirection(ranks, currentRank, direction) {
+  const maxRank = Math.max(0, (ranks?.length ?? 1) - 1);
+  const current = clamp(Math.floor(Number(currentRank) || 0), 0, maxRank);
+  if (direction === "down") return Math.max(0, current - 1);
+  if (direction === "up") return Math.min(maxRank, current + 1);
+  return clamp(Math.floor(Number(direction) || 0), 0, maxRank);
+}
+
+function factionRankThreshold(ranks, rankIndex) {
+  const maxRank = Math.max(0, (ranks?.length ?? 1) - 1);
+  const index = clamp(Math.floor(Number(rankIndex) || 0), 0, maxRank);
+  return Math.max(0, Math.floor(Number(ranks?.[index]?.threshold) || 0));
+}
+
+function adminFactionRankControlMarkup(factionId, label, ranks, currentRank, reputation, metricLabel = "Reputation") {
+  if (!adminEnabled() || !Array.isArray(ranks) || !ranks.length) return "";
+  const maxRank = ranks.length - 1;
+  const rank = clamp(Math.floor(Number(currentRank) || 0), 0, maxRank);
+  const current = ranks[rank] ?? ranks[0];
+  return `
+    <section class="guild-section admin-faction-rank-control">
+      <h3>Admin Rank</h3>
+      <article class="guild-contract-row ready">
+        <div>
+          <b>${escapeHtml(label)}</b>
+          <span>${escapeHtml(`Rank ${rank}: ${current?.name ?? "Rank"}`)}</span>
+          <small>${escapeHtml(`${metricLabel} ${Math.max(0, Math.floor(Number(reputation) || 0))}; rank changes set ${metricLabel.toLowerCase()} to the selected rank threshold.`)}</small>
+        </div>
+        <div class="store-row-actions">
+          <button type="button" data-action="admin-faction-rank" data-faction="${escapeAttribute(factionId)}" data-direction="down" ${rank <= 0 ? "disabled" : ""}>Rank Down</button>
+          <button type="button" data-action="admin-faction-rank" data-faction="${escapeAttribute(factionId)}" data-direction="up" ${rank >= maxRank ? "disabled" : ""}>Rank Up</button>
+        </div>
+      </article>
+    </section>
+  `;
+}
+
+function setFactionAdminRank(factionId, direction) {
+  if (!adminEnabled()) return;
+  npcBehavior(factionId)?.setAdminRank?.(direction);
+}
+
 function returnToNpcVisit(npcId) {
   npcBehavior(npcId)?.returnToVisit?.();
 }
@@ -8693,6 +8822,7 @@ function recordNpcMonsterKill(monster) {
 
 const monsterHunterGuildId = "monster-guild";
 const monsterHunterStateKey = "monsterHunterGuild";
+let monsterHunterBoardPanel = "contracts";
 const monsterHunterRanks = [
   { name: "Stranger", threshold: 0, reward: "The lodge will post basic beast contracts." },
   { name: "Associate", threshold: 25, reward: "Hunter notes mark contracted beasts more clearly in the quest log." },
@@ -8925,6 +9055,202 @@ function monsterHunterTurnInsMarkup() {
   `;
 }
 
+function factionSetStock(factionId) {
+  return window.DungeonContent
+    .list("items")
+    .filter((item) => item?.purchase?.factionId === factionId && item.store?.factionShop)
+    .sort((a, b) => (a.factionSet?.tier ?? 0) - (b.factionSet?.tier ?? 0) || (a.factionSet?.slotKey ?? "").localeCompare(b.factionSet?.slotKey ?? "") || a.name.localeCompare(b.name));
+}
+
+function factionSetShopStock(factionId, rank) {
+  return factionSetStock(factionId)
+    .filter((item) => factionSetItemUnlocked(item, rank))
+    .sort((a, b) => (b.factionSet?.tier ?? 0) - (a.factionSet?.tier ?? 0) || (a.factionSet?.slotKey ?? "").localeCompare(b.factionSet?.slotKey ?? "") || a.name.localeCompare(b.name));
+}
+
+function factionSetItemUnlocked(item, rank) {
+  return rank >= Math.max(1, Math.floor(Number(item?.purchase?.minRank) || 1));
+}
+
+function factionSetPurchaseReason(hero, item, rank, method) {
+  if (!hero || !item) return "Unavailable";
+  if (!factionSetItemUnlocked(item, rank)) return `Rank ${item.purchase?.minRank ?? 1}`;
+  if (method === "heroTokens") {
+    const price = Math.max(0, Math.floor(Number(item.purchase?.heroTokens) || 0));
+    return (hero.inventory?.heroTokens ?? 0) >= price ? "" : "Need Hero Tokens";
+  }
+  const price = Math.max(0, Math.floor(Number(item.purchase?.goldCp) || itemValueCp(item)));
+  return moneyToCp(hero.inventory?.money ?? {}) >= price ? "" : "Need Coin";
+}
+
+function factionSetShopRow(item, rank, hero) {
+  const set = item.factionSet ?? {};
+  const goldCp = Math.max(0, Math.floor(Number(item.purchase?.goldCp) || itemValueCp(item)));
+  const tokenPrice = Math.max(0, Math.floor(Number(item.purchase?.heroTokens) || 0));
+  const goldReason = factionSetPurchaseReason(hero, item, rank, "gold");
+  const tokenReason = factionSetPurchaseReason(hero, item, rank, "heroTokens");
+  const tokenLabel = `${tokenPrice} Hero Token${tokenPrice === 1 ? "" : "s"}`;
+  return `
+    <article class="guild-contract-row faction-set-shop-row">
+      <div>
+        <b>${escapeHtml(item.name)}</b>
+        <span>${escapeHtml(`${set.setName ?? "Faction Set"} - Tier ${set.tier ?? "?"} ${set.rarity ?? item.magic?.rarity ?? ""} - ${set.slotKey ?? item.type}`)}</span>
+        <small>${escapeHtml(itemDetails(item))}</small>
+      </div>
+      <div class="store-row-actions">
+        <button type="button" data-action="buy-faction-set-item" data-faction="${escapeAttribute(set.factionId ?? "")}" data-method="gold" data-item="${escapeAttribute(item.id)}" ${goldReason ? "disabled" : ""} title="${escapeAttribute(goldReason || "Shareable purchase: any hero can equip this copy.")}">Buy for ${escapeHtml(priceText(goldCp))}</button>
+        <button type="button" data-action="buy-faction-set-item" data-faction="${escapeAttribute(set.factionId ?? "")}" data-method="heroTokens" data-item="${escapeAttribute(item.id)}" ${tokenReason ? "disabled" : ""} title="${escapeAttribute(tokenReason || `Bound purchase: only ${hero?.name ?? "the buyer"} can equip this copy.`)}">Buy for ${escapeHtml(tokenLabel)}</button>
+      </div>
+    </article>
+  `;
+}
+
+function factionSetShopMarkup(factionId, rank, title = "Faction Gear") {
+  const hero = activeHero();
+  const items = factionSetShopStock(factionId, rank);
+  if (!items.length) return "";
+  return `
+    <section class="guild-section faction-set-shop">
+      <h3>${escapeHtml(title)}</h3>
+      <p class="empty-note faction-set-shop-note"><span class="currency-gold">Gold</span> buys a normal shareable copy. <span class="currency-token">Hero Tokens</span> are cheaper, but that copy binds to ${escapeHtml(hero?.name ?? "the buyer")} and cannot be equipped or attuned by another hero.</p>
+      <div class="guild-contract-list">
+        ${items.map((item) => factionSetShopRow(item, rank, hero)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function rankNameForFactionSetTier(factionId, tier) {
+  const rankIndex = Math.max(1, Math.floor(Number(tier) || 1));
+  if (factionId === monsterHunterGuildId) return monsterHunterRanks[rankIndex]?.name ?? `Rank ${rankIndex}`;
+  if (factionId === gravebinderGuildId) return gravebinderRanks[rankIndex]?.name ?? `Rank ${rankIndex}`;
+  if (factionId === crucibleGuildId) return crucibleRanks[rankIndex]?.name ?? `Rank ${rankIndex}`;
+  if (factionId === antiquarianGuildId) return antiquarianRanks[rankIndex]?.name ?? `Rank ${rankIndex}`;
+  if (factionId === fightingPitId) return fightingPitRanks[rankIndex]?.name ?? `Rank ${rankIndex}`;
+  const behavior = window.DungeonNpcBehaviors?.[factionId];
+  if (typeof behavior?.rankNameForTier === "function") return behavior.rankNameForTier(rankIndex);
+  return `Rank ${rankIndex}`;
+}
+
+function factionSetRank(factionId) {
+  if (factionId === monsterHunterGuildId) return monsterHunterRank();
+  if (factionId === gravebinderGuildId) return gravebinderRank();
+  if (factionId === crucibleGuildId) return crucibleRank();
+  if (factionId === antiquarianGuildId) return antiquarianRank();
+  if (factionId === fightingPitId) return fightingPitRank();
+  const behavior = window.DungeonNpcBehaviors?.[factionId];
+  if (typeof behavior?.currentRank === "function") return behavior.currentRank();
+  return 0;
+}
+
+function renderFactionSetShopOwner(factionId) {
+  if (factionId === monsterHunterGuildId) renderMonsterHunterGuild();
+  if (factionId === gravebinderGuildId) renderGravebinderGuild();
+  if (factionId === crucibleGuildId) renderCrucibleGuild();
+  if (factionId === antiquarianGuildId) renderAntiquarianGuild();
+  if (factionId === fightingPitId) renderFightingPit();
+  const behavior = window.DungeonNpcBehaviors?.[factionId];
+  if (typeof behavior?.returnToVisit === "function") behavior.returnToVisit();
+}
+
+function factionSetCatalogSets(factionId) {
+  return window.DungeonContent
+    .list("factionSets")
+    .filter((set) => set?.factionId === factionId)
+    .sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0) || a.name.localeCompare(b.name));
+}
+
+function factionSetCatalogItems(set) {
+  const stockItems = factionSetStock(set.factionId).filter((item) => item.factionSet?.setId === set.id);
+  if (stockItems.length) {
+    return stockItems.map((item) => ({
+      name: item.name,
+      slotKey: item.factionSet?.slotKey ?? item.type,
+      slot: item.factionSet?.variantKey ?? item.category ?? item.type,
+      effect: itemDisplayDescription(item) || itemDetails(item),
+      implemented: true,
+    }));
+  }
+  return (set.catalogItems ?? []).map((item) => ({ ...item, implemented: false }));
+}
+
+function factionSetCatalogMarkup(factionId, rank, title = "Set Catalog") {
+  const sets = factionSetCatalogSets(factionId);
+  if (!sets.length) return "";
+  return `
+    <section class="guild-section">
+      <h3>${escapeHtml(title)}</h3>
+      <p class="empty-note faction-set-shop-note">The catalog shows every planned set, including future ranks. Shop copies bought with <span class="currency-gold">gold</span> are shareable; copies bought with <span class="currency-token">Hero Tokens</span> are cheaper but bind to the buying hero.</p>
+      <div class="guild-groups">
+        ${sets
+          .map((set) => {
+            const unlocked = rank >= Math.max(1, Math.floor(Number(set.tier) || 1));
+            const rankName = rankNameForFactionSetTier(factionId, set.tier);
+            const stateText = set.previewOnly ? `Preview - needs ${rankName}` : unlocked ? "Available" : `Needs ${rankName}`;
+            return `
+              <details class="guild-group" ${unlocked || set.tier === 1 ? "open" : ""}>
+                <summary>${escapeHtml(set.name)} <small>${escapeHtml(`Tier ${set.tier} - ${set.rarity} - ${stateText}`)}</small></summary>
+                <div>
+                  <article class="guild-contract-row ${unlocked && !set.previewOnly ? "ready" : ""}">
+                    <div>
+                      <b>${escapeHtml(set.setBonus?.label ?? "Set Bonus")}</b>
+                      <span>${escapeHtml(set.setBonus?.description ?? "No set bonus preview yet.")}</span>
+                      <small>${escapeHtml(`Rank needed: ${rankName}`)}</small>
+                    </div>
+                  </article>
+                  ${factionSetCatalogItems(set)
+                    .map(
+                      (item) => `
+                        <article class="guild-contract-row">
+                          <div>
+                            <b>${escapeHtml(item.name)}</b>
+                            <span>${escapeHtml(`${item.slotKey ?? "piece"} - ${item.slot ?? "set piece"}`)}</span>
+                            <small>${escapeHtml(item.effect ?? "Effect preview pending.")}</small>
+                          </div>
+                        </article>
+                      `,
+                    )
+                    .join("")}
+                </div>
+              </details>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function buyFactionSetItem(factionId, itemId, method = "gold") {
+  const hero = activeHero();
+  const template = getItemTemplate(itemId);
+  if (!hero || !template || template.purchase?.factionId !== factionId) return;
+  const rank = factionSetRank(factionId);
+  const reason = factionSetPurchaseReason(hero, template, rank, method);
+  if (reason) return;
+  if (method === "heroTokens") {
+    const price = Math.max(0, Math.floor(Number(template.purchase?.heroTokens) || 0));
+    hero.inventory.heroTokens = Math.max(0, Math.floor(Number(hero.inventory.heroTokens) || 0) - price);
+  } else {
+    const price = Math.max(0, Math.floor(Number(template.purchase?.goldCp) || itemValueCp(template)));
+    if (!spendMoney(hero.inventory.money, price)) return;
+  }
+  const item = createItemInstance(itemId, "faction-set");
+  if (!item) return;
+  item.purchasedFromFactionId = factionId;
+  item.purchasedWith = method;
+  if (method === "heroTokens") {
+    item.boundHeroId = hero.id;
+    item.boundHeroName = hero.name;
+    item.sell = { ...(item.sell ?? {}), valueCp: 0, rate: 0 };
+    item.resaleValueCp = 0;
+  }
+  addItemToInventory(hero, item, "faction-set-stack");
+  addLog(`${hero.name} buys ${template.name}${method === "heroTokens" ? " with Hero Tokens. It binds to them." : "."}`, "important");
+  render();
+  renderFactionSetShopOwner(factionId);
+}
+
 function monsterHunterRankRewardsMarkup() {
   const rank = monsterHunterRank();
   return `
@@ -8986,16 +9312,36 @@ function monsterHunterBoardHeaderMarkup(npc, progress) {
 function monsterHunterBoardActionsMarkup() {
   const readyContracts = monsterHunterContracts.filter(monsterHunterContractReady).length;
   const readyTurnIns = monsterHunterTurnIns.filter(monsterHunterTurnInReady).length;
+  const panelButton = (panel, label) => `
+    <button type="button" data-action="set-monster-hunter-panel" data-panel="${escapeAttribute(panel)}" ${monsterHunterBoardPanel === panel ? "disabled" : ""}>${escapeHtml(label)}</button>
+  `;
   return `
     <section class="guild-actions-panel">
       <h3>Lodge Desk</h3>
       <button type="button" data-action="show-quest-log">Quest Log</button>
+      ${panelButton("contracts", "Contracts")}
+      ${panelButton("turnins", "Trophy Turn-Ins")}
+      ${panelButton("shop", "Lodge Gear")}
+      ${panelButton("catalog", "See Sets")}
       <div>
         <span>${escapeHtml(readyContracts)} contract${readyContracts === 1 ? "" : "s"} ready to claim</span>
         <span>${escapeHtml(readyTurnIns)} trophy turn-in${readyTurnIns === 1 ? "" : "s"} ready</span>
       </div>
     </section>
   `;
+}
+
+function setMonsterHunterBoardPanel(panel = "contracts") {
+  const allowed = new Set(["contracts", "turnins", "shop", "catalog"]);
+  monsterHunterBoardPanel = allowed.has(panel) ? panel : "contracts";
+  renderMonsterHunterGuild();
+}
+
+function monsterHunterMainPanelMarkup(progress) {
+  if (monsterHunterBoardPanel === "turnins") return monsterHunterTurnInsMarkup();
+  if (monsterHunterBoardPanel === "shop") return factionSetShopMarkup(monsterHunterGuildId, monsterHunterRank(progress), "Lodge Gear");
+  if (monsterHunterBoardPanel === "catalog") return factionSetCatalogMarkup(monsterHunterGuildId, monsterHunterRank(progress), "Lodge Set Catalog");
+  return monsterHunterContractsMarkup();
 }
 
 function renderMonsterHunterGuild(npc = window.DungeonContent.get("npcs", monsterHunterGuildId)) {
@@ -9009,11 +9355,11 @@ function renderMonsterHunterGuild(npc = window.DungeonContent.get("npcs", monste
       <div class="guild-board-grid">
         <aside class="guild-board-side">
           ${monsterHunterRankBarMarkup(progress)}
+          ${adminFactionRankControlMarkup(monsterHunterGuildId, "Trophy Lodge", monsterHunterRanks, monsterHunterRank(progress), progress.reputation)}
           ${monsterHunterBoardActionsMarkup()}
         </aside>
         <main class="guild-board-main">
-          ${monsterHunterContractsMarkup()}
-          ${monsterHunterTurnInsMarkup()}
+          ${monsterHunterMainPanelMarkup(progress)}
         </main>
         <aside class="guild-board-rewards">
           ${monsterHunterRankRewardsMarkup()}
@@ -9197,10 +9543,21 @@ window.DungeonNpcBehaviors[monsterHunterGuildId] = {
     }
     addLog(`Admin set Trophy Lodge progress: ${progressId}.`, "important");
   },
+  setAdminRank(direction) {
+    if (!adminEnabled()) return;
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    state.questFlags["flag.village.monsterHunterGuildUnlocked"] = true;
+    const progress = monsterHunterProgress();
+    const nextRank = factionRankIndexFromDirection(monsterHunterRanks, monsterHunterRank(progress), direction);
+    progress.reputation = factionRankThreshold(monsterHunterRanks, nextRank);
+    addLog(`Admin set Trophy Lodge to rank ${nextRank}: ${monsterHunterRanks[nextRank]?.name ?? "Rank"}.`, "important");
+    renderMonsterHunterGuild();
+  },
 };
 
 const gravebinderGuildId = "gravebinders";
 const gravebinderStateKey = "gravebinderGuild";
+let gravebinderBoardPanel = "contracts";
 const gravebinderRanks = [
   { name: "Unsworn", threshold: 0, reward: "The order will post basic undead contracts." },
   { name: "Candlebearer", threshold: 30, reward: "Gravebinder notes mark common restless dead more clearly." },
@@ -9494,16 +9851,36 @@ function gravebinderBoardHeaderMarkup(npc, progress) {
 function gravebinderBoardActionsMarkup() {
   const readyContracts = gravebinderContracts.filter(gravebinderContractReady).length;
   const readyTurnIns = gravebinderTurnIns.filter(gravebinderTurnInReady).length;
+  const panelButton = (panel, label) => `
+    <button type="button" data-action="set-gravebinder-panel" data-panel="${escapeAttribute(panel)}" ${gravebinderBoardPanel === panel ? "disabled" : ""}>${escapeHtml(label)}</button>
+  `;
   return `
     <section class="guild-actions-panel">
       <h3>Candle Desk</h3>
       <button type="button" data-action="show-quest-log">Quest Log</button>
+      ${panelButton("contracts", "Rites")}
+      ${panelButton("turnins", "Grave Turn-Ins")}
+      ${panelButton("shop", "Grave Gear")}
+      ${panelButton("catalog", "See Sets")}
       <div>
         <span>${escapeHtml(readyContracts)} rite${readyContracts === 1 ? "" : "s"} ready to claim</span>
         <span>${escapeHtml(readyTurnIns)} grave turn-in${readyTurnIns === 1 ? "" : "s"} ready</span>
       </div>
     </section>
   `;
+}
+
+function setGravebinderBoardPanel(panel = "contracts") {
+  const allowed = new Set(["contracts", "turnins", "shop", "catalog"]);
+  gravebinderBoardPanel = allowed.has(panel) ? panel : "contracts";
+  renderGravebinderGuild();
+}
+
+function gravebinderMainPanelMarkup(progress) {
+  if (gravebinderBoardPanel === "turnins") return gravebinderTurnInsMarkup();
+  if (gravebinderBoardPanel === "shop") return factionSetShopMarkup(gravebinderGuildId, gravebinderRank(progress), "Grave Gear");
+  if (gravebinderBoardPanel === "catalog") return factionSetCatalogMarkup(gravebinderGuildId, gravebinderRank(progress), "Gravebinder Set Catalog");
+  return gravebinderContractsMarkup();
 }
 
 function renderGravebinderGuild(npc = window.DungeonContent.get("npcs", gravebinderGuildId)) {
@@ -9517,11 +9894,11 @@ function renderGravebinderGuild(npc = window.DungeonContent.get("npcs", gravebin
       <div class="guild-board-grid">
         <aside class="guild-board-side">
           ${gravebinderRankBarMarkup(progress)}
+          ${adminFactionRankControlMarkup(gravebinderGuildId, "Gravebinders", gravebinderRanks, gravebinderRank(progress), progress.reputation)}
           ${gravebinderBoardActionsMarkup()}
         </aside>
         <main class="guild-board-main">
-          ${gravebinderContractsMarkup()}
-          ${gravebinderTurnInsMarkup()}
+          ${gravebinderMainPanelMarkup(progress)}
         </main>
         <aside class="guild-board-rewards">
           ${gravebinderRankRewardsMarkup()}
@@ -9707,10 +10084,21 @@ window.DungeonNpcBehaviors[gravebinderGuildId] = {
     }
     addLog(`Admin set Gravebinders progress: ${progressId}.`, "important");
   },
+  setAdminRank(direction) {
+    if (!adminEnabled()) return;
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    state.questFlags["flag.village.gravebindersUnlocked"] = true;
+    const progress = gravebinderProgress();
+    const nextRank = factionRankIndexFromDirection(gravebinderRanks, gravebinderRank(progress), direction);
+    progress.reputation = factionRankThreshold(gravebinderRanks, nextRank);
+    addLog(`Admin set Gravebinders to rank ${nextRank}: ${gravebinderRanks[nextRank]?.name ?? "Rank"}.`, "important");
+    renderGravebinderGuild();
+  },
 };
 
 const crucibleGuildId = "crucible-collegium";
 const crucibleStateKey = "crucibleCollegium";
+let crucibleBoardPanel = "contracts";
 const crucibleRanks = [
   { name: "Observer", threshold: 0, reward: "The Collegium will post basic elemental field work." },
   { name: "Field Adept", threshold: 30, reward: "Tavren accepts more refined elemental samples." },
@@ -10004,16 +10392,36 @@ function crucibleBoardHeaderMarkup(npc, progress) {
 function crucibleBoardActionsMarkup() {
   const readyContracts = crucibleContracts.filter(crucibleContractReady).length;
   const readyTurnIns = crucibleTurnIns.filter(crucibleTurnInReady).length;
+  const panelButton = (panel, label) => `
+    <button type="button" data-action="set-crucible-panel" data-panel="${escapeAttribute(panel)}" ${crucibleBoardPanel === panel ? "disabled" : ""}>${escapeHtml(label)}</button>
+  `;
   return `
     <section class="guild-actions-panel">
       <h3>Research Desk</h3>
       <button type="button" data-action="show-quest-log">Quest Log</button>
+      ${panelButton("contracts", "Studies")}
+      ${panelButton("turnins", "Sample Turn-Ins")}
+      ${panelButton("shop", "Crucible Gear")}
+      ${panelButton("catalog", "See Sets")}
       <div>
         <span>${escapeHtml(readyContracts)} study${readyContracts === 1 ? "" : "ies"} ready to file</span>
         <span>${escapeHtml(readyTurnIns)} sample turn-in${readyTurnIns === 1 ? "" : "s"} ready</span>
       </div>
     </section>
   `;
+}
+
+function setCrucibleBoardPanel(panel = "contracts") {
+  const allowed = new Set(["contracts", "turnins", "shop", "catalog"]);
+  crucibleBoardPanel = allowed.has(panel) ? panel : "contracts";
+  renderCrucibleGuild();
+}
+
+function crucibleMainPanelMarkup(progress) {
+  if (crucibleBoardPanel === "turnins") return crucibleTurnInsMarkup();
+  if (crucibleBoardPanel === "shop") return factionSetShopMarkup(crucibleGuildId, crucibleRank(progress), "Crucible Gear");
+  if (crucibleBoardPanel === "catalog") return factionSetCatalogMarkup(crucibleGuildId, crucibleRank(progress), "Crucible Set Catalog");
+  return crucibleContractsMarkup();
 }
 
 function renderCrucibleGuild(npc = window.DungeonContent.get("npcs", crucibleGuildId)) {
@@ -10027,11 +10435,11 @@ function renderCrucibleGuild(npc = window.DungeonContent.get("npcs", crucibleGui
       <div class="guild-board-grid">
         <aside class="guild-board-side">
           ${crucibleRankBarMarkup(progress)}
+          ${adminFactionRankControlMarkup(crucibleGuildId, "Crucible Collegium", crucibleRanks, crucibleRank(progress), progress.reputation)}
           ${crucibleBoardActionsMarkup()}
         </aside>
         <main class="guild-board-main">
-          ${crucibleContractsMarkup()}
-          ${crucibleTurnInsMarkup()}
+          ${crucibleMainPanelMarkup(progress)}
         </main>
         <aside class="guild-board-rewards">
           ${crucibleRankRewardsMarkup()}
@@ -10217,10 +10625,21 @@ window.DungeonNpcBehaviors[crucibleGuildId] = {
     }
     addLog(`Admin set Crucible Collegium progress: ${progressId}.`, "important");
   },
+  setAdminRank(direction) {
+    if (!adminEnabled()) return;
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    state.questFlags["flag.village.crucibleCollegiumUnlocked"] = true;
+    const progress = crucibleProgress();
+    const nextRank = factionRankIndexFromDirection(crucibleRanks, crucibleRank(progress), direction);
+    progress.reputation = factionRankThreshold(crucibleRanks, nextRank);
+    addLog(`Admin set Crucible Collegium to rank ${nextRank}: ${crucibleRanks[nextRank]?.name ?? "Rank"}.`, "important");
+    renderCrucibleGuild();
+  },
 };
 
 const antiquarianGuildId = "antiquarian-society";
 const antiquarianStateKey = "antiquarianSociety";
+let antiquarianBoardPanel = "contracts";
 const antiquarianRanks = [
   { name: "Visitor", threshold: 0, reward: "The Society will accept basic field notes and relic cataloging." },
   { name: "Cataloger", threshold: 30, reward: "Professor Inkglass accepts better provenance work and fragile finds." },
@@ -10546,16 +10965,36 @@ function antiquarianBoardHeaderMarkup(npc, progress) {
 function antiquarianBoardActionsMarkup() {
   const readyContracts = antiquarianContracts.filter(antiquarianContractReady).length;
   const readyTurnIns = antiquarianTurnIns.filter(antiquarianTurnInReady).length;
+  const panelButton = (panel, label) => `
+    <button type="button" data-action="set-antiquarian-panel" data-panel="${escapeAttribute(panel)}" ${antiquarianBoardPanel === panel ? "disabled" : ""}>${escapeHtml(label)}</button>
+  `;
   return `
     <section class="guild-actions-panel">
       <h3>Archive Desk</h3>
       <button type="button" data-action="show-quest-log">Quest Log</button>
+      ${panelButton("contracts", "Commissions")}
+      ${panelButton("turnins", "Archive Turn-Ins")}
+      ${panelButton("shop", "Archive Gear")}
+      ${panelButton("catalog", "See Sets")}
       <div>
         <span>${escapeHtml(readyContracts)} commission${readyContracts === 1 ? "" : "s"} ready to file</span>
         <span>${escapeHtml(readyTurnIns)} archive turn-in${readyTurnIns === 1 ? "" : "s"} ready</span>
       </div>
     </section>
   `;
+}
+
+function setAntiquarianBoardPanel(panel = "contracts") {
+  const allowed = new Set(["contracts", "turnins", "shop", "catalog"]);
+  antiquarianBoardPanel = allowed.has(panel) ? panel : "contracts";
+  renderAntiquarianGuild();
+}
+
+function antiquarianMainPanelMarkup(progress) {
+  if (antiquarianBoardPanel === "turnins") return antiquarianTurnInsMarkup();
+  if (antiquarianBoardPanel === "shop") return factionSetShopMarkup(antiquarianGuildId, antiquarianRank(progress), "Archive Gear");
+  if (antiquarianBoardPanel === "catalog") return factionSetCatalogMarkup(antiquarianGuildId, antiquarianRank(progress), "Antiquarian Set Catalog");
+  return antiquarianContractsMarkup();
 }
 
 function renderAntiquarianGuild(npc = window.DungeonContent.get("npcs", antiquarianGuildId)) {
@@ -10569,11 +11008,11 @@ function renderAntiquarianGuild(npc = window.DungeonContent.get("npcs", antiquar
       <div class="guild-board-grid">
         <aside class="guild-board-side">
           ${antiquarianRankBarMarkup(progress)}
+          ${adminFactionRankControlMarkup(antiquarianGuildId, "Antiquarian Society", antiquarianRanks, antiquarianRank(progress), progress.reputation)}
           ${antiquarianBoardActionsMarkup()}
         </aside>
         <main class="guild-board-main">
-          ${antiquarianContractsMarkup()}
-          ${antiquarianTurnInsMarkup()}
+          ${antiquarianMainPanelMarkup(progress)}
         </main>
         <aside class="guild-board-rewards">
           ${antiquarianRankRewardsMarkup()}
@@ -10758,6 +11197,16 @@ window.DungeonNpcBehaviors[antiquarianGuildId] = {
     }
     addLog(`Admin set Antiquarian Society progress: ${progressId}.`, "important");
   },
+  setAdminRank(direction) {
+    if (!adminEnabled()) return;
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    state.questFlags["flag.village.antiquarianSocietyUnlocked"] = true;
+    const progress = antiquarianProgress();
+    const nextRank = factionRankIndexFromDirection(antiquarianRanks, antiquarianRank(progress), direction);
+    progress.reputation = factionRankThreshold(antiquarianRanks, nextRank);
+    addLog(`Admin set Antiquarian Society to rank ${nextRank}: ${antiquarianRanks[nextRank]?.name ?? "Rank"}.`, "important");
+    renderAntiquarianGuild();
+  },
 };
 
 function createCompactGuildBoard(config) {
@@ -10765,6 +11214,8 @@ function createCompactGuildBoard(config) {
   const ranks = config.ranks ?? [];
   const contracts = config.contracts ?? [];
   const turnIns = config.turnIns ?? [];
+  const panels = new Set(["contracts", "turnins", ...(config.factionSetShopTitle ? ["shop", "catalog"] : [])]);
+  let activePanel = "contracts";
 
   function progress() {
     state.questFlags = { ...(state.questFlags ?? {}) };
@@ -10981,16 +11432,35 @@ function createCompactGuildBoard(config) {
   function actionsMarkup() {
     const readyContracts = contracts.filter(contractReady).length;
     const readyTurnIns = turnIns.filter(turnInReady).length;
+    const panelButton = (panel, label) => `
+      <button type="button" data-action="set-compact-guild-panel" data-faction="${escapeAttribute(config.id)}" data-panel="${escapeAttribute(panel)}" ${activePanel === panel ? "disabled" : ""}>${escapeHtml(label)}</button>
+    `;
     return `
       <section class="guild-actions-panel">
         <h3>${escapeHtml(config.actionsTitle ?? "Guild Desk")}</h3>
         <button type="button" data-action="show-quest-log">Quest Log</button>
+        ${panelButton("contracts", config.contractsButtonLabel ?? config.contractsTitle ?? "Contracts")}
+        ${panelButton("turnins", config.turnInsButtonLabel ?? config.turnInsTitle ?? "Turn-Ins")}
+        ${config.factionSetShopTitle ? panelButton("shop", config.factionSetShopTitle) : ""}
+        ${config.factionSetCatalogTitle ? panelButton("catalog", "See Sets") : ""}
         <div>
           <span>${escapeHtml(readyContracts)} ${escapeHtml(config.readyContractText ?? "contract")}${readyContracts === 1 ? "" : "s"} ready</span>
           <span>${escapeHtml(readyTurnIns)} ${escapeHtml(config.readyTurnInText ?? "turn-in")}${readyTurnIns === 1 ? "" : "s"} ready</span>
         </div>
       </section>
     `;
+  }
+
+  function setBoardPanel(panel = "contracts") {
+    activePanel = panels.has(panel) ? panel : "contracts";
+    renderGuild();
+  }
+
+  function mainPanelMarkup(entry) {
+    if (activePanel === "turnins") return turnInsMarkup();
+    if (activePanel === "shop" && config.factionSetShopTitle) return factionSetShopMarkup(config.id, rank(entry), config.factionSetShopTitle);
+    if (activePanel === "catalog" && config.factionSetCatalogTitle) return factionSetCatalogMarkup(config.id, rank(entry), config.factionSetCatalogTitle);
+    return contractsMarkup();
   }
 
   function renderGuild(npc = window.DungeonContent.get("npcs", config.id)) {
@@ -11004,11 +11474,11 @@ function createCompactGuildBoard(config) {
         <div class="guild-board-grid">
           <aside class="guild-board-side">
             ${rankBarMarkup(entry)}
+            ${adminFactionRankControlMarkup(config.id, config.label, ranks, rank(entry), entry.reputation)}
             ${actionsMarkup()}
           </aside>
           <main class="guild-board-main">
-            ${contractsMarkup()}
-            ${turnInsMarkup()}
+            ${mainPanelMarkup(entry)}
           </main>
           <aside class="guild-board-rewards">
             ${rankRewardsMarkup()}
@@ -11188,6 +11658,17 @@ function createCompactGuildBoard(config) {
     addLog(`Admin set ${config.label} progress: ${progressId}.`, "important");
   }
 
+  function setAdminRank(direction) {
+    if (!adminEnabled()) return;
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    state.questFlags[config.unlockFlag] = true;
+    const entry = progress();
+    const nextRank = factionRankIndexFromDirection(ranks, rank(entry), direction);
+    entry.reputation = factionRankThreshold(ranks, nextRank);
+    addLog(`Admin set ${config.label} to rank ${nextRank}: ${ranks[nextRank]?.name ?? "Rank"}.`, "important");
+    renderGuild();
+  }
+
   window.DungeonNpcBehaviors[config.id] = {
     visit: renderGuild,
     returnToVisit: () => renderGuild(),
@@ -11197,9 +11678,13 @@ function createCompactGuildBoard(config) {
     cancelQuest: cancelContract,
     adminProgressEntries,
     setAdminProgress,
+    setAdminRank,
+    setBoardPanel,
+    currentRank: () => rank(),
+    rankNameForTier: (tier) => ranks[Math.max(1, Math.floor(Number(tier) || 1))]?.name ?? `Rank ${Math.max(1, Math.floor(Number(tier) || 1))}`,
   };
 
-  return { renderGuild, acceptContract, completeContract, completeTurnIn, cancelContract, progress, contractReady, turnInReady };
+  return { renderGuild, acceptContract, completeContract, completeTurnIn, cancelContract, progress, contractReady, turnInReady, setBoardPanel, rank };
 }
 
 function itemHasAnyTag(item, tags) {
@@ -11223,7 +11708,11 @@ const expeditionBoardApi = createCompactGuildBoard({
   heroClass: "expedition-hero",
   actionsTitle: "Route Desk",
   contractsTitle: "Postings",
+  contractsButtonLabel: "Postings",
   turnInsTitle: "Supply Turn-Ins",
+  turnInsButtonLabel: "Supply Turn-Ins",
+  factionSetShopTitle: "Expedition Gear",
+  factionSetCatalogTitle: "Expedition Set Catalog",
   readyContractText: "posting",
   readyTurnInText: "supply turn-in",
   claimLabel: "File Report",
@@ -11472,6 +11961,14 @@ const fightingPitBossInterval = 4;
 const fightingPitShortRestLimit = 5;
 const fightingPitRenownByCategory = 8;
 const fightingPitRewardCpByCategory = 1800;
+let fightingPitBoardPanel = "rules";
+const fightingPitRanks = [
+  { name: "Unknown", threshold: 0, reward: "The pit will let the party try the early brackets." },
+  { name: "Crowd Name", threshold: 50, reward: "Regulars begin to recognize the party." },
+  { name: "Arena Draw", threshold: 120, reward: "The pit record starts to matter to challengers." },
+  { name: "Champion Heat", threshold: 240, reward: "Reserved for stronger arena rewards and elite bouts." },
+  { name: "Glory-King", threshold: 480, reward: "Reserved for legendary pit progression." },
+];
 
 function fightingPitProgress() {
   state.questFlags = { ...(state.questFlags ?? {}) };
@@ -11484,6 +11981,37 @@ function fightingPitProgress() {
   progress.bossesDefeated = Math.max(0, Math.floor(Number(progress.bossesDefeated) || 0));
   progress.runs = Math.max(0, Math.floor(Number(progress.runs) || 0));
   return progress;
+}
+
+function fightingPitRank(progress = fightingPitProgress()) {
+  const renown = Math.max(0, Math.floor(Number(progress.renown) || 0));
+  let current = 0;
+  fightingPitRanks.forEach((entry, index) => {
+    if (renown >= entry.threshold) current = index;
+  });
+  return current;
+}
+
+function setFightingPitBoardPanel(panel = "rules") {
+  const allowed = new Set(["rules", "shop", "catalog"]);
+  fightingPitBoardPanel = allowed.has(panel) ? panel : "rules";
+  renderFightingPit();
+}
+
+function fightingPitMainPanelMarkup(progress) {
+  if (fightingPitBoardPanel === "shop") return factionSetShopMarkup(fightingPitId, fightingPitRank(progress), "Pit Gear");
+  if (fightingPitBoardPanel === "catalog") return factionSetCatalogMarkup(fightingPitId, fightingPitRank(progress), "Fighting Pit Set Catalog");
+  return `
+    <section class="guild-section">
+      <h3>Wave Rules</h3>
+      <div class="guild-contract-list">
+        <article class="guild-contract-row"><div><b>Category Ladder</b><span>Category 1 normal waves x3, then a Category 1 boss. The pattern repeats upward through Category ${escapeHtml(fightingPitMaxCategory)}.</span><small>Wave balance scales with active party size.</small></div></article>
+        <article class="guild-contract-row"><div><b>Rewards</b><span>Coin and renown are paid after each cleared wave based on defeated foes and category. Boss waves pay extra.</span><small>Current rate: ${escapeHtml(priceText(fightingPitRewardCpByCategory))} and ${escapeHtml(fightingPitRenownByCategory)} renown per foe per category.</small></div></article>
+        <article class="guild-contract-row"><div><b>Safety Rule</b><span>Blunted weapons and waiting medics make the bout nonlethal. A hero can be battered to the brink, but cannot die in the pit.</span></div></article>
+        <article class="guild-contract-row"><div><b>Rest Rule</b><span>After each cleared wave, the party may take an optional short rest checkpoint. The pit allows up to ${escapeHtml(fightingPitShortRestLimit)} short rests and never grants a long rest mid-run.</span></div></article>
+      </div>
+    </section>
+  `;
 }
 
 function fightingPitWaveCategory(wave = 1) {
@@ -11913,6 +12441,9 @@ function renderFightingPit(npc = window.DungeonContent.get("npcs", fightingPitId
   setVillageBackButtonVisible(true);
   const progress = fightingPitProgress();
   const nextWave = progress.bestWave > 0 ? progress.bestWave + 1 : 1;
+  const panelButton = (panel, label) => `
+    <button type="button" data-action="set-fighting-pit-panel" data-panel="${escapeAttribute(panel)}" ${fightingPitBoardPanel === panel ? "disabled" : ""}>${escapeHtml(label)}</button>
+  `;
   els.villageBody.innerHTML = `
     <section class="guild-board fighting-pit-board">
       <section class="guild-hero fighting-pit-hero">
@@ -11937,21 +12468,17 @@ function renderFightingPit(npc = window.DungeonContent.get("npcs", fightingPitId
             <div><span>Short Rests</span><b>0 / ${escapeHtml(fightingPitShortRestLimit)}</b></div>
             <p>This is a controlled fighting pit: weapons are blunted, medics are ready at the rail, and heroes cannot die here. Three normal waves per category, then a boss. Cleared waves offer an optional short rest.</p>
           </section>
+          ${adminFactionRankControlMarkup(fightingPitId, "Fighting Pit", fightingPitRanks, fightingPitRank(progress), progress.renown, "Renown")}
           <section class="guild-actions-panel">
             <h3>Pit Gate</h3>
             <button type="button" data-action="start-fighting-pit">Enter the Pit</button>
+            ${panelButton("rules", "Wave Rules")}
+            ${panelButton("shop", "Pit Gear")}
+            ${panelButton("catalog", "See Sets")}
           </section>
         </aside>
         <main class="guild-board-main">
-          <section class="guild-section">
-            <h3>Wave Rules</h3>
-            <div class="guild-contract-list">
-              <article class="guild-contract-row"><div><b>Category Ladder</b><span>Category 1 normal waves x3, then a Category 1 boss. The pattern repeats upward through Category ${escapeHtml(fightingPitMaxCategory)}.</span><small>Wave balance scales with active party size.</small></div></article>
-              <article class="guild-contract-row"><div><b>Rewards</b><span>Coin and renown are paid after each cleared wave based on defeated foes and category. Boss waves pay extra.</span><small>Current rate: ${escapeHtml(priceText(fightingPitRewardCpByCategory))} and ${escapeHtml(fightingPitRenownByCategory)} renown per foe per category.</small></div></article>
-              <article class="guild-contract-row"><div><b>Safety Rule</b><span>Blunted weapons and waiting medics make the bout nonlethal. A hero can be battered to the brink, but cannot die in the pit.</span></div></article>
-              <article class="guild-contract-row"><div><b>Rest Rule</b><span>After each cleared wave, the party may take an optional short rest checkpoint. The pit allows up to ${escapeHtml(fightingPitShortRestLimit)} short rests and never grants a long rest mid-run.</span></div></article>
-            </div>
-          </section>
+          ${fightingPitMainPanelMarkup(progress)}
         </main>
         <aside class="guild-board-rewards">
           <section class="guild-section">
@@ -12010,6 +12537,9 @@ async function startFightingPitRun() {
 window.DungeonNpcBehaviors[fightingPitId] = {
   visit: renderFightingPit,
   returnToVisit: () => renderFightingPit(),
+  setBoardPanel: setFightingPitBoardPanel,
+  currentRank: () => fightingPitRank(),
+  rankNameForTier: (tier) => fightingPitRanks[Math.max(1, Math.floor(Number(tier) || 1))]?.name ?? `Rank ${Math.max(1, Math.floor(Number(tier) || 1))}`,
   adminProgressEntries() {
     const progress = fightingPitProgress();
     return [
@@ -12060,6 +12590,18 @@ window.DungeonNpcBehaviors[fightingPitId] = {
       }
     }
     addLog(`Admin set Fighting Pit progress: ${progressId}.`, "important");
+  },
+  setAdminRank(direction) {
+    if (!adminEnabled()) return;
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    state.questFlags["flag.village.fightingPitUnlocked"] = true;
+    const progress = fightingPitProgress();
+    const nextRank = factionRankIndexFromDirection(fightingPitRanks, fightingPitRank(progress), direction);
+    progress.renown = factionRankThreshold(fightingPitRanks, nextRank);
+    progress.bestWave = Math.max(progress.bestWave, nextRank * fightingPitBossInterval);
+    progress.bestCategory = Math.max(progress.bestCategory, nextRank);
+    addLog(`Admin set Fighting Pit to rank ${nextRank}: ${fightingPitRanks[nextRank]?.name ?? "Rank"}.`, "important");
+    renderFightingPit();
   },
 };
 
@@ -16735,7 +17277,9 @@ function equipItem(itemId, slotId) {
   const hero = activeHero();
   const item = itemForId(hero, itemId);
   if (!itemCanEquipInSlot(hero, item, slotId)) {
-    if (item?.requirements?.strength) {
+    if (itemBoundToOtherHero(hero, item)) {
+      addLog(`${item.name} is bound to ${itemBoundOwnerName(item) || "another hero"} and cannot be equipped by ${hero.name}.`);
+    } else if (item?.requirements?.strength) {
       addLog(`${hero.name} needs Strength ${item.requirements.strength} to equip ${item.name}.`);
     } else if (item?.type === "armor" && !heroHasArmorProficiency(hero, item)) {
       addLog(`${hero.name} lacks proficiency to equip ${item.name}.`);

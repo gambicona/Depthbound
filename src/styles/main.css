@@ -4243,6 +4243,44 @@ button[data-ui-icon]::before,
   right: 8px;
 }
 
+.equipment-slot-actions {
+  align-items: center;
+  bottom: 8px;
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+  left: 10px;
+  position: absolute;
+  right: 8px;
+}
+
+.equipment-slot-actions .attunement-status {
+  color: var(--muted);
+  flex: 1 1 auto;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.15;
+  margin: 0;
+  min-width: 0;
+}
+
+.equipment-slot-actions .attunement-status.set-attunement-ready {
+  color: #75d7c8;
+}
+
+.equipment-slot-actions button {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 4px 8px;
+  position: static;
+}
+
+.equipment-slot-actions .small-action-button {
+  background: linear-gradient(180deg, #775a28, #5b3f1d);
+  border-color: rgba(226, 174, 82, 0.72);
+  color: #ffe0a3;
+}
+
 .equipment-slot.is-empty > button {
   display: none;
 }
@@ -6465,6 +6503,50 @@ button[data-ui-icon]::before,
   flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
+}
+
+.faction-set-shop-note {
+  line-height: 1.45;
+}
+
+.currency-gold {
+  color: var(--gold);
+  font-weight: 950;
+}
+
+.currency-token {
+  color: #75d7c8;
+  font-weight: 950;
+}
+
+.faction-set-shop-row {
+  align-items: start;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) max-content;
+}
+
+.faction-set-shop-row .store-row-actions {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  width: 148px;
+}
+
+.faction-set-shop-row button {
+  font-size: 0.72rem;
+  line-height: 1.15;
+  min-height: 30px;
+  padding: 5px 8px;
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .faction-set-shop-row {
+    grid-template-columns: 1fr;
+  }
+
+  .faction-set-shop-row .store-row-actions {
+    width: 100%;
+  }
 }
 
 .errand-material-picker {

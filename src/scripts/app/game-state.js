@@ -5487,6 +5487,18 @@ function itemRequiresAttunement(item) {
   return Boolean(item?.requiresAttunement ?? item?.attunementRequired ?? item?.magic?.requiresAttunement ?? false);
 }
 
+function itemBoundToOtherHero(fighter, item) {
+  return Boolean(item?.boundHeroId && fighter?.id && item.boundHeroId !== fighter.id);
+}
+
+function itemBoundOwnerName(item) {
+  return item?.boundHeroName ?? state?.fighters?.[item?.boundHeroId]?.name ?? "";
+}
+
+function factionSetInfo(item) {
+  return item?.factionSet && item.factionSet.setId && item.factionSet.slotKey ? item.factionSet : null;
+}
+
 function attunedItemIds(fighter) {
   if (!fighter) return [];
   const source = Array.isArray(fighter.attunement?.itemIds)
@@ -5497,12 +5509,35 @@ function attunedItemIds(fighter) {
   return uniqueValues(source.filter(Boolean));
 }
 
+function itemCanUseFreeSetAttunement(fighter, item, currentIds = attunedItemIds(fighter)) {
+  const set = factionSetInfo(item);
+  if (!fighter || !itemRequiresAttunement(item) || !set || !item?.id) return false;
+  const ids = new Set((currentIds ?? []).filter((id) => id && id !== item.id));
+  let sameSetCount = 0;
+  for (const itemId of ids) {
+    const other = itemForId(fighter, itemId);
+    const otherSet = factionSetInfo(other);
+    if (otherSet?.setId === set.setId) sameSetCount += 1;
+  }
+  return sameSetCount >= 3;
+}
+
+function normalizeAttunementIdsWithSetOverflow(fighter, itemIds = []) {
+  const carriedIds = new Set((fighter.inventory?.items ?? []).map((item) => item.id).filter(Boolean));
+  const carried = uniqueValues(itemIds.filter((itemId) => carriedIds.has(itemId)));
+  const limited = carried.slice(0, attunementLimit);
+  if (carried.length <= attunementLimit) return limited;
+
+  for (const itemId of carried.slice(attunementLimit)) {
+    const item = itemForId(fighter, itemId);
+    if (itemCanUseFreeSetAttunement(fighter, item, carried)) return [...limited, itemId];
+  }
+  return limited;
+}
+
 function normalizeAttunementState(fighter) {
   if (!fighter) return [];
-  const carriedIds = new Set((fighter.inventory?.items ?? []).map((item) => item.id).filter(Boolean));
-  const itemIds = attunedItemIds(fighter)
-    .filter((itemId) => carriedIds.has(itemId))
-    .slice(0, attunementLimit);
+  const itemIds = normalizeAttunementIdsWithSetOverflow(fighter, attunedItemIds(fighter));
   fighter.attunement = { ...(fighter.attunement ?? {}), itemIds };
   delete fighter.attunedItemIds;
   return itemIds;
@@ -5573,7 +5608,7 @@ function missingProficiencyText(fighter, item) {
 }
 
 function itemCanEquipInSlot(fighter, item, slotId) {
-  return itemCanUseSlot(item, slotId) && armorStrengthRequirementMet(fighter, item) && heroHasArmorProficiency(fighter, item);
+  return itemCanUseSlot(item, slotId) && !itemBoundToOtherHero(fighter, item) && armorStrengthRequirementMet(fighter, item) && heroHasArmorProficiency(fighter, item);
 }
 
 function isHandSlot(slotId) {
@@ -5625,6 +5660,10 @@ function magicEffects(fighter) {
     mergePassiveEffects(effects, item.magic);
   }
 
+  for (const effects of factionSetBonusEffects(fighter)) {
+    mergePassiveEffects(effects);
+  }
+
   for (const { definition } of fighterFeatDefinitions(fighter)) {
     mergePassiveEffects(definition.effects ?? {});
   }
@@ -5658,6 +5697,41 @@ function magicEffects(fighter) {
   merged.vulnerabilities = Array.from(new Set(merged.vulnerabilities));
   merged.immunities = Array.from(new Set(merged.immunities));
   return merged;
+}
+
+function factionSetBonusEffects(fighter) {
+  return activeFactionSetBonuses(fighter).map((entry) => entry.effects).filter(Boolean);
+}
+
+function activeFactionSetBonuses(fighter) {
+  normalizeAttunementState(fighter);
+  const attunedIds = new Set(attunedItemIds(fighter));
+  const activeItems = equipmentSlots
+    .map((slot) => equippedItem(fighter, slot.id))
+    .filter((item, index, items) => item && items.findIndex((entry) => entry?.id === item.id) === index)
+    .filter((item) => attunedIds.has(item.id))
+    .filter((item) => item && factionSetInfo(item));
+  const bySet = new Map();
+  for (const item of activeItems) {
+    const set = factionSetInfo(item);
+    if (!bySet.has(set.setId)) bySet.set(set.setId, []);
+    bySet.get(set.setId).push(item);
+  }
+  const bonuses = [];
+  for (const [setId, items] of bySet.entries()) {
+    const definition = window.DungeonContent?.get?.("factionSets", setId);
+    if (items.length < 4) continue;
+    if (definition?.setBonus?.effects) {
+      bonuses.push({
+        setId,
+        name: definition.name ?? setId,
+        label: definition.setBonus.label ?? "Set Bonus",
+        description: definition.setBonus.description ?? "",
+        effects: definition.setBonus.effects,
+      });
+    }
+  }
+  return bonuses;
 }
 
 function magicAcBonusApplies(fighter, item) {

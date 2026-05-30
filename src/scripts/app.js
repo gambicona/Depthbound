@@ -774,6 +774,30 @@ els.villageMenu?.addEventListener("click", (event) => {
     if (button.dataset.npc === "expedition-board") completeExpeditionTurnIn(button.dataset.turnIn);
     if (button.dataset.npc === "boom-club") completeBoomClubTurnIn(button.dataset.turnIn);
   }
+  if (button?.dataset.action === "buy-faction-set-item") {
+    buyFactionSetItem(button.dataset.faction, button.dataset.item, button.dataset.method);
+  }
+  if (button?.dataset.action === "set-monster-hunter-panel") {
+    setMonsterHunterBoardPanel(button.dataset.panel);
+  }
+  if (button?.dataset.action === "set-gravebinder-panel") {
+    setGravebinderBoardPanel(button.dataset.panel);
+  }
+  if (button?.dataset.action === "set-crucible-panel") {
+    setCrucibleBoardPanel(button.dataset.panel);
+  }
+  if (button?.dataset.action === "set-antiquarian-panel") {
+    setAntiquarianBoardPanel(button.dataset.panel);
+  }
+  if (button?.dataset.action === "set-compact-guild-panel") {
+    window.DungeonNpcBehaviors?.[button.dataset.faction]?.setBoardPanel?.(button.dataset.panel);
+  }
+  if (button?.dataset.action === "set-fighting-pit-panel") {
+    setFightingPitBoardPanel(button.dataset.panel);
+  }
+  if (button?.dataset.action === "admin-faction-rank") {
+    setFactionAdminRank(button.dataset.faction, button.dataset.direction);
+  }
   if (button?.dataset.action === "show-quest-log") {
     showQuestLog();
   }
@@ -974,6 +998,10 @@ els.inventoryMenu.addEventListener("click", (event) => {
   if (button.dataset.action === "add-admin-coins") {
     if (!adminEnabled()) return;
     addAdminCoins(Number(button.dataset.cp));
+  }
+  if (button.dataset.action === "add-admin-hero-tokens") {
+    if (!adminEnabled()) return;
+    addAdminHeroTokens(Number(button.dataset.tokens));
   }
   if (button.dataset.action === "inspect-party-resource") {
     showPartyResourceInfo(button.dataset.item);
