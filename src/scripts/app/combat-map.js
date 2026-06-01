@@ -4098,6 +4098,7 @@ function checkDungeonCompletion(hero = activeHero()) {
           resolved: true,
           pending: false,
           cleared: true,
+          clearedDay: normalizeWorldDay(state.worldDay),
           lastEventId: travelReturnCamp.eventId ?? current.lastEventId ?? "",
           lastEventTitle: travelReturnCamp.eventTitle ?? current.lastEventTitle ?? "",
           lastOutcome: "Cleared after a travel dungeon or fight.",

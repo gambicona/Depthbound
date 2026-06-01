@@ -8594,6 +8594,50 @@ function travelFeatureKind(object = null) {
   return String(object?.kind || object?.nameKind || window.DepthboundWorldNames?.structureKind?.(object?.tile) || "").toLowerCase();
 }
 
+const travelClearableThreatCooldownDays = 10;
+const travelRepeatableAdventureKinds = new Set(["mine", "shrine", "portal", "ruin", "ruins", "temple", "lake", "harbor", "castle"]);
+const travelClearableThreatKinds = new Set(["burrow", "camp", "hideout", "lair", "den", "warren"]);
+const travelClearableThreatTilePatterns = [
+  /burrow/i,
+  /bandit/i,
+  /goblin/i,
+  /outlaw/i,
+  /camp_(goblin|siege|palisade|pallisade|border)/i,
+];
+
+function travelFeatureIsRepeatableAdventureSite(feature = null) {
+  const kind = travelFeatureKind(feature);
+  const tile = String(feature?.tile ?? "").toLowerCase();
+  if (travelRepeatableAdventureKinds.has(kind)) return true;
+  return /mine|shrine|portal|ruin|temple|harbor|castle/.test(tile);
+}
+
+function travelFeatureIsClearableRoadThreat(feature = null) {
+  if (!feature || travelFeatureIsTeleportSettlement(feature) || travelFeatureIsRepeatableAdventureSite(feature)) return false;
+  const kind = travelFeatureKind(feature);
+  const tile = String(feature?.tile ?? "").toLowerCase();
+  if (travelClearableThreatKinds.has(kind)) return true;
+  return travelClearableThreatTilePatterns.some((pattern) => pattern.test(tile));
+}
+
+function travelRefreshClearableStructureThreat(feature = null, day = normalizeWorldDay(state.worldDay)) {
+  if (!travelFeatureIsClearableRoadThreat(feature) || !feature?.id || !state?.world?.visitedStructures) return "active";
+  const visit = state.world.visitedStructures[feature.id];
+  if (!visit?.cleared) return "active";
+  const clearedDay = Math.max(0, Math.floor(Number(visit.clearedDay ?? visit.lastResolvedDay) || 0));
+  const elapsed = Math.max(0, Math.floor(Number(day) || 0) - clearedDay);
+  if (elapsed < travelClearableThreatCooldownDays) return "quiet";
+  state.world.visitedStructures[feature.id] = {
+    ...visit,
+    cleared: false,
+    resolved: false,
+    pending: false,
+    respawnedAtDay: day,
+    lastOutcome: "New danger has moved into the site.",
+  };
+  return "respawned";
+}
+
 function travelFeatureIsTeleportSettlement(object = null) {
   const kind = travelFeatureKind(object);
   const tile = String(object?.tile ?? "").toLowerCase();
@@ -8665,7 +8709,15 @@ function travelStructureStatusLabel(feature = null) {
   if (feature?.id && (feature.id === state?.world?.homeVillageId || state?.world?.visitedStructures?.[feature.id]?.home)) return "Home";
   const visit = travelStructureVisitState(feature);
   if (!visit?.count) return "Unvisited";
-  if (visit.cleared) return "Cleared";
+  if (visit.cleared) {
+    if (travelFeatureIsRepeatableAdventureSite(feature)) return "Explored";
+    if (travelFeatureIsClearableRoadThreat(feature)) {
+      const clearedDay = Math.max(0, Math.floor(Number(visit.clearedDay ?? visit.lastResolvedDay) || 0));
+      const remaining = Math.max(0, travelClearableThreatCooldownDays - (normalizeWorldDay(state.worldDay) - clearedDay));
+      return remaining > 0 ? `Cleared (${remaining}d quiet)` : "Threat returning";
+    }
+    return "Cleared";
+  }
   if (visit.pending) return "In progress";
   if (visit.resolved) return "Resolved";
   return `Visited ${visit.count}`;
@@ -11422,6 +11474,12 @@ function travelRememberBlockedRoadDanger(context = {}, event = {}, choice = null
   };
 }
 
+function travelContextCanBlockRoadDanger(context = {}) {
+  if (!context || (!context.pendingRoadBuilds?.length && !context.manualRoadBuild)) return false;
+  if (context.feature) return travelFeatureIsClearableRoadThreat(context.feature);
+  return true;
+}
+
 function travelPrepareReturnCamp(event, context = {}, options = {}) {
   state.travelReturnCamp = {
     eventId: event?.id ?? "",
@@ -11586,8 +11644,11 @@ async function travelResolveEventOutcome(event, choice, context = {}) {
       confirmText: "Make Camp",
     });
     if (context.feature && !outcome.noResolve) travelMarkStructureResolved(context.feature, event, { text: summary }, summary);
-    travelRememberBlockedRoadDanger(context, event, choice, outcome);
-    return "road-blocked";
+    if (travelContextCanBlockRoadDanger(context)) {
+      travelRememberBlockedRoadDanger(context, event, choice, outcome);
+      return "road-blocked";
+    }
+    return "handled";
   }
   const resultSummary = await travelShowEventResult(event, outcome, context, checkResult);
   travelApplyEventRewards(outcome.rewards);
@@ -11713,17 +11774,56 @@ function travelEmberveinClaimSiteEvent(feature = null) {
   };
 }
 
+function travelClearableThreatFallbackEvent(feature = null, kind = "") {
+  if (!travelFeatureIsClearableRoadThreat(feature)) return null;
+  const tile = String(feature?.tile ?? "").toLowerCase();
+  const place = travelStructureDisplayLabel(feature);
+  if (/goblin/.test(tile)) {
+    return {
+      id: "clear-goblin-road-threat",
+      title: "Goblin Holdout",
+      text: `${place} looks quiet from the road, but smoke still leaks from hidden holes. The site has to be cleared before a road can safely pass.`,
+      choices: [
+        { id: "clear", label: "Clear The Holdout", description: "Enter the goblin hideout and drive them out.", outcome: { text: "The party follows the smoke holes into the goblin den.", dungeon: { size: "small", themeId: "goblinWarren" } } },
+        { id: "leave", label: "Leave It For Now", description: "Do not risk the road crew here yet.", outcome: { text: "The party marks the danger and camps out of bowshot." } },
+      ],
+    };
+  }
+  if (/bandit|outlaw|camp_/.test(tile) || String(kind).toLowerCase().includes("camp")) {
+    return {
+      id: "clear-bandit-road-threat",
+      title: "Occupied Camp",
+      text: `${place} has gone still, but the tracks are fresh. Someone will contest a road unless the camp is broken.`,
+      choices: [
+        { id: "clear", label: "Break The Camp", description: "Push through the camp and clear its heart.", outcome: { text: "The party pushes into the camp before the lookouts can scatter.", dungeon: { size: "small", themeId: "outlawCamp" } } },
+        { id: "wait", label: "Wait", description: "Leave the camp alone for now.", outcome: { text: "The party keeps the camp marked and makes no road claim today." } },
+      ],
+    };
+  }
+  return {
+    id: "clear-burrow-road-threat",
+    title: "Occupied Lair",
+    text: `${place} is quiet, but the ground around it is freshly disturbed. The lair has to be dealt with before the road can be marked.`,
+    choices: [
+      { id: "flush", label: "Flush The Lair", description: "Draw out whatever owns the burrow.", outcome: { text: "The party makes noise at the lair mouth. Something answers.", fight: { monsterTags: ["beast"], count: "party", size: "skirmish" } } },
+      { id: "leave", label: "Leave It", description: "Do not challenge the lair today.", outcome: { text: "The party leaves the lair marked and keeps the road crew back." } },
+    ],
+  };
+}
+
 function travelMarkStructureResolved(feature = null, event = {}, outcome = {}, summary = "") {
   if (!feature?.id || !state?.world?.visitedStructures) return;
   const current = state.world.visitedStructures[feature.id] && typeof state.world.visitedStructures[feature.id] === "object"
     ? state.world.visitedStructures[feature.id]
     : { count: 1 };
   const dangerous = Boolean(outcome.fight || outcome.dungeon);
+  const cleared = Boolean(current.cleared || (!dangerous && outcome.cleared));
   state.world.visitedStructures[feature.id] = {
     ...current,
     resolved: true,
     pending: dangerous,
-    cleared: Boolean(current.cleared || (!dangerous && outcome.cleared)),
+    cleared,
+    clearedDay: cleared ? Math.max(0, Math.floor(Number(current.clearedDay ?? normalizeWorldDay(state.worldDay)) || 0)) : current.clearedDay,
     lastEventId: event.id ?? "",
     lastEventTitle: event.title ?? "",
     lastOutcome: summary,
@@ -11737,9 +11837,23 @@ async function travelResolveStructureEvent(context = {}) {
   const tile = travelBiomeForHex(context.to);
   const biomeGroup = window.DepthboundWorldTravel?.biomeGroup?.(tile) ?? window.DepthboundWorldNames?.biomeGroup?.(tile) ?? String(tile).split("_")[0];
   const kind = feature.kind || feature.nameKind || window.DepthboundWorldNames?.structureKind?.(feature.tile) || "";
+  const threatState = travelRefreshClearableStructureThreat(feature, context.departureDay);
+  if (threatState === "quiet") {
+    travelRegisterStructureVisit(feature, context.departureDay);
+    const place = travelStructureDisplayLabel(feature);
+    const message = `${place} is still quiet after the party's last clearing. The road crew can work without chasing anything out today.`;
+    addLog(message, "important");
+    await showTravelMapNotice({
+      kicker: travelFeatureKindLabel(feature),
+      title: place,
+      message,
+      confirmText: "Make Camp",
+    });
+    return "handled";
+  }
   const visitCount = travelRegisterStructureVisit(feature, context.departureDay);
   const boardQuest = settlementBoardQuestAtHex(context.to);
-  const event = settlementBoardEventForQuest(boardQuest) ?? travelEmberveinClaimSiteEvent(feature) ?? window.DepthboundTravelEvents?.pickStructureEvent?.({
+  let event = settlementBoardEventForQuest(boardQuest) ?? travelEmberveinClaimSiteEvent(feature) ?? window.DepthboundTravelEvents?.pickStructureEvent?.({
     seed: state.world?.seed,
     day: context.departureDay,
     visitCount,
@@ -11751,6 +11865,7 @@ async function travelResolveStructureEvent(context = {}) {
     biomeGroup,
     recentEventIds: travelRecentEventIds(),
   });
+  if (!event && travelFeatureIsClearableRoadThreat(feature)) event = travelClearableThreatFallbackEvent(feature, kind);
   if (!event) {
     const place = travelStructureDisplayLabel(feature);
     const message = `${place} is quiet today. The party makes camp nearby.`;
@@ -11781,7 +11896,16 @@ async function travelResolveStructureEvent(context = {}) {
     ? await showTravelMapChoiceDialog({ kicker: kindLabel, title: event.title, message, choices })
     : await showChoiceDialog({ title: event.title, message, choices });
   const choice = (event.choices ?? []).find((entry) => entry.id === choiceId) ?? travelFallbackEventChoice(event);
-  return travelResolveEventOutcome(event, choice, { ...context, feature, kind, tile, biomeGroup, visitCount, boardQuest });
+  const outcomeContext = { ...context, feature, kind, tile, biomeGroup, visitCount, boardQuest };
+  const result = await travelResolveEventOutcome(event, choice, outcomeContext);
+  if (result === "handled" && travelContextCanBlockRoadDanger(outcomeContext) && travelFeatureIsClearableRoadThreat(feature)) {
+    const visit = travelStructureVisitState(feature);
+    if (!visit?.cleared) {
+      travelRememberBlockedRoadDanger(outcomeContext, event, choice, { text: "The threat site remains active." });
+      return "road-blocked";
+    }
+  }
+  return result;
 }
 
 async function travelOneDay(options = {}) {
