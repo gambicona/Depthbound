@@ -4095,17 +4095,26 @@ function checkDungeonCompletion(hero = activeHero()) {
           lastResolvedDay: normalizeWorldDay(state.worldDay),
         };
       }
+      state.questFlags = questFlags;
       const boardQuestCompletion = typeof completeSettlementBoardQuestForTravelReturn === "function"
         ? completeSettlementBoardQuestForTravelReturn(travelReturnCamp, questFlags)
         : null;
+      const completedRoadBuilds = typeof applyPendingTravelRoadBuilds === "function"
+        ? applyPendingTravelRoadBuilds(travelReturnCamp.pendingRoadBuilds ?? [], { silent: true })
+        : [];
+      const roadProjectReady = completedRoadBuilds.length && typeof expeditionRoadProjectComplete === "function"
+        ? Object.values(state.questFlags?.expeditionRoads?.projects ?? {}).filter((project) => project?.status === "accepted" && expeditionRoadProjectComplete(project)).map((project) => project.targetLabel)
+        : [];
+      const questFlagsAfterTravelWork = { ...(state.questFlags ?? {}) };
+      const partyResourcesAfterTravelWork = normalizePartyResources(state.partyResources ?? {});
       const returningHeroes = rosterHeroes();
       const storedCoins = moveHeroCoinsToPartyPurse(returningHeroes);
       state = createHomeState(returningHeroes, state.chest ?? [], state.chestMoney ?? {}, {
         ...state.party,
         worldDay: normalizeWorldDay(state.worldDay),
         campaignProgress: completedCampaign,
-        questFlags,
-        partyResources,
+        questFlags: questFlagsAfterTravelWork,
+        partyResources: partyResourcesAfterTravelWork,
         partyTomes: state.partyTomes ?? [],
         home: state.home,
         monsterCompendium: state.monsterCompendium,
@@ -4116,6 +4125,12 @@ function checkDungeonCompletion(hero = activeHero()) {
       addLog(`${hero.name} reaches the exit. The party returns to camp after ${travelReturnCamp.eventTitle ?? "the travel encounter"}.`, "important");
       if (boardQuestCompletion) {
         addLog(`${boardQuestCompletion.title} is complete. Return to ${boardQuestCompletion.sourceName} to claim ${priceText(boardQuestCompletion.rewardCp)}.`, "important");
+      }
+      if (completedRoadBuilds.length) {
+        addLog(`Road work complete: ${completedRoadBuilds.length} segment${completedRoadBuilds.length === 1 ? "" : "s"} built after the danger was cleared.`, "important");
+      }
+      for (const targetLabel of roadProjectReady) {
+        addLog(`Road project ready to file: ${targetLabel}.`, "important");
       }
       if (storedCoins > 0) addLog(`${moneyText(cpToMoney(storedCoins))} is secured in the party purse.`, "important");
       if (consumedGoalItems) addLog(`${consumedGoalItems} goal item${consumedGoalItems === 1 ? " was" : "s were"} left behind.`, "important");

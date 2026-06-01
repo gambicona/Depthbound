@@ -8898,6 +8898,31 @@ function travelRoadBuildHintForHex(hex = null) {
   return `${project.targetLabel}: ${action} Kits: ${travelRoadKitCount()}.`;
 }
 
+function travelPendingRoadBuildsForEdge(from = null, to = null) {
+  const project = expeditionRoadProjectForEdge(from, to);
+  if (!project) return [];
+  return [{ from: cloneData(travelNormalizeHex(from)), to: cloneData(travelNormalizeHex(to)), projectId: project.id, targetLabel: project.targetLabel }];
+}
+
+function travelPendingRoadBuildsForDay({ from = null, via = null, to = null, forceWilderness = false } = {}) {
+  if (forceWilderness) return [];
+  return via
+    ? [...travelPendingRoadBuildsForEdge(from, via), ...travelPendingRoadBuildsForEdge(via, to)]
+    : travelPendingRoadBuildsForEdge(from, to);
+}
+
+function applyPendingTravelRoadBuilds(pendingRoadBuilds = [], options = {}) {
+  const applied = [];
+  for (const segment of pendingRoadBuilds ?? []) {
+    const project = expeditionRoadProjectForEdge(segment.from, segment.to);
+    if (!project) continue;
+    if (buildExpeditionRoadSegmentIfNeeded(segment.from, segment.to, { silent: Boolean(options.silent) })) {
+      applied.push(project.targetLabel ?? segment.targetLabel ?? "the road project");
+    }
+  }
+  return applied;
+}
+
 function travelRoadEdgesList() {
   return Object.values(travelRoadState().builtEdges)
     .filter((edge) => edge?.from && edge?.to)
@@ -11115,6 +11140,18 @@ async function travelConfirmDangerousFight(outcome = {}, context = {}) {
   return choice === "fight";
 }
 
+function travelOutcomeStartsDanger(outcome = {}) {
+  return Boolean(outcome?.fight || outcome?.dungeon || outcome?.campaign);
+}
+
+function travelEventCanBlockRoadBuild(event = null) {
+  return (event?.choices ?? []).some((choice) =>
+    travelOutcomeStartsDanger(choice?.outcome) ||
+    travelOutcomeStartsDanger(choice?.success) ||
+    travelOutcomeStartsDanger(choice?.failure),
+  );
+}
+
 function travelPrepareReturnCamp(event, context = {}, options = {}) {
   state.travelReturnCamp = {
     eventId: event?.id ?? "",
@@ -11123,6 +11160,7 @@ function travelPrepareReturnCamp(event, context = {}, options = {}) {
     structureId: context.feature?.id ?? "",
     boardQuestId: context.boardQuest?.id ?? "",
     questTargetHex: context.boardQuest?.targetHex ? cloneData(context.boardQuest.targetHex) : null,
+    pendingRoadBuilds: Array.isArray(context.pendingRoadBuilds) ? cloneData(context.pendingRoadBuilds) : [],
     world: cloneData(state.world),
     camp: cloneData(state.world?.travelCamp ?? null),
     lockRetreat: Boolean(options.lockRetreat),
@@ -11277,7 +11315,7 @@ async function travelResolveEventOutcome(event, choice, context = {}) {
       confirmText: "Make Camp",
     });
     if (context.feature && !outcome.noResolve) travelMarkStructureResolved(context.feature, event, { text: summary }, summary);
-    return "handled";
+    return "road-blocked";
   }
   const resultSummary = await travelShowEventResult(event, outcome, context, checkResult);
   travelApplyEventRewards(outcome.rewards);
@@ -11286,6 +11324,7 @@ async function travelResolveEventOutcome(event, choice, context = {}) {
   if (outcome.fight) return (await travelStartEventSkirmish(event, outcome, context)) ? "dungeon" : "handled";
   if (outcome.dungeon) return (await travelStartEventDungeon(event, outcome, context)) ? "dungeon" : "handled";
   if (outcome.campaign) return (await travelStartEventCampaign(event, outcome, context)) ? "dungeon" : "handled";
+  if (context.pendingRoadBuilds?.length && travelEventCanBlockRoadBuild(event)) return "road-blocked";
   return "handled";
 }
 
@@ -11511,13 +11550,8 @@ async function travelOneDay(options = {}) {
   const fromName = travelPlaceLabelForHex(from);
   const destinationName = travelPlaceLabelForHex(to);
   const departureDay = normalizeWorldDay(state.worldDay);
+  const pendingRoadBuilds = travelPendingRoadBuildsForDay({ from, via, to, forceWilderness });
   await travelPresentDayMovement({ from, to, departureDay, destinationName });
-  if (!forceWilderness && roadDoubleSpeed) {
-    buildExpeditionRoadSegmentIfNeeded(from, via);
-    buildExpeditionRoadSegmentIfNeeded(via, to);
-  } else if (!forceWilderness) {
-    buildExpeditionRoadSegmentIfNeeded(from, to);
-  }
   state.world.currentHex = to;
   state.world.travelPlan = route.slice(consumedSteps);
   state.world.routeConfirmed = state.world.travelPlan.length > 0;
@@ -11572,16 +11606,32 @@ async function travelOneDay(options = {}) {
   renderTravelMap();
   render();
   if (!forceWilderness) {
-    const structureEventResult = await travelResolveStructureEvent({ from, to, via, fromName, destinationName, departureDay, roadDoubleSpeed });
+    const structureEventResult = await travelResolveStructureEvent({ from, to, via, fromName, destinationName, departureDay, roadDoubleSpeed, pendingRoadBuilds });
     if (structureEventResult === "dungeon") return true;
     if (structureEventResult === "handled") {
+      const builtRoads = applyPendingTravelRoadBuilds(pendingRoadBuilds);
+      if (builtRoads.length) addLog(`Road work complete: ${builtRoads.length} segment${builtRoads.length === 1 ? "" : "s"} built after the site was secured.`, "important");
+      showTravelCampMenu();
+      window.DepthboundPlaytest?.syncNow?.();
+      return true;
+    }
+    if (structureEventResult === "road-blocked") {
+      if (pendingRoadBuilds.length) addLog("Road work is postponed. The party must clear the danger here before a road can be marked safely.", "important");
       showTravelCampMenu();
       window.DepthboundPlaytest?.syncNow?.();
       return true;
     }
   }
-  const eventResult = await travelResolveEmptyHexEvent({ from, to, via, fromName, destinationName, departureDay, roadDoubleSpeed, forceWilderness });
+  const eventResult = await travelResolveEmptyHexEvent({ from, to, via, fromName, destinationName, departureDay, roadDoubleSpeed, forceWilderness, pendingRoadBuilds });
   if (eventResult === "dungeon") return true;
+  if (eventResult === "road-blocked") {
+    if (pendingRoadBuilds.length) addLog("Road work is postponed. The party must clear the danger here before a road can be marked safely.", "important");
+    showTravelCampMenu();
+    window.DepthboundPlaytest?.syncNow?.();
+    return true;
+  }
+  const builtRoads = applyPendingTravelRoadBuilds(pendingRoadBuilds);
+  if (builtRoads.length) addLog(`Road work complete: ${builtRoads.length} segment${builtRoads.length === 1 ? "" : "s"} built after the route was secured.`, "important");
   showTravelCampMenu();
   window.DepthboundPlaytest?.syncNow?.();
   return true;
@@ -18525,7 +18575,7 @@ function claimExpeditionRoadProject(projectId = "") {
   expeditionBoardApi.setBoardPanel?.("roads");
 }
 
-function buildExpeditionRoadSegmentIfNeeded(from = null, to = null) {
+function buildExpeditionRoadSegmentIfNeeded(from = null, to = null, options = {}) {
   if (!from || !to) return false;
   const roadState = travelRoadState();
   const edgeKey = travelRoadEdgeKey(from, to);
@@ -18533,7 +18583,7 @@ function buildExpeditionRoadSegmentIfNeeded(from = null, to = null) {
   const activeProject = expeditionRoadProjectForEdge(from, to);
   if (!activeProject) return false;
   if (!consumePartyResource(roadBuildingKitItemId, 1)) {
-    addLog(`The party reaches a planned road segment, but has no Road-Building Kit left. Return to the Expedition Board or finish another project for more kits.`, "important");
+    if (!options.silent) addLog(`The party reaches a planned road segment, but has no Road-Building Kit left. Return to the Expedition Board or finish another project for more kits.`, "important");
     return false;
   }
   roadState.builtEdges[edgeKey] = {
@@ -18543,8 +18593,8 @@ function buildExpeditionRoadSegmentIfNeeded(from = null, to = null) {
     projectId: activeProject.id,
     builtAtDay: normalizeWorldDay(state.worldDay),
   };
-  addLog(`The party spends 1 Road-Building Kit and builds the road segment toward ${activeProject.targetLabel}.`, "important");
-  if (expeditionRoadProjectComplete(activeProject)) addLog(`Road project ready to file: ${activeProject.targetLabel}.`, "important");
+  if (!options.silent) addLog(`The party spends 1 Road-Building Kit and builds the road segment toward ${activeProject.targetLabel}.`, "important");
+  if (!options.silent && expeditionRoadProjectComplete(activeProject)) addLog(`Road project ready to file: ${activeProject.targetLabel}.`, "important");
   renderQuestLogButton();
   return true;
 }

@@ -5398,7 +5398,7 @@ button[data-ui-icon]::before,
   position: relative;
   text-overflow: ellipsis;
   white-space: nowrap;
-  z-index: 2;
+  z-index: 6;
 }
 
 .travel-hex-biome {
@@ -5423,7 +5423,7 @@ button[data-ui-icon]::before,
   object-fit: contain;
   pointer-events: none;
   position: absolute;
-  z-index: 2;
+  z-index: 6;
 }
 
 .travel-marker {
@@ -5434,7 +5434,7 @@ button[data-ui-icon]::before,
   padding: 3px 5px;
   position: relative;
   text-transform: uppercase;
-  z-index: 3;
+  z-index: 7;
 }
 
 .home-marker {
