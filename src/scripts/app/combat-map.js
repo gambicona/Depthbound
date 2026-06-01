@@ -4079,12 +4079,13 @@ function checkDungeonCompletion(hero = activeHero()) {
     if (travelReturnCamp?.world && travelReturnCamp?.camp) {
       const world = window.DepthboundWorldTravel?.normalizeWorldState?.(travelReturnCamp.world) ?? travelReturnCamp.world;
       world.travelCamp = { ...travelReturnCamp.camp, active: true };
-      if (world.travelCamp?.manualRoadBuild?.pendingDanger) {
+      if (world.travelCamp?.manualRoadBuild?.pendingDanger || travelReturnCamp.clearBlockedRoad) {
         world.travelCamp.manualRoadBuild = {
           ...world.travelCamp.manualRoadBuild,
           safe: true,
           pendingDanger: false,
           blockedReason: "",
+          blockedDanger: null,
         };
       }
       if (travelReturnCamp.structureId) {

@@ -8980,20 +8980,35 @@ function travelCampManualRoadBuildState(camp = state?.world?.travelCamp) {
   };
 }
 
+function travelCampBlockedRoadDangerState(camp = state?.world?.travelCamp) {
+  const build = camp?.manualRoadBuild;
+  if (!build?.blockedReason || !build?.blockedDanger?.event) return { visible: false, available: false, reason: "" };
+  return {
+    visible: true,
+    available: true,
+    title: build.blockedDanger.event.title ?? "Road Danger",
+    reason: camp?.rested
+      ? "Spend the next travel day clearing the danger that blocked this road segment."
+      : "Go back out before resting to clear the danger that blocked this road segment today.",
+  };
+}
+
 function travelMarkManualRoadBuildSafe() {
   const build = state?.world?.travelCamp?.manualRoadBuild;
   if (!build) return;
   build.safe = true;
   build.pendingDanger = false;
   build.blockedReason = "";
+  build.blockedDanger = null;
 }
 
-function travelBlockManualRoadBuild(reason = "Road work is postponed until the danger here is cleared.") {
+function travelBlockManualRoadBuild(reason = "Road work is postponed until the danger here is cleared.", blockedDanger = null) {
   const build = state?.world?.travelCamp?.manualRoadBuild;
   if (!build) return;
   build.safe = false;
   build.pendingDanger = false;
   build.blockedReason = reason;
+  if (blockedDanger) build.blockedDanger = cloneData(blockedDanger);
 }
 
 function buildManualRoadSegmentAtCamp() {
@@ -10733,6 +10748,7 @@ function renderTravelCampMenu() {
   const comfort = ` ${travelCampComfortSummary()}.`;
   const hunger = ` ${travelCampHungerSummary()}`;
   const manualRoadStatus = travelCampManualRoadBuildState(camp);
+  const blockedRoadDanger = travelCampBlockedRoadDangerState(camp);
   const roadWork = manualRoadStatus.visible
     ? ` Road work: ${manualRoadStatus.built ? "this segment is already marked" : manualRoadStatus.reason}`
     : "";
@@ -10751,6 +10767,7 @@ function renderTravelCampMenu() {
       forage: els[`${prefix}Forage`],
       hungryRest: els[`${prefix}HungryRest`],
       buildRoad: els[`${prefix}BuildRoad`],
+      clearRoadDanger: els[`${prefix}ClearRoadDanger`],
       longRest: els[`${prefix}LongRest`],
       exploreHere: els[`${prefix}ExploreHere`],
       ventureOffTrack: els[`${prefix}VentureOffTrack`],
@@ -10802,6 +10819,12 @@ function renderTravelCampMenu() {
       panel.buildRoad.disabled = !manualRoadStatus.available;
       panel.buildRoad.textContent = manualRoadStatus.built ? "Road Built" : "Build Road Segment";
       panel.buildRoad.title = manualRoadStatus.reason || "Spend a Road-Building Kit to mark today's safe route segment.";
+    }
+    if (panel.clearRoadDanger) {
+      panel.clearRoadDanger.classList.toggle("hidden", !blockedRoadDanger.visible);
+      panel.clearRoadDanger.disabled = !blockedRoadDanger.available;
+      panel.clearRoadDanger.textContent = "Clear Road Danger";
+      panel.clearRoadDanger.title = blockedRoadDanger.reason || "Clear the danger before building this road segment.";
     }
     if (panel.longRest) panel.longRest.disabled = !mealResolved || rested;
     if (panel.exploreHere) {
@@ -10866,6 +10889,91 @@ function travelHungryRestAtCamp() {
     return;
   }
   travelFinishCampRest({ hungry: true });
+}
+
+async function travelClearBlockedRoadDanger() {
+  state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state.world;
+  const camp = travelCampState();
+  const build = camp.manualRoadBuild;
+  const blocked = build?.blockedDanger;
+  const event = blocked?.event;
+  if (!camp.active || !build?.blockedReason || !event) {
+    addLog("There is no stored road danger to clear from this camp.", "important");
+    renderTravelCampMenu();
+    return false;
+  }
+  const here = travelNormalizeHex(state.world?.currentHex ?? camp.at ?? build.to);
+  if (!here) return false;
+  const spentNewDay = Boolean(camp.rested);
+  const placeName = travelPlaceLabelForHex(here);
+  const departureDay = normalizeWorldDay(state.worldDay);
+  if (spentNewDay) {
+    advanceWorldDay(1);
+    camp.day = normalizeWorldDay(state.worldDay);
+    camp.mealResolved = false;
+    camp.foodSource = "";
+    camp.refreshmentId = "";
+    camp.refreshmentName = "";
+    camp.forage = null;
+    camp.hungryRest = false;
+    camp.rested = false;
+    camp.summary = `After spending the day clearing danger around ${placeName}, the party makes camp again.`;
+  }
+  hideTravelCampMenu();
+  showTravelMapMenu();
+  centerTravelMapOnHex(here, "smooth");
+  await showTravelMapNotice({
+    kicker: spentNewDay ? "Road Work Day" : "Before Rest",
+    title: event.title ?? "Road Danger",
+    message: spentNewDay
+      ? `The party spends the day dealing with the danger that blocked the road near ${placeName}.`
+      : `Before settling in, the party goes back out to deal with the danger that blocked the road near ${placeName}.`,
+    confirmText: "Face It",
+  });
+  const tile = travelBiomeForHex(here);
+  const feature = travelFeatureForHex(here);
+  const boardQuest = blocked.boardQuestId ? settlementBoardQuestAtHex(here) : null;
+  const context = {
+    from: travelNormalizeHex(build.from) ?? here,
+    to: here,
+    fromName: travelPlaceLabelForHex(build.from) || placeName,
+    destinationName: placeName,
+    departureDay,
+    revisitingBlockedRoad: true,
+    manualRoadBuild: true,
+    pendingRoadBuilds: [],
+    tile,
+    biomeGroup: window.DepthboundWorldTravel?.biomeGroup?.(tile) ?? window.DepthboundWorldNames?.biomeGroup?.(tile) ?? String(tile).split("_")[0],
+    feature,
+    kind: feature ? (feature.kind || feature.nameKind || window.DepthboundWorldNames?.structureKind?.(feature.tile) || "") : "",
+    boardQuest,
+  };
+  travelRecordEvent(event, context);
+  const choices = (event.choices ?? []).map((choice) => ({
+    value: choice.id,
+    label: choice.label,
+    description: travelChoiceDescriptionWithDanger(choice, context),
+  }));
+  const choiceId = await showTravelMapChoiceDialog({
+    kicker: "Road Danger",
+    title: event.title ?? "Road Danger",
+    message: event.text ?? "The danger remains near the unfinished road.",
+    choices,
+  });
+  const choice = (event.choices ?? []).find((entry) => entry.id === choiceId) ?? travelFallbackEventChoice(event);
+  const result = await travelResolveEventOutcome(event, choice, context);
+  if (result === "dungeon") return true;
+  if (result === "road-blocked") {
+    travelBlockManualRoadBuild("Road work is still postponed. The danger here has not been cleared.", context.blockedRoadDanger ?? blocked);
+    showTravelCampMenu();
+    window.DepthboundPlaytest?.syncNow?.();
+    return true;
+  }
+  travelMarkManualRoadBuildSafe();
+  addLog(`The danger near ${placeName} is cleared. The road segment can now be built from camp.`, "important");
+  showTravelCampMenu();
+  window.DepthboundPlaytest?.syncNow?.();
+  return true;
 }
 
 function travelArriveHome(destinationName = "home") {
@@ -11306,6 +11414,20 @@ function travelEventCanBlockRoadBuild(event = null) {
   );
 }
 
+function travelRememberBlockedRoadDanger(context = {}, event = {}, choice = null, outcome = {}) {
+  if (!context || (!context.pendingRoadBuilds?.length && !context.manualRoadBuild)) return;
+  context.blockedRoadDanger = {
+    event: cloneData(event),
+    choiceId: choice?.id ?? "",
+    outcome: cloneData(outcome),
+    at: cloneData(travelNormalizeHex(context.to) ?? travelNormalizeHex(state?.world?.currentHex)),
+    featureId: context.feature?.id ?? "",
+    boardQuestId: context.boardQuest?.id ?? "",
+    title: event?.title ?? "Road Danger",
+    storedAtDay: normalizeWorldDay(state.worldDay),
+  };
+}
+
 function travelPrepareReturnCamp(event, context = {}, options = {}) {
   state.travelReturnCamp = {
     eventId: event?.id ?? "",
@@ -11315,6 +11437,7 @@ function travelPrepareReturnCamp(event, context = {}, options = {}) {
     boardQuestId: context.boardQuest?.id ?? "",
     questTargetHex: context.boardQuest?.targetHex ? cloneData(context.boardQuest.targetHex) : null,
     pendingRoadBuilds: Array.isArray(context.pendingRoadBuilds) ? cloneData(context.pendingRoadBuilds) : [],
+    clearBlockedRoad: Boolean(context.revisitingBlockedRoad),
     world: cloneData(state.world),
     camp: cloneData(state.world?.travelCamp ?? null),
     lockRetreat: Boolean(options.lockRetreat),
@@ -11469,6 +11592,7 @@ async function travelResolveEventOutcome(event, choice, context = {}) {
       confirmText: "Make Camp",
     });
     if (context.feature && !outcome.noResolve) travelMarkStructureResolved(context.feature, event, { text: summary }, summary);
+    travelRememberBlockedRoadDanger(context, event, choice, outcome);
     return "road-blocked";
   }
   const resultSummary = await travelShowEventResult(event, outcome, context, checkResult);
@@ -11478,7 +11602,10 @@ async function travelResolveEventOutcome(event, choice, context = {}) {
   if (outcome.fight) return (await travelStartEventSkirmish(event, outcome, context)) ? "dungeon" : "handled";
   if (outcome.dungeon) return (await travelStartEventDungeon(event, outcome, context)) ? "dungeon" : "handled";
   if (outcome.campaign) return (await travelStartEventCampaign(event, outcome, context)) ? "dungeon" : "handled";
-  if ((context.pendingRoadBuilds?.length || context.manualRoadBuild) && travelEventCanBlockRoadBuild(event)) return "road-blocked";
+  if ((context.pendingRoadBuilds?.length || context.manualRoadBuild) && travelEventCanBlockRoadBuild(event)) {
+    travelRememberBlockedRoadDanger(context, event, choice, outcome);
+    return "road-blocked";
+  }
   return "handled";
 }
 
@@ -11763,7 +11890,8 @@ async function travelOneDay(options = {}) {
   renderTravelMap();
   render();
   if (!forceWilderness) {
-    const structureEventResult = await travelResolveStructureEvent({ from, to, via, fromName, destinationName, departureDay, roadDoubleSpeed, pendingRoadBuilds, manualRoadBuild: Boolean(manualRoadBuild) });
+    const structureContext = { from, to, via, fromName, destinationName, departureDay, roadDoubleSpeed, pendingRoadBuilds, manualRoadBuild: Boolean(manualRoadBuild) };
+    const structureEventResult = await travelResolveStructureEvent(structureContext);
     if (structureEventResult === "dungeon") return true;
     if (structureEventResult === "handled") {
       travelMarkManualRoadBuildSafe();
@@ -11773,17 +11901,18 @@ async function travelOneDay(options = {}) {
     }
     if (structureEventResult === "road-blocked") {
       if (pendingRoadBuilds.length) addLog("Road work is postponed. The party must clear the danger here before a road can be marked safely.", "important");
-      travelBlockManualRoadBuild("Road work is postponed. The party must clear the danger here before a road can be marked safely.");
+      travelBlockManualRoadBuild("Road work is postponed. The party must clear the danger here before a road can be marked safely.", structureContext.blockedRoadDanger);
       showTravelCampMenu();
       window.DepthboundPlaytest?.syncNow?.();
       return true;
     }
   }
-  const eventResult = await travelResolveEmptyHexEvent({ from, to, via, fromName, destinationName, departureDay, roadDoubleSpeed, forceWilderness, pendingRoadBuilds, manualRoadBuild: Boolean(manualRoadBuild) });
+  const emptyContext = { from, to, via, fromName, destinationName, departureDay, roadDoubleSpeed, forceWilderness, pendingRoadBuilds, manualRoadBuild: Boolean(manualRoadBuild) };
+  const eventResult = await travelResolveEmptyHexEvent(emptyContext);
   if (eventResult === "dungeon") return true;
   if (eventResult === "road-blocked") {
     if (pendingRoadBuilds.length) addLog("Road work is postponed. The party must clear the danger here before a road can be marked safely.", "important");
-    travelBlockManualRoadBuild("Road work is postponed. The party must clear the danger here before a road can be marked safely.");
+    travelBlockManualRoadBuild("Road work is postponed. The party must clear the danger here before a road can be marked safely.", emptyContext.blockedRoadDanger);
     showTravelCampMenu();
     window.DepthboundPlaytest?.syncNow?.();
     return true;
