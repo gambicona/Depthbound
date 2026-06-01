@@ -8944,6 +8944,12 @@ function travelCampManualRoadBuildState(camp = state?.world?.travelCamp) {
   const to = travelNormalizeHex(build?.to);
   if (!build || !from || !to || travelSameHex(from, to)) return { visible: false, available: false, reason: "" };
   if (travelCampIsInn(camp)) return { visible: false, available: false, reason: "" };
+  if (build.blockedReason && !build.blockedDanger?.event) {
+    build.safe = true;
+    build.pendingDanger = false;
+    build.blockedReason = "";
+    build.blockedDanger = null;
+  }
   if (build.built || travelRoadEdgeBuilt(from, to)) {
     return {
       visible: true,
@@ -11402,18 +11408,6 @@ async function travelConfirmDangerousFight(outcome = {}, context = {}) {
   return choice === "fight";
 }
 
-function travelOutcomeStartsDanger(outcome = {}) {
-  return Boolean(outcome?.fight || outcome?.dungeon || outcome?.campaign);
-}
-
-function travelEventCanBlockRoadBuild(event = null) {
-  return (event?.choices ?? []).some((choice) =>
-    travelOutcomeStartsDanger(choice?.outcome) ||
-    travelOutcomeStartsDanger(choice?.success) ||
-    travelOutcomeStartsDanger(choice?.failure),
-  );
-}
-
 function travelRememberBlockedRoadDanger(context = {}, event = {}, choice = null, outcome = {}) {
   if (!context || (!context.pendingRoadBuilds?.length && !context.manualRoadBuild)) return;
   context.blockedRoadDanger = {
@@ -11602,10 +11596,6 @@ async function travelResolveEventOutcome(event, choice, context = {}) {
   if (outcome.fight) return (await travelStartEventSkirmish(event, outcome, context)) ? "dungeon" : "handled";
   if (outcome.dungeon) return (await travelStartEventDungeon(event, outcome, context)) ? "dungeon" : "handled";
   if (outcome.campaign) return (await travelStartEventCampaign(event, outcome, context)) ? "dungeon" : "handled";
-  if ((context.pendingRoadBuilds?.length || context.manualRoadBuild) && travelEventCanBlockRoadBuild(event)) {
-    travelRememberBlockedRoadDanger(context, event, choice, outcome);
-    return "road-blocked";
-  }
   return "handled";
 }
 
