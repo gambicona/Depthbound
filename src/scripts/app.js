@@ -1051,6 +1051,9 @@ els.villageMenu?.addEventListener("click", (event) => {
   if (button?.dataset.action === "claim-road-project") {
     claimExpeditionRoadProject(button.dataset.project);
   }
+  if (button?.dataset.action === "buy-road-kit") {
+    buyExpeditionRoadKit();
+  }
   if (button?.dataset.action === "start-expedition-milepost") {
     void startExpeditionMilepostMission(button.dataset.index);
   }

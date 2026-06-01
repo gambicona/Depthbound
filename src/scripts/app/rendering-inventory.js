@@ -8812,6 +8812,7 @@ function travelHexAdjacent(a, b) {
 }
 
 const roadBuildingKitItemId = "road-building-kit";
+const expeditionRoadKitPurchaseCp = 5000;
 
 function travelHexKeyForHex(hex = null) {
   const target = travelNormalizeHex(hex);
@@ -18669,6 +18670,14 @@ function expeditionRoadProjectsMarkup() {
         <div><span>Built Segments</span><b>${escapeHtml(builtCount)}</b></div>
         <div><span>Ready Reports</span><b>${escapeHtml(ready.length)}</b></div>
       </div>
+      <article class="guild-contract-row">
+        <div>
+          <b>Emergency Road-Building Kit</b>
+          <span>Buy one extra kit from the Expedition Board. It is costly, but it can save a project if the party spent its issued kits poorly.</span>
+          <small>Price: ${escapeHtml(priceText(expeditionRoadKitPurchaseCp))}. Party purse: ${escapeHtml(moneyText(partyPurse()))}.</small>
+        </div>
+        <button type="button" data-action="buy-road-kit" ${moneyToCp(partyPurse()) >= expeditionRoadKitPurchaseCp ? "" : "disabled"}>Buy Kit</button>
+      </article>
       <div class="guild-contract-list">
         ${
           active.length
@@ -18729,6 +18738,20 @@ function claimExpeditionRoadProject(projectId = "") {
   addLog(`The Expedition Board files ${project.targetLabel} as road-linked. ${priceText(project.rewardCp)} and ${project.bonusKits} spare kit${project.bonusKits === 1 ? "" : "s"} added. Reputation +${project.reputation}.`, "important");
   render();
   expeditionBoardApi.setBoardPanel?.("roads");
+}
+
+function buyExpeditionRoadKit() {
+  if (!spendMoney(partyPurse(), expeditionRoadKitPurchaseCp)) {
+    addLog(`The Expedition Board sells emergency Road-Building Kits for ${priceText(expeditionRoadKitPurchaseCp)} each.`, "important");
+    expeditionBoardApi.setBoardPanel?.("roads");
+    return false;
+  }
+  addTravelRoadKits(1);
+  addLog(`The party buys 1 emergency Road-Building Kit from the Expedition Board for ${priceText(expeditionRoadKitPurchaseCp)}.`, "important");
+  expeditionBoardApi.setBoardPanel?.("roads");
+  renderQuestLogButton();
+  window.DepthboundPlaytest?.syncNow?.();
+  return true;
 }
 
 function expeditionRoadQuestLogEntries() {
