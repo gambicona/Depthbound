@@ -1,0 +1,191 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hexagonal World Builder</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <aside class="sidebar" aria-label="World builder tools">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <div>
+        <h1>World Builder</h1>
+        <p id="mapMeta">12 x 12 biome layer</p>
+      </div>
+    </div>
+
+    <section class="panel">
+      <h2>Map</h2>
+      <div class="field-grid">
+        <label>
+          Width
+          <input id="mapWidth" type="number" min="1" max="40" value="12">
+        </label>
+        <label>
+          Height
+          <input id="mapHeight" type="number" min="1" max="40" value="12">
+        </label>
+      </div>
+      <button id="resizeMap" class="primary">Apply Size</button>
+    </section>
+
+    <section class="panel">
+      <h2>Layer</h2>
+      <div class="tool-row layer-row" role="group" aria-label="Layer selection">
+        <button class="layer-button is-active" data-layer="biome" title="Biome layer">Biome</button>
+        <button class="layer-button" data-layer="middle" title="Lake, river, and road layer">Water/Road</button>
+        <button class="layer-button" data-layer="paths" title="Editable path layer">Paths</button>
+        <button class="layer-button" data-layer="structures" title="Structure layer">Structures</button>
+      </div>
+    </section>
+
+    <section class="panel layer-panel" data-layer-panel="biome">
+      <h2>Biome Brush</h2>
+      <div class="generator-box">
+        <div class="segmented" role="group" aria-label="Generator mode">
+          <button id="singleMapMode" class="secondary is-active" type="button">Single Map</button>
+          <button id="bigMapMode" class="secondary" type="button">Big Map</button>
+        </div>
+        <div id="bigMapControls" class="big-map-controls is-hidden">
+          <div class="field-grid">
+            <label>
+              Chunk X
+              <input id="chunkX" type="number" step="1" value="0">
+            </label>
+            <label>
+              Chunk Y
+              <input id="chunkY" type="number" step="1" value="0">
+            </label>
+          </div>
+          <div class="tool-row">
+            <button id="generateChunk" class="secondary" type="button">Generate Chunk</button>
+            <button id="saveChunk" class="secondary" type="button">Save Chunk</button>
+          </div>
+          <label>
+            World Export Hex Pixels
+            <input id="worldExportHexHeight" type="number" min="4" max="128" value="24">
+          </label>
+          <div class="tool-row">
+            <button id="exportWorldPng" class="secondary" type="button">World PNG</button>
+            <button id="exportWorldJpg" class="secondary" type="button">World JPG</button>
+          </div>
+          <div id="chunkGrid" class="chunk-grid" aria-label="Big map chunk grid"></div>
+        </div>
+      </div>
+      <div class="tool-row">
+        <button id="generateBiomes" class="secondary">Generate Biomes</button>
+      </div>
+      <div id="tilePalette" class="palette" aria-label="Biome tile palette"></div>
+    </section>
+
+    <section class="panel layer-panel is-hidden" data-layer-panel="middle">
+      <h2>Water/Road</h2>
+      <div id="middlePalette" class="palette" aria-label="Lake and river tile palette"></div>
+      <div class="tool-row">
+        <button id="riverTool" class="secondary">River Tool</button>
+      </div>
+      <div class="tool-row">
+        <button class="road-tool secondary" data-road-type="dirt">Dirt Road</button>
+        <button class="road-tool secondary" data-road-type="street">Street</button>
+      </div>
+    </section>
+
+    <section class="panel layer-panel is-hidden" data-layer-panel="paths">
+      <h2>Path Tool</h2>
+      <div id="pathPalette" class="palette" aria-label="Path material palette"></div>
+      <div class="tool-row">
+        <button id="togglePathClosed" class="secondary">Toggle Closed</button>
+      </div>
+    </section>
+
+    <section class="panel layer-panel is-hidden" data-layer-panel="structures">
+      <h2>Structures</h2>
+      <div id="structurePalette" class="palette" aria-label="Structure tile palette"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Tools</h2>
+      <div class="tool-row" role="group" aria-label="Paint tools">
+        <button class="tool is-active" data-tool="paint" title="Paint">Paint</button>
+        <button class="tool" data-tool="erase" title="Erase">Erase</button>
+      </div>
+      <div class="tool-row">
+        <button id="clearMap" class="secondary danger">Clear</button>
+      </div>
+      <div class="tool-row">
+        <button id="exportMap" class="secondary">Export JSON</button>
+        <label class="file-button">
+          Import
+          <input id="importMap" type="file" accept="application/json,.json">
+        </label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Image Export</h2>
+      <label>
+        Hex Height Pixels
+        <input id="exportHexHeight" type="number" min="4" max="512" value="172">
+      </label>
+      <div class="tool-row">
+        <button id="exportPng" class="secondary">Export PNG</button>
+        <button id="exportJpg" class="secondary">Export JPG</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Water Controls</h2>
+      <label class="range-field">
+        River Mouth Width
+        <input id="riverWidth" type="range" min="8" max="80" step="1" value="34">
+      </label>
+      <label class="range-field">
+        Road Width
+        <input id="roadWidth" type="range" min="8" max="48" step="1" value="18">
+      </label>
+      <label class="range-field">
+        Path Width
+        <input id="pathWidth" type="range" min="4" max="96" step="1" value="24">
+      </label>
+      <label class="range-field">
+        Path Smoothing
+        <input id="pathSmoothing" type="range" min="0" max="1" step="0.05" value="0.45">
+      </label>
+      <label class="range-field">
+        Size
+        <input id="middleScale" type="range" min="0.35" max="2.5" step="0.05" value="1">
+      </label>
+      <label class="range-field">
+        Rotation
+        <input id="middleRotation" type="range" min="-180" max="180" step="1" value="0">
+      </label>
+      <div class="tool-row">
+        <button id="rotateLeft" class="secondary">Rotate Left</button>
+        <button id="rotateRight" class="secondary">Rotate Right</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>View</h2>
+      <label class="range-field">
+        Zoom
+        <input id="zoomControl" type="range" min="0.55" max="1.45" step="0.05" value="1">
+      </label>
+      <button id="centerMap" class="secondary">Center</button>
+    </section>
+  </aside>
+
+  <main class="workspace">
+    <div class="topbar">
+      <div id="statusText">Paint with the selected biome tile.</div>
+      <div class="hint">Biomes snap to hexes | Water and paths place freely | Wheel variants/rotate | Right-drag to pan</div>
+    </div>
+    <canvas id="worldCanvas" aria-label="Hexagonal world map canvas"></canvas>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
+

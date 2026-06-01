@@ -1,0 +1,347 @@
+1. More Bottom-Layer Biome Tiles
+
+These should stay “pure terrain”: no buildings, no roads, no rivers, no ruins.
+
+Grassland Variants
+open meadow
+flower meadow
+rocky grassland
+rolling hills
+dry savanna grassland
+farmland-ready plain
+windswept steppe
+Arctic Variants
+snow plain
+frozen lake / ice sheet
+rocky tundra
+glacier field
+snowy pine edge
+cracked ice
+aurora-tinted magical snowfield
+Mountain Variants
+rocky mountain
+snowy mountain
+green highland mountain
+cliff plateau
+canyon mountain
+volcanic mountain
+crystal mountain
+Swamp Variants
+muddy marsh
+reed marsh
+dead-tree bog
+toxic green swamp
+flooded swamp
+misty fen
+blackwater swamp
+Volcano Variants
+basalt field
+lava cracks
+lava lake
+ash plain
+obsidian field
+magma vent
+sulfur wasteland
+Desert Variants
+sand dunes
+rocky desert
+cracked dry earth
+oasis base
+salt flat
+red desert
+desert canyon
+Forest Variants
+light woodland
+dense pine forest
+autumn forest
+dark forest
+birch forest
+ancient forest
+burned forest
+Jungle Variants
+dense jungle
+vine jungle
+wet jungle floor
+jungle hills
+overgrown stone terrain
+mangrove jungle
+giant-leaf jungle
+Ocean / Sea Variants
+shallow sea
+deep ocean
+coral reef
+stormy sea
+icy sea
+dark abyssal sea
+kelp forest sea
+Extra Biomes Worth Adding
+badlands
+taiga
+savanna
+highland
+wasteland
+mushroom biome
+corrupted land
+crystal field
+underground cavern
+fungal cave
+magical faewild forest
+shadowfell-like deadland
+floating island base
+ashland
+moonlit silver plain
+2. Middle-Layer Overlay Tiles
+
+These are the most important for making the map flexible. They should be semi-independent overlays that can sit on many biomes.
+
+Water Overlays
+River Pieces
+river straight
+river curve
+river fork
+river three-way junction
+river source / spring
+river mouth into sea
+wide river
+narrow stream
+frozen river
+lava river
+toxic swamp river
+Lakes and Ponds
+small pond
+large lake center
+lake edge
+frozen lake
+swamp pool
+volcanic lava pool
+oasis water
+magical glowing pool
+Coast Pieces
+straight coast
+curved coast
+beach edge
+rocky coast
+cliff coast
+ice coast
+jungle coast
+swamp coast
+desert coast
+volcanic coast
+3. Path and Travel Overlays
+
+These should sit above biome, below buildings.
+
+Roads
+dirt road straight
+dirt road curve
+dirt road fork
+stone road straight
+stone road curve
+bridge road
+ruined road
+snowy road
+desert caravan trail
+jungle overgrown trail
+Special Travel Routes
+mountain pass
+canyon path
+swamp boardwalk
+forest trail
+underground tunnel entrance
+ferry crossing
+rope bridge
+magical portal path
+rail track / minecart track
+ancient paved causeway
+4. Top-Layer Structure Tiles
+
+These sit on top of the biome and should be modular. They can cover part of a hex but should not fully replace the biome identity unless they are major settlements.
+
+Settlements
+tiny hamlet
+farming village
+fishing village
+forest village
+desert village
+mountain village
+swamp village
+jungle village
+arctic village
+ruined village
+fortified village
+large city district
+capital city tile
+harbor town
+nomad camp
+Military / Defensive
+watchtower
+wooden palisade camp
+stone fort
+mountain fortress
+ruined castle
+active castle
+border outpost
+siege camp
+bandit camp
+knightly keep
+wizard tower
+coastal fort
+Religious / Magical
+small shrine
+forest shrine
+desert temple
+ruined temple
+sun temple
+moon shrine
+necromancer altar
+druid circle
+standing stones
+magical obelisk
+portal ruin
+crystal shrine
+elemental altar: fire
+elemental altar: water
+elemental altar: earth
+elemental altar: air
+Economy / Resources
+lumber camp
+quarry
+iron mine
+coal mine
+gold mine
+crystal mine
+fishing camp
+hunting lodge
+farmstead
+windmill
+watermill
+vineyard
+market camp
+caravan stop
+forge settlement
+salt mine
+herb garden
+alchemist hut
+Dungeon Entrances
+cave entrance
+mine entrance
+crypt entrance
+ruined stairway
+sewer entrance
+ancient gate
+jungle ruin doorway
+desert tomb entrance
+volcano cave
+ice cave
+swamp sinkhole
+forest burrow
+spider nest entrance
+dragon cave
+abyssal rift
+glowing portal
+5. Monster / Encounter Landmark Tiles
+
+These are useful for world-map encounters without needing full structure tiles.
+
+dragon lair
+giant nest
+wyvern peak
+spider web grove
+troll bridge
+goblin camp
+bandit hideout
+undead graveyard
+haunted battlefield
+beast den
+elemental rift
+demon scar
+cursed tree
+giant skeleton
+monster bones
+kraken reef
+siren rocks
+manticore cliffs
+hydra swamp
+chimera nest
+6. Ruin Tiles
+
+These are probably very valuable for your game style.
+
+small ruin
+overgrown ruin
+desert ruin
+jungle ruin
+arctic ruin
+sunken ruin
+swamp ruin
+volcanic ruin
+broken tower
+ruined bridge
+collapsed gate
+ancient arena
+old battlefield
+broken statue
+shattered temple
+buried city remains
+7. Hazard / World-State Overlay Tiles
+
+These can make the same biome feel dangerous or changed.
+
+burning forest
+forest fire edge
+corrupted ground
+cursed mist
+plague fog
+ashfall
+magical storm
+blizzard
+sandstorm
+toxic gas
+lava eruption
+earthquake cracks
+flood overlay
+drought overlay
+battlefield smoke
+monster infestation
+spider webs
+undead corruption
+demonic corruption
+fae glow
+arcane anomaly
+8. Strong Starter Expansion Pack
+
+For the next practical batch, I would make these:
+
+Bottom Tiles
+grassland hills
+rocky desert
+dense dark forest
+rocky coast
+highland
+badlands
+mushroom cave
+crystal field
+corrupted wasteland
+ashland
+Middle Tiles
+river straight
+river curve
+river fork
+lake
+coast edge
+dirt road straight
+dirt road curve
+road fork
+bridge
+mountain pass
+Top Tiles
+village
+castle
+watchtower
+ruined temple
+cave entrance
+mine entrance
+farm
+harbor
+wizard tower
+bandit camp
