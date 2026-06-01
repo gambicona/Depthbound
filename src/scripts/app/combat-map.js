@@ -4079,6 +4079,14 @@ function checkDungeonCompletion(hero = activeHero()) {
     if (travelReturnCamp?.world && travelReturnCamp?.camp) {
       const world = window.DepthboundWorldTravel?.normalizeWorldState?.(travelReturnCamp.world) ?? travelReturnCamp.world;
       world.travelCamp = { ...travelReturnCamp.camp, active: true };
+      if (world.travelCamp?.manualRoadBuild?.pendingDanger) {
+        world.travelCamp.manualRoadBuild = {
+          ...world.travelCamp.manualRoadBuild,
+          safe: true,
+          pendingDanger: false,
+          blockedReason: "",
+        };
+      }
       if (travelReturnCamp.structureId) {
         world.visitedStructures = world.visitedStructures && typeof world.visitedStructures === "object" ? world.visitedStructures : {};
         const current = world.visitedStructures[travelReturnCamp.structureId] && typeof world.visitedStructures[travelReturnCamp.structureId] === "object"
