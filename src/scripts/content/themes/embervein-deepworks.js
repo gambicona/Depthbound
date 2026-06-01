@@ -1,7 +1,7 @@
 (() => {
 window.DungeonContent.register("themes", "emberveinDeepworks", {
-  name: "The Embervein Deepworks",
-  description: "A forge-mine dungeon for farming stone, iron, and coal, with fire/earth elementals, steam, devils, and industrial hazards.",
+  name: "Mine Dungeon",
+  description: "Old rails, ore seams, broken lifts, hot vents, and things that learned to live in the dark below.",
   music: {
     exploration: "assets/sounds/music/emberveinDeepworks-exploration.mp3",
     combat: "assets/sounds/music/emberveinDeepworks-combat.mp3",

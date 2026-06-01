@@ -3021,7 +3021,12 @@ async function startNewAdventure() {
     initialDungeonState.fighters.hero.unusedFeatChoiceCredits =
       (initialDungeonState.fighters.hero.unusedFeatChoiceCredits ?? 0) + heroOptions.skippedStartingFeatChoiceCount;
   }
-  state = createHomeState([initialDungeonState.fighters.hero], [], { cp: 0, sp: 0, gp: 0 }, { ...initialDungeonState.party, partyTomes: initialDungeonState.partyTomes ?? [] });
+  const initialWorld = await window.DepthboundWorldTravel?.createInitialWorldState?.({
+    seed: `adventure:${slotId}:${chosenName || "hero"}:${Date.now()}`,
+    chunkWidth: 10,
+    chunkHeight: 10,
+  });
+  state = createHomeState([initialDungeonState.fighters.hero], [], { cp: 0, sp: 0, gp: 0 }, { ...initialDungeonState.party, partyTomes: initialDungeonState.partyTomes ?? [], world: initialWorld });
   state.saveSlotId = slotId;
   activeSaveSlot = slotId;
   await saveAdventure(slotId, { skipOverwriteWarning: true, slotName });
@@ -3041,7 +3046,19 @@ function availableDungeonThemes() {
   return window.DungeonContent
     .list("themes")
     .filter((theme) => !theme.hidden)
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => dungeonThemePlayerName(a).localeCompare(dungeonThemePlayerName(b)));
+}
+
+function dungeonThemePlayerName(themeOrId) {
+  const theme = typeof themeOrId === "string" ? getContentDefinition("themes", themeOrId) : themeOrId;
+  if (theme?.id === "emberveinDeepworks") return "Mine Dungeon";
+  return theme?.name ?? "this dungeon";
+}
+
+function dungeonThemePlayerDescription(themeOrId) {
+  const theme = typeof themeOrId === "string" ? getContentDefinition("themes", themeOrId) : themeOrId;
+  if (theme?.id === "emberveinDeepworks") return "Old rails, ore seams, broken lifts, hot vents, and things that learned to live in the dark below.";
+  return theme?.description ?? "";
 }
 
 function availableCustomDungeons() {
@@ -3052,7 +3069,7 @@ async function chooseDungeonChoice() {
   const themes = availableDungeonThemes();
   const customDungeons = availableCustomDungeons();
   const choices = [
-    ...themes.map((theme) => ({ value: `theme:${theme.id}`, label: theme.name, description: theme.description })),
+    ...themes.map((theme) => ({ value: `theme:${theme.id}`, label: dungeonThemePlayerName(theme), description: dungeonThemePlayerDescription(theme) })),
     ...customDungeons.map((dungeon) => ({ value: `custom:${dungeon.id}`, label: `Custom: ${dungeon.name}` })),
   ];
   if (choices.length <= 1) return choices[0]?.value ?? `theme:${defaultContent.theme}`;
@@ -3068,8 +3085,8 @@ async function chooseRandomDungeonChoice() {
   if (themes.length <= 1) return themes[0]?.id ?? defaultContent.theme;
   const themeId = await showChoiceDialog({
     title: "Random Runs",
-    message: "Choose a dungeon theme.",
-    choices: themes.map((theme) => ({ value: theme.id, label: theme.name, description: theme.description })),
+    message: "Choose where the party ventures next.",
+    choices: themes.map((theme) => ({ value: theme.id, label: dungeonThemePlayerName(theme), description: dungeonThemePlayerDescription(theme) })),
   });
   return themeId;
 }
@@ -3101,7 +3118,7 @@ async function chooseDungeonSizeChoice(themeId) {
   }));
   return showChoiceDialog({
     title: "Choose Size",
-    message: `How large should ${theme?.name ?? "this dungeon"} be?`,
+    message: `How deep should the party push into ${dungeonThemePlayerName(theme)}?`,
     choices,
   });
 }
@@ -3246,8 +3263,8 @@ async function showCampaignMenu(campaignId) {
   });
 }
 
-async function startCampaignDungeon(campaignId) {
-  const dungeonIndex = await showCampaignMenu(campaignId);
+async function startCampaignDungeon(campaignId, options = {}) {
+  const dungeonIndex = options.dungeonIndex ?? (await showCampaignMenu(campaignId));
   if (!dungeonIndex) return;
   const template = await window.DungeonCampaigns?.dungeon(campaignId, dungeonIndex);
   if (!template) return;
@@ -3264,7 +3281,38 @@ async function startCampaignDungeon(campaignId) {
     });
   }
   const previousState = state;
-  state = createCustomDungeonStateFromTemplate(partyMembers, state, template);
+  if (template.generated) {
+    const generated = template.generated ?? {};
+    state = createDungeonStateForParty(
+      partyMembers,
+      previousState,
+      generated.themeId ?? template.themeId ?? defaultContent.theme,
+      generated.dungeonSizeId ?? template.dungeonSizeId ?? "small",
+      generated.generatorOverrides ?? {},
+    );
+    if (state) {
+      const entranceRoom = state.dungeon?.rooms?.find((room) => room.id === state.dungeon?.entranceRoomId) ?? state.dungeon?.rooms?.[0];
+      state.campaignId = template.campaignId ?? campaignId;
+      state.campaignIndex = template.campaignIndex ?? dungeonIndex;
+      state.customDungeonId = template.id;
+      state.room.name = template.name;
+      state.customDungeon = {
+        id: template.id,
+        name: template.name,
+        oneShotDungeon: Boolean(template.oneShotDungeon),
+        oneShotDungeonId: template.oneShotDungeonId ?? (template.oneShotDungeon ? template.id : null),
+        goal: template.goal ?? { type: "reachExit" },
+        monsterSummary: customDungeonMonsterSummary?.(state.fighters ?? {}) ?? {},
+        intro: template.intro ?? { text: "", images: [] },
+        outro: template.outro ?? { text: "", images: [] },
+        storyTriggers: Array.isArray(template.storyTriggers) ? cloneData(template.storyTriggers) : [],
+        storyTriggerHistory: {},
+      };
+      state.log = [{ text: dungeonArrivalLogText(template.name, entranceRoom?.name ?? "the entrance"), type: "important" }];
+    }
+  } else {
+    state = createCustomDungeonStateFromTemplate(partyMembers, state, template);
+  }
   if (!state) {
     state = previousState;
     return;
@@ -3284,10 +3332,19 @@ async function startCampaignDungeon(campaignId) {
 
 async function returnHomeEarly() {
   if (state.mode === "home" || state.mode === "combat" || !gameHasStarted) return;
+  if (travelEncounterLocksRetreat()) {
+    addLog(state.travelReturnCamp?.lockRetreatReason ?? "This encounter must be finished before the party can leave.", "important");
+    render();
+    return;
+  }
+  const travelReturnCamp = state.travelReturnCamp ? cloneData(state.travelReturnCamp) : null;
+  const returnsToCamp = Boolean(travelReturnCamp?.world && travelReturnCamp?.camp);
   const confirmed = await showGameDialog({
-    title: "Return Home",
-    message: "Return home now? Half your carried bag items and half your carried coins will be lost. Equipped items and home chest contents are safe.",
-    confirmText: "Return Home",
+    title: returnsToCamp ? "Return To Camp" : "Return Home",
+    message: returnsToCamp
+      ? "Return to camp now? Half your carried bag items and half your carried coins will be lost. Equipped items and the party inventory are safe."
+      : "Return home now? Half your carried bag items and half your carried coins will be lost. Equipped items and the party inventory are safe.",
+    confirmText: returnsToCamp ? "Return To Camp" : "Return Home",
     cancelText: "Stay Here",
   });
   if (!confirmed) return;
@@ -3306,6 +3363,31 @@ async function returnHomeEarly() {
   addMoney(hero.inventory.money, -lostCoins);
 
   const saveSlotId = state.saveSlotId ?? activeSaveSlot;
+  if (returnsToCamp) {
+    const world = window.DepthboundWorldTravel?.normalizeWorldState?.(travelReturnCamp.world) ?? travelReturnCamp.world;
+    world.travelCamp = { ...travelReturnCamp.camp, active: true };
+    state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, {
+      ...state.party,
+      worldDay: normalizeWorldDay(state.worldDay),
+      campaignProgress: state.campaignProgress ?? {},
+      questFlags: state.questFlags ?? {},
+      partyResources: state.partyResources ?? {},
+      partyTomes: state.partyTomes ?? [],
+      home: state.home,
+      monsterCompendium: state.monsterCompendium,
+      world,
+    });
+    state.saveSlotId = saveSlotId;
+    roomIsBuilt = false;
+    const lostItemText = lostItems.length ? lostItems.map((item) => item.name).join(", ") : "no items";
+    addLog(`${hero.name} retreats to camp, losing ${lostItemText} and ${moneyText(cpToMoney(lostCoins))}.`, "important");
+    if (movedMaterials > 0) addLog(`${movedMaterials} material${movedMaterials === 1 ? "" : "s"} stay safe in the party's Material Satchel.`, "important");
+    render();
+    showTravelCampMenu();
+    window.DepthboundPlaytest?.syncNow?.();
+    centerViewOnHero();
+    return;
+  }
   state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, {
     ...state.party,
     worldDay: normalizeWorldDay(state.worldDay) + 1,

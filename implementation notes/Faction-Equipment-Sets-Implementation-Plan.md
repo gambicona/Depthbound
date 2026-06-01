@@ -716,8 +716,8 @@ Recommended extra variants:
 - Trophy Lodge: longbow/greatbow/war bow variants, axe/handaxe variants.
 - Gravebinders: longsword/greatsword/warhammer variants where listed.
 - Crucible Collegium: staff/wand/quarterstaff variants should stay within their tier slot.
-- Antiquarian Society: rapier/cane-sword/staff/dagger variants as listed.
-- Expedition Board: battleaxe/warhammer/greatsword/greataxe variants as listed.
+- Antiquarian Society: rapier/quarterstaff/wand/staff/dagger variants as listed.
+- Expedition Board: battleaxe/warhammer/greatsword/greataxe/warhammer variants as listed.
 - Fighting Pit: longsword/greataxe/maul/warhammer/greatsword variants as listed.
 
 ## Implementation Steps

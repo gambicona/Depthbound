@@ -226,6 +226,7 @@ const els = {
   deleteSelected: document.querySelector("#delete-selected"),
   savedDungeons: document.querySelector("#saved-dungeons"),
   oneShotDungeons: document.querySelector("#one-shot-dungeons"),
+  settlementLayouts: document.querySelector("#settlement-layouts"),
   saveDungeon: document.querySelector("#save-dungeon"),
   campaignDungeons: document.querySelector("#campaign-dungeons"),
   saveCampaignOverride: document.querySelector("#save-campaign-override"),
@@ -1944,23 +1945,46 @@ async function renderCampaignDungeons() {
   renderCampaignSaveState();
 }
 
+async function renderSettlementLayouts() {
+  if (!els.settlementLayouts || !window.DungeonSettlementLayouts) return;
+  const entries = window.DungeonSettlementLayouts.list();
+  const body = entries.length
+    ? entries.map((entry) => `
+      <div class="creator-list-item">
+        <div>
+          <b>${escapeHtml(entry.name)}</b><br>
+          <span class="small-note">${escapeHtml(entry.kind === "camp" ? "Travel camp source" : "Inn source")} - ${escapeHtml(entry.id)}</span>
+        </div>
+        <div>
+          <button type="button" data-action="load-settlement-layout" data-id="${escapeAttribute(entry.id)}">Load</button>
+          <button type="button" class="ghost-button" data-action="load-original-settlement-layout" data-id="${escapeAttribute(entry.id)}">Built-In</button>
+        </div>
+      </div>
+    `).join("")
+    : `<p class="small-note">No settlement layouts found.</p>`;
+  els.settlementLayouts.innerHTML = creatorListCategory("Settlement Inns / Camps", body);
+}
+
 function renderCampaignSaveState() {
   if (!els.saveCampaignOverride) return;
   const campaignSource = state.campaignSource;
   const oneShotSource = state.oneShotSource;
-  els.saveCampaignOverride.disabled = !campaignSource && !oneShotSource;
+  const settlementLayoutSource = state.settlementLayoutSource;
+  els.saveCampaignOverride.disabled = !campaignSource && !oneShotSource && !settlementLayoutSource;
   els.saveCampaignOverride.textContent = campaignSource
     ? `Overwrite ${campaignSource.campaignName ?? campaignSource.campaignId} Dungeon ${campaignSource.campaignIndex}`
     : oneShotSource
       ? `Overwrite ${oneShotSource.name ?? oneShotSource.id}`
+      : settlementLayoutSource
+        ? `Overwrite ${settlementLayoutSource.name ?? settlementLayoutSource.id}`
     : "Overwrite Loaded Source";
   if (els.topSaveDungeon) {
-    els.topSaveDungeon.textContent = campaignSource || oneShotSource ? "Overwrite" : "Save";
+    els.topSaveDungeon.textContent = campaignSource || oneShotSource || settlementLayoutSource ? "Overwrite" : "Save";
   }
 }
 
 function hasLoadedSource() {
-  return Boolean(state.campaignSource || state.oneShotSource);
+  return Boolean(state.campaignSource || state.oneShotSource || state.settlementLayoutSource);
 }
 
 function canRerollRandomLayout() {
@@ -2021,6 +2045,7 @@ function renderAll() {
   renderRoomList();
   renderSelected();
   renderSavedDungeons();
+  void renderSettlementLayouts();
   renderCampaignSaveState();
   renderRandomLayoutControls();
   renderCreatorSummary();
@@ -2500,6 +2525,7 @@ function saveDungeon() {
   state.id = saved.id;
   state.campaignSource = null;
   state.oneShotSource = null;
+  state.settlementLayoutSource = null;
   setStatus(`Saved ${saved.name}. It will appear at the Home Door as a Custom dungeon.`);
   renderAll();
 }
@@ -2513,8 +2539,20 @@ function primarySaveDungeon() {
 }
 
 async function saveCampaignOverride() {
-  if (!state.campaignSource && !state.oneShotSource) {
-    setStatus("Load a main story or one-shot dungeon first.");
+  if (!state.campaignSource && !state.oneShotSource && !state.settlementLayoutSource) {
+    setStatus("Load a main story, one-shot, inn, or camp source first.");
+    return;
+  }
+  if (state.settlementLayoutSource) {
+    const template = templateFromState();
+    const saved = await window.DungeonSettlementLayouts?.saveSource?.(state.settlementLayoutSource.id, template);
+    if (!saved) {
+      setStatus("Could not save the settlement layout file. Run through playtest-server.js so Dungeon Creator can write game files.");
+      return;
+    }
+    setStatus(`Saved ${state.settlementLayoutSource.name ?? state.settlementLayoutSource.id} to its game file.`);
+    await renderSettlementLayouts();
+    renderAll();
     return;
   }
   if (state.oneShotSource) {
@@ -2568,8 +2606,18 @@ function loadTemplate(template, options = {}) {
         }
       : null
   );
+  state.settlementLayoutSource = options.settlementLayoutSource ?? (
+    template.settlementLayoutId
+      ? {
+          id: template.settlementLayoutId,
+          name: template.name ?? template.settlementLayoutId,
+        }
+      : null
+  );
   if (state.campaignSource) state.oneShotSource = null;
-  if (state.oneShotSource) state.campaignSource = null;
+  if (state.campaignSource || state.oneShotSource) state.settlementLayoutSource = null;
+  if (state.oneShotSource || state.settlementLayoutSource) state.campaignSource = null;
+  if (state.settlementLayoutSource) state.oneShotSource = null;
   state.gridSize = template.gridSize ?? template.dungeon?.gridSize ?? 36;
   state.rooms = clone(template.dungeon?.rooms ?? []);
   state.corridors = clone(template.dungeon?.corridors ?? []);
@@ -2625,6 +2673,7 @@ function newBlankDungeon() {
   state.exit = null;
   state.campaignSource = null;
   state.oneShotSource = null;
+  state.settlementLayoutSource = null;
   state.start = null;
   state.selectedId = "";
   state.connectFromRoomId = "";
@@ -3050,6 +3099,29 @@ async function init() {
       }
       renderOneShotDungeons();
       setStatus("One-shot override removed. The original JSON dungeon will be used again.");
+    }
+  });
+  els.settlementLayouts?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-action]");
+    if (!button) return;
+    const layoutId = button.dataset.id;
+    const entry = window.DungeonSettlementLayouts?.list?.().find((item) => item.id === layoutId);
+    if (button.dataset.action === "load-settlement-layout") void window.DungeonSettlementLayouts?.get?.(layoutId).then((template) => {
+      if (!template) {
+        setStatus("Could not load that settlement layout.");
+        return;
+      }
+      loadTemplate(template, { settlementLayoutSource: { id: layoutId, name: entry?.name ?? template.name ?? layoutId } });
+      setStatus(`Loaded ${entry?.name ?? template.name ?? "settlement layout"}. Click Overwrite to replace its source JSON.`);
+    });
+    if (button.dataset.action === "load-original-settlement-layout") {
+      const template = window.DungeonSettlementLayouts?.builtIn?.(layoutId);
+      if (!template) {
+        setStatus("Could not load that built-in settlement layout.");
+        return;
+      }
+      loadTemplate(template, { settlementLayoutSource: { id: layoutId, name: entry?.name ?? template.name ?? layoutId } });
+      setStatus(`Loaded built-in ${entry?.name ?? template.name ?? layoutId}. Click Overwrite to replace the source JSON.`);
     }
   });
   els.campaignDungeons?.addEventListener("click", (event) => {

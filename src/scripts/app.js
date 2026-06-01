@@ -134,6 +134,7 @@ function updatePerfOverlay() {
 
 function render() {
   const renderStart = performance.now();
+  if (typeof processTavernHirelingPayments === "function") processTavernHirelingPayments();
   processDungeonPassiveObjects();
   renderRoom();
   renderPartyRoster();
@@ -142,7 +143,9 @@ function render() {
   renderInitiative();
   renderLog();
   renderControls();
+  if (state?.world?.travelCamp?.active && !els.homeMenu?.classList.contains("hidden")) renderTravelCampMenu();
   scheduleInitiativePromptIfNeeded();
+  if (typeof scheduleFactionFirstContacts === "function") scheduleFactionFirstContacts();
   updateInteractiveTutorial();
   perfStats.renderMs = performance.now() - renderStart;
   updatePerfOverlay();
@@ -168,6 +171,12 @@ els.partyRoster?.addEventListener("click", (event) => {
   const entry = event.target.closest("[data-party-hero]");
   if (!entry) return;
   const heroId = entry.dataset.partyHero;
+  if (entry.dataset.adminAiAlly && adminEnabled() && isAutonomousAlly(state.fighters?.[heroId])) {
+    showCombatantInfo(state.fighters[heroId]);
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   const changed = (event.shiftKey || event.ctrlKey || event.metaKey) && state.mode !== "combat"
     ? toggleHeroSelection(heroId)
     : setActiveHero(heroId);
@@ -281,6 +290,7 @@ els.toggleAdminMode.addEventListener("click", () => {
   if (!adminMode) disableAdminModeOptions();
   addLog(adminMode ? "Admin tools enabled." : "Admin tools disabled.", "important");
   render();
+  if (!els.homeMenu?.classList.contains("hidden")) renderHomeAdventurePanels();
   if (isHomeBuilderOpen()) renderHomeBuilder();
 });
 els.toggleLayout.addEventListener("click", () => {
@@ -510,6 +520,14 @@ els.fighterInfo.addEventListener("click", (event) => {
   if (button.dataset.action === "cook-home-meal") {
     cookHomeMeal();
   }
+  if (button.dataset.action === "camp-use-rations") {
+    travelUseCampRations();
+    hideFighterInfo();
+  }
+  if (button.dataset.action === "inn-buy-refreshment") {
+    travelBuyInnRefreshment(button.dataset.refreshment);
+    hideFighterInfo();
+  }
   if (button.dataset.action === "harvest-home-herbs") {
     harvestHomeHerbs();
   }
@@ -557,6 +575,13 @@ els.fighterInfo.addEventListener("click", (event) => {
   }
   if (button.dataset.action === "retire-party-member") {
     retirePartyMember(button.dataset.hero);
+  }
+  if (button.dataset.action === "dismiss-tavern-hireling") {
+    dismissTavernHirelingFromParty(button.dataset.hero);
+  }
+  if (button.dataset.action === "show-ai-ally-stat-block") {
+    const ally = state.fighters?.[button.dataset.hero];
+    if (adminEnabled() && isAutonomousAlly(ally)) showCombatantInfo(ally);
   }
   if (button.dataset.action === "make-main-hero") {
     makeMainHero(button.dataset.hero);
@@ -624,6 +649,10 @@ els.closeFavoriteActions?.addEventListener("click", hideFavoriteActionsMenu);
 els.closeAbilities.addEventListener("click", hideAbilitiesMenu);
 els.closeHomeMenu.addEventListener("click", hideHomeMenu);
 els.closeVillage?.addEventListener("click", hideVillageMenu);
+els.closeTravelMap?.addEventListener("click", () => {
+  hideTravelMapMenu();
+  if (state?.world?.travelCamp?.active) showHomeMenu();
+});
 els.closeStore.addEventListener("click", hideStoreMenu);
 els.backStoreVillage?.addEventListener("click", () => {
   hideStoreMenu();
@@ -631,6 +660,7 @@ els.backStoreVillage?.addEventListener("click", () => {
 });
 els.goVillage?.addEventListener("click", showVillageMenu);
 els.buildHome?.addEventListener("click", showHomeBuilder);
+els.goTravel?.addEventListener("click", showTravelMapMenu);
 els.goAdventure?.addEventListener("click", () => setHomeMenuPanel("adventure"));
 els.goBarrowCrown?.addEventListener("click", () => void startCampaignDungeon("barrow-crown"));
 els.goThornwoodPact?.addEventListener("click", () => void startCampaignDungeon("thornwood-pact"));
@@ -702,11 +732,27 @@ els.gameDialog.addEventListener("click", (event) => {
   }
 });
 els.homeMenu.addEventListener("click", (event) => {
-  if (event.target === els.homeMenu) {
+  if (event.target === els.homeMenu && !state?.world?.travelCamp?.active) {
     hideHomeMenu();
     return;
   }
   const button = event.target.closest("button");
+    if (button?.dataset.action === "camp-add-furniture") {
+      addTravelCampFurniture(button.dataset.hero, button.dataset.furniture);
+      return;
+    }
+    if (button?.dataset.action === "buy-camp-gear") {
+      buyTravelCampGear(button.dataset.hero, button.dataset.furniture);
+      return;
+    }
+    if (button?.dataset.action === "inn-buy-refreshment") {
+      travelBuyInnRefreshment(button.dataset.refreshment);
+      return;
+    }
+    if (button?.dataset.action === "open-party-inventory") {
+      openPartyInventory();
+      return;
+    }
     if (button?.dataset.homeMenu) {
       setHomeMenuPanel(button.dataset.homeMenu);
       return;
@@ -723,6 +769,122 @@ els.homeMenu.addEventListener("click", (event) => {
     void startCustomDungeonWithHero(button.dataset.customDungeonId);
   }
 });
+els.travelMapMenu?.addEventListener("click", (event) => {
+  if (event.target === els.travelMapMenu) {
+    hideTravelMapMenu();
+  }
+});
+els.travelMapGrid?.addEventListener("pointerover", (event) => {
+  const hex = event.target.closest("[data-travel-row][data-travel-col]");
+  if (!hex) return;
+  renderTravelMapTooltip(Number(hex.dataset.travelRow), Number(hex.dataset.travelCol), Number(hex.dataset.travelChunkX), Number(hex.dataset.travelChunkY));
+});
+els.travelMapGrid?.addEventListener("focusin", (event) => {
+  const hex = event.target.closest("[data-travel-row][data-travel-col]");
+  if (!hex) return;
+  renderTravelMapTooltip(Number(hex.dataset.travelRow), Number(hex.dataset.travelCol), Number(hex.dataset.travelChunkX), Number(hex.dataset.travelChunkY));
+});
+els.travelMapGrid?.addEventListener("click", (event) => {
+  if (travelMapAnimating) return;
+  if (suppressNextTravelHexClick) {
+    suppressNextTravelHexClick = false;
+    return;
+  }
+  const hex = event.target.closest("[data-travel-row][data-travel-col]");
+  if (!hex) return;
+  handleTravelMapHexSelection(Number(hex.dataset.travelRow), Number(hex.dataset.travelCol), Number(hex.dataset.travelChunkX), Number(hex.dataset.travelChunkY));
+});
+els.travelMapScroll?.addEventListener("pointerdown", (event) => {
+  if (travelMapAnimating) return;
+  if (event.button !== 0 || event.target.closest("input, textarea, select, a, #travel-map-event, .panel-actions")) return;
+  const rect = els.travelMapScroll.getBoundingClientRect();
+  const inHorizontalScrollbar = event.clientY >= rect.bottom - Math.max(12, els.travelMapScroll.offsetHeight - els.travelMapScroll.clientHeight);
+  const inVerticalScrollbar = event.clientX >= rect.right - Math.max(12, els.travelMapScroll.offsetWidth - els.travelMapScroll.clientWidth);
+  if (inHorizontalScrollbar || inVerticalScrollbar) return;
+  const hex = event.target.closest("[data-travel-row][data-travel-col]");
+  travelMapPan = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    scrollLeft: els.travelMapScroll.scrollLeft,
+    scrollTop: els.travelMapScroll.scrollTop,
+    hexRow: hex ? Number(hex.dataset.travelRow) : null,
+    hexCol: hex ? Number(hex.dataset.travelCol) : null,
+    hexChunkX: hex ? Number(hex.dataset.travelChunkX) : null,
+    hexChunkY: hex ? Number(hex.dataset.travelChunkY) : null,
+    moved: false,
+  };
+  els.travelMapScroll.setPointerCapture?.(event.pointerId);
+  els.travelMapScroll.classList.add("panning");
+});
+els.travelMapScroll?.addEventListener("pointermove", (event) => {
+  if (!travelMapPan || travelMapPan.pointerId !== event.pointerId) return;
+  const deltaX = event.clientX - travelMapPan.startX;
+  const deltaY = event.clientY - travelMapPan.startY;
+  if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) travelMapPan.moved = true;
+  els.travelMapScroll.scrollLeft = travelMapPan.scrollLeft - (event.clientX - travelMapPan.startX);
+  els.travelMapScroll.scrollTop = travelMapPan.scrollTop - (event.clientY - travelMapPan.startY);
+  event.preventDefault();
+});
+const finishTravelMapPan = (event) => {
+  if (!travelMapPan || travelMapPan.pointerId !== event.pointerId) return;
+  if (!travelMapPan.moved && travelMapPan.hexRow !== null && travelMapPan.hexCol !== null) {
+    handleTravelMapHexSelection(travelMapPan.hexRow, travelMapPan.hexCol, travelMapPan.hexChunkX, travelMapPan.hexChunkY);
+    suppressNextTravelHexClick = true;
+    window.setTimeout(() => {
+      suppressNextTravelHexClick = false;
+    }, 0);
+  } else if (travelMapPan.moved) {
+    suppressNextTravelHexClick = true;
+    window.setTimeout(() => {
+      suppressNextTravelHexClick = false;
+    }, 0);
+  }
+  els.travelMapScroll.releasePointerCapture?.(event.pointerId);
+  els.travelMapScroll.classList.remove("panning");
+  travelMapPan = null;
+};
+els.travelMapScroll?.addEventListener("pointerup", finishTravelMapPan);
+els.travelMapScroll?.addEventListener("pointercancel", finishTravelMapPan);
+els.travelMapScroll?.addEventListener("wheel", (event) => {
+  if (!event.ctrlKey && !event.metaKey) return;
+  event.preventDefault();
+  event.stopPropagation();
+  adjustTravelMapZoom(event.deltaY > 0 ? -0.1 : 0.1, travelMapViewportFocus(event.clientX, event.clientY));
+}, { passive: false });
+els.travelMapScroll?.addEventListener("scroll", positionTravelMapEvent);
+els.travelZoomOut?.addEventListener("click", () => adjustTravelMapZoom(-0.1));
+els.travelZoomIn?.addEventListener("click", () => adjustTravelMapZoom(0.1));
+els.travelZoomSlider?.addEventListener("input", (event) => setTravelMapZoom(Number(event.target.value) / 100));
+els.travelGenerateChunks?.addEventListener("click", () => void scoutTravelRouteEdgeChunks());
+els.travelClearRoute?.addEventListener("click", () => clearTravelRoute());
+els.travelConfirmRoute?.addEventListener("click", confirmTravelRoutePlan);
+els.travelStartRoute?.addEventListener("click", travelOneDay);
+els.travelCampReviewRoute?.addEventListener("click", showTravelMapMenu);
+els.travelCampUseRations?.addEventListener("click", travelUseCampRations);
+els.travelCampForage?.addEventListener("click", travelForageForCamp);
+els.travelCampHungryRest?.addEventListener("click", travelHungryRestAtCamp);
+els.travelCampLongRest?.addEventListener("click", travelLongRestAtCamp);
+els.travelCampExploreHere?.addEventListener("click", travelStayHereOneDay);
+els.travelCampVentureOffTrack?.addEventListener("click", () => travelOneDay({ roadMode: "offroad" }));
+els.travelCampContinue?.addEventListener("click", travelOneDay);
+els.campHomeReviewRoute?.addEventListener("click", showTravelMapMenu);
+els.campHomeUseRations?.addEventListener("click", travelUseCampRations);
+els.campHomeForage?.addEventListener("click", travelForageForCamp);
+els.campHomeHungryRest?.addEventListener("click", travelHungryRestAtCamp);
+els.campHomeLongRest?.addEventListener("click", travelLongRestAtCamp);
+els.campHomeExploreHere?.addEventListener("click", travelStayHereOneDay);
+els.campHomeVentureOffTrack?.addEventListener("click", () => travelOneDay({ roadMode: "offroad" }));
+els.campHomeContinue?.addEventListener("click", travelOneDay);
+els.closeTravelCamp?.addEventListener("click", hideTravelCampMenu);
+els.travelCampMenu?.addEventListener("click", (event) => {
+  if (event.target === els.travelCampMenu) {
+    hideTravelCampMenu();
+    return;
+  }
+  const button = event.target.closest("button");
+  if (button?.dataset.action === "open-party-inventory") openPartyInventory();
+});
 els.villageMenu?.addEventListener("click", (event) => {
   if (event.target === els.villageMenu) {
     hideVillageMenu();
@@ -732,8 +894,115 @@ els.villageMenu?.addEventListener("click", (event) => {
   if (button?.dataset.action === "visit-village-npc") {
     visitVillageNpc(button.dataset.npc);
   }
+  if (button?.dataset.action === "visit-settlement-faction") {
+    visitSettlementFaction(button.dataset.npc);
+  }
+  if (button?.dataset.action === "visit-tavern-guest") {
+    visitTavernGuest(button.dataset.guest);
+  }
+  if (button?.dataset.action === "tavern-walk-to-guest") {
+    void tavernWalkToGuestAndTalk(button.dataset.guest);
+  }
+  if (button?.dataset.action === "tavern-chat-guest") {
+    tavernChatWithGuest(button.dataset.guest);
+  }
+  if (button?.dataset.action === "tavern-chat-option") {
+    window.tavernChooseGuestChatOption?.(button.dataset.guest, button.dataset.option);
+  }
+  if (button?.dataset.action === "tavern-finish-chat-guest") {
+    tavernFinishGuestChat(button.dataset.guest);
+  }
+  if (button?.dataset.action === "tavern-barkeeper-guests") {
+    tavernBarkeeperChatGuests();
+  }
+  if (button?.dataset.action === "tavern-faction-check") {
+    tavernFactionCheck(button.dataset.guest);
+  }
+  if (button?.dataset.action === "tavern-faction-explain") {
+    tavernFactionExplain(button.dataset.guest);
+  }
+  if (button?.dataset.action === "tavern-buy-guest-item") {
+    tavernBuyGuestItem(button.dataset.guest, button.dataset.item);
+  }
+  if (button?.dataset.action === "tavern-recruit-guest") {
+    tavernRecruitGuest(button.dataset.guest);
+  }
+  if (button?.dataset.action === "tavern-complete-material-ask") {
+    tavernCompleteMaterialAsk(button.dataset.guest);
+  }
+  if (button?.dataset.action === "tavern-complete-monster-ask") {
+    tavernCompleteMonsterAsk(button.dataset.guest);
+  }
+  if (button?.dataset.action === "tavern-ask-rumor") {
+    window.tavernAskRumor?.(button.dataset.guest);
+  }
+  if (button?.dataset.action === "inn-buy-refreshment") {
+    travelBuyInnRefreshment(button.dataset.refreshment);
+    renderTavernBarkeeperMenu();
+  }
+  if (button?.dataset.action === "camp-use-rations") {
+    travelUseCampRations();
+    renderTavernBarkeeperMenu();
+  }
+  if (button?.dataset.action === "inn-hungry-fallback") {
+    travelInnTryHungryFallback();
+    renderTavernBarkeeperMenu();
+  }
   if (button?.dataset.action === "open-graveyard") {
     renderGraveyardMenu();
+  }
+  if (button?.dataset.action === "open-teleport-circles") {
+    renderTeleportCirclesMenu();
+  }
+  if (button?.dataset.action === "teleport-circle") {
+    teleportToKnownCircle(button.dataset.circle);
+  }
+  if (button?.dataset.action === "open-camp-gear") {
+    renderVillageCampGearMenu();
+  }
+  if (button?.dataset.action === "open-home-decor") {
+    renderVillageHomeDecorMenu();
+  }
+  if (button?.dataset.action === "buy-camp-gear") {
+    buyTravelCampGear(button.dataset.hero, button.dataset.furniture);
+    renderVillageCampGearMenu();
+  }
+  if (button?.dataset.action === "buy-home-decor") {
+    buyHomeDecorFurniture(button.dataset.furniture);
+  }
+  if (button?.dataset.action === "open-settlement-storefront") {
+    renderSettlementStorefrontMenu(button.dataset.storefront);
+  }
+  if (button?.dataset.action === "open-settlement-quest-board") {
+    renderSettlementQuestBoardMenu();
+  }
+  if (button?.dataset.action === "accept-settlement-board-quest") {
+    acceptSettlementBoardQuest(button.dataset.quest);
+  }
+  if (button?.dataset.action === "claim-settlement-board-quest") {
+    claimSettlementBoardQuest(button.dataset.quest);
+  }
+  if (button?.dataset.action === "buy-settlement-stock") {
+    buySettlementStorefrontStock(button.dataset.storefront, button.dataset.stock);
+  }
+  if (button?.dataset.action === "settlement-cure-disease") {
+    settlementCureDisease(button.dataset.hero, button.dataset.disease, button.dataset.storefront);
+  }
+  if (button?.dataset.action === "settlement-treat-exhaustion") {
+    settlementTreatExhaustion(button.dataset.hero, button.dataset.storefront);
+  }
+  if (button?.dataset.action === "settlement-revive-corpse") {
+    settlementReviveCorpse(button.dataset.corpse, button.dataset.rite, button.dataset.storefront);
+  }
+  if (button?.dataset.action === "back-to-settlement-list") {
+    renderSettlementMenu();
+  }
+  if (button?.dataset.action === "settlement-return-inn") {
+    hideVillageMenu();
+    showHomeMenu();
+  }
+  if (button?.dataset.action === "open-party-inventory") {
+    openPartyInventory();
   }
   if (button?.dataset.action === "inspect-npc") {
     showNpcInspection(button.dataset.npc);
@@ -773,6 +1042,15 @@ els.villageMenu?.addEventListener("click", (event) => {
     if (button.dataset.npc === "antiquarian-society") completeAntiquarianTurnIn(button.dataset.turnIn);
     if (button.dataset.npc === "expedition-board") completeExpeditionTurnIn(button.dataset.turnIn);
     if (button.dataset.npc === "boom-club") completeBoomClubTurnIn(button.dataset.turnIn);
+  }
+  if (button?.dataset.action === "accept-road-project") {
+    acceptExpeditionRoadProject(button.dataset.project);
+  }
+  if (button?.dataset.action === "claim-road-project") {
+    claimExpeditionRoadProject(button.dataset.project);
+  }
+  if (button?.dataset.action === "start-expedition-milepost") {
+    void startExpeditionMilepostMission(button.dataset.index);
   }
   if (button?.dataset.action === "buy-faction-set-item") {
     buyFactionSetItem(button.dataset.faction, button.dataset.item, button.dataset.method);
@@ -1121,13 +1399,14 @@ window.addEventListener("keydown", (event) => {
     hideAbilitiesMenu();
     hideActionMenu();
     hideFavoriteActionsMenu();
-    hideHomeMenu();
+    if (!state?.world?.travelCamp?.active) hideHomeMenu();
+    hideTravelMapMenu();
     hideStoreMenu();
     return;
   }
 
-  const overlayOpen = [els.mainMenu, els.fighterInfo, els.inventoryMenu, els.useItemMenu, els.actionMenu, els.favoriteActionsMenu, els.abilitiesMenu, els.homeMenu, els.storeMenu].some(
-    (element) => !element.classList.contains("hidden"),
+  const overlayOpen = [els.mainMenu, els.fighterInfo, els.inventoryMenu, els.useItemMenu, els.actionMenu, els.favoriteActionsMenu, els.abilitiesMenu, state?.world?.travelCamp?.active ? null : els.homeMenu, els.travelMapMenu, els.storeMenu].some(
+    (element) => element && !element.classList.contains("hidden"),
   );
   const key = event.key.toLowerCase();
   const target = event.target;

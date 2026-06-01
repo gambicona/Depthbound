@@ -1353,7 +1353,7 @@ async function runMonsterAi(monster) {
   addAdminLog(`${monster.name} did not use a start/special action; continuing to behavior AI.`);
 
   if (isAutonomousAlly(monster)) {
-    addAdminLog(`${monster.name} is an autonomous ally; delegating to ally combat AI.`);
+    addAdminLog(`${monster.name} is a companion; using companion combat behavior.`);
     await runAutonomousAllyCombatAi(monster);
     return;
   }

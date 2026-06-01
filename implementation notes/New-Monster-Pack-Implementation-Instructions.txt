@@ -99,6 +99,7 @@ Recommended pack shape:
 4. Tags
 
 Tags drive theme spawning, resource drops, and some special handling.
+The first tag MUST represent the creatures type, eg beast, fiend, humanoid etc.
 
 Use broad family tags:
 - undead

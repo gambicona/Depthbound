@@ -3873,7 +3873,7 @@ function isExitPosition(position) {
 }
 
 function canHeroUseHomeExit(hero = activeHero()) {
-  return state.mode === "home" && hero?.alive && isPartyHeroId(hero.id) && !isAutonomousAlly(hero);
+  return (state.mode === "home" || (state.mode === "camp" && travelCampIsInn())) && hero?.alive && isPartyHeroId(hero.id) && !isAutonomousAlly(hero);
 }
 
 function partyHasBaseItem(itemId) {
@@ -3986,21 +3986,22 @@ function triggerMonsterDeathStory(monster) {
 
 function customGoalStatus() {
   const goal = state.customDungeon?.goal;
-  if (!goal || goal.type === "reachExit") return { met: true, text: "Reach the exit." };
+  if (!goal || goal.type === "reachExit" || goal.type === "exit") return { met: true, text: "Reach the exit." };
   if (goal.type === "collectItem") {
     const item = getItemTemplate(goal.itemId);
     return {
       met: partyHasBaseItem(goal.itemId),
-      text: `Collect ${item?.name ?? goal.itemId ?? "the required object"}.`,
+      text: `Collect ${item?.name ?? goal.itemId ?? "the required object"}.${goal.hint ? ` ${goal.hint}` : ""}`,
     };
   }
   if (goal.type === "collectItemCount") {
     const item = getItemTemplate(goal.itemId);
     const target = Math.max(1, Number(goal.count) || 1);
     const collected = partyBaseItemCount(goal.itemId);
+    const itemName = item?.name ?? "marked item";
     return {
       met: collected >= target,
-      text: `Collect ${target} ${item?.name ?? goal.itemId ?? "required item"}${target === 1 ? "" : "s"} (${collected}/${target}).`,
+      text: `Collect ${target} ${itemName}${target === 1 ? "" : "s"} (${collected}/${target}).${goal.hint ? ` ${goal.hint}` : ""}`,
     };
   }
   if (goal.type === "killBoss") {
@@ -4015,15 +4016,16 @@ function customGoalStatus() {
     const killed = Math.max(0, initial - alive);
     const target = Math.max(1, Number(goal.count) || 1);
     const monster = getMonsterTemplate(goal.monsterId);
+    const monsterName = monster?.name ?? "marked foe";
     return {
       met: killed >= target,
-      text: `Defeat ${target} ${monster?.name ?? goal.monsterId ?? "chosen monster"}${target === 1 ? "" : "s"} (${killed}/${target}).`,
+      text: `Defeat ${target} ${monsterName}${target === 1 ? "" : "s"} (${killed}/${target}).`,
     };
   }
   if (goal.type === "escortNpc") {
-    return { met: false, text: "Find the NPC and bring them to the exit. This goal type is reserved for the NPC escort system." };
+    return { met: false, text: "Find the missing person and bring them safely to the exit." };
   }
-  return { met: false, text: "Complete the dungeon goal." };
+  return { met: false, text: "Finish the marked objective before leaving." };
 }
 
 function dungeonGoalMet() {
@@ -4055,11 +4057,13 @@ function checkDungeonCompletion(hero = activeHero()) {
   playSoundEffect("exitReached");
   const outro = state.customDungeon?.outro;
   const finishDungeon = () => {
+    const travelReturnCamp = state.travelReturnCamp ? cloneData(state.travelReturnCamp) : null;
     const completedContext = {
       themeId: state.themeId,
       campaignId: state.campaignId,
       campaignIndex: state.campaignIndex,
     };
+    handleNpcDungeonComplete(completedContext);
     const completedCampaign = state.campaignId && state.campaignIndex ? { ...state.campaignProgress } : state.campaignProgress;
     const questFlags = { ...(state.questFlags ?? {}) };
     const partyResources = normalizePartyResources(state.partyResources ?? {});
@@ -4072,7 +4076,58 @@ function checkDungeonCompletion(hero = activeHero()) {
         [state.customDungeon.oneShotDungeonId]: Date.now(),
       };
     }
-    state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, {
+    if (travelReturnCamp?.world && travelReturnCamp?.camp) {
+      const world = window.DepthboundWorldTravel?.normalizeWorldState?.(travelReturnCamp.world) ?? travelReturnCamp.world;
+      world.travelCamp = { ...travelReturnCamp.camp, active: true };
+      if (travelReturnCamp.structureId) {
+        world.visitedStructures = world.visitedStructures && typeof world.visitedStructures === "object" ? world.visitedStructures : {};
+        const current = world.visitedStructures[travelReturnCamp.structureId] && typeof world.visitedStructures[travelReturnCamp.structureId] === "object"
+          ? world.visitedStructures[travelReturnCamp.structureId]
+          : { count: 1 };
+        world.visitedStructures[travelReturnCamp.structureId] = {
+          ...current,
+          resolved: true,
+          pending: false,
+          cleared: true,
+          lastEventId: travelReturnCamp.eventId ?? current.lastEventId ?? "",
+          lastEventTitle: travelReturnCamp.eventTitle ?? current.lastEventTitle ?? "",
+          lastOutcome: "Cleared after a travel dungeon or fight.",
+          lastResolvedDay: normalizeWorldDay(state.worldDay),
+        };
+      }
+      const boardQuestCompletion = typeof completeSettlementBoardQuestForTravelReturn === "function"
+        ? completeSettlementBoardQuestForTravelReturn(travelReturnCamp, questFlags)
+        : null;
+      const returningHeroes = rosterHeroes();
+      const storedCoins = moveHeroCoinsToPartyPurse(returningHeroes);
+      state = createHomeState(returningHeroes, state.chest ?? [], state.chestMoney ?? {}, {
+        ...state.party,
+        worldDay: normalizeWorldDay(state.worldDay),
+        campaignProgress: completedCampaign,
+        questFlags,
+        partyResources,
+        partyTomes: state.partyTomes ?? [],
+        home: state.home,
+        monsterCompendium: state.monsterCompendium,
+        world,
+      });
+      state.combatStarted = false;
+      roomIsBuilt = false;
+      addLog(`${hero.name} reaches the exit. The party returns to camp after ${travelReturnCamp.eventTitle ?? "the travel encounter"}.`, "important");
+      if (boardQuestCompletion) {
+        addLog(`${boardQuestCompletion.title} is complete. Return to ${boardQuestCompletion.sourceName} to claim ${priceText(boardQuestCompletion.rewardCp)}.`, "important");
+      }
+      if (storedCoins > 0) addLog(`${moneyText(cpToMoney(storedCoins))} is secured in the party purse.`, "important");
+      if (consumedGoalItems) addLog(`${consumedGoalItems} goal item${consumedGoalItems === 1 ? " was" : "s were"} left behind.`, "important");
+      render();
+      showTravelCampMenu();
+      window.DepthboundPlaytest?.syncNow?.();
+      centerViewOnHero();
+      return;
+    }
+    const returningHeroes = rosterHeroes();
+    const storedCoins = moveHeroCoinsToPartyPurse(returningHeroes);
+    state = createHomeState(returningHeroes, state.chest ?? [], state.chestMoney ?? {}, {
       ...state.party,
       worldDay: normalizeWorldDay(state.worldDay) + 1,
       campaignProgress: completedCampaign,
@@ -4084,9 +4139,9 @@ function checkDungeonCompletion(hero = activeHero()) {
     });
     state.combatStarted = false;
     roomIsBuilt = false;
-    handleNpcDungeonComplete(completedContext);
     maybeUnlockNpcProgress();
     addLog(`${hero.name} reaches the exit. Dungeon complete. The party gained ${tokenAward} Hero Token${tokenAward === 1 ? "" : "s"} each.`, "important");
+    if (storedCoins > 0) addLog(`${moneyText(cpToMoney(storedCoins))} is secured in the party purse.`, "important");
     if (consumedGoalItems) addLog(`${consumedGoalItems} goal item${consumedGoalItems === 1 ? " was" : "s were"} left behind.`, "important");
     render();
     maybeTriggerNpcArrivals();
@@ -4111,15 +4166,23 @@ function checkDungeonCompletion(hero = activeHero()) {
 function createLootForMonster(monster) {
   const category = Math.max(currentLootCategory(), monsterCategory(monster));
   const boss = monster.id?.startsWith("boss-") || monster.tags?.includes("boss");
+  const humanoid = monster.tags?.includes("humanoid");
   const healingPotion = rollDie(100) <= (boss ? 30 : 5) ? randomHealingPotionDrop() : null;
   const equipmentDrop = rollDie(100) <= (boss ? 18 : 2) ? randomEquipmentDrop() : null;
   const treasureDrop = rollDie(100) <= (boss ? 75 : 2) ? randomTreasureDrop(category) : null;
   const magicDrop = rollDie(100) <= (boss ? Math.min(55, 20 + category * 8) : Math.min(2, Math.max(1, Math.floor(category / 2)))) ? randomMagicLootDrop(category) : null;
   const items = [healingPotion, equipmentDrop, treasureDrop, magicDrop, ...(monster.pickedUpItems ?? []), ...definedLootForMonster(monster)].filter(Boolean);
+  const money = humanoid
+    ? boss
+      ? normalizeMoney({ gp: rollDie(category * 5) + category * 2, sp: rollDie(10), cp: rollDie(10) })
+      : normalizeMoney({ gp: rollDie(Math.max(1, category)), sp: rollDie(10), cp: rollDie(10) })
+    : boss
+      ? normalizeMoney({ gp: rollDie(category * 4), sp: rollDie(10), cp: rollDie(10) })
+      : { cp: rollDie(11) - 1, sp: 0, gp: 0 };
   return {
     id: `loot-${monster.id}-${Date.now()}`,
     position: { ...monster.position },
-    money: boss ? normalizeMoney({ gp: rollDie(category * 4), sp: rollDie(10), cp: rollDie(10) }) : { cp: rollDie(11) - 1, sp: 0, gp: 0 },
+    money,
     items,
   };
 }
@@ -4154,6 +4217,7 @@ function addMonsterMaterialDrops(monster) {
   if (!monster || monster.materialDropsAdded) return;
   monster.materialDropsAdded = true;
   const ids = new Set([monster.baseMonsterId, monster.templateId, monster.id, ...(monster.tags ?? [])].filter(Boolean));
+  if (ids.has("humanoid")) return;
   const textFields = [
     ...Array.from(ids),
     monster.name,
@@ -5119,7 +5183,7 @@ function endCurrentEncounter() {
 }
 
 function combatBlockingOverlayOpen() {
-  return [els.mainMenu, els.fighterInfo, els.inventoryMenu, els.useItemMenu, els.abilitiesMenu, els.homeMenu, els.villageMenu, els.storeMenu, els.gameDialog].some(
+  return [els.mainMenu, els.fighterInfo, els.inventoryMenu, els.useItemMenu, els.abilitiesMenu, els.homeMenu, els.travelMapMenu, els.travelCampMenu, els.villageMenu, els.storeMenu, els.gameDialog].some(
     (element) => element && !element.classList.contains("hidden"),
   );
 }
@@ -5166,6 +5230,9 @@ function activateFledMonstersWithLineOfSight() {
 function fleeCombatStatus() {
   if (!gameHasStarted || state.mode !== "combat" || !state.combatStarted) {
     return { ok: false, reason: "Fleeing is only possible during combat." };
+  }
+  if (travelEncounterLocksRetreat()) {
+    return { ok: false, reason: state.travelReturnCamp?.lockRetreatReason ?? "This encounter must be finished before the party can leave." };
   }
   const heroes = partyHeroes();
   const monsters = combatMonsters();
@@ -5554,7 +5621,7 @@ async function maybeApplyCrownshardSeverCommand(attacker, defender, weapon) {
   const useSever = await showReactionPrompt({
     actor: attacker,
     title: "Sever Command",
-    message: `Attempt to command ${defender.name}? DC 16 Charisma save. On failure it becomes an AI ally for this combat.`,
+    message: `Attempt to command ${defender.name}? DC 16 Charisma save. On failure it fights beside the party for this combat.`,
     acceptLabel: "Sever Command",
     declineLabel: "Save It",
   });
@@ -5568,7 +5635,7 @@ async function maybeApplyCrownshardSeverCommand(attacker, defender, weapon) {
     defender.aiControlled = true;
     defender.barrowCrownDustAfterCombat = true;
     applyStatusEffect(defender, { id: "sever-command", label: "Severed Command", durationRounds: 99 });
-    addLog(`${defender.name} becomes an AI ally for this combat. The Crownshard will turn it to dust afterward.`, "important");
+    addLog(`${defender.name} is bound to fight beside the party for this combat. The Crownshard will turn it to dust afterward.`, "important");
   }
 }
 
@@ -9096,10 +9163,12 @@ async function maybeUseMonsterStartSpecial(monster) {
     const allyTags = monster.tags ?? [];
     const bonusIsFire = hasMonsterSpecial(monster, /stoke the furnace|forgeheart pulse|heart of ore and flame/i);
     const bonusIsUndead = hasMonsterSpecial(monster, /command the dead|carrion crown command|imperial corpse decree|unburied retinue|lockstep/i);
+    const bonusIsHumanoid = allyTags.includes("humanoid");
     for (const ally of combatMonsters().filter((candidate) => candidate.id !== monster.id && candidate.alive && fightersWithinSquares(candidate, monster, 3))) {
       const sharesTheme = (candidate.tags ?? []).some((tag) => allyTags.includes(tag) && ["embervein-deepworks", "embervein", "deepworks", "forge", "mine", "fire", "gear"].includes(tag));
       const sharesUndead = bonusIsUndead && (candidate.tags ?? []).some((tag) => ["undead", "skeletal", "zombie"].includes(tag));
-      if (!sharesTheme && !sharesUndead) continue;
+      const sharesHumanoid = bonusIsHumanoid && (candidate.tags ?? []).includes("humanoid");
+      if (!sharesTheme && !sharesUndead && !sharesHumanoid) continue;
       applyStatusEffect(ally, { id: bonusIsFire ? "forge-stoked" : bonusIsUndead ? "death-commanded" : "ordered", label: bonusIsFire ? "Stoked" : bonusIsUndead ? "Commanded" : "Ordered", attackBonus: 1, expiresAtEndOfTurn: true });
     }
   }
@@ -9132,13 +9201,13 @@ async function maybeUseMonsterStartSpecial(monster) {
     }
   }
 
-  if (hasMonsterSpecial(monster, /furnace aura|hellfire wings|filth aura|crown of thorns|molten trail|bright seam|ignition flood|wake the deepworks|heart of ore and flame/i)) {
+  if (hasMonsterSpecial(monster, /furnace aura|hellfire wings|filth aura|crown of thorns|molten trail|bright seam|ignition flood|wake the (deepworks|mine)|heart of ore and flame/i)) {
     for (const target of monsterTargetableHeroes(monster).filter((hero) => fightersWithinSquares(hero, monster, 1))) {
       const dice = specialDamageDice(monster, 6);
       const roll = rollDice(dice.count, dice.sides);
       const isFilth = hasMonsterSpecial(monster, /filth aura/i);
       const isThorn = hasMonsterSpecial(monster, /crown of thorns/i);
-      const label = isFilth ? "Filth Aura" : isThorn ? "Crown of Thorns" : hasMonsterSpecial(monster, /wake the deepworks/i) ? "Wake the Deepworks" : hasMonsterSpecial(monster, /heart of ore and flame/i) ? "Heart of Ore and Flame" : hasMonsterSpecial(monster, /ignition flood/i) ? "Ignition Flood" : hasMonsterSpecial(monster, /bright seam/i) ? "Bright Seam" : hasMonsterSpecial(monster, /molten trail/i) ? "Molten Trail" : hasMonsterSpecial(monster, /hellfire wings/i) ? "Hellfire Wings" : "Furnace Aura";
+      const label = isFilth ? "Filth Aura" : isThorn ? "Crown of Thorns" : hasMonsterSpecial(monster, /wake the (deepworks|mine)/i) ? "Wake the Mine" : hasMonsterSpecial(monster, /heart of ore and flame/i) ? "Heart of Ore and Flame" : hasMonsterSpecial(monster, /ignition flood/i) ? "Ignition Flood" : hasMonsterSpecial(monster, /bright seam/i) ? "Bright Seam" : hasMonsterSpecial(monster, /molten trail/i) ? "Molten Trail" : hasMonsterSpecial(monster, /hellfire wings/i) ? "Hellfire Wings" : "Furnace Aura";
       applySpecialDamage(monster, target, Math.max(1, roll.total + dice.bonus), isFilth ? "poison" : isThorn ? "piercing" : "fire", label);
       if (!target.alive) handleHeroDeath();
     }

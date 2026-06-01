@@ -715,6 +715,10 @@ function buildRoom() {
   objectLayer.className = "object-layer";
   tokenLayer.append(objectLayer);
 
+  const tavernNpcLayer = document.createElement("div");
+  tavernNpcLayer.className = "tavern-npc-layer";
+  tokenLayer.append(tavernNpcLayer);
+
   els.room.append(tileLayer, lightingLayer, wallEdgeLayer, tokenLayer);
   roomIsBuilt = true;
 }
@@ -725,9 +729,10 @@ function renderWallEdges() {
 
   edgeLayer.innerHTML = "";
   const scaledTileSizePx = currentTileSizePx();
-  for (const segment of wallEdgeSegments()) {
+  const segments = state.mode === "camp" && !travelCampIsInn() ? [...wallEdgeSegments(), ...travelCampTentWallSegments()] : wallEdgeSegments();
+  for (const segment of segments) {
     const edge = document.createElement("div");
-    edge.className = `wall-edge wall-edge-${segment.direction}`;
+    edge.className = `wall-edge wall-edge-${segment.direction}${segment.campTent ? " camp-tent-wall" : ""}`;
     const homeWallColor = state.mode === "home" ? state.home?.wallColors?.[homeWallEdgeKey(segment.position, segment.direction)] : null;
     if (homeWallColor) {
       edge.classList.add("home-painted-wall");
@@ -808,9 +813,23 @@ function furnitureIconFilename(template, type) {
     .replace(/^-+|-+$/g, "");
 }
 
-function furnitureIconPath(template, type) {
+function furnitureIconPathCandidates(template, type) {
+  const candidates = [];
+  const add = (path) => {
+    if (path && !candidates.includes(path)) candidates.push(path);
+  };
+  const id = template?.id || type || "";
   const filename = furnitureIconFilename(template, type);
-  return filename ? `assets/furniture/${filename}.png` : "";
+  if (type === "camp-fireplace") return ["assets/furniture/camp-fireplace.png"];
+  if (type === "inn-bar") return ["assets/furniture/inn-bar.png"];
+  if (type === "water-floor") return ["assets/furniture/underground-pool.png"];
+  add(id ? `assets/furniture/${id}.png` : "");
+  add(filename ? `assets/furniture/${filename}.png` : "");
+  return candidates;
+}
+
+function furnitureIconPath(template, type) {
+  return furnitureIconPathCandidates(template, type)[0] ?? "";
 }
 
 const furnitureIconLoadStatus = new Map();
@@ -831,9 +850,10 @@ function setFurnitureIconMissing(element, icon, label, iconPath) {
 }
 
 function configureFurnitureIconToken(element, template, type, fallbackSymbol, iconClass, labelClass) {
-  const iconPath = furnitureIconPath(template, type);
+  const iconPaths = furnitureIconPathCandidates(template, type);
   const icon = document.createElement("img");
-  const iconStatus = iconPath ? furnitureIconLoadStatus.get(iconPath) : "missing";
+  let currentIconPath = iconPaths.find((path) => furnitureIconLoadStatus.get(path) === "loaded") ?? iconPaths.find((path) => furnitureIconLoadStatus.get(path) !== "missing") ?? "";
+  const iconStatus = currentIconPath ? furnitureIconLoadStatus.get(currentIconPath) : "missing";
   icon.className = `${iconClass}${iconStatus === "loaded" ? "" : " hidden"}`;
   icon.alt = "";
   icon.draggable = false;
@@ -843,19 +863,28 @@ function configureFurnitureIconToken(element, template, type, fallbackSymbol, ic
   label.textContent = fallbackSymbol;
 
   if (iconStatus === "loaded") {
-    icon.src = iconPath;
+    icon.src = currentIconPath;
     element.classList.add("has-furniture-icon");
-  } else if (iconPath && iconStatus !== "missing") {
+  } else if (currentIconPath && iconStatus !== "missing") {
+    const tryNextIconPath = () => {
+      const nextPath = iconPaths.find((path) => path !== currentIconPath && furnitureIconLoadStatus.get(path) !== "missing");
+      if (!nextPath) return false;
+      currentIconPath = nextPath;
+      icon.src = currentIconPath;
+      return true;
+    };
     icon.addEventListener("load", () => {
-      setFurnitureIconLoaded(element, icon, label, iconPath);
+      setFurnitureIconLoaded(element, icon, label, currentIconPath);
     });
     icon.addEventListener("error", () => {
-      setFurnitureIconMissing(element, icon, label, iconPath);
+      setFurnitureIconMissing(element, icon, label, currentIconPath);
+      if (tryNextIconPath()) return;
+      element.classList.remove("has-furniture-icon");
     });
-    icon.src = iconPath;
+    icon.src = currentIconPath;
     if (icon.complete) {
-      if (icon.naturalWidth > 0) setFurnitureIconLoaded(element, icon, label, iconPath);
-      else setFurnitureIconMissing(element, icon, label, iconPath);
+      if (icon.naturalWidth > 0) setFurnitureIconLoaded(element, icon, label, currentIconPath);
+      else if (!tryNextIconPath()) setFurnitureIconMissing(element, icon, label, currentIconPath);
     }
   }
 
@@ -1013,20 +1042,29 @@ function preferredMonsterTargetOverObject(object) {
 
 function placeExitToken() {
   const token = els.room.querySelector("[data-exit='dungeon']");
-  if (!token || !state.exit?.position) return;
+  if (!token) return;
+  if (!state.exit?.position) {
+    token.classList.add("hidden");
+    els.room.querySelector(".home-move-out-button")?.classList.add("hidden");
+    return;
+  }
 
   const scaledTileSizePx = currentTileSizePx();
-  token.title = state.mode === "home" ? "Home door" : "Dungeon exit";
-  token.textContent = state.mode === "home" ? "H" : "E";
+  const innExit = travelCampIsInn();
+  token.title = state.mode === "home" ? "Home door" : innExit ? "Inn door" : "Dungeon exit";
+  token.textContent = state.mode === "home" ? "H" : innExit ? "I" : "E";
   token.style.left = `${(state.exit.position.x + 0.5) * scaledTileSizePx}px`;
   token.style.top = `${(state.exit.position.y + 0.5) * scaledTileSizePx}px`;
   token.classList.toggle("hidden", state.completed || !isKnownTile(state.exit.position));
 
   const homeMoveOutButton = els.room.querySelector(".home-move-out-button");
   if (homeMoveOutButton) {
-    homeMoveOutButton.style.left = `${(state.exit.position.x + 1.35) * scaledTileSizePx}px`;
+    homeMoveOutButton.style.left = `${(state.exit.position.x + (innExit ? -1.95 : 1.35)) * scaledTileSizePx}px`;
     homeMoveOutButton.style.top = `${(state.exit.position.y + 0.5) * scaledTileSizePx}px`;
-    homeMoveOutButton.classList.toggle("hidden", state.mode !== "home" || state.completed);
+    homeMoveOutButton.textContent = innExit ? "Travel" : "Adventure";
+    homeMoveOutButton.title = innExit ? "Choose where to travel next" : "Choose an adventure";
+    homeMoveOutButton.setAttribute("aria-label", innExit ? "Choose where to travel next" : "Choose an adventure");
+    homeMoveOutButton.classList.toggle("hidden", (!["home"].includes(state.mode) && !innExit) || state.completed);
   }
 }
 
@@ -1170,7 +1208,12 @@ function renderRoom() {
   els.room.style.setProperty("--room-size", `${mapGridSize * scaledTileSizePx}px`);
   els.room.style.setProperty("--token-size", `${Math.round(scaledTileSizePx * 0.62)}px`);
   els.room.style.setProperty("--token-slide-ms", `${tokenSlideMs}ms`);
-  els.room.classList.toggle("home-room", state.mode === "home");
+  const isRestSurface = state.mode === "home" || state.mode === "camp";
+  const isInnRoom = travelCampIsInn();
+  els.roomScroll?.classList.toggle("camp-dock-scroll", state.mode === "camp");
+  els.room.classList.toggle("home-room", isRestSurface);
+  els.room.classList.toggle("camp-room", state.mode === "camp");
+  els.room.classList.toggle("inn-room", isInnRoom);
 
   const hero = activeHero();
   const heroTurn = state.mode === "combat" && activeFighter()?.id === hero?.id && isPlayerControlledPartyFighter(hero) && combatNeedsHeroTurns();
@@ -1189,7 +1232,7 @@ function renderRoom() {
   const persistentAreas = persistentAreaTileKeys();
   const persistentBlockingAreas = typeof persistentAreaBlockingTileKeys === "function" ? persistentAreaBlockingTileKeys() : new Set();
   const persistentDifficultAreas = typeof persistentAreaDifficultTerrainKeys === "function" ? persistentAreaDifficultTerrainKeys() : new Set();
-  const lightingMap = state.mode === "home" || typeof currentLightingMap !== "function" ? { tiles: new Map(), sources: [] } : currentLightingMap();
+  const lightingMap = isRestSurface || typeof currentLightingMap !== "function" ? { tiles: new Map(), sources: [] } : currentLightingMap();
   const lightingSourcesById = new Map((lightingMap.sources ?? []).map((source) => [source.id, source]));
   const visibleLightTileKeys = new Set([...activeTiles].filter((key) => isKnownTile(positionFromKey(key))));
   renderLightingLayer(lightingMap, scaledTileSizePx, visibleLightTileKeys);
@@ -1251,7 +1294,7 @@ function renderRoom() {
       lightingSourcesById.get(lighting?.dimSources?.[0]) ??
       lightingSourcesById.get(lighting?.darknessSources?.[0]) ??
       null;
-    const showTileLighting = state.mode !== "home";
+    const showTileLighting = !isRestSurface;
     const isLitTile = showTileLighting && isKnown && isWalkable && Boolean(lighting);
     const isSpellOrigin = spellTargeting?.hoverPosition && positionKey(spellTargeting.hoverPosition) === key;
     const isSpellTargetable =
@@ -1290,6 +1333,10 @@ function renderRoom() {
     }
     tile.classList.toggle("spell-affected-occupied", isSpellAffected && Boolean(spellTargetAtTile));
     tile.classList.toggle("home-comfort-range", state.mode === "home" && homeComfortRangePreviewKeys.has(key));
+    tile.classList.toggle("camp-ground", state.mode === "camp" && !isInnRoom && isWalkable && isKnown);
+    const campTent = state.mode === "camp" && !isInnRoom ? travelCampTentLayouts.find((tent) => position.x >= tent.bounds.x1 && position.x <= tent.bounds.x2 && position.y >= tent.bounds.y1 && position.y <= tent.bounds.y2) : null;
+    tile.classList.toggle("camp-tent-floor", Boolean(campTent));
+    tile.dataset.campTent = campTent?.id ?? "";
     const homeFloorColor = state.mode === "home" ? state.home?.floorColors?.[key] : null;
     tile.classList.toggle("home-painted-floor", Boolean(homeFloorColor && isWalkable && isKnown));
     if (homeFloorColor && isWalkable && isKnown) {
@@ -1348,6 +1395,7 @@ function renderRoom() {
   placePlanningTableToken();
   renderLootPiles();
   renderDungeonObjects();
+  renderTavernNpcTokens();
   renderWallEdges();
   renderedDragPathKeys = new Set((dragPath ?? []).map(positionKey));
 }
@@ -1445,15 +1493,16 @@ function renderHeroStatusCard(element, fighter) {
 function partyRosterEntryMarkup(fighter) {
   const active = fighter.id === state.party?.activeHeroId;
   const selected = selectedHeroIds.has(fighter.id);
-  const selectable = selectableHeroIds().has(fighter.id);
   const ally = isAutonomousAlly(fighter);
+  const adminInspectableAlly = adminEnabled() && ally;
+  const selectable = selectableHeroIds().has(fighter.id) || adminInspectableAlly;
   const hpText = `${Math.max(0, fighter.hp ?? 0)} / ${fighter.maxHp ?? 0}`;
   return `
-    <button type="button" class="party-roster-entry${active ? " active" : ""}${selected ? " selected" : ""}${ally ? " ally" : ""}" data-party-hero="${escapeAttribute(fighter.id)}" ${selectable ? "" : "disabled"}>
+    <button type="button" class="party-roster-entry${active ? " active" : ""}${selected ? " selected" : ""}${ally ? " ally" : ""}" data-party-hero="${escapeAttribute(fighter.id)}" ${adminInspectableAlly ? `data-admin-ai-ally="${escapeAttribute(fighter.id)}"` : ""} ${selectable ? "" : "disabled"}>
       ${combatantArtworkMarkup(fighter, "party-roster-art")}
       <span>
         <b>${escapeHtml(fighter.name ?? "Hero")}</b>
-        <small>${escapeHtml(ally ? "Companion" : combatantRoleLabel(fighter))}</small>
+        <small>${escapeHtml(adminInspectableAlly ? "Admin stat block" : ally ? "Companion" : combatantRoleLabel(fighter))}</small>
       </span>
       <strong>${escapeHtml(hpText)}</strong>
     </button>
@@ -2369,6 +2418,115 @@ function activeFactionSetBonusMarkup(fighter) {
   });
 }
 
+function adminAiAllyFeatureListMarkup(items = []) {
+  const entries = (items ?? []).filter(Boolean);
+  if (!entries.length) return `<p class="empty-note">None recorded.</p>`;
+  return entries
+    .map((entry) => {
+      if (typeof entry === "string") return `<p><b>${escapeHtml(entry)}</b></p>`;
+      const name = entry.name ?? entry.label ?? entry.id ?? "Feature";
+      const detail = entry.description ?? entry.text ?? entry.effect ?? "";
+      const meta = [entry.level ? `Level ${entry.level}` : "", entry.refresh, entry.resource].filter(Boolean).join(" - ");
+      return `<p><b>${escapeHtml(name)}</b>${meta ? ` <small>${escapeHtml(meta)}</small>` : ""}${detail ? ` ${escapeHtml(detail)}` : ""}</p>`;
+    })
+    .join("");
+}
+
+function adminAiAllyStatBlockMarkup(fighter) {
+  if (!adminEnabled() || !isAutonomousAlly(fighter)) return "";
+  const abilities = ["str", "dex", "con", "int", "wis", "cha"];
+  const templateId = fighter.monsterId ?? fighter.baseMonsterId ?? fighter.templateId ?? fighter.sourceMonsterId ?? "";
+  const template = getMonsterTemplate(templateId);
+  const profileRange = fighter.damage?.range ?? template?.damage?.range ?? { kind: "melee", feet: 5 };
+  const range = profileRange.kind === "ranged"
+    ? `${profileRange.normal ?? profileRange.feet ?? 60}/${profileRange.long ?? (profileRange.normal ?? profileRange.feet ?? 60) * 3} ft`
+    : `${profileRange.kind ?? "melee"}${profileRange.feet ? ` ${profileRange.feet} ft` : ""}`;
+  const specialAbilities = [
+    ...(fighter.specialAbility ?? []),
+    ...(fighter.specialAbilities ?? []),
+    ...(template?.specialAbility ?? []),
+  ];
+  const traits = [
+    ...(fighter.traits ?? []),
+    ...(template?.traits ?? []),
+  ];
+  const actions = [
+    ...(fighter.actions ?? []),
+    ...(template?.actions ?? []),
+  ];
+  const skills = fighter.skills ?? template?.skills ?? {};
+  const senses = fighter.senses ?? template?.senses ?? {};
+  const tags = [...new Set([...(fighter.tags ?? []), ...(template?.tags ?? [])].map(String).filter(Boolean))];
+  const listText = (values) => (values ?? []).length ? values.join(", ") : "None";
+  const objectText = (object) =>
+    Object.entries(object ?? {})
+      .map(([key, value]) => `${travelTitleText(key)} ${typeof value === "number" ? abilityLabel(value) : value}`)
+      .join(", ") || "None";
+  return `
+    ${inspectDetailsMarkup({
+      title: "Admin AI Stat Block",
+      meta: templateId || fighter.id || "",
+      open: true,
+      body: `
+        <div class="stat-grid">
+          <div class="stat-pill"><b>${fighter.ac}</b><span>AC</span></div>
+          <div class="stat-pill"><b>${fighter.hp} / ${fighter.maxHp}</b><span>HP</span></div>
+          <div class="stat-pill"><b>${fighter.speedFeet ?? 30} ft</b><span>Speed</span></div>
+          <div class="stat-pill"><b>${abilityLabel(fighter.initiativeBonus ?? 0)}</b><span>Init</span></div>
+          <div class="stat-pill"><b>${abilityLabel(attackBonus(fighter))}</b><span>To Hit</span></div>
+          <div class="stat-pill"><b>${escapeHtml(fighter.damage?.label ?? template?.damage?.label ?? "None")}</b><span>Damage</span></div>
+          <div class="stat-pill"><b>${escapeHtml(range)}</b><span>Range</span></div>
+          <div class="stat-pill"><b>${fighter.multiattack?.attacks ?? template?.multiattack?.attacks ?? 1}</b><span>Attacks</span></div>
+          <div class="stat-pill"><b>${fighter.category ?? template?.category ?? "-"}</b><span>Cat</span></div>
+          <div class="stat-pill"><b>${fighter.xp ?? template?.xp ?? 0}</b><span>XP</span></div>
+        </div>
+        <div class="stat-grid ability-grid">
+          ${abilities
+            .map(
+              (ability) => `
+                <div class="stat-pill">
+                  <b>${abilityScore(fighter, ability)}</b>
+                  <span>${ability.toUpperCase()} ${abilityLabel(abilityMod(fighter, ability))}</span>
+                </div>
+              `,
+            )
+            .join("")}
+        </div>
+        <div class="equipment-summary">
+          <div><b>Role</b><span>${escapeHtml(fighter.role ?? template?.role ?? "Companion")}</span></div>
+          <div><b>Type</b><span>${escapeHtml(fighterCreatureType(fighter) || fighter.type || template?.type || "creature")}</span></div>
+          <div><b>Behavior</b><span>${escapeHtml(fighter.behavior ?? template?.behavior ?? "default")}</span></div>
+          <div><b>Tags</b><span>${escapeHtml(tags.join(", ") || "None")}</span></div>
+          <div><b>Skills</b><span>${escapeHtml(objectText(skills))}</span></div>
+          <div><b>Senses</b><span>${escapeHtml(objectText(senses))}</span></div>
+          <div><b>Resist</b><span>${escapeHtml(listText([...(fighter.damageResistances ?? []), ...(template?.damageResistances ?? [])]))}</span></div>
+          <div><b>Immune</b><span>${escapeHtml(listText([...(fighter.damageImmunities ?? []), ...(template?.damageImmunities ?? [])]))}</span></div>
+          <div><b>Vulnerable</b><span>${escapeHtml(listText([...(fighter.damageVulnerabilities ?? []), ...(template?.damageVulnerabilities ?? [])]))}</span></div>
+          <div><b>Cond. Immune</b><span>${escapeHtml(listText([...(fighter.conditionImmunities ?? []), ...(template?.conditionImmunities ?? [])]))}</span></div>
+          <div><b>ID</b><span>${escapeHtml(fighter.id ?? "")}</span></div>
+          <div><b>Template</b><span>${escapeHtml(templateId || template?.id || "none")}</span></div>
+        </div>
+      `,
+    })}
+    ${inspectDetailsMarkup({
+      title: "AI Abilities",
+      meta: specialAbilities.length ? `${specialAbilities.length}` : "",
+      open: true,
+      body: adminAiAllyFeatureListMarkup(specialAbilities),
+    })}
+    ${inspectDetailsMarkup({
+      title: "Traits",
+      meta: traits.length ? `${traits.length}` : "",
+      body: adminAiAllyFeatureListMarkup(traits),
+    })}
+    ${inspectDetailsMarkup({
+      title: "Actions",
+      meta: actions.length ? `${actions.length}` : "",
+      body: adminAiAllyFeatureListMarkup(actions),
+    })}
+  `;
+}
+
 function showCombatantInfo(fighter) {
   els.fighterInfo.classList.remove("home-builder-dock");
   els.fighterInfo.dataset.fighterId = fighter.id ?? "";
@@ -2517,6 +2675,7 @@ function showCombatantInfo(fighter) {
           </div>
         `
     }
+    ${adminAiAllyStatBlockMarkup(fighter)}
     <section class="inspect-section">
       <h3>Temporary Effects</h3>
       ${temporaryEffectsMarkup(fighter)}
@@ -2642,6 +2801,10 @@ function showDungeonObjectInfo(object) {
           </div>`
         : object.type === "home-cooking-pot"
           ? `<button type="button" data-action="cook-home-meal">Cook Hearty Meal</button>`
+          : object.type === "inn-bar"
+            ? travelInnRefreshmentButtonsMarkup()
+          : object.type === "camp-fireplace"
+            ? `<button type="button" data-action="camp-use-rations" ${travelCampMealResolved() ? "disabled" : ""}>Cook Camp Meal</button>`
           : object.type === "home-herb-garden"
             ? `<button type="button" data-action="harvest-home-herbs">Harvest Medicinal Herbs</button>`
             : ""
@@ -2780,10 +2943,10 @@ function showDungeonObjectInfo(object) {
           ${
             isHomeChest
               ? `<section class="object-inventory">
-                  <h3>Stored Coins</h3>
+                  <h3>Party Purse</h3>
                   <div class="chest-money">
                     <div><b>Carried Coins</b><span>${escapeHtml(moneyText(hero.inventory.money))}</span></div>
-                    <div><b>Chest Coins</b><span>${escapeHtml(moneyText(state.chestMoney ?? {}))}</span></div>
+                    <div><b>Party Purse</b><span>${escapeHtml(moneyText(state.chestMoney ?? {}))}</span></div>
                     <div class="chest-coin-fields" aria-label="Coin amount">
                       <label><span>CP</span><input type="number" inputmode="numeric" min="0" step="1" value="0" data-home-coin-input="cp" /></label>
                       <label><span>SP</span><input type="number" inputmode="numeric" min="0" step="1" value="0" data-home-coin-input="sp" /></label>
@@ -3291,14 +3454,15 @@ function homeFurnitureCatalogueEntries() {
 
 function homeFurnitureCatalogue() {
   const groups = new Map([
-    ["homeUtility", { label: "Home Utility", entries: [] }],
-    ["homeDecor", { label: "Home Decor", entries: [] }],
-    ["guardroomDecor", { label: "Guardroom Decor", entries: [] }],
-    ["natureDecor", { label: "Nature Decor", entries: [] }],
-    ["misc", { label: "Misc", entries: [] }],
+    ["ownedHomeDecor", { label: "Owned Home Decor", entries: [] }],
+    ["homeUtility", { label: "Admin: Home Utility", entries: [] }],
+    ["homeDecor", { label: "Admin: Home Decor", entries: [] }],
+    ["guardroomDecor", { label: "Admin: Guardroom Decor", entries: [] }],
+    ["natureDecor", { label: "Admin: Nature Decor", entries: [] }],
+    ["misc", { label: "Admin: Misc", entries: [] }],
   ]);
   for (const entry of homeFurnitureCatalogueEntries()) {
-    groups.get(homeFurnitureCategory(entry)).entries.push(entry);
+    groups.get(adminEnabled() ? homeFurnitureCategory(entry) : "ownedHomeDecor").entries.push(entry);
   }
   return Array.from(groups.values()).filter((group) => group.entries.length);
 }
@@ -3320,9 +3484,32 @@ function homeFurnitureCategory(entry) {
 
 function homeCatalogueEntryVisible(entry) {
   if (adminEnabled()) return true;
-  if (homeCatalogueAdminOnlyIds.has(entry.id) || (entry.id.includes("crate") && objectHasComponent(entry.id, "captiveCreature"))) return false;
-  if (!homeCatalogueStoryLockedIds.has(entry.id)) return true;
-  return (state.home?.unlockedFurniture ?? []).includes(entry.id);
+  if (!objectComponent(entry.id, "homeDecor")) return false;
+  return homeDecorAvailableCount(entry.id) > 0;
+}
+
+function homeDecorFurnitureItems(type = "") {
+  return (state.chest ?? []).filter((item) => item?.homeDecorFurnitureId === type);
+}
+
+function homeDecorPendingPlacementItemIds(type = "") {
+  if (!homeBuilderSnapshot) return new Set();
+  const snapshotIds = new Set((homeBuilderSnapshot.objects ?? []).map((object) => object.id));
+  return new Set(
+    (state.dungeonObjects ?? [])
+      .filter((object) => object.homePlaced && object.type === type && !snapshotIds.has(object.id))
+      .map((object) => object.homeDecorFurnitureItemId)
+      .filter(Boolean),
+  );
+}
+
+function homeDecorAvailableItems(type = "") {
+  const pending = homeDecorPendingPlacementItemIds(type);
+  return homeDecorFurnitureItems(type).filter((item) => !pending.has(item.id));
+}
+
+function homeDecorAvailableCount(type = "") {
+  return homeDecorAvailableItems(type).length;
 }
 
 function homeBuilderNewFloorKeys() {
@@ -3349,11 +3536,49 @@ function homeBuilderNewObjectCostCp() {
 }
 
 function homeFurnitureBuildCostCp(type) {
+  if (!adminEnabled() && objectComponent(type, "homeDecor")) return 0;
   const bed = objectComponent(type, "homeBed");
   if (bed?.priceCp !== undefined) return bed.priceCp;
   const decor = objectComponent(type, "homeDecor");
   if (decor?.priceCp !== undefined) return decor.priceCp;
   return homeObjectTypeIsStorage(type) ? homeStorageFurnitureCostCp : 0;
+}
+
+function createHomeDecorInventoryItem(type, source = "decor-shop") {
+  const template = objectTemplate(type);
+  const decor = objectComponent(type, "homeDecor");
+  if (!template || !decor) return null;
+  return {
+    id: `home-decor-${type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    baseItemId: `home-decor-${type}`,
+    name: template.name ?? type,
+    type: "furniture",
+    category: "Home Decor",
+    cost: cpToMoney(Math.max(0, Math.floor(Number(decor.priceCp) || 0))),
+    weightLb: 0,
+    homeDecorFurnitureId: type,
+    tags: ["home-decor", "furniture", ...(template.tags ?? [])],
+    description: template.description ?? `A piece of home decor ready to place in your home.`,
+    source,
+  };
+}
+
+function removePartyHomeDecorItem(itemId = "") {
+  if (!itemId) return null;
+  const item = (state.chest ?? []).find((entry) => entry.id === itemId) ?? null;
+  if (!item) return null;
+  state.chest = (state.chest ?? []).filter((entry) => entry.id !== itemId);
+  return item;
+}
+
+function consumePendingHomeDecorPlacements() {
+  if (adminEnabled() || !homeBuilderSnapshot) return;
+  const snapshotIds = new Set((homeBuilderSnapshot.objects ?? []).map((object) => object.id));
+  for (const object of state.dungeonObjects ?? []) {
+    if (!object.homePlaced || snapshotIds.has(object.id) || !object.homeDecorFurnitureItemId) continue;
+    removePartyHomeDecorItem(object.homeDecorFurnitureItemId);
+    delete object.homeDecorFurnitureItemId;
+  }
 }
 
 function homeObjectTypeIsStorage(type, template = objectTemplate(type)) {
@@ -3384,7 +3609,7 @@ function renderHomeBuilder() {
   els.fighterInfo.classList.add("home-builder-dock");
   els.fighterInfoName.textContent = "Build Your Home";
   els.fighterInfoBody.innerHTML = `
-    <p class="empty-note">Choose a tool. Floor, erase, and color painting can be dragged. Save commits this edit session; restore rolls it back.</p>
+    <p class="empty-note">${adminEnabled() ? "Admin mode shows the complete furniture catalogue." : "Furniture placement uses home decor owned in the party inventory. Buy more in village or city shops."} Floor, erase, and color painting can be dragged. Save commits this edit session; restore rolls it back.</p>
     <section class="home-builder-tools" aria-label="Home building tools">
       ${[
         ["floor", "Floor"],
@@ -3399,7 +3624,7 @@ function renderHomeBuilder() {
         .join("")}
     </section>
     <section class="home-builder-tools" aria-label="Furniture rotation">
-      <button type="button" data-action="home-rotate-furniture" ${homeBuildTool === "furniture" || movingObject ? "" : "disabled"}>Rotate ${activeRotation}°</button>
+      <button type="button" data-action="home-rotate-furniture" ${homeBuildTool === "furniture" || movingObject ? "" : "disabled"}>Rotate ${activeRotation} deg</button>
     </section>
     ${
       showPaintTools
@@ -3428,31 +3653,43 @@ function renderHomeBuilder() {
     ${homeMoveSelection ? `<p class="empty-note">Moving: ${escapeHtml(homeMoveSelection.label)}. Click a valid floor tile.</p>` : ""}
     <label class="home-builder-search">
       <span>Furniture</span>
-      <input id="home-build-search" type="search" value="${escapeAttribute(homeBuildSearch)}" placeholder="Search catalogue" />
+      <input id="home-build-search" type="search" value="${escapeAttribute(homeBuildSearch)}" placeholder="${adminEnabled() ? "Search catalogue" : "Search owned decor"}" />
     </label>
     <section class="home-furniture-catalogue" aria-label="Furniture catalogue">
-      ${groups
-        .map(
-          (group) => `
-            <details class="home-furniture-group" open>
-              <summary>${escapeHtml(group.label)}</summary>
-              <div class="home-furniture-group-list">
-                ${group.entries
-                  .map((entry) => {
-                    const cost = homeFurnitureBuildCostCp(entry.id);
-                    return `
-                      <button type="button" data-action="home-build-furniture" data-furniture="${escapeAttribute(entry.id)}" class="${homeBuildFurnitureId === entry.id ? "active" : ""}">
-                        <b>${escapeHtml(entry.symbol ?? "?")}</b>
-                        <span>${escapeHtml(entry.name)}${cost ? `<small>${escapeHtml(moneyText(cpToMoney(cost)))}</small>` : ""}</span>
-                      </button>
-                    `;
-                  })
-                  .join("")}
-              </div>
-            </details>
-          `,
-        )
-        .join("")}
+      ${
+        groups.length
+          ? groups
+              .map(
+                (group) => `
+                  <details class="home-furniture-group" open>
+                    <summary>${escapeHtml(group.label)}</summary>
+                    <div class="home-furniture-group-list">
+                      ${group.entries
+                        .map((entry) => {
+                          const cost = homeFurnitureBuildCostCp(entry.id);
+                          const owned = adminEnabled() ? null : homeDecorFurnitureItems(entry.id).length;
+                          const available = adminEnabled() ? null : homeDecorAvailableCount(entry.id);
+                          return `
+                            <button type="button" data-action="home-build-furniture" data-furniture="${escapeAttribute(entry.id)}" class="${homeBuildFurnitureId === entry.id ? "active" : ""}">
+                              <b>${escapeHtml(entry.symbol ?? "?")}</b>
+                              <span>${escapeHtml(entry.name)}${
+                                adminEnabled()
+                                  ? cost
+                                    ? `<small>${escapeHtml(moneyText(cpToMoney(cost)))}</small>`
+                                    : ""
+                                  : `<small>${escapeHtml(available)} / ${escapeHtml(owned)} available</small>`
+                              }</span>
+                            </button>
+                          `;
+                        })
+                        .join("")}
+                    </div>
+                  </details>
+                `,
+              )
+              .join("")
+          : `<p class="empty-note">${adminEnabled() ? "No furniture matches that search." : "No owned home decor matches that search. Visit a decor shop to buy furniture for the party inventory."}</p>`
+      }
     </section>
     <section class="home-builder-tools home-builder-footer" aria-label="Home save tools">
       <button type="button" data-action="home-save-build" class="${canAffordBuild ? "home-build-cost-ok" : "home-build-cost-bad"}" ${canAffordBuild ? "" : "disabled"}>Save Home (${escapeHtml(costText)})</button>
@@ -3484,6 +3721,7 @@ function saveHomeBuilderChanges() {
     renderHomeBuilder();
     return;
   }
+  consumePendingHomeDecorPlacements();
   syncHomeLayoutToDungeon();
   homeBuilderSnapshot = cloneData(state.home);
   addLog(buildCostCp > 0 ? `Home layout saved. Paid ${moneyText(cpToMoney(buildCostCp))} from the home chest.` : "Home layout saved.", "important");
@@ -3516,6 +3754,11 @@ function removeHomeObjectAt(position) {
     return true;
   }
   state.dungeonObjects = (state.dungeonObjects ?? []).filter((object) => object.id !== target.id);
+  if (!adminEnabled() && objectComponent(target.type, "homeDecor")) {
+    const returned = target.homeDecorFurnitureItemId ? null : createHomeDecorInventoryItem(target.type, "home-return");
+    if (returned) addItemToPartyInventory(returned, "home-decor-return");
+    addLog(`${objectTemplate(target.type)?.name ?? "Decor"} returns to the party inventory.`, "important");
+  }
   return true;
 }
 
@@ -3549,6 +3792,18 @@ function applyHomeBuildAt(position, event = null) {
       renderHomeBuilder();
       return true;
     }
+    const homeDecorComponent = objectComponent(homeBuildFurnitureId, "homeDecor");
+    if (!adminEnabled() && !homeDecorComponent) {
+      addLog("Only owned home decor can be placed without admin mode.", "important");
+      renderHomeBuilder();
+      return true;
+    }
+    const availableDecorItem = homeDecorComponent ? homeDecorAvailableItems(homeBuildFurnitureId)[0] : null;
+    if (!adminEnabled() && homeDecorComponent && !availableDecorItem) {
+      addLog("Buy that decor before placing it at home.", "important");
+      renderHomeBuilder();
+      return true;
+    }
     const template = objectTemplate(homeBuildFurnitureId);
     const instanceNumber = (state.dungeonObjects ?? []).filter((object) => object.id?.startsWith(`home-${homeBuildFurnitureId}-`)).length + 1;
     state.dungeonObjects.push({
@@ -3559,6 +3814,7 @@ function applyHomeBuildAt(position, event = null) {
       height: template.height ?? 1,
       rotation,
       homePlaced: true,
+      homeDecorFurnitureItemId: availableDecorItem?.id ?? null,
       items: [],
     });
   } else if (homeBuildTool === "move") {
@@ -3742,7 +3998,7 @@ const homeLibraryTutorials = {
       },
       {
         title: "Who Breaks Stealth",
-        body: "A non-stealthing hero entering the monster room starts danger normally. AI allies automatically stealth when the hero they follow is stealthing.",
+        body: "A non-stealthing hero entering the monster room starts danger normally. Companions automatically stealth when the hero they follow is stealthing.",
       },
       {
         title: "New Checks",
@@ -4103,7 +4359,7 @@ function freeCaptiveCreature(objectId) {
   object.lastResult = checkText;
   if (state.mode === "combat") hero.hasAction = false;
   addLog(checkText, "important");
-  addAdminCheckLog({ actor: hero, label: `${skillLabel} check to free captive`, target: template.name, rollResult, bonus, guidance, total, dc, success, note: success ? `recruited as ${component.control === "player" ? "player companion" : "AI ally"}` : "released hostile" });
+  addAdminCheckLog({ actor: hero, label: `${skillLabel} check to free captive`, target: template.name, rollResult, bonus, guidance, total, dc, success, note: success ? `recruited as ${component.control === "player" ? "player companion" : "companion"}` : "released hostile" });
   recordD20OutcomeForFighter(hero, success);
 
   if (success) {
@@ -4189,9 +4445,11 @@ function showPlanningTableInfo() {
             <div class="planning-slot bench-slot">
               <div>
                 <b>${escapeHtml(hero.name)}</b>
-                <span>${escapeHtml(hero.className ?? (partyMemberKind(hero) === "companion" ? "Companion" : "Ally"))}${hero.companionControl === "ai" ? " - AI controlled" : " - Player controlled"}</span>
+                <span>${escapeHtml(hero.className ?? (partyMemberKind(hero) === "companion" ? "Companion" : "Ally"))}${hero.companionControl === "ai" ? " - Self-directed" : " - Player-directed"}${hero.tavernRecruit ? ` - ${escapeHtml(tavernHirelingStatusText(hero))}` : ""}</span>
               </div>
+              ${adminEnabled() && isAutonomousAlly(hero) ? `<button type="button" data-action="show-ai-ally-stat-block" data-hero="${escapeAttribute(hero.id)}">Stat Block</button>` : ""}
               <button type="button" data-action="remove-party-hero" data-hero="${escapeAttribute(hero.id)}">Remove</button>
+              ${hero.tavernRecruit ? `<button class="delete-save" type="button" data-action="dismiss-tavern-hireling" data-hero="${escapeAttribute(hero.id)}">Dismiss</button>` : ""}
               ${retireButtonMarkup(hero)}
             </div>
           `;
@@ -4212,10 +4470,12 @@ function showPlanningTableInfo() {
             <div class="planning-slot bench-slot">
               <div>
                 <b>${escapeHtml(hero.name)}</b>
-                <span>${hero.dead ? "Dead" : classHero ? escapeHtml(planningClassLabel(hero)) : `${escapeHtml(hero.className ?? "Ally")}${hero.companionControl === "ai" ? " - AI controlled" : " - Player controlled"}${missingOwner ? ` - bound to ${escapeHtml(state.fighters[ownerId]?.name ?? "hero")}` : ""}`}</span>
+                <span>${hero.dead ? "Dead" : classHero ? escapeHtml(planningClassLabel(hero)) : `${escapeHtml(hero.className ?? "Ally")}${hero.companionControl === "ai" ? " - Self-directed" : " - Player-directed"}${hero.tavernRecruit ? ` - ${escapeHtml(tavernHirelingStatusText(hero))}` : ""}${missingOwner ? ` - bound to ${escapeHtml(state.fighters[ownerId]?.name ?? "hero")}` : ""}`}</span>
               </div>
               ${classHero ? `<select data-action="party-role" data-hero="${escapeAttribute(hero.id)}">${roleOptionsMarkup(partyRoleFor(hero))}</select>` : ""}
+              ${adminEnabled() && isAutonomousAlly(hero) ? `<button type="button" data-action="show-ai-ally-stat-block" data-hero="${escapeAttribute(hero.id)}">Stat Block</button>` : ""}
               <button type="button" data-action="add-party-hero" data-hero="${escapeAttribute(hero.id)}" ${addDisabled ? "disabled" : ""}${addTitle}>Add</button>
+              ${hero.tavernRecruit ? `<button class="delete-save" type="button" data-action="dismiss-tavern-hireling" data-hero="${escapeAttribute(hero.id)}">Dismiss</button>` : ""}
               ${retireButtonMarkup(hero)}
             </div>
           `;
@@ -5695,6 +5955,7 @@ function itemDetails(item) {
     return `${quantityText}${item.category ?? "Consumable"}; ${item.use?.resource === "bonusAction" ? "bonus action" : "action"}${chargeText}${cost}${weight}${starterText}`;
   }
   if (item.type === "accessory") return `${magicText.replace(/^; /, "") || item.loot?.rarity || "magic"}${chargeText}${cost}${weight}${boundText}${starterText}`;
+  if (item.type === "furniture" && item.homeDecorFurnitureId) return `Home decor; place with Build Your Home${cost}${starterText}`;
   if (item.type === "tool") {
     const proficiency = item.use?.requiredTool ?? item.use?.instrument ?? item.id;
     const songText = item.use?.kind === "instrumentPerformance" ? `; ${(item.use.songs ?? []).length} piece${(item.use.songs ?? []).length === 1 ? "" : "s"}` : "";
@@ -6281,11 +6542,11 @@ function moveChestItemToInventory(itemId) {
 }
 
 function moveInventoryItemToHomeStorage(itemId, objectId = "home-chest") {
-  if (state.mode !== "home") return;
+  if (!["home", "camp"].includes(state.mode)) return;
   const storage = homeStorageObjectForId(objectId);
   const hero = activeHero();
   const item = itemForId(hero, itemId);
-  if (!storage || !item) return;
+  if ((!storage && objectId !== "home-chest") || !item) return;
 
   for (const slot of equipmentSlots) {
     if (hero.equipment[slot.id] === itemId) {
@@ -6305,7 +6566,7 @@ function moveInventoryItemToHomeStorage(itemId, objectId = "home-chest") {
 }
 
 function moveHomeStorageItemToInventory(objectId = "home-chest", itemId) {
-  if (state.mode !== "home") return;
+  if (!["home", "camp"].includes(state.mode)) return;
   const storage = homeStorageObjectForId(objectId);
   const item = objectId === "home-chest" ? chestItemForId(itemId) : (storage?.items ?? []).find((entry) => entry.id === itemId);
   if (!item) return;
@@ -6322,7 +6583,7 @@ function moveHomeStorageItemToInventory(objectId = "home-chest", itemId) {
 }
 
 function moveMoneyBetweenHeroAndChest(direction, cpAmount) {
-  if (state.mode !== "home" || cpAmount <= 0) return;
+  if (!["home", "camp"].includes(state.mode) || cpAmount <= 0) return;
   const heroMoney = activeHero().inventory.money;
   state.chestMoney = normalizeMoney(state.chestMoney ?? {});
   const from = direction === "deposit" ? heroMoney : state.chestMoney;
@@ -6680,7 +6941,7 @@ function inventoryTabs() {
   return [
     { id: "equipment", label: "Equipment" },
     { id: "items", label: "Items" },
-    ...(state.mode === "home" ? [{ id: "chest", label: "Chest" }] : []),
+    ...(["home", "camp"].includes(state.mode) ? [{ id: "chest", label: "Party Inventory" }] : []),
     ...(adminEnabled() && inventoryAdminOpen ? [{ id: "vault", label: "Vault" }] : []),
     { id: "materials", label: "Materials" },
   ];
@@ -6766,15 +7027,15 @@ function renderInventoryMenu() {
     </section>
   `;
   const chestMarkup = `
-    <section class="inventory-list chest-list" data-drop-chest="true" aria-label="Home chest">
-      <h3>Home Chest</h3>
+    <section class="inventory-list chest-list" data-drop-chest="true" aria-label="Party inventory">
+      <h3>Party Inventory</h3>
       <div class="chest-money">
         <div>
           <b>Carried Coins</b>
           <span>${escapeHtml(moneyText(fighter.inventory.money))}</span>
         </div>
         <div>
-          <b>Chest Coins</b>
+          <b>Party Purse</b>
           <span>${escapeHtml(moneyText(chestMoney))}</span>
         </div>
         <div class="chest-coin-fields" aria-label="Coin amount">
@@ -6791,7 +7052,7 @@ function renderInventoryMenu() {
         </div>
       </div>
       ${groupedInventoryItemsMarkup(chestItems, {
-        emptyText: "Drop items here to leave them at home.",
+        emptyText: "Drop items here to keep them in the party inventory.",
         renderItem: renderChestInventoryItem,
       })}
     </section>
@@ -6799,7 +7060,7 @@ function renderInventoryMenu() {
   const tabPanels = {
     equipment: equipmentMarkup,
     items: itemsMarkup,
-    chest: state.mode === "home" ? chestMarkup : itemsMarkup,
+    chest: ["home", "camp"].includes(state.mode) ? chestMarkup : itemsMarkup,
     vault: renderAdminItemCatalog(),
     materials: partyResourceInventoryMarkup(),
   };
@@ -6865,14 +7126,14 @@ function partyResourceInventoryMarkup() {
   return `
     <section class="party-resource-inventory ${questSatchelOpen ? "open" : "collapsed"}">
       <button type="button" class="quest-satchel-toggle" data-action="toggle-quest-satchel" aria-expanded="${questSatchelOpen ? "true" : "false"}">
-        <span>Material Satchel</span>
+        <span>Party Supplies</span>
         <small>${entries.length ? `${entries.reduce((sum, [, quantity]) => sum + quantity, 0)} item${entries.reduce((sum, [, quantity]) => sum + quantity, 0) === 1 ? "" : "s"}` : "Empty"}</small>
       </button>
       ${
         questSatchelOpen
           ? entries.length
             ? groupMarkup
-            : `<p class="empty-note">No shared materials yet.</p>`
+            : `<p class="empty-note">No shared supplies yet.</p>`
           : ""
       }
     </section>
@@ -6885,7 +7146,7 @@ function showPartyResourceInfo(itemId) {
   if (!item || quantity <= 0) return;
   showGameDialog({
     title: item.name ?? "Material",
-    message: `${item.flavor?.description ?? item.description ?? item.flavor?.short ?? "A shared crafting material."}\n\nMaterial Satchel: ${quantity}`,
+    message: `${item.flavor?.description ?? item.description ?? item.flavor?.short ?? "A shared party supply."}\n\nParty Supplies: ${quantity}`,
     confirmText: "Close",
     cancelText: "Close",
   });
@@ -7060,6 +7321,14 @@ function showInventoryMenu() {
   clearHeldMovementKeys();
   renderInventoryMenu();
   els.inventoryMenu.classList.remove("hidden");
+}
+
+function openPartyInventory() {
+  activeInventoryTab = "chest";
+  els.homeMenu?.classList.add("hidden");
+  els.homeMenu?.classList.remove("camp-dock");
+  els.travelCampMenu?.classList.add("hidden");
+  showInventoryMenu();
 }
 
 function hideInventoryMenu() {
@@ -8232,18 +8501,5111 @@ function shouldShowHomeObjectiveChip() {
   return highestHeroLevel < 2 && completedDungeonCount() < 1;
 }
 
+function travelChunk() {
+  const world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state?.world;
+  if (!state || !world) return null;
+  if (world !== state.world) state.world = world;
+  const key = window.DepthboundWorldTravel?.chunkKey?.(world.currentHex?.chunkX ?? 0, world.currentHex?.chunkY ?? 0) ?? "0,0";
+  return world.chunks?.[key] ?? world.chunks?.["0,0"] ?? null;
+}
+
+function travelHexKey(row, col, chunkX = null, chunkY = null) {
+  const displayed = travelDisplayedChunkCoords();
+  const keyChunkX = Math.floor(Number(chunkX ?? displayed.chunkX) || 0);
+  const keyChunkY = Math.floor(Number(chunkY ?? displayed.chunkY) || 0);
+  return window.DepthboundWorldTravel?.cellId?.(keyChunkX, keyChunkY, row, col) ?? `${keyChunkX},${keyChunkY}:${row},${col}`;
+}
+
+function travelStructureForCell(chunk, row, col) {
+  return (chunk?.middleObjects ?? []).find((object) => {
+    if (object?.layer && object.layer !== "structures") return false;
+    const cell = object.generatedCell ?? { row: Math.floor(Number(object.y) || 0), col: Math.floor(Number(object.x) || 0) };
+    return cell.row === row && cell.col === col;
+  }) ?? null;
+}
+
+function travelObjectsForCell(chunk, row, col) {
+  return (chunk?.middleObjects ?? []).filter((object) => {
+    const cell = object.generatedCell ?? { row: Math.floor(Number(object.y) || 0), col: Math.floor(Number(object.x) || 0) };
+    return cell.row === row && cell.col === col;
+  });
+}
+
+function travelPrimaryFeatureForCell(chunk, row, col) {
+  const objects = travelObjectsForCell(chunk, row, col);
+  return objects.find((object) => object?.layer === "structures") ?? objects.find((object) => String(object?.tile ?? "").startsWith("lake_")) ?? null;
+}
+
+function travelAssetPath(base, tile) {
+  return `${base}${String(tile || "").split("/").map(encodeURIComponent).join("/")}.png`;
+}
+
+function travelBiomeAsset(tile) {
+  return travelAssetPath("hexagonalworldbuilder/assets/bottomtiles/noiso_fitted/", tile || "grassland");
+}
+
+function travelMiddleAsset(tile) {
+  const assetTile = tile === "city" ? "city_large" : tile;
+  return travelAssetPath("hexagonalworldbuilder/assets/middletiles/", assetTile || "");
+}
+
+function travelTitleText(value = "") {
+  return String(value || "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function travelBiomeLabel(tile = "") {
+  const group = window.DepthboundWorldTravel?.biomeGroup?.(tile) ?? window.DepthboundWorldNames?.biomeGroup?.(tile) ?? String(tile).split("_")[0];
+  return travelTitleText(group || tile || "wilds");
+}
+
+function travelStructureLabel(object = null) {
+  if (!object) return "";
+  const kind = object.kind || object.nameKind || window.DepthboundWorldNames?.structureKind?.(object.tile) || "";
+  const shouldUseName = window.DepthboundWorldNames?.shouldGenerateFeatureName?.(kind) ?? ["village", "city", "lake"].includes(String(kind).toLowerCase());
+  if (shouldUseName && object.name) return object.name;
+  return window.DepthboundWorldNames?.structureLabel?.(object.tile || kind) ?? travelTitleText(object.tile || kind || "Structure");
+}
+
+function travelStructureDisplayLabel(object = null, options = {}) {
+  if (!object) return "";
+  const kind = String(object.kind || object.nameKind || window.DepthboundWorldNames?.structureKind?.(object.tile) || "").toLowerCase();
+  if (["village", "city", "lake"].includes(kind) && object.name) return object.name;
+  const boardLike = typeof settlementBoardStructureNoun === "function" ? settlementBoardStructureNoun(object) : "";
+  const label = travelStructureLabel(object);
+  const cleaned = boardLike && boardLike !== "site" ? travelTitleText(boardLike) : label;
+  if (options.article) {
+    const lower = String(cleaned || "site").toLowerCase();
+    if (/^(the|a|an)\s/.test(lower)) return cleaned;
+    return `${/^[aeiou]/i.test(cleaned) ? "an" : "a"} ${cleaned}`;
+  }
+  return cleaned || "Site";
+}
+
+function travelFeatureKindLabel(object = null) {
+  const kind = object?.kind || object?.nameKind || window.DepthboundWorldNames?.structureKind?.(object?.tile) || "structure";
+  return window.DepthboundWorldNames?.structureLabel?.(object?.tile || kind) ?? travelTitleText(kind);
+}
+
+function travelFeatureKind(object = null) {
+  return String(object?.kind || object?.nameKind || window.DepthboundWorldNames?.structureKind?.(object?.tile) || "").toLowerCase();
+}
+
+function travelFeatureIsTeleportSettlement(object = null) {
+  const kind = travelFeatureKind(object);
+  const tile = String(object?.tile ?? "").toLowerCase();
+  return kind === "village" || kind === "city" || tile.startsWith("village") || tile.startsWith("city_") || tile === "city";
+}
+
+function travelTeleportCircleId(feature = null, hex = null) {
+  if (feature?.id) return feature.id;
+  const target = hex ?? state?.world?.currentHex ?? {};
+  return window.DepthboundWorldTravel?.cellId?.(target.chunkX, target.chunkY, target.row, target.col) ?? `${target.chunkX},${target.chunkY}:${target.row},${target.col}`;
+}
+
+function travelEnsureHomeVillageState(world = state?.world) {
+  if (!world) return null;
+  world.visitedStructures = world.visitedStructures && typeof world.visitedStructures === "object" ? world.visitedStructures : {};
+  const homeHex = world.homeHex;
+  const homeFeature = travelFeatureForHex(homeHex);
+  if (!homeHex || !homeFeature) return homeFeature;
+  const id = homeFeature.id || world.homeVillageId || travelTeleportCircleId(homeFeature, homeHex);
+  if (!id) return homeFeature;
+  world.homeVillageId = world.homeVillageId || id;
+  world.visitedStructures[id] = {
+    ...(world.visitedStructures[id] ?? {}),
+    count: Math.max(1, Math.floor(Number(world.visitedStructures[id]?.count) || 0)),
+    firstVisitedDay: world.visitedStructures[id]?.firstVisitedDay ?? 0,
+    lastVisitedDay: Math.max(0, Math.floor(Number(world.visitedStructures[id]?.lastVisitedDay) || 0)),
+    home: true,
+  };
+  return homeFeature;
+}
+
+function travelEnsureTeleportData() {
+  state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state.world;
+  if (!state?.world) return null;
+  state.world.teleportCircles = state.world.teleportCircles && typeof state.world.teleportCircles === "object" ? state.world.teleportCircles : {};
+  state.world.teleportUnlocked = Boolean(state.world.teleportUnlocked);
+  state.world.teleportIntroShown = Boolean(state.world.teleportIntroShown);
+  const homeHex = state.world.homeHex;
+  const homeFeature = travelEnsureHomeVillageState(state.world) ?? travelFeatureForHex(homeHex);
+  if (homeHex && travelFeatureIsTeleportSettlement(homeFeature)) {
+    const id = travelTeleportCircleId(homeFeature, homeHex);
+    state.world.teleportCircles[id] ??= {
+      id,
+      label: travelStructureLabel(homeFeature) || "Home Village",
+      kind: travelFeatureKindLabel(homeFeature),
+      hex: cloneData(homeHex),
+      home: true,
+      discoveredDay: 0,
+    };
+  }
+  const knownNonHome = Object.values(state.world.teleportCircles).some((entry) => entry && !entry.home);
+  if (knownNonHome) state.world.teleportUnlocked = true;
+  return state.world;
+}
+
+function travelKnownTeleportCircles() {
+  const world = travelEnsureTeleportData();
+  return Object.values(world?.teleportCircles ?? {})
+    .filter((entry) => entry?.id && entry?.hex)
+    .sort((a, b) => Number(Boolean(b.home)) - Number(Boolean(a.home)) || String(a.label ?? "").localeCompare(String(b.label ?? "")));
+}
+
+function travelStructureVisitState(feature = null) {
+  if (!feature?.id || !state?.world?.visitedStructures) return null;
+  return state.world.visitedStructures[feature.id] ?? null;
+}
+
+function travelStructureStatusLabel(feature = null) {
+  if (feature?.id && (feature.id === state?.world?.homeVillageId || state?.world?.visitedStructures?.[feature.id]?.home)) return "Home";
+  const visit = travelStructureVisitState(feature);
+  if (!visit?.count) return "Unvisited";
+  if (visit.cleared) return "Cleared";
+  if (visit.pending) return "In progress";
+  if (visit.resolved) return "Resolved";
+  return `Visited ${visit.count}`;
+}
+
+function travelRumorAtHex(hex = null) {
+  if (!hex || !state?.world?.rumoredHexes) return null;
+  return state.world.rumoredHexes[travelHexKey(hex.row, hex.col, hex.chunkX, hex.chunkY)] ?? null;
+}
+
+function travelCurrentPlaceLabel() {
+  const chunk = travelChunk();
+  const current = state?.world?.currentHex;
+  if (!chunk || !current) return "Unknown";
+  const feature = travelPrimaryFeatureForCell(chunk, current.row, current.col);
+  return feature ? travelStructureDisplayLabel(feature) : `${travelBiomeLabel(chunk.tiles?.[current.row]?.[current.col])} (${current.row}, ${current.col})`;
+}
+
+function travelHomePlaceLabel() {
+  const chunk = state?.world?.chunks?.["0,0"];
+  const home = state?.world?.homeHex;
+  if (!chunk || !home) return "Unknown";
+  const feature = travelPrimaryFeatureForCell(chunk, home.row, home.col);
+  return feature ? travelStructureDisplayLabel(feature) : `Home (${home.row}, ${home.col})`;
+}
+
+function travelDisplayedChunkCoords() {
+  const current = state?.world?.currentHex ?? {};
+  return {
+    chunkX: Math.floor(Number(current.chunkX) || 0),
+    chunkY: Math.floor(Number(current.chunkY) || 0),
+  };
+}
+
+function travelHexForCell(row, col, chunkX = null, chunkY = null) {
+  const displayed = travelDisplayedChunkCoords();
+  return {
+    chunkX: Math.floor(Number(chunkX ?? displayed.chunkX) || 0),
+    chunkY: Math.floor(Number(chunkY ?? displayed.chunkY) || 0),
+    row: Math.floor(Number(row) || 0),
+    col: Math.floor(Number(col) || 0),
+  };
+}
+
+function travelNormalizeHex(hex = null) {
+  if (!hex || !state?.world) return null;
+  const width = Math.max(1, Math.floor(Number(state.world.chunkWidth) || 10));
+  const height = Math.max(1, Math.floor(Number(state.world.chunkHeight) || 10));
+  let chunkX = Math.floor(Number(hex.chunkX) || 0);
+  let chunkY = Math.floor(Number(hex.chunkY) || 0);
+  let row = Math.floor(Number(hex.row) || 0);
+  let col = Math.floor(Number(hex.col) || 0);
+  while (row < 0) {
+    row += height;
+    chunkY -= 1;
+  }
+  while (row >= height) {
+    row -= height;
+    chunkY += 1;
+  }
+  while (col < 0) {
+    col += width;
+    chunkX -= 1;
+  }
+  while (col >= width) {
+    col -= width;
+    chunkX += 1;
+  }
+  return { chunkX, chunkY, row, col };
+}
+
+function travelChunkKeyForHex(hex = null) {
+  const target = hex ?? state?.world?.currentHex ?? { chunkX: 0, chunkY: 0 };
+  return window.DepthboundWorldTravel?.chunkKey?.(target.chunkX ?? 0, target.chunkY ?? 0) ?? `${target.chunkX ?? 0},${target.chunkY ?? 0}`;
+}
+
+function travelChunkForHex(hex = null) {
+  const key = travelChunkKeyForHex(hex);
+  return state?.world?.chunks?.[key] ?? null;
+}
+
+function travelSameHex(a, b) {
+  return Boolean(
+    a &&
+      b &&
+      Math.floor(Number(a.chunkX) || 0) === Math.floor(Number(b.chunkX) || 0) &&
+      Math.floor(Number(a.chunkY) || 0) === Math.floor(Number(b.chunkY) || 0) &&
+      Math.floor(Number(a.row) || 0) === Math.floor(Number(b.row) || 0) &&
+      Math.floor(Number(a.col) || 0) === Math.floor(Number(b.col) || 0)
+  );
+}
+
+function travelRoute() {
+  state.world ??= {};
+  state.world.travelPlan = Array.isArray(state.world.travelPlan) ? state.world.travelPlan : [];
+  return state.world.travelPlan;
+}
+
+function travelRouteIndex(row, col) {
+  const target = travelHexForCell(row, col);
+  return travelRoute().findIndex((hex) => travelSameHex(hex, target));
+}
+
+function travelRouteAnchor() {
+  const route = travelRoute();
+  return route[route.length - 1] ?? state?.world?.currentHex ?? { chunkX: 0, chunkY: 0, row: 0, col: 0 };
+}
+
+function travelEdgeScoutAnchor() {
+  const routeAnchor = travelRouteAnchor();
+  if (travelHexAtChunkEdge(routeAnchor)) return routeAnchor;
+  const current = state?.world?.currentHex;
+  if (travelHexAtChunkEdge(current)) return current;
+  return routeAnchor;
+}
+
+function travelNeighborHexes(hex) {
+  const row = Math.floor(Number(hex?.row) || 0);
+  const col = Math.floor(Number(hex?.col) || 0);
+  const odd = row % 2 !== 0;
+  const offsets = odd
+    ? [
+        { row: -1, col: 0 },
+        { row: -1, col: 1 },
+        { row: 0, col: -1 },
+        { row: 0, col: 1 },
+        { row: 1, col: 0 },
+        { row: 1, col: 1 },
+      ]
+    : [
+        { row: -1, col: -1 },
+        { row: -1, col: 0 },
+        { row: 0, col: -1 },
+        { row: 0, col: 1 },
+        { row: 1, col: -1 },
+        { row: 1, col: 0 },
+      ];
+  return offsets.map((offset) => travelNormalizeHex({ chunkX: hex.chunkX ?? 0, chunkY: hex.chunkY ?? 0, row: row + offset.row, col: col + offset.col })).filter(Boolean);
+}
+
+function travelHexAdjacent(a, b) {
+  if (!a || !b) return false;
+  return travelNeighborHexes(a).some((hex) => travelSameHex(hex, travelNormalizeHex(b)));
+}
+
+const roadBuildingKitItemId = "road-building-kit";
+
+function travelHexKeyForHex(hex = null) {
+  const target = travelNormalizeHex(hex);
+  if (!target) return "";
+  return travelHexKey(target.row, target.col, target.chunkX, target.chunkY);
+}
+
+function travelRoadEdgeKey(a = null, b = null) {
+  const first = travelHexKeyForHex(a);
+  const second = travelHexKeyForHex(b);
+  if (!first || !second) return "";
+  return [first, second].sort().join("|");
+}
+
+function travelRoadState() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  const entry = state.questFlags.expeditionRoads && typeof state.questFlags.expeditionRoads === "object" ? state.questFlags.expeditionRoads : {};
+  entry.projects = entry.projects && typeof entry.projects === "object" ? entry.projects : {};
+  entry.builtEdges = entry.builtEdges && typeof entry.builtEdges === "object" ? entry.builtEdges : {};
+  entry.connectedTargets = entry.connectedTargets && typeof entry.connectedTargets === "object" ? entry.connectedTargets : {};
+  state.questFlags.expeditionRoads = entry;
+  return entry;
+}
+
+function travelRoadKitCount() {
+  return partyResourceCount(roadBuildingKitItemId);
+}
+
+function addTravelRoadKits(quantity = 1) {
+  const amount = Math.max(1, Math.floor(Number(quantity) || 1));
+  const template = getItemTemplate(roadBuildingKitItemId) ?? { id: roadBuildingKitItemId };
+  return addPartyResourceItem(template, amount);
+}
+
+function travelRoadEdgeBuilt(a = null, b = null) {
+  const key = travelRoadEdgeKey(a, b);
+  return Boolean(key && travelRoadState().builtEdges[key]);
+}
+
+function travelRoadTouchesHex(hex = null) {
+  const target = travelNormalizeHex(hex);
+  if (!target) return false;
+  return Object.keys(travelRoadState().builtEdges).some((key) => key.includes(travelHexKeyForHex(target)));
+}
+
+function expeditionActiveRoadProjectAtHex(hex = null) {
+  const targetKey = travelHexKeyForHex(hex);
+  if (!targetKey) return null;
+  return Object.values(travelRoadState().projects ?? {}).find((project) => {
+    if (project.status !== "accepted") return false;
+    if (travelHexKeyForHex(project.target) === targetKey) return true;
+    return (project.path ?? []).some((step) => travelHexKeyForHex(step) === targetKey);
+  }) ?? null;
+}
+
+function travelRoadEdgesList() {
+  return Object.values(travelRoadState().builtEdges)
+    .filter((edge) => edge?.from && edge?.to)
+    .map((edge) => ({ ...edge, from: travelNormalizeHex(edge.from), to: travelNormalizeHex(edge.to) }))
+    .filter((edge) => edge.from && edge.to);
+}
+
+function travelCanUseRoadDoubleSpeed(from = null, first = null, second = null) {
+  const start = travelNormalizeHex(from);
+  const middle = travelNormalizeHex(first);
+  const end = travelNormalizeHex(second);
+  if (!start || !middle || !end) return false;
+  if (!travelHexIsSaferRoute(start) || !travelHexIsSaferRoute(middle) || !travelHexIsSaferRoute(end)) return false;
+  if (!travelRoadEdgeBuilt(start, middle) || !travelRoadEdgeBuilt(middle, end)) return false;
+  if (travelSameHex(middle, state?.world?.homeHex) || travelFeatureForHex(middle)) return false;
+  return true;
+}
+
+async function travelChooseRoadModeForNextHex(from = null, to = null) {
+  if (!to || !travelHexIsSaferRoute(to)) return "normal";
+  const destination = travelPlaceLabelForHex(to);
+  const roadText = travelCanUseRoadDoubleSpeed(from, to, travelRoute()[1])
+    ? "Follow the built road. If the following route step is also connected by road, the party reaches it today."
+    : "Follow the built road and use the safer road travel pool.";
+  const choices = [
+    { value: "road", label: "Take The Road", description: roadText },
+    { value: "offroad", label: "Venture Off Track", description: "Move to this hex without using the road, rolling normal wilderness events and dungeon chances." },
+  ];
+  const choice = travelMapMenuVisible()
+    ? await showTravelMapChoiceDialog({
+        kicker: "Road Travel",
+        title: destination,
+        message: `${destination} lies on a built road. Choose whether the party follows the road or leaves it for rougher ground today.`,
+        choices,
+      })
+    : await showChoiceDialog({
+        title: "Road Travel",
+        message: `${destination} lies on a built road. Choose whether the party follows the road or leaves it for rougher ground today.`,
+        choices,
+      });
+  return choice === "offroad" ? "offroad" : choice === "road" ? "road" : null;
+}
+
+function travelHexInChunk(hex) {
+  const target = travelNormalizeHex(hex);
+  const chunk = travelChunkForHex(target);
+  return Boolean(chunk && target.row >= 0 && target.col >= 0 && target.row < chunk.height && target.col < chunk.width);
+}
+
+function travelCanAddHex(row, col, chunkX = null, chunkY = null) {
+  const target = travelHexForCell(row, col, chunkX, chunkY);
+  if (!travelHexInChunk(target)) return false;
+  if (travelSameHex(target, state?.world?.currentHex)) return false;
+  return travelHexAdjacent(travelRouteAnchor(), target);
+}
+
+function travelRouteStep(row, col, chunkX = null, chunkY = null) {
+  const target = travelHexForCell(row, col, chunkX, chunkY);
+  const index = travelRoute().findIndex((hex) => travelSameHex(hex, target));
+  return index >= 0 ? index + 1 : 0;
+}
+
+function travelRouteSummaryText() {
+  const count = travelRoute().length;
+  if (!count) return "No route selected";
+  const ready = state?.world?.routeConfirmed ? " ready" : " planned";
+  return `${count} day${count === 1 ? "" : "s"}${ready}`;
+}
+
+function syncTravelRouteControls() {
+  const routeLength = travelRoute().length;
+  const scoutAnchor = travelEdgeScoutAnchor();
+  const scoutAnchorAtEdge = travelHexAtChunkEdge(scoutAnchor);
+  if (els.travelRouteLabel) els.travelRouteLabel.textContent = travelRouteSummaryText();
+  if (els.travelClearRoute) els.travelClearRoute.disabled = routeLength === 0 || travelMapAnimating;
+  if (els.travelGenerateChunks) {
+    els.travelGenerateChunks.disabled = travelMapAnimating || !scoutAnchorAtEdge;
+    els.travelGenerateChunks.title = scoutAnchorAtEdge
+      ? "Generate any missing neighboring chunk beside this edge."
+      : "Stand on, or plan to, a chunk-edge hex first.";
+  }
+  if (els.travelConfirmRoute) {
+    els.travelConfirmRoute.disabled = routeLength === 0 || travelMapAnimating || Boolean(state?.world?.routeConfirmed);
+    els.travelConfirmRoute.textContent = "Confirm Route";
+  }
+  if (els.travelStartRoute) {
+    els.travelStartRoute.disabled = routeLength === 0 || travelMapAnimating || !state?.world?.routeConfirmed;
+    els.travelStartRoute.textContent = "Start Travel";
+  }
+}
+
+function adminTravelTeleportEnabled() {
+  return Boolean(adminEnabled() && adminTeleportEnabled);
+}
+
+function travelHexClasses(tile, structure, row, col, chunkX = null, chunkY = null) {
+  const world = state?.world ?? {};
+  const current = world.currentHex;
+  const home = world.homeHex;
+  const group = window.DepthboundWorldTravel?.biomeGroup?.(tile) ?? "wilds";
+  const classes = ["travel-hex", `travel-biome-${group}`];
+  const hex = travelHexForCell(row, col, chunkX, chunkY);
+  const routeStep = travelRouteStep(row, col, chunkX, chunkY);
+  if (structure) {
+    classes.push("has-structure");
+    const visit = travelStructureVisitState(structure);
+    if (visit?.cleared) classes.push("structure-cleared");
+    else if (visit?.resolved) classes.push("structure-resolved");
+    else if (visit?.count) classes.push("structure-visited");
+  }
+  if (travelHexIsSaferRoute(hex)) classes.push("safe-route");
+  if (travelRoadTouchesHex(hex)) classes.push("road-built");
+  if (expeditionActiveRoadProjectAtHex(hex)) classes.push("road-project");
+  if (travelHexAtChunkEdge(hex)) classes.push("chunk-edge");
+  if (routeStep) classes.push("planned-route");
+  if (settlementBoardQuestAtHex(hex)) classes.push("quest-target");
+  if (travelRumorAtHex(hex)) classes.push("rumor-target");
+  if (routeStep && world.routeConfirmed) classes.push("route-confirmed");
+  if (!routeStep && travelCanAddHex(row, col, chunkX, chunkY)) classes.push("route-candidate");
+  if (current && travelSameHex(current, hex)) classes.push("current");
+  if (home && travelSameHex(home, hex)) classes.push("home");
+  if (world.discoveredHexes?.[travelHexKey(row, col, chunkX, chunkY)]) classes.push("discovered");
+  if (adminTravelTeleportEnabled()) classes.push("admin-teleport-target");
+  return classes.join(" ");
+}
+
+function travelMarkerMarkup(structure, row, col, chunkX = null, chunkY = null) {
+  const world = state?.world ?? {};
+  const current = world.currentHex;
+  const home = world.homeHex;
+  const markers = [];
+  const hex = travelHexForCell(row, col, chunkX, chunkY);
+  const routeStep = travelRouteStep(row, col, chunkX, chunkY);
+  if (home && travelSameHex(home, hex)) markers.push(`<span class="travel-marker home-marker">Home</span>`);
+  if (current && travelSameHex(current, hex)) markers.push(`<span class="travel-marker current-marker">Here</span>`);
+  const boardQuest = settlementBoardQuestAtHex(hex);
+  const roadProject = expeditionActiveRoadProjectAtHex(hex);
+  if (boardQuest) markers.push(`<span class="travel-marker quest-marker">Quest</span>`);
+  if (roadProject && travelSameHex(roadProject.target, hex)) markers.push(`<span class="travel-marker quest-marker">Road</span>`);
+  if (travelRumorAtHex(hex)) markers.push(`<span class="travel-marker rumor-marker">Rumor</span>`);
+  if (routeStep) markers.push(`<span class="travel-marker route-marker">${escapeHtml(routeStep)}</span>`);
+  return markers.join("");
+}
+
+function travelObjectMarkup(objects = []) {
+  return objects
+    .filter((object) => object?.tile)
+    .map((object) => {
+      const label = travelStructureLabel(object);
+      return `<img class="travel-map-object" src="${escapeAttribute(travelMiddleAsset(object.tile))}" alt="${escapeAttribute(label)}" title="${escapeAttribute(label)}" onerror="this.remove()" />`;
+    })
+    .join("");
+}
+
+function travelScaledPoint(point, scale, inset = 12) {
+  return {
+    x: inset + (Number(point?.x) || 0) * scale,
+    y: inset + (Number(point?.y) || 0) * scale,
+  };
+}
+
+function travelPolylinePoints(points = [], scale) {
+  return points
+    .map((point) => travelScaledPoint(point, scale))
+    .map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`)
+    .join(" ");
+}
+
+function travelMapOverlayMarkup(chunk, scale, offsetX = 0, offsetY = 0) {
+  return "";
+}
+
+function travelPlayerRoadOverlayMarkup(bounds = null, widthPx = 0, heightPx = 0) {
+  const roads = travelRoadEdgesList();
+  if (!bounds || !roads.length) return "";
+  const lines = roads
+    .map((road) => {
+      const from = travelHexMapPoint(road.from);
+      const to = travelHexMapPoint(road.to);
+      return `<line class="travel-road-line travel-player-road-line" x1="${from.x.toFixed(1)}" y1="${from.y.toFixed(1)}" x2="${to.x.toFixed(1)}" y2="${to.y.toFixed(1)}" />`;
+    })
+    .join("");
+  return `
+    <svg class="travel-map-overlay travel-player-road-overlay" width="${escapeAttribute(widthPx)}" height="${escapeAttribute(heightPx)}" viewBox="0 0 ${escapeAttribute(widthPx)} ${escapeAttribute(heightPx)}" aria-hidden="true">
+      ${lines}
+    </svg>
+  `;
+}
+
+function clampTravelMapZoom(value) {
+  return Math.max(0.55, Math.min(1.8, Number(value) || 1));
+}
+
+function syncTravelMapZoomControls() {
+  const percent = Math.round(travelMapZoom * 100);
+  if (els.travelZoomLabel) els.travelZoomLabel.textContent = `${percent}%`;
+  if (els.travelZoomSlider) els.travelZoomSlider.value = String(percent);
+}
+
+function travelMapViewportFocus(clientX = null, clientY = null) {
+  const scroll = els.travelMapScroll;
+  if (!scroll) return null;
+  const rect = scroll.getBoundingClientRect();
+  const offsetX = clientX === null ? scroll.clientWidth / 2 : Math.max(0, Math.min(scroll.clientWidth, clientX - rect.left));
+  const offsetY = clientY === null ? scroll.clientHeight / 2 : Math.max(0, Math.min(scroll.clientHeight, clientY - rect.top));
+  return {
+    offsetX,
+    offsetY,
+    worldX: (scroll.scrollLeft + offsetX) / Math.max(0.01, travelMapZoom),
+    worldY: (scroll.scrollTop + offsetY) / Math.max(0.01, travelMapZoom),
+  };
+}
+
+function travelMapGlobalCell(hex = null) {
+  const target = travelNormalizeHex(hex) ?? { chunkX: 0, chunkY: 0, row: 0, col: 0 };
+  const width = Math.max(1, Math.floor(Number(state?.world?.chunkWidth) || 10));
+  const height = Math.max(1, Math.floor(Number(state?.world?.chunkHeight) || 10));
+  return {
+    row: target.chunkY * height + target.row,
+    col: target.chunkX * width + target.col,
+  };
+}
+
+function travelMapBounds() {
+  const chunks = Object.entries(state?.world?.chunks ?? {})
+    .map(([key, chunk]) => {
+      const [chunkXText, chunkYText] = key.split(",");
+      const chunkX = Math.floor(Number(chunk?.chunkX ?? chunkXText) || 0);
+      const chunkY = Math.floor(Number(chunk?.chunkY ?? chunkYText) || 0);
+      return chunk ? { key, chunk, chunkX, chunkY } : null;
+    })
+    .filter(Boolean);
+  if (!chunks.length) return null;
+  const width = Math.max(1, Math.floor(Number(state?.world?.chunkWidth) || chunks[0].chunk.width || 10));
+  const height = Math.max(1, Math.floor(Number(state?.world?.chunkHeight) || chunks[0].chunk.height || 10));
+  const minChunkX = Math.min(...chunks.map((entry) => entry.chunkX));
+  const maxChunkX = Math.max(...chunks.map((entry) => entry.chunkX));
+  const minChunkY = Math.min(...chunks.map((entry) => entry.chunkY));
+  const maxChunkY = Math.max(...chunks.map((entry) => entry.chunkY));
+  return {
+    chunks,
+    width,
+    height,
+    minChunkX,
+    maxChunkX,
+    minChunkY,
+    maxChunkY,
+    minGlobalCol: minChunkX * width,
+    maxGlobalCol: (maxChunkX + 1) * width - 1,
+    minGlobalRow: minChunkY * height,
+    maxGlobalRow: (maxChunkY + 1) * height - 1,
+  };
+}
+
+function travelHexMapPoint(hex = null) {
+  if (!hex) return { x: 0, y: 0 };
+  const bounds = travelMapBounds();
+  const global = travelMapGlobalCell(hex);
+  const hexWidth = 92 * travelMapZoom;
+  const hexHeight = 106 * travelMapZoom;
+  const stepX = hexWidth;
+  const stepY = hexHeight * 0.75;
+  const mapRow = global.row - (bounds?.minGlobalRow ?? 0);
+  const mapCol = global.col - (bounds?.minGlobalCol ?? 0);
+  return {
+    x: mapCol * stepX + (global.row % 2 ? stepX / 2 : 0) + 12 + hexWidth / 2,
+    y: mapRow * stepY + 12 + hexHeight / 2,
+  };
+}
+
+function centerTravelMapOnHex(hex = null, behavior = "smooth") {
+  const scroll = els.travelMapScroll;
+  if (!scroll || !hex) return;
+  const point = travelHexMapPoint(hex);
+  scroll.scrollTo({
+    left: Math.max(0, point.x - scroll.clientWidth / 2),
+    top: Math.max(0, point.y - scroll.clientHeight / 2),
+    behavior,
+  });
+}
+
+function restoreTravelMapViewportFocus(focus) {
+  const scroll = els.travelMapScroll;
+  if (!scroll || !focus) return;
+  scroll.scrollLeft = Math.max(0, focus.worldX * travelMapZoom - focus.offsetX);
+  scroll.scrollTop = Math.max(0, focus.worldY * travelMapZoom - focus.offsetY);
+}
+
+function captureTravelMapViewport() {
+  const scroll = els.travelMapScroll;
+  const bounds = travelMapBounds();
+  if (!scroll || !bounds) return null;
+  return {
+    scrollLeft: scroll.scrollLeft,
+    scrollTop: scroll.scrollTop,
+    minGlobalCol: bounds.minGlobalCol,
+    minGlobalRow: bounds.minGlobalRow,
+    zoom: travelMapZoom,
+  };
+}
+
+function restoreTravelMapViewport(viewport = null) {
+  const scroll = els.travelMapScroll;
+  const bounds = travelMapBounds();
+  if (!scroll || !bounds || !viewport) return;
+  const hexWidth = 92 * travelMapZoom;
+  const hexHeight = 106 * travelMapZoom;
+  const stepX = hexWidth;
+  const stepY = hexHeight * 0.75;
+  const zoomRatio = travelMapZoom / Math.max(0.01, Number(viewport.zoom) || travelMapZoom);
+  const originShiftX = (viewport.minGlobalCol - bounds.minGlobalCol) * stepX;
+  const originShiftY = (viewport.minGlobalRow - bounds.minGlobalRow) * stepY;
+  scroll.scrollLeft = Math.max(0, viewport.scrollLeft * zoomRatio + originShiftX);
+  scroll.scrollTop = Math.max(0, viewport.scrollTop * zoomRatio + originShiftY);
+  positionTravelMapEvent();
+}
+
+function setTravelMapZoom(value, focus = travelMapViewportFocus()) {
+  const nextZoom = Number(clampTravelMapZoom(value).toFixed(2));
+  if (Math.abs(nextZoom - travelMapZoom) < 0.001) {
+    syncTravelMapZoomControls();
+    return;
+  }
+  travelMapZoom = nextZoom;
+  renderTravelMap();
+  restoreTravelMapViewportFocus(focus);
+}
+
+function adjustTravelMapZoom(delta, focus = travelMapViewportFocus()) {
+  setTravelMapZoom(travelMapZoom + delta, focus);
+}
+
+function travelTooltipHtml(row, col, chunkX = null, chunkY = null) {
+  const hex = travelHexForCell(row, col, chunkX, chunkY);
+  const chunk = travelChunkForHex(hex);
+  if (!chunk) return `<span>Unavailable</span><b>No Map</b><p>The world chunk is not ready yet.</p>`;
+  const tile = chunk.tiles?.[row]?.[col] ?? "grassland";
+  const feature = travelPrimaryFeatureForCell(chunk, row, col);
+  const biome = travelBiomeLabel(tile);
+  const place = feature ? travelStructureDisplayLabel(feature) : biome;
+  const featureType = feature && String(feature.tile ?? "").startsWith("lake_") ? "Lake" : "Structure";
+  const visit = travelStructureVisitState(feature);
+  const isHome = travelSameHex(state?.world?.homeHex, hex);
+  const statusText = feature
+    ? `<p><b>Status:</b> ${escapeHtml(isHome ? "Home" : travelStructureStatusLabel(feature))}${!isHome && visit?.lastEventTitle ? ` - ${escapeHtml(visit.lastEventTitle)}` : ""}</p>`
+    : "";
+  const structureText = feature
+    ? featureType === "Lake"
+      ? `<p><b>Lake:</b> ${escapeHtml(travelStructureDisplayLabel(feature))}</p>`
+      : `<p><b>Structure:</b> ${escapeHtml(travelStructureDisplayLabel(feature))}</p>`
+    : "";
+  const markers = [];
+  const world = state?.world ?? {};
+  const routeStep = travelRouteStep(row, col, chunkX, chunkY);
+  const boardQuest = settlementBoardQuestAtHex(hex);
+  const rumor = travelRumorAtHex(hex);
+  const roadProject = expeditionActiveRoadProjectAtHex(hex);
+  if (travelSameHex(world.currentHex, hex)) markers.push("Current location");
+  if (travelSameHex(world.homeHex, hex)) markers.push("Home village");
+  if (boardQuest) markers.push(`Quest target: ${boardQuest.title}`);
+  if (roadProject) markers.push(travelSameHex(roadProject.target, hex) ? `Road target: ${roadProject.targetLabel}` : `Road project route: ${roadProject.targetLabel}`);
+  if (rumor) markers.push(`Rumor: ${rumor.title ?? "local word"}`);
+  if (travelRoadTouchesHex(hex)) markers.push("Player-built road");
+  if (routeStep) markers.push(`Route step ${routeStep}`);
+  if (adminTravelTeleportEnabled()) markers.push("Admin teleport target");
+  if (travelHexAtChunkEdge(hex)) markers.push("Chunk edge: arriving here scouts the next map edge");
+  else if (travelCanAddHex(row, col, chunkX, chunkY)) markers.push("Adjacent route choice");
+  return `
+    <span>${escapeHtml(biome)}</span>
+    <b>${escapeHtml(place)}</b>
+    <p>Chunk ${escapeHtml(hex.chunkX)}, ${escapeHtml(hex.chunkY)} - Hex ${escapeHtml(row)}, ${escapeHtml(col)}. Travel cost: 1 day.</p>
+    ${structureText}
+    ${statusText}
+    ${markers.length ? `<p>${markers.map(escapeHtml).join(" - ")}</p>` : ""}
+  `;
+}
+
+function renderTravelRouteFeedback(message, type = "note") {
+  if (!els.travelMapTooltip) return;
+  els.travelMapTooltip.innerHTML = `
+    <span>${escapeHtml(type === "blocked" ? "Route blocked" : "Route")}</span>
+    <b>${escapeHtml(type === "blocked" ? "Not Adjacent" : "Route Updated")}</b>
+    <p>${escapeHtml(message)}</p>
+  `;
+}
+
+function renderTravelMapTooltip(row = null, col = null, chunkX = null, chunkY = null) {
+  if (!els.travelMapTooltip) return;
+  if (row === null || col === null) {
+    els.travelMapTooltip.innerHTML = `
+      <span>Hover a hex</span>
+      <b>World Map</b>
+      <p>Biomes, structures, your current location, and home village are visible here.</p>
+    `;
+    return;
+  }
+  els.travelMapTooltip.innerHTML = travelTooltipHtml(row, col, chunkX, chunkY);
+}
+
+function adminTeleportTravelPartyToHex(row, col, chunkX = null, chunkY = null) {
+  if (!adminTravelTeleportEnabled()) return false;
+  state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state.world;
+  if (!state?.world) return false;
+  const target = travelHexForCell(row, col, chunkX, chunkY);
+  if (!travelHexInChunk(target)) {
+    renderTravelRouteFeedback("That hex is not in a generated chunk yet.", "blocked");
+    return true;
+  }
+  state.world.currentHex = cloneData(target);
+  state.world.travelPlan = [];
+  state.world.routeConfirmed = false;
+  state.world.travelCamp = { active: false };
+  state.world.discoveredHexes ??= {};
+  state.world.discoveredHexes[travelHexKey(target.row, target.col, target.chunkX, target.chunkY)] = true;
+  addLog(`Admin teleport: party moved to ${travelPlaceLabelForHex(target)}.`, "important");
+  renderTravelMap();
+  renderTravelMapTooltip(target.row, target.col, target.chunkX, target.chunkY);
+  centerTravelMapOnHex(target, "smooth");
+  window.DepthboundPlaytest?.syncNow?.();
+  return true;
+}
+
+function handleTravelMapHexSelection(row, col, chunkX = null, chunkY = null) {
+  if (adminTeleportTravelPartyToHex(row, col, chunkX, chunkY)) return;
+  selectTravelRouteHex(row, col, chunkX, chunkY);
+}
+
+function renderTravelMap() {
+  if (!els.travelMapGrid) return;
+  state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state.world;
+  travelEnsureHomeVillageState(state.world);
+  const bounds = travelMapBounds();
+  if (!bounds) {
+    els.travelMapGrid.innerHTML = `<p class="empty-note">No world map is available yet.</p>`;
+    return;
+  }
+  if (els.travelCurrentLabel) els.travelCurrentLabel.textContent = travelCurrentPlaceLabel();
+  if (els.travelHomeLabel) els.travelHomeLabel.textContent = travelHomePlaceLabel();
+  syncTravelRouteControls();
+  syncTravelMapZoomControls();
+  const hexWidth = 92 * travelMapZoom;
+  const hexHeight = 106 * travelMapZoom;
+  const builderHexHeight = 172;
+  const builderScale = hexHeight / builderHexHeight;
+  const stepX = hexWidth;
+  const stepY = hexHeight * 0.75;
+  const totalCols = bounds.maxGlobalCol - bounds.minGlobalCol + 1;
+  const totalRows = bounds.maxGlobalRow - bounds.minGlobalRow + 1;
+  const widthPx = (totalCols - 1) * stepX + hexWidth + stepX / 2 + 44;
+  const heightPx = (totalRows - 1) * stepY + hexHeight + 32;
+  els.travelMapGrid.style.width = `${widthPx}px`;
+  els.travelMapGrid.style.height = `${heightPx}px`;
+  els.travelMapGrid.innerHTML = travelPlayerRoadOverlayMarkup(bounds, widthPx, heightPx) + bounds.chunks
+    .map(({ chunk, chunkX, chunkY }) => {
+      const chunkGlobalCol = chunkX * bounds.width;
+      const chunkGlobalRow = chunkY * bounds.height;
+      const chunkMapCol = chunkGlobalCol - bounds.minGlobalCol;
+      const chunkMapRow = chunkGlobalRow - bounds.minGlobalRow;
+      const chunkOffsetX = chunkMapCol * stepX;
+      const chunkOffsetY = chunkMapRow * stepY;
+      return travelMapOverlayMarkup(chunk, builderScale, chunkOffsetX, chunkOffsetY);
+    })
+    .join("") + bounds.chunks
+    .map(({ chunk, chunkX, chunkY }) =>
+      chunk.tiles
+        .map((rowTiles, row) =>
+          rowTiles
+            .map((tile, col) => {
+          const structure = travelStructureForCell(chunk, row, col);
+          const objects = travelObjectsForCell(chunk, row, col);
+          const global = travelMapGlobalCell({ chunkX, chunkY, row, col });
+          const mapRow = global.row - bounds.minGlobalRow;
+          const mapCol = global.col - bounds.minGlobalCol;
+          const left = mapCol * stepX + (global.row % 2 ? stepX / 2 : 0) + 12;
+          const top = mapRow * stepY + 12;
+          const feature = travelPrimaryFeatureForCell(chunk, row, col);
+          const label = feature ? travelStructureDisplayLabel(feature) : travelBiomeLabel(tile);
+          return `
+            <button
+              type="button"
+              class="${escapeAttribute(travelHexClasses(tile, structure, row, col, chunkX, chunkY))}"
+              style="left: ${left}px; top: ${top}px; width: ${hexWidth}px; height: ${hexHeight}px;"
+              data-travel-chunk-x="${chunkX}"
+              data-travel-chunk-y="${chunkY}"
+              data-travel-row="${row}"
+              data-travel-col="${col}"
+              data-route-step="${travelRouteStep(row, col, chunkX, chunkY) || ""}"
+              aria-label="${escapeAttribute(label)}"
+            >
+              <img class="travel-biome-image" src="${escapeAttribute(travelBiomeAsset(tile))}" alt="" onerror="this.remove()" />
+              <span class="travel-hex-biome">${escapeHtml(travelBiomeLabel(tile))}</span>
+              ${travelObjectMarkup(objects)}
+              ${travelMarkerMarkup(structure, row, col, chunkX, chunkY)}
+            </button>
+          `;
+            })
+            .join(""),
+        )
+        .join(""),
+    )
+    .join("");
+  renderTravelMapTooltip();
+}
+
+function travelMapMenuVisible() {
+  return Boolean(els.travelMapMenu && !els.travelMapMenu.classList.contains("hidden"));
+}
+
+function hideTravelMapEvent() {
+  els.travelMapEvent?.classList.add("hidden");
+  if (els.travelMapEventActions) els.travelMapEventActions.innerHTML = "";
+}
+
+function positionTravelMapEvent() {
+  const scroll = els.travelMapScroll;
+  const eventPanel = els.travelMapEvent;
+  if (!scroll || !eventPanel) return;
+  eventPanel.style.left = `${scroll.scrollLeft + scroll.clientWidth / 2}px`;
+  eventPanel.style.top = `${scroll.scrollTop + 12}px`;
+}
+
+function showTravelMapNotice({ kicker = "Travel", title = "On the Road", message = "", confirmText = "Continue" } = {}) {
+  if (!travelMapMenuVisible() || !els.travelMapEvent) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    els.travelMapEventKicker.textContent = kicker;
+    els.travelMapEventTitle.textContent = title;
+    els.travelMapEventMessage.innerHTML = dialogPlainMessageMarkup(message || "The party travels onward.");
+    els.travelMapEventActions.innerHTML = `<button type="button" data-travel-event-confirm>${escapeHtml(confirmText)}</button>`;
+    const cleanup = () => {
+      els.travelMapEventActions.removeEventListener("click", handleClick);
+      hideTravelMapEvent();
+      resolve(true);
+    };
+    const handleClick = (event) => {
+      if (!event.target.closest("[data-travel-event-confirm]")) return;
+      cleanup();
+    };
+    els.travelMapEventActions.addEventListener("click", handleClick);
+    positionTravelMapEvent();
+    els.travelMapEvent.classList.remove("hidden");
+    els.travelMapEventActions.querySelector("button")?.focus();
+  });
+}
+
+function showTravelMapChoiceDialog({ kicker = "Travel Event", title = "Event", message = "", choices = [] } = {}) {
+  if (!travelMapMenuVisible() || !els.travelMapEvent) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    els.travelMapEventKicker.textContent = kicker;
+    els.travelMapEventTitle.textContent = title;
+    els.travelMapEventMessage.innerHTML = dialogPlainMessageMarkup(message || "Choose how the party responds.");
+    els.travelMapEventActions.innerHTML = choices
+      .map(
+        (choice) =>
+          `<button type="button" class="${choice.description ? "choice-with-description" : ""}" data-travel-event-choice="${escapeAttribute(choice.value)}" ${choice.disabled ? "disabled" : ""} ${
+            choice.description ? `title="${escapeAttribute(choice.description)}"` : ""
+          }>
+            <b>${escapeHtml(choice.label)}</b>
+            ${choice.description ? `<span class="choice-description">${escapeHtml(choice.description)}</span>` : ""}
+          </button>`,
+      )
+      .join("");
+    const cleanup = (value) => {
+      els.travelMapEventActions.removeEventListener("click", handleClick);
+      hideTravelMapEvent();
+      resolve(value);
+    };
+    const handleClick = (event) => {
+      const button = event.target.closest("[data-travel-event-choice]");
+      if (!button || button.disabled) return;
+      cleanup(button.dataset.travelEventChoice);
+    };
+    els.travelMapEventActions.addEventListener("click", handleClick);
+    positionTravelMapEvent();
+    els.travelMapEvent.classList.remove("hidden");
+    els.travelMapEventActions.querySelector("[data-travel-event-choice]:not(:disabled)")?.focus();
+  });
+}
+
+async function travelPresentDayMovement({ from = null, to = null, departureDay = normalizeWorldDay(state?.worldDay), destinationName = "" } = {}) {
+  if (!from || !to) return;
+  hideTravelCampMenu();
+  showTravelMapMenu();
+  hideTravelMapEvent();
+  travelMapAnimating = true;
+  renderTravelMap();
+  syncTravelRouteControls();
+  centerTravelMapOnHex(from, "smooth");
+  renderTravelRouteFeedback(`Day ${departureDay}: leaving ${travelPlaceLabelForHex(from)}.`);
+  await sleep(360);
+  const grid = els.travelMapGrid;
+  if (!grid) {
+    travelMapAnimating = false;
+    return;
+  }
+  const marker = document.createElement("div");
+  marker.className = "travel-party-motion";
+  marker.textContent = "Here";
+  const start = travelHexMapPoint(from);
+  const end = travelHexMapPoint(to);
+  marker.style.transform = `translate(${start.x}px, ${start.y}px) translate(-50%, -50%)`;
+  grid.append(marker);
+  marker.getBoundingClientRect();
+  centerTravelMapOnHex(to, "smooth");
+  marker.classList.add("moving");
+  marker.style.transform = `translate(${end.x}px, ${end.y}px) translate(-50%, -50%)`;
+  await sleep(820);
+  marker.remove();
+  travelMapAnimating = false;
+  renderTravelRouteFeedback(`Arrived at ${destinationName || travelPlaceLabelForHex(to)}.`, "note");
+  syncTravelRouteControls();
+}
+
+function clearTravelRoute({ silent = false } = {}) {
+  if (!state?.world) return;
+  state.world.travelPlan = [];
+  state.world.routeConfirmed = false;
+  renderTravelMap();
+  if (!silent) renderTravelRouteFeedback("Route cleared.");
+}
+
+function selectTravelRouteHex(row, col, chunkX = null, chunkY = null) {
+  if (travelMapAnimating) return;
+  state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state.world;
+  const route = travelRoute();
+  const target = travelHexForCell(row, col, chunkX, chunkY);
+  const existingIndex = travelRoute().findIndex((hex) => travelSameHex(hex, target));
+  if (travelSameHex(target, state.world.currentHex)) {
+    clearTravelRoute({ silent: true });
+    renderTravelRouteFeedback("Route reset to your current location.");
+    return;
+  }
+  if (existingIndex >= 0) {
+    state.world.travelPlan = route.slice(0, existingIndex + 1);
+    state.world.routeConfirmed = false;
+    renderTravelMap();
+    renderTravelRouteFeedback(`Route shortened to ${existingIndex + 1} day${existingIndex === 0 ? "" : "s"}.`);
+    return;
+  }
+  if (!travelCanAddHex(row, col, chunkX, chunkY)) {
+    renderTravelMapTooltip(row, col, chunkX, chunkY);
+    renderTravelRouteFeedback("Choose a hex adjacent to your current position or the last planned route step.", "blocked");
+    return;
+  }
+  state.world.travelPlan = [...route, target];
+  state.world.routeConfirmed = false;
+  renderTravelMap();
+  renderTravelRouteFeedback(`Added day ${state.world.travelPlan.length} to the route.`);
+}
+
+function confirmTravelRoutePlan() {
+  if (travelMapAnimating) return;
+  const route = travelRoute();
+  if (!route.length) {
+    renderTravelRouteFeedback("Select at least one adjacent hex first.", "blocked");
+    return;
+  }
+  if (state.world.routeConfirmed) {
+    travelOneDay();
+    return;
+  }
+  state.world.routeConfirmed = true;
+  state.world.routeHistory = Array.isArray(state.world.routeHistory) ? state.world.routeHistory : [];
+  state.world.routeHistory.push({
+    createdAt: Date.now(),
+    from: { ...(state.world.currentHex ?? { chunkX: 0, chunkY: 0, row: 0, col: 0 }) },
+    steps: route.map((hex) => ({ ...hex })),
+  });
+  renderTravelMap();
+  renderTravelRouteFeedback(`Route confirmed: ${route.length} day${route.length === 1 ? "" : "s"} planned. Press Start Travel to begin.`);
+}
+
+async function scoutTravelRouteEdgeChunks() {
+  if (travelMapAnimating) return;
+  state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state.world;
+  const anchor = travelEdgeScoutAnchor();
+  if (!travelHexAtChunkEdge(anchor)) {
+    renderTravelRouteFeedback("Stand on, or plan to, a chunk-edge hex first. Then scout beyond it.", "blocked");
+    return;
+  }
+  const neighbors = travelEdgeNeighborCoords(anchor);
+  const missing = neighbors.filter((neighbor) => {
+    const key = window.DepthboundWorldTravel?.chunkKey?.(neighbor.chunkX, neighbor.chunkY) ?? `${neighbor.chunkX},${neighbor.chunkY}`;
+    return !state.world?.chunks?.[key];
+  });
+  if (!missing.length) {
+    renderTravelRouteFeedback("The neighboring chunk beside this route edge is already scouted.");
+    return;
+  }
+  travelMapAnimating = true;
+  if (els.travelGenerateChunks) {
+    els.travelGenerateChunks.disabled = true;
+    els.travelGenerateChunks.textContent = "Scouting...";
+  }
+  const viewport = captureTravelMapViewport();
+  renderTravelRouteFeedback(`Scouting ${missing.length} neighboring chunk${missing.length === 1 ? "" : "s"} from the route edge.`);
+  try {
+    const generated = await travelEnsureEdgeNeighborChunks(anchor);
+    renderTravelMap();
+    restoreTravelMapViewport(viewport);
+    if (generated.length) {
+      renderTravelRouteFeedback(`Scouted ${generated.length} new chunk${generated.length === 1 ? "" : "s"}: ${generated.join(", ")}.`);
+    } else {
+      renderTravelRouteFeedback("No new chunk was generated from this edge.");
+    }
+    window.DepthboundPlaytest?.syncNow?.();
+  } finally {
+    travelMapAnimating = false;
+    if (els.travelGenerateChunks) els.travelGenerateChunks.textContent = "Scout Edge";
+    syncTravelRouteControls();
+  }
+}
+
+function travelPlaceLabelForHex(hex = null) {
+  const target = hex ?? state?.world?.currentHex;
+  const chunk = travelChunkForHex(target);
+  if (!target || !chunk) return "Unknown";
+  const feature = travelPrimaryFeatureForCell(chunk, target.row, target.col);
+  return feature ? travelStructureDisplayLabel(feature) : `${travelBiomeLabel(chunk.tiles?.[target.row]?.[target.col])} (${target.row}, ${target.col})`;
+}
+
+function travelCampState() {
+  state.world ??= {};
+  state.world.travelCamp = state.world.travelCamp && typeof state.world.travelCamp === "object" ? state.world.travelCamp : {};
+  return state.world.travelCamp;
+}
+
+function travelCampIsActive() {
+  return Boolean(state?.world?.travelCamp?.active);
+}
+
+function travelCampIsInn(camp = state?.world?.travelCamp) {
+  return Boolean(camp?.active && camp.kind === "inn");
+}
+
+function travelSettlementFeatureForHex(hex = state?.world?.currentHex) {
+  const feature = travelFeatureForHex(hex);
+  return travelFeatureIsTeleportSettlement(feature) ? feature : null;
+}
+
+function travelSettlementRestData(hex = state?.world?.currentHex, fallbackName = "") {
+  const feature = travelSettlementFeatureForHex(hex);
+  if (!feature) return null;
+  const placeName = travelStructureDisplayLabel(feature) || fallbackName || travelPlaceLabelForHex(hex);
+  const profile = window.DepthboundSettlementStorefronts?.ensureProfile?.({
+    world: state.world,
+    hex,
+    feature,
+    biome: travelBiomeLabel(travelBiomeForHex(hex)),
+    name: placeName,
+    day: normalizeWorldDay(state.worldDay),
+  });
+  return {
+    kind: "inn",
+    settlementKind: travelFeatureKind(feature),
+    settlementId: feature.id ?? travelTeleportCircleId(feature, hex),
+    locationName: placeName,
+    innName: `${placeName} Inn`,
+    innLayoutId: profile?.innLayoutId ?? "inn-common-hall",
+  };
+}
+
+const travelInnRefreshmentOptions = [
+  {
+    id: "simple",
+    name: "Hot Stew and Small Beer",
+    pricePerHeroCp: 25,
+    comfort: 1,
+    label: "Simple Supper",
+    description: "Warm bowls, clean bread, and enough small beer to sleep easier.",
+  },
+  {
+    id: "hearth",
+    name: "Hearth Platter",
+    pricePerHeroCp: 100,
+    comfort: 3,
+    label: "Hearth Platter",
+    description: "Roast meat, vegetables, spiced cider, and a better room for the night.",
+  },
+  {
+    id: "best",
+    name: "Best Table",
+    pricePerHeroCp: 300,
+    comfort: 6,
+    label: "Best Table",
+    description: "The inn's best food, a quiet corner, hot baths, and soft beds.",
+  },
+];
+
+function travelInnRefreshmentOption(optionId = "simple") {
+  return travelInnRefreshmentOptions.find((entry) => entry.id === optionId) ?? travelInnRefreshmentOptions[0];
+}
+
+function travelInnRefreshmentPrice(option = travelInnRefreshmentOptions[0]) {
+  return Math.max(1, travelCampPartySize()) * Math.max(0, Math.floor(Number(option?.pricePerHeroCp) || 0));
+}
+
+function travelInnRefreshmentButtonsMarkup() {
+  const camp = travelCampState();
+  const mealResolved = travelCampMealResolved(camp);
+  return `
+    <div class="object-actions inn-refreshment-actions">
+      ${travelInnRefreshmentOptions
+        .map((option) => {
+          const price = travelInnRefreshmentPrice(option);
+          return `<button type="button" data-action="inn-buy-refreshment" data-refreshment="${escapeAttribute(option.id)}" ${mealResolved || moneyToCp(partyPurse()) < price ? "disabled" : ""}>${escapeHtml(option.label)} <small>${escapeHtml(priceText(price))}, comfort +${option.comfort}</small></button>`;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function travelInnCells(gridSize = 24) {
+  const cells = [];
+  for (let y = 5; y <= 18; y += 1) {
+    for (let x = 4; x <= 20; x += 1) {
+      cells.push({ x, y });
+    }
+  }
+  for (let y = 11; y <= 14; y += 1) {
+    for (let x = 2; x <= 3; x += 1) {
+      cells.push({ x, y });
+    }
+  }
+  return cells.filter((cell) => cell.x >= 0 && cell.y >= 0 && cell.x < gridSize && cell.y < gridSize);
+}
+
+function travelInnObjects() {
+  return [
+    { id: "inn-bar", type: "inn-bar", position: { x: 15, y: 6 }, width: 4, height: 1, innFixture: true },
+    { id: "inn-lantern-1", type: "modest-brass-lantern", position: { x: 6, y: 6 }, innFixture: true },
+    { id: "inn-lantern-2", type: "modest-brass-lantern", position: { x: 19, y: 15 }, innFixture: true },
+    { id: "inn-rug", type: "comfortable-thick-rug", position: { x: 10, y: 10 }, width: 2, height: 2, innFixture: true },
+    { id: "inn-table-1", type: "modest-breakfast-table", position: { x: 7, y: 8 }, width: 2, height: 1, innFixture: true },
+    { id: "inn-table-2", type: "modest-breakfast-table", position: { x: 7, y: 14 }, width: 2, height: 1, innFixture: true },
+    { id: "inn-table-3", type: "comfortable-tea-table", position: { x: 12, y: 15 }, width: 2, height: 1, innFixture: true },
+    { id: "inn-chair-1", type: "poor-pine-chair", position: { x: 6, y: 8 }, innFixture: true },
+    { id: "inn-chair-2", type: "poor-pine-chair", position: { x: 9, y: 8 }, innFixture: true },
+    { id: "inn-chair-3", type: "poor-pine-chair", position: { x: 6, y: 14 }, innFixture: true },
+    { id: "inn-chair-4", type: "poor-pine-chair", position: { x: 9, y: 14 }, innFixture: true },
+    { id: "inn-chair-5", type: "modest-oak-chair", position: { x: 11, y: 15 }, innFixture: true },
+    { id: "inn-chair-6", type: "modest-oak-chair", position: { x: 14, y: 15 }, innFixture: true },
+    { id: "inn-sideboard", type: "wealthy-wine-sideboard", position: { x: 16, y: 17 }, width: 2, height: 1, innFixture: true },
+    { id: "inn-bookcase", type: "comfortable-bookcase", position: { x: 4, y: 6 }, innFixture: true },
+    { id: "inn-screen", type: "poor-reed-screen", position: { x: 18, y: 10 }, width: 2, height: 1, innFixture: true },
+  ].filter((object) => objectTemplate(object.type));
+}
+
+const travelCampTentLayouts = [
+  { id: "northwest", label: "Northwest Tent", bounds: { x1: 7, y1: 7, x2: 9, y2: 9 }, spawn: { x: 8, y: 8 } },
+  { id: "northeast", label: "Northeast Tent", bounds: { x1: 15, y1: 7, x2: 17, y2: 9 }, spawn: { x: 16, y: 8 } },
+  { id: "southwest", label: "Southwest Tent", bounds: { x1: 7, y1: 15, x2: 9, y2: 17 }, spawn: { x: 8, y: 16 } },
+  { id: "southeast", label: "Southeast Tent", bounds: { x1: 15, y1: 15, x2: 17, y2: 17 }, spawn: { x: 16, y: 16 } },
+];
+
+const travelCampFurnitureOptions = [
+  { id: "bedroll", type: "poor-wool-blanket", name: "Bedroll", comfort: 2, priceCp: 250, offset: { x: -1, y: 0 } },
+  { id: "mat", type: "squalid-straw-mat", name: "Straw Mat", comfort: 1, priceCp: 90, offset: { x: -1, y: 1 } },
+  { id: "rug", type: "poor-rush-rug", name: "Rush Rug", comfort: 2, priceCp: 240, offset: { x: 0, y: 0 } },
+  { id: "lantern", type: "modest-brass-lantern", name: "Lantern", comfort: 3, priceCp: 950, offset: { x: 1, y: 0 } },
+];
+
+function travelCampCells(gridSize = 24) {
+  const cells = [];
+  for (let y = 4; y < gridSize - 3; y += 1) {
+    for (let x = 4; x < gridSize - 3; x += 1) {
+      cells.push({ x, y });
+    }
+  }
+  return cells;
+}
+
+function travelCampEnsureData() {
+  const world = state.world ??= {};
+  world.campTentAssignments = world.campTentAssignments && typeof world.campTentAssignments === "object" ? world.campTentAssignments : {};
+  world.campFurniture = world.campFurniture && typeof world.campFurniture === "object" ? world.campFurniture : {};
+  world.campGearInventory = world.campGearInventory && typeof world.campGearInventory === "object" ? world.campGearInventory : {};
+  world.campGearInventory.party = world.campGearInventory.party && typeof world.campGearInventory.party === "object" ? world.campGearInventory.party : {};
+  if (!world.campGearSharedMigrated) {
+    for (const option of travelCampFurnitureOptions) {
+      let migrated = Math.max(0, Math.floor(Number(world.campGearInventory.party[option.id]) || 0));
+      for (const [ownerId, gear] of Object.entries(world.campGearInventory)) {
+        if (ownerId === "party" || !gear || typeof gear !== "object") continue;
+        migrated += Math.max(0, Math.floor(Number(gear[option.id]) || 0));
+      }
+      world.campGearInventory.party[option.id] = migrated;
+    }
+    world.campGearSharedMigrated = true;
+  }
+  const used = new Set();
+  for (const heroId of Object.keys(world.campTentAssignments)) {
+    if (!partyHeroes().some((hero) => hero.id === heroId)) {
+      delete world.campTentAssignments[heroId];
+      continue;
+    }
+    if (!travelCampTentLayouts.some((tent) => tent.id === world.campTentAssignments[heroId]) || used.has(world.campTentAssignments[heroId])) {
+      delete world.campTentAssignments[heroId];
+      continue;
+    }
+    used.add(world.campTentAssignments[heroId]);
+  }
+  for (const hero of partyHeroes().slice(0, travelCampTentLayouts.length)) {
+    if (world.campTentAssignments[hero.id]) continue;
+    const tent = travelCampTentLayouts.find((entry) => !used.has(entry.id));
+    if (!tent) continue;
+    world.campTentAssignments[hero.id] = tent.id;
+    used.add(tent.id);
+  }
+  for (const hero of partyHeroes()) {
+    world.campFurniture[hero.id] = Array.isArray(world.campFurniture[hero.id]) ? world.campFurniture[hero.id].filter(Boolean).slice(0, 4) : [];
+  }
+  for (const option of travelCampFurnitureOptions) {
+    world.campGearInventory.party[option.id] = Math.max(0, Math.floor(Number(world.campGearInventory.party[option.id]) || 0));
+  }
+  return world;
+}
+
+function travelCampTentForHero(hero) {
+  const world = travelCampEnsureData();
+  return travelCampTentLayouts.find((tent) => tent.id === world.campTentAssignments?.[hero?.id]) ?? null;
+}
+
+function travelCampFurnitureForHero(hero) {
+  const world = travelCampEnsureData();
+  return Array.isArray(world.campFurniture?.[hero?.id]) ? world.campFurniture[hero.id] : [];
+}
+
+function travelCampFurnitureOption(id) {
+  return travelCampFurnitureOptions.find((entry) => entry.id === id) ?? null;
+}
+
+function travelCampComfortLevel(hero) {
+  return travelCampFurnitureForHero(hero).reduce((total, itemId) => total + (travelCampFurnitureOption(itemId)?.comfort ?? 0), 0);
+}
+
+function travelCampTotalComfort() {
+  const camp = travelCampState();
+  if (travelCampIsInn(camp)) return Math.max(0, Math.floor(Number(camp.innComfort) || 0)) * travelCampPartySize();
+  return partyHeroes().reduce((total, hero) => total + travelCampComfortLevel(hero), 0);
+}
+
+function travelCampRationNeed() {
+  const partySize = travelCampPartySize();
+  const comfortDiscount = Math.min(Math.max(0, partySize - 1), Math.floor(travelCampTotalComfort() / 8));
+  return Math.max(1, partySize - comfortDiscount);
+}
+
+const travelForageBiomeProfiles = {
+  grassland: { dc: 10, success: "edible roots, field herbs, and small game", failure: "the open ground has already been picked clean" },
+  forest: { dc: 10, success: "berries, mushrooms, and snares full enough for supper", failure: "the undergrowth is noisy but gives up little" },
+  jungle: { dc: 13, success: "heavy fruit, clean vines, and a brace of bright-feathered game", failure: "too much of the green is bitter, stinging, or watching back" },
+  swamp: { dc: 14, success: "watercress, fat frogs, and safe roots from the black mud", failure: "the good pools are hidden under sour water and biting insects" },
+  desert: { dc: 16, success: "cactus flesh, dry seeds, and lizards found under warm stone", failure: "the sand keeps its food buried deep" },
+  mountain: { dc: 15, success: "hardy lichens, snowmelt herbs, and a cliff-hare caught near camp", failure: "the slopes are bare and the wind steals the trail" },
+  highlands: { dc: 13, success: "moor berries, bitter greens, and a lean upland hare", failure: "the stony grass hides more thorns than food" },
+  hills: { dc: 12, success: "wild onions, nuts, and enough burrow game to fill the pot", failure: "the party finds tracks, but no meal" },
+  coast: { dc: 11, success: "shellfish, kelp, and tidepool crabs gathered before dusk", failure: "the tide is wrong and the pools are mostly empty" },
+  savanna: { dc: 12, success: "seed heads, tubers, and small game flushed from the dry grass", failure: "the grassland offers tracks and dust, but little food" },
+  arctic: { dc: 16, success: "lichen, ice-cold fish, and hardy roots from a sheltered hollow", failure: "the cold locks away anything edible" },
+  badlands: { dc: 15, success: "tough roots, bitter leaves, and a few desert birds", failure: "the cracked earth offers almost nothing worth eating" },
+  cave: { dc: 16, success: "pale mushrooms and blind cave fish from a dark pool", failure: "the darkness hides more hazards than food" },
+  wasteland: { dc: 17, success: "stubborn weeds and a little game scraped from the ruins", failure: "the land is too spent to feed travelers tonight" },
+  ashland: { dc: 18, success: "smoke-black tubers and insects roasted clean of ash", failure: "ash chokes the search and spoils what little can be found" },
+  volcano: { dc: 18, success: "heat-hardened roots and cave insects found away from the fumes", failure: "the ground is hot, sharp, and empty" },
+  ocean: { dc: 18, success: "fish and kelp gathered from a safe shoal", failure: "open water gives the camp no easy meal" },
+  crystalfield: { dc: 14, success: "clearwater moss and shy burrow game among the crystal spines", failure: "the glittering ground makes every trail uncertain" },
+};
+
+function travelCampForageProfile(hex = state?.world?.currentHex) {
+  const tile = travelBiomeForHex(hex);
+  const group = String(window.DepthboundWorldTravel?.biomeGroup?.(tile) ?? window.DepthboundWorldNames?.biomeGroup?.(tile) ?? tile ?? "wilds").toLowerCase();
+  const profile = travelForageBiomeProfiles[group] ?? { dc: 12, success: "enough wild food for a simple camp meal", failure: "the party cannot find enough safe food before dusk" };
+  const comfortReduction = Math.floor(travelCampTotalComfort() / 10);
+  const dc = Math.max(8, profile.dc - comfortReduction);
+  return {
+    ...profile,
+    dc,
+    baseDc: profile.dc,
+    comfortReduction,
+    tile,
+    group,
+    label: travelBiomeLabel(tile),
+  };
+}
+
+function travelCampForageDc() {
+  return travelCampForageProfile().dc;
+}
+
+function travelCampForageResultSummary(camp = travelCampState()) {
+  const forage = camp?.forage;
+  if (!forage) return "";
+  const place = forage.biomeLabel ? ` in the ${forage.biomeLabel}` : "";
+  if (forage.auto) return `${forage.heroName ?? "A ranger"} finds ${forage.found ?? "enough wild food"}${place}.`;
+  const check = forage.total && forage.dc ? ` Survival ${forage.total} vs DC ${forage.dc}.` : "";
+  if (forage.success) return `${forage.heroName ?? "The forager"} succeeds${place}.${check} The camp meal is covered.`;
+  return `${forage.heroName ?? "The forager"} comes back empty-handed${place}.${check} ${forage.failure ?? "There is not enough safe food tonight."}`;
+}
+
+function travelCampComfortSummary() {
+  const camp = travelCampState();
+  if (travelCampIsInn(camp)) {
+    const comfort = Math.max(0, Math.floor(Number(camp.innComfort) || 0));
+    return comfort > 0 ? `Inn comfort ${comfort}; rest temp HP: ${partyHeroes().map((hero) => `${hero.name} +${comfort}`).join(", ")}` : "Inn comfort 0; no rest temp HP yet";
+  }
+  const comfort = travelCampTotalComfort();
+  const rationDiscount = Math.max(0, travelCampPartySize() - travelCampRationNeed());
+  const tempHpHeroes = partyHeroes()
+    .map((hero) => ({ hero, bonus: travelCampComfortRestBonus(hero) }))
+    .filter((entry) => entry.bonus > 0);
+  const parts = [`Comfort ${comfort}`];
+  if (rationDiscount > 0) parts.push(`ration need -${rationDiscount}`);
+  if (tempHpHeroes.length) {
+    parts.push(`rest temp HP: ${tempHpHeroes.map(({ hero, bonus }) => `${hero.name} +${bonus}`).join(", ")}`);
+  } else {
+    parts.push("no rest temp HP yet");
+  }
+  return parts.join("; ");
+}
+
+function travelCampHungerSummary() {
+  const hungry = partyHeroes()
+    .map((hero) => ({ hero, level: travelHungerExhaustionLevel(hero) }))
+    .filter((entry) => entry.level > 0);
+  if (!hungry.length) return "No hungry exhaustion.";
+  return `Hungry exhaustion: ${hungry.map(({ hero, level }) => `${hero.name} level ${level}`).join(", ")}. A proper camp meal recovers one level.`;
+}
+
+function travelCampComfortRestBonus(hero) {
+  const camp = travelCampState();
+  if (travelCampIsInn(camp)) return Math.max(0, Math.floor(Number(camp.innComfort) || 0));
+  return Math.max(0, Math.floor(travelCampComfortLevel(hero) / 3));
+}
+
+function travelHungerExhaustionEffect(level = 1) {
+  return normalizeConditionEffect({
+    id: "travel-hunger-exhaustion",
+    label: "Hungry Exhaustion",
+    condition: "exhaustion",
+    exhaustionLevel: Math.max(1, Math.min(6, Math.floor(Number(level) || 1))),
+    source: "travel-hunger",
+    conditionDescription: "Exhaustion from resting without enough food. A later camp with a proper meal removes one level.",
+  });
+}
+
+function travelHungerExhaustionLevel(hero) {
+  const effect = (hero?.statusEffects ?? []).find((entry) => entry.id === "travel-hunger-exhaustion");
+  return effect ? exhaustionLevelForEffect(effect) : 0;
+}
+
+function setTravelHungerExhaustionLevel(hero, level = 0) {
+  if (!hero) return;
+  const nextLevel = Math.max(0, Math.min(6, Math.floor(Number(level) || 0)));
+  hero.statusEffects = (hero.statusEffects ?? []).filter((effect) => effect.id !== "travel-hunger-exhaustion");
+  if (nextLevel > 0) hero.statusEffects.push(travelHungerExhaustionEffect(nextLevel));
+  refreshDerivedStats(hero);
+}
+
+function travelRecoverHungryExhaustion() {
+  const recovered = [];
+  for (const hero of partyHeroes()) {
+    const level = travelHungerExhaustionLevel(hero);
+    if (level <= 0) continue;
+    setTravelHungerExhaustionLevel(hero, level - 1);
+    recovered.push({ hero, level: level - 1 });
+  }
+  return recovered;
+}
+
+function travelCampTentAtPosition(position = null) {
+  if (!position) return null;
+  return travelCampTentLayouts.find((tent) => position.x >= tent.bounds.x1 && position.x <= tent.bounds.x2 && position.y >= tent.bounds.y1 && position.y <= tent.bounds.y2) ?? null;
+}
+
+function travelCampTentOwner(tentId = "") {
+  const world = travelCampEnsureData();
+  const entry = Object.entries(world.campTentAssignments ?? {}).find(([, assignedTentId]) => assignedTentId === tentId);
+  return entry ? state.fighters?.[entry[0]] ?? null : null;
+}
+
+function travelCampOwnedGearCount(hero, furnitureId) {
+  const world = travelCampEnsureData();
+  return Math.max(0, Math.floor(Number(world.campGearInventory?.party?.[furnitureId]) || 0));
+}
+
+function travelCampTotalPlacedGearCount(furnitureId) {
+  const world = travelCampEnsureData();
+  return Object.values(world.campFurniture ?? {}).reduce(
+    (total, entries) => total + (Array.isArray(entries) ? entries.filter((id) => id === furnitureId).length : 0),
+    0,
+  );
+}
+
+function travelCampTentWallSegments() {
+  const segments = [];
+  for (const tent of travelCampTentLayouts) {
+    const { x1, y1, x2, y2 } = tent.bounds;
+    for (let x = x1; x <= x2; x += 1) {
+      segments.push({ position: { x, y: y1 }, direction: "north", campTent: true });
+      segments.push({ position: { x, y: y2 }, direction: "south", campTent: true });
+    }
+    for (let y = y1; y <= y2; y += 1) {
+      segments.push({ position: { x: x1, y }, direction: "west", campTent: true });
+      segments.push({ position: { x: x2, y }, direction: "east", campTent: true });
+    }
+  }
+  return segments;
+}
+
+function travelCampFurnitureObjects() {
+  travelCampEnsureData();
+  const fireplace = {
+    id: "camp-fireplace",
+    type: "camp-fireplace",
+    position: { x: 12, y: 12 },
+    width: 1,
+    height: 1,
+    campFireplace: true,
+  };
+  return [
+    fireplace,
+    ...partyHeroes().flatMap((hero) => {
+    const tent = travelCampTentForHero(hero);
+    if (!tent) return [];
+    return travelCampFurnitureForHero(hero)
+      .map(travelCampFurnitureOption)
+      .filter(Boolean)
+      .map((entry) => ({
+        id: `camp-${hero.id}-${entry.id}`,
+        type: entry.type,
+        position: { x: tent.spawn.x + entry.offset.x, y: tent.spawn.y + entry.offset.y },
+        width: objectTemplate(entry.type)?.width ?? 1,
+        height: objectTemplate(entry.type)?.height ?? 1,
+        campFurniture: true,
+        assignedHeroId: hero.id,
+      }));
+  }),
+  ];
+}
+
+function addTravelCampFurniture(heroId, furnitureId) {
+  const hero = state?.fighters?.[heroId];
+  const option = travelCampFurnitureOption(furnitureId);
+  if (!hero || !option || !travelCampTentForHero(hero)) return;
+  const currentTent = travelCampTentAtPosition(activeHero()?.position);
+  if (activeHero()?.id !== hero.id || currentTent?.id !== travelCampTentForHero(hero)?.id) {
+    addLog(`Select ${hero.name} and move them into their tent before arranging camp furniture.`, "important");
+    renderTravelCampMenu();
+    return;
+  }
+  const world = travelCampEnsureData();
+  const items = world.campFurniture[hero.id] ?? [];
+  const owned = travelCampOwnedGearCount(hero, option.id);
+  const placed = travelCampTotalPlacedGearCount(option.id);
+  if (placed >= owned) return;
+  if (items.length >= travelCampFurnitureOptions.length) return;
+  items.push(option.id);
+  world.campFurniture[hero.id] = items;
+  state.dungeonObjects = travelCampFurnitureObjects();
+  addLog(`${option.name} added to ${hero.name}'s camp tent. Comfort is now ${travelCampComfortLevel(hero)}.`, "important");
+  renderTravelCampMenu();
+  render();
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function buyTravelCampGear(heroId, furnitureId) {
+  const option = travelCampFurnitureOption(furnitureId);
+  if (!option) return;
+  if (!spendMoney(partyPurse(), option.priceCp)) {
+    addLog(`The party purse cannot afford ${option.name}.`, "important");
+    renderHomeAdventurePanels();
+    return;
+  }
+  const world = travelCampEnsureData();
+  world.campGearInventory.party[option.id] = travelCampOwnedGearCount(null, option.id) + 1;
+  addLog(`The party buys ${option.name} for the shared camp pack. Owned: ${travelCampOwnedGearCount(null, option.id)}.`, "important");
+  render();
+  renderHomeAdventurePanels();
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function travelCampLayoutId(inn = travelCampIsInn()) {
+  return inn ? state.world?.travelCamp?.innLayoutId ?? "inn-common-hall" : "travel-camp";
+}
+
+async function travelCampLayoutTemplate(inn = travelCampIsInn()) {
+  const layoutId = travelCampLayoutId(inn);
+  return (await window.DungeonSettlementLayouts?.get?.(layoutId)) ?? window.DungeonSettlementLayouts?.builtIn?.(layoutId) ?? null;
+}
+
+function travelCampTemplateObjects(template, inn = travelCampIsInn()) {
+  const objects = (template?.objects ?? [])
+    .map((object) => ({
+      ...cloneData(object),
+      innFixture: inn ? object.innFixture !== false : object.innFixture,
+      campFireplace: !inn && (object.campFireplace || object.type === "camp-fireplace"),
+    }))
+    .filter((object) => objectTemplate(object.type));
+  if (!inn && !objects.some((object) => object.type === "camp-fireplace")) {
+    objects.unshift({ id: "camp-fireplace", type: "camp-fireplace", position: { x: 12, y: 12 }, width: 1, height: 1, campFireplace: true });
+  }
+  return inn ? objects : [...objects, ...travelCampFurnitureObjects().filter((object) => !object.campFireplace)];
+}
+
+function travelCampOpenPositions(dungeon, count, fallback) {
+  const blocked = new Set(
+    (state.dungeonObjects ?? [])
+      .filter(objectBlocksMovement)
+      .flatMap(objectCells)
+      .map(positionKey),
+  );
+  const walkable = (dungeon?.walkable ?? []).filter((cell) => !blocked.has(positionKey(cell)));
+  const start = dungeon?.startPosition ?? fallback;
+  return walkable
+    .slice()
+    .sort((a, b) => distance(a, start) - distance(b, start))
+    .slice(0, count);
+}
+
+async function applyTravelCampRoom() {
+  if (!state?.world?.travelCamp?.active) return;
+  travelCampEnsureData();
+  const inn = travelCampIsInn();
+  const template = await travelCampLayoutTemplate(inn);
+  const gridSize = Math.max(12, Math.floor(Number(template?.gridSize ?? template?.dungeon?.gridSize) || 24));
+  const cells = template?.dungeon?.walkable?.length ? cloneData(template.dungeon.walkable) : inn ? travelInnCells(gridSize) : travelCampCells(gridSize);
+  const roomName = inn ? (state.world.travelCamp.innName || `${state.world.travelCamp.locationName || "Town"} Inn`) : "Camp";
+  const roomId = inn ? "inn-room" : "camp-room";
+  const templateRoom = template?.dungeon?.rooms?.[0];
+  const exitPosition = inn ? cloneData(template?.exit?.position ?? { x: 2, y: 12 }) : null;
+  const startPosition = cloneData(template?.dungeon?.startPosition ?? (inn ? { x: 4, y: 12 } : { x: 12, y: 13 }));
+  state.mode = "camp";
+  state.combatStarted = false;
+  state.round = 0;
+  state.initiative = [];
+  state.room = {
+    id: inn ? "settlement-inn" : "camp",
+    name: roomName,
+    gridSize,
+    tileSizePx,
+  };
+  state.dungeon = {
+    id: inn ? "settlement-inn" : "travel-camp",
+    roomCount: 1,
+    gridSize,
+    rooms: [{ ...(templateRoom ? cloneData(templateRoom) : { id: roomId, cells, doors: [] }), id: roomId, name: roomName, cells, doors: cloneData(templateRoom?.doors ?? []) }],
+    walkable: cloneData(cells),
+    corridors: cloneData(template?.dungeon?.corridors ?? []),
+    doors: cloneData(template?.dungeon?.doors ?? []),
+    corridorPassages: cloneData(template?.dungeon?.corridorPassages ?? []),
+    entranceRoomId: roomId,
+    startPosition,
+  };
+  state.exploration = {
+    discoveredRoomIds: [roomId],
+    openedDoorKeys: [],
+    openedCorridorKeys: [],
+    discoveredHiddenDoorKeys: [],
+    hiddenDoorSearchAttempts: {},
+  };
+  state.exit = inn ? { roomId, position: exitPosition } : null;
+  state.completed = false;
+  state.lootPiles = [];
+  state.dungeonObjects = travelCampTemplateObjects(template, inn);
+  if (inn) {
+    const profile = travelCurrentSettlementProfile();
+    startTavernConversationVisit(profile);
+    ensureTavernNpcPositions(profile);
+  }
+  const heroes = partyHeroes();
+  const openPositions = travelCampOpenPositions(state.dungeon, heroes.length, startPosition);
+  heroes.forEach((hero, index) => {
+    const position = inn ? openPositions[index] ?? startPosition : travelCampTentForHero(hero)?.spawn ?? openPositions[index] ?? startPosition;
+    hero.position = { ...position };
+  });
+  roomIsBuilt = false;
+}
+
+function travelCampPartySize() {
+  return Math.max(1, partyHeroes().length);
+}
+
+const travelRationItemId = "trail-ration";
+
+function migrateTravelRationsToPartyInventory() {
+  state.partyResources = state.partyResources && typeof state.partyResources === "object" ? state.partyResources : {};
+  const legacy = Math.max(0, Math.floor(Number(state.partyResources.rations) || 0));
+  if (legacy > 0) {
+    state.partyResources[travelRationItemId] = Math.max(0, Math.floor(Number(state.partyResources[travelRationItemId]) || 0)) + legacy;
+  }
+  delete state.partyResources.rations;
+}
+
+function travelRationCount() {
+  state.partyResources = state.partyResources && typeof state.partyResources === "object" ? state.partyResources : {};
+  state.party = state.party && typeof state.party === "object" ? state.party : {};
+  migrateTravelRationsToPartyInventory();
+  if (!state.party.travelRationsInitialized && !Object.prototype.hasOwnProperty.call(state.partyResources, travelRationItemId)) {
+    state.partyResources[travelRationItemId] = travelCampPartySize() * 3;
+    state.party.travelRationsInitialized = true;
+  }
+  state.partyResources[travelRationItemId] = Math.max(0, Math.floor(Number(state.partyResources[travelRationItemId]) || 0));
+  return Math.max(0, Math.floor(Number(state.partyResources[travelRationItemId]) || 0));
+}
+
+function setTravelRationCount(count) {
+  state.partyResources = state.partyResources && typeof state.partyResources === "object" ? state.partyResources : {};
+  state.party = state.party && typeof state.party === "object" ? state.party : {};
+  migrateTravelRationsToPartyInventory();
+  const amount = Math.max(0, Math.floor(Number(count) || 0));
+  state.partyResources[travelRationItemId] = amount;
+  state.party.travelRationsInitialized = true;
+}
+
+function addTravelRations(count = 1) {
+  setTravelRationCount(travelRationCount() + Math.max(0, Math.floor(Number(count) || 0)));
+}
+
+function travelCampMealResolved(camp = travelCampState()) {
+  return Boolean(camp.mealResolved);
+}
+
+function travelCampHeroNearFireplace(hero = activeHero()) {
+  return Boolean(hero?.position && distance(hero.position, { x: 12, y: 12 }) <= 1);
+}
+
+function travelBestForager() {
+  return partyHeroes()
+    .map((hero) => ({
+      hero,
+      auto: hero.classId === "ranger",
+      bonus: skillCheckBonus(hero, "wis", "survival"),
+    }))
+    .sort((a, b) => Number(b.auto) - Number(a.auto) || b.bonus - a.bonus || (a.hero.name ?? "").localeCompare(b.hero.name ?? ""))[0] ?? null;
+}
+
+function travelBestPersuader() {
+  return partyHeroes()
+    .map((hero) => ({
+      hero,
+      bonus: skillCheckBonus(hero, "cha", "persuasion"),
+    }))
+    .sort((a, b) => b.bonus - a.bonus || (a.hero.name ?? "").localeCompare(b.hero.name ?? ""))[0] ?? null;
+}
+
+function travelForageForCamp() {
+  const camp = travelCampState();
+  if (travelCampMealResolved(camp)) return;
+  const forager = travelBestForager();
+  const needed = travelCampRationNeed();
+  const forageProfile = travelCampForageProfile();
+  if (!forager?.hero) return;
+  if (forager.auto) {
+    camp.mealResolved = true;
+    camp.foodSource = "forage";
+    camp.forage = {
+      heroId: forager.hero.id,
+      heroName: forager.hero.name,
+      auto: true,
+      success: true,
+      gathered: needed,
+      found: forageProfile.success,
+      biome: forageProfile.group,
+      biomeLabel: forageProfile.label,
+      dc: forageProfile.dc,
+    };
+    addLog(`${forager.hero.name} reads the ${forageProfile.label} with a ranger's eye and finds ${forageProfile.success}. The party has enough for camp.`, "important");
+  } else {
+    const roll = typeof rollSkillCheck === "function"
+      ? rollSkillCheck(forager.hero, "wis", "survival", { guidance: true })
+      : { roll: rollDie(20), bonus: forager.bonus, total: 0 };
+    if (!roll.total) roll.total = (roll.roll ?? 0) + (roll.bonus ?? forager.bonus);
+    const dc = forageProfile.dc;
+    const success = roll.total >= dc;
+    camp.forage = {
+      heroId: forager.hero.id,
+      heroName: forager.hero.name,
+      total: roll.total,
+      dc,
+      baseDc: forageProfile.baseDc,
+      comfortReduction: forageProfile.comfortReduction,
+      success,
+      found: forageProfile.success,
+      failure: forageProfile.failure,
+      biome: forageProfile.group,
+      biomeLabel: forageProfile.label,
+    };
+    if (success) {
+      camp.mealResolved = true;
+      camp.foodSource = "forage";
+      addLog(`${forager.hero.name} forages the ${forageProfile.label}: Survival ${roll.total} vs DC ${dc}. They find ${forageProfile.success}, enough to cook for camp.`, "important");
+    } else {
+      const fallback = travelRationCount() >= needed ? "Rations can still cover the meal." : "Without enough rations, the party may need to rest hungry.";
+      addLog(`${forager.hero.name} forages the ${forageProfile.label}: Survival ${roll.total} vs DC ${dc}. ${forageProfile.failure}. ${fallback}`, "important");
+    }
+  }
+  renderTravelCampMenu();
+  render();
+}
+
+function travelFinishCampRest({ hungry = false } = {}) {
+  const camp = travelCampState();
+  const inn = travelCampIsInn(camp);
+  for (const hero of partyHeroes()) {
+    const restedHero = prepareRestedHero(hero, hero.position ?? { x: 0, y: 0 });
+    if (!hungry) {
+      const comfortBonus = travelCampComfortRestBonus(restedHero);
+      if (comfortBonus > 0) {
+        restedHero.tempHp = Math.max(restedHero.tempHp ?? 0, comfortBonus);
+        restedHero.travelComfortRest = { day: normalizeWorldDay(state.worldDay), comfort: inn ? comfortBonus : travelCampComfortLevel(restedHero), tempHp: comfortBonus };
+      }
+    }
+    state.fighters[restedHero.id] = restedHero;
+  }
+  if (hungry) {
+    state.partyResources = state.partyResources && typeof state.partyResources === "object" ? state.partyResources : {};
+    state.partyResources.hungryCampStreak = Math.max(0, Math.floor(Number(state.partyResources.hungryCampStreak) || 0)) + 1;
+    const exhausted = [];
+    for (const hero of partyHeroes()) {
+      const nextLevel = travelHungerExhaustionLevel(hero) + 1;
+      setTravelHungerExhaustionLevel(hero, nextLevel);
+      exhausted.push(`${hero.name} exhaustion ${Math.min(6, nextLevel)}`);
+    }
+    camp.mealResolved = true;
+    camp.foodSource = "hungry";
+    camp.hungryRest = true;
+    camp.hungryRestStreak = state.partyResources.hungryCampStreak;
+    addLog(`The party rests hungry. ${exhausted.join(", ")}.`, "important");
+  } else {
+    state.partyResources = state.partyResources && typeof state.partyResources === "object" ? state.partyResources : {};
+    state.partyResources.hungryCampStreak = 0;
+    const recovered = travelRecoverHungryExhaustion();
+    if (recovered.length) {
+      addLog(`A proper camp meal eases hunger exhaustion: ${recovered.map(({ hero, level }) => `${hero.name}${level > 0 ? ` to ${level}` : " recovers"}`).join(", ")}.`, "important");
+    }
+  }
+  camp.rested = true;
+  addLog(`The party takes a long rest at ${inn ? camp.innName || travelPlaceLabelForHex(state.world.currentHex) : travelPlaceLabelForHex(state.world.currentHex)}.`, "important");
+  if (!hungry) {
+    const comfortHeroes = partyHeroes().filter((hero) => travelCampComfortRestBonus(hero) > 0);
+    if (comfortHeroes.length) addLog(`${inn ? "Inn comforts" : "Camp comforts"} grant ${comfortHeroes.map((hero) => `${hero.name} ${travelCampComfortRestBonus(hero)} temp HP`).join(", ")}.`, "important");
+  }
+  if (inn) homeMenuPanel = "main";
+  renderTravelCampMenu();
+  render();
+  if (inn && !els.homeMenu?.classList.contains("hidden")) renderHomeAdventurePanels();
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function travelUseCampRations() {
+  if (travelCampIsInn()) {
+    if (moneyToCp(partyPurse()) >= travelInnRefreshmentPrice(travelInnRefreshmentOptions[0])) {
+      travelBuyInnRefreshment("simple");
+      return;
+    }
+    const camp = travelCampState();
+    if (travelCampMealResolved(camp)) return;
+    const needed = travelCampRationNeed();
+    const available = travelRationCount();
+    if (available < needed) {
+      addLog(`The party cannot afford supper and only has ${available}/${needed} ration${needed === 1 ? "" : "s"}.`, "important");
+      renderTravelCampMenu();
+      return;
+    }
+    setTravelRationCount(available - needed);
+    camp.mealResolved = true;
+    camp.foodSource = "rations";
+    camp.rationsConsumed = needed;
+    camp.hungryRest = false;
+    addLog(`The party eats ${needed} carried ration${needed === 1 ? "" : "s"} in ${camp.innName || "the inn"}.`, "important");
+    renderTravelCampMenu();
+    render();
+    return;
+  }
+  const camp = travelCampState();
+  if (travelCampMealResolved(camp)) return;
+  const needed = travelCampRationNeed();
+  const available = travelRationCount();
+  if (available < needed) {
+    addLog(`The party needs ${needed} ration${needed === 1 ? "" : "s"} for camp, but only has ${available}.`, "important");
+    renderTravelCampMenu();
+    return;
+  }
+  setTravelRationCount(available - needed);
+  camp.mealResolved = true;
+  camp.foodSource = "rations";
+  camp.rationsConsumed = needed;
+  camp.hungryRest = false;
+  const comfortNote = needed < travelCampPartySize() ? ` Camp comfort reduces the meal need to ${needed}.` : "";
+  addLog(`The party consumes ${needed} ration${needed === 1 ? "" : "s"} at camp.${comfortNote}`, "important");
+  renderTravelCampMenu();
+  render();
+}
+
+function travelBuyInnRefreshment(optionId = "simple") {
+  const camp = travelCampState();
+  if (!travelCampIsInn(camp) || travelCampMealResolved(camp)) return;
+  const option = travelInnRefreshmentOption(optionId);
+  const price = travelInnRefreshmentPrice(option);
+  if (!spendMoney(partyPurse(), price)) {
+    addLog(`The party purse cannot cover ${option.name} at ${camp.innName || "the inn"}.`, "important");
+    renderTravelCampMenu();
+    return;
+  }
+  camp.mealResolved = true;
+  camp.foodSource = "inn";
+  camp.refreshmentId = option.id;
+  camp.refreshmentName = option.name;
+  camp.innComfort = Math.max(0, Math.floor(Number(option.comfort) || 0));
+  camp.hungryRest = false;
+  addLog(`The party buys ${option.name} at ${camp.innName || "the inn"} for ${priceText(price)}. Comfort +${camp.innComfort} for tonight's rest.`, "important");
+  renderTravelCampMenu();
+  render();
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function travelInnPersuasionDc() {
+  const partySize = travelCampPartySize();
+  return Math.min(18, 12 + Math.max(0, partySize - 1));
+}
+
+function travelInnTryHungryFallback() {
+  const camp = travelCampState();
+  if (!travelCampIsInn(camp) || travelCampMealResolved(camp) || camp.rested) return;
+  const simple = travelInnRefreshmentOptions[0];
+  const price = travelInnRefreshmentPrice(simple);
+  const needed = travelCampRationNeed();
+  if (moneyToCp(partyPurse()) >= price || travelRationCount() >= needed) {
+    addLog("The party still has a way to eat tonight before asking for charity.", "important");
+    renderTravelCampMenu();
+    return;
+  }
+  const persuader = travelBestPersuader();
+  const dc = travelInnPersuasionDc();
+  if (!camp.innPersuasionAttempted && persuader?.hero) {
+    const roll = typeof rollSkillCheck === "function"
+      ? rollSkillCheck(persuader.hero, "cha", "persuasion", { guidance: true })
+      : { roll: rollDie(20), bonus: persuader.bonus, total: 0 };
+    if (!roll.total) roll.total = (roll.roll ?? 0) + (roll.bonus ?? persuader.bonus);
+    camp.innPersuasionAttempted = true;
+    camp.innPersuasion = {
+      heroId: persuader.hero.id,
+      heroName: persuader.hero.name,
+      total: roll.total,
+      dc,
+      success: roll.total >= dc,
+    };
+    if (roll.total >= dc) {
+      camp.mealResolved = true;
+      camp.foodSource = "inn-charity";
+      camp.refreshmentId = simple.id;
+      camp.refreshmentName = `${simple.name} on the house`;
+      camp.innComfort = Math.max(0, Math.floor(Number(simple.comfort) || 0));
+      camp.hungryRest = false;
+      addLog(`${persuader.hero.name} speaks with the innkeeper: Persuasion ${roll.total} vs DC ${dc}. The innkeeper sets out ${simple.name.toLowerCase()} and waves away the coin.`, "important");
+      travelFinishCampRest({ hungry: false });
+      return;
+    }
+    addLog(`${persuader.hero.name} asks the innkeeper for mercy: Persuasion ${roll.total} vs DC ${dc}. The answer is kind, but firm. The party goes to bed hungry.`, "important");
+  } else {
+    addLog(`No coin and no rations remain. The party goes to bed hungry at ${camp.innName || "the inn"}.`, "important");
+  }
+  travelFinishCampRest({ hungry: true });
+}
+
+function travelCampComfortsForHero(hero) {
+  return travelCampFurnitureForHero(hero)
+    .map(travelCampFurnitureOption)
+    .filter(Boolean);
+}
+
+function travelCampTentMarkup(hero) {
+  const tent = travelCampTentForHero(hero);
+  const comforts = travelCampComfortsForHero(hero);
+  const slots = Array.from({ length: 4 }, (_, index) => comforts[index]?.name ?? "Empty").map(
+    (label) => `<span class="travel-camp-comfort-slot">${escapeHtml(label)}</span>`,
+  );
+  const addButtons = travelCampFurnitureOptions
+    .map((entry) => {
+      const owned = travelCampOwnedGearCount(hero, entry.id);
+      const placed = travelCampTotalPlacedGearCount(entry.id);
+      const available = owned - placed;
+      return `<button type="button" data-action="camp-add-furniture" data-hero="${escapeAttribute(hero.id)}" data-furniture="${escapeAttribute(entry.id)}" ${available > 0 && tent ? "" : "disabled"}>${escapeHtml(entry.name)} <small>${available}/${owned} +${entry.comfort}</small></button>`;
+    })
+    .join("");
+  return `
+    <div class="travel-camp-tent">
+      <strong>${escapeHtml(hero.name ?? "Hero")}</strong>
+      <span class="travel-camp-tent-assignment">${escapeHtml(tent?.label ?? "No tent")}</span>
+      <div class="travel-camp-comforts">
+        <span>Comfort ${travelCampComfortLevel(hero)}</span>
+        <div class="travel-camp-comfort-slots">${slots.join("")}</div>
+      </div>
+      <div class="travel-camp-furniture-actions">${addButtons}</div>
+    </div>
+  `;
+}
+
+function travelCampTentPanelMarkup() {
+  const hero = activeHero();
+  if (!hero) return `<p class="empty-note">Select a hero to inspect their tent.</p>`;
+  const currentTent = travelCampTentAtPosition(hero.position);
+  if (!currentTent) return `<p class="empty-note">Enter a tent with ${escapeHtml(hero.name ?? "the selected hero")} to arrange that hero's camp furniture.</p>`;
+  const owner = travelCampTentOwner(currentTent.id);
+  if (!owner) return `<p class="empty-note">${escapeHtml(currentTent.label)} is unassigned.</p>`;
+  if (owner.id !== hero.id) {
+    return `<p class="empty-note">${escapeHtml(currentTent.label)} belongs to ${escapeHtml(owner.name ?? "another hero")}. Select or move that hero to arrange it.</p>`;
+  }
+  return travelCampTentMarkup(hero);
+}
+
+function renderTravelCampMenu() {
+  const camp = state?.world?.travelCamp ?? {};
+  const inn = travelCampIsInn(camp);
+  const routeLength = travelRoute().length;
+  const nextRouteHex = travelRoute()[0] ?? null;
+  const nextRouteIsRoad = Boolean(nextRouteHex && travelHexIsSaferRoute(nextRouteHex));
+  const mealResolved = travelCampMealResolved(camp);
+  const rested = Boolean(camp.rested);
+  const rationCount = travelRationCount();
+  const rationNeed = travelCampRationNeed();
+  const forageAttempted = Boolean(camp.forage);
+  const canCookMeal = !inn && !mealResolved && rationCount >= rationNeed;
+  const canForage = !inn && !mealResolved && !forageAttempted && Boolean(travelBestForager()?.hero);
+  const innSimplePrice = travelInnRefreshmentPrice(travelInnRefreshmentOptions[0]);
+  const canBuyInnMeal = inn && !mealResolved && moneyToCp(partyPurse()) >= innSimplePrice;
+  const canEatInnRations = inn && !mealResolved && !canBuyInnMeal && rationCount >= rationNeed;
+  const showHungryRest = !mealResolved && (inn ? !canBuyInnMeal && !canEatInnRations : !canCookMeal && !canForage);
+  const totalComfort = travelCampTotalComfort();
+  const kicker = inn ? `Day ${normalizeWorldDay(state?.worldDay)} Inn` : `Day ${normalizeWorldDay(state?.worldDay)} Camp`;
+  const location = inn ? (camp.innName || `${camp.locationName || travelPlaceLabelForHex(state?.world?.currentHex)} Inn`) : camp.locationName || travelPlaceLabelForHex(state?.world?.currentHex);
+  const remaining = routeLength ? `${routeLength} day${routeLength === 1 ? "" : "s"} remain on the route.` : "No route steps remain.";
+  const mealSourceText = camp.foodSource === "inn" ? camp.refreshmentName || "inn food and drink" : camp.foodSource === "forage" ? "foraging" : camp.foodSource === "hungry" ? "a hungry rest" : "rations";
+  const forageProfile = travelCampForageProfile();
+  const forageDc = forageProfile.dc;
+  const forageTerrain = forageProfile.comfortReduction > 0
+    ? `${forageProfile.label} forage DC ${forageDc} (${forageProfile.baseDc} terrain, -${forageProfile.comfortReduction} comfort)`
+    : `${forageProfile.label} forage DC ${forageDc}`;
+  const innPersuasionText = inn && camp.innPersuasion
+    ? ` Last plea: Persuasion ${camp.innPersuasion.total} vs DC ${camp.innPersuasion.dc}.`
+    : "";
+  const food = inn ? ` Food and drink are available at the bar. Party purse: ${moneyText(partyPurse())}; rations ${rationCount}/${rationNeed}. Cheapest supper: ${priceText(innSimplePrice)}.${innPersuasionText}` : ` Food: ${rationCount}/${rationNeed} ration${rationNeed === 1 ? "" : "s"} needed; ${forageTerrain}.`;
+  const meal = inn
+    ? mealResolved
+      ? ` Supper handled by ${mealSourceText}.`
+      : canBuyInnMeal
+        ? " Buy food and drinks at the bar before sleeping."
+        : canEatInnRations
+          ? " Eat carried rations here or ask the innkeeper for mercy."
+          : " Ask the innkeeper for mercy or go to bed hungry."
+    : mealResolved
+      ? ` Meal handled by ${mealSourceText}.`
+      : ` Resolve food with rations, forage, or a hungry rest before sleeping.`;
+  const forageResult = travelCampForageResultSummary(camp);
+  const rest = rested ? (inn ? " The party is rested and ready to leave the inn." : " The camp is rested and ready to break.") : "";
+  const comfort = ` ${travelCampComfortSummary()}.`;
+  const hunger = ` ${travelCampHungerSummary()}`;
+  const details = `${camp.summary || (inn ? "The party takes rooms for the night." : "The party makes camp for the night.")} ${remaining}${food}${meal}${!inn && forageResult ? ` Forage: ${forageResult}` : ""}${comfort}${hunger}${rest}`;
+  const tents = inn ? travelInnRefreshmentButtonsMarkup() : travelCampTentPanelMarkup();
+  const mealLabel = mealResolved ? (camp.foodSource === "inn" ? "Inn Table" : camp.foodSource === "forage" ? "Foraged" : camp.foodSource === "hungry" ? "Hungry" : "Rations") : "Needed";
+  const bindCampPanel = (prefix) => {
+    const panel = {
+      kicker: els[`${prefix}Kicker`],
+      location: els[`${prefix}Location`],
+      details: els[`${prefix}Details`],
+      tents: els[`${prefix}Tents`],
+      rations: els[`${prefix}Rations`],
+      meal: els[`${prefix}Meal`],
+      useRations: els[`${prefix}UseRations`],
+      forage: els[`${prefix}Forage`],
+      hungryRest: els[`${prefix}HungryRest`],
+      longRest: els[`${prefix}LongRest`],
+      exploreHere: els[`${prefix}ExploreHere`],
+      ventureOffTrack: els[`${prefix}VentureOffTrack`],
+      continue: els[`${prefix}Continue`],
+    };
+    if (panel.kicker) panel.kicker.textContent = kicker;
+    if (panel.location) panel.location.textContent = location;
+    if (panel.details) panel.details.textContent = details;
+    if (panel.tents) panel.tents.innerHTML = tents;
+    if (panel.rations) {
+      panel.rations.textContent = inn ? moneyText(partyPurse()) : `${rationCount} / ${rationNeed}`;
+      const label = panel.rations.closest("div")?.querySelector("span");
+      if (label) label.textContent = inn ? "Purse" : "Rations";
+    }
+    if (panel.meal) {
+      panel.meal.textContent = mealLabel;
+      const label = panel.meal.closest("div")?.querySelector("span");
+      if (label) label.textContent = inn ? "Table" : "Meal";
+    }
+    if (panel.useRations) {
+      panel.useRations.textContent = inn ? (canEatInnRations ? "Eat Rations" : "Buy Supper") : "Cook Meal";
+      panel.useRations.disabled = mealResolved || (inn ? !canBuyInnMeal && !canEatInnRations : !canCookMeal);
+      panel.useRations.title = inn
+        ? canBuyInnMeal
+          ? "Buy the simple inn supper for the party."
+          : canEatInnRations
+            ? "Eat carried rations in the inn common room."
+            : `Needs ${priceText(innSimplePrice)} or ${rationNeed} ration${rationNeed === 1 ? "" : "s"}.`
+        : canCookMeal ? "Cook a camp meal from party rations." : `Needs ${rationNeed} ration${rationNeed === 1 ? "" : "s"}.`;
+    }
+    if (panel.forage) {
+      panel.forage.classList.toggle("hidden", inn);
+      panel.forage.textContent = `Forage (DC ${forageDc})`;
+      panel.forage.disabled = inn || !canForage;
+      panel.forage.title = forageAttempted ? "The party already searched for food at this camp." : `Survival DC ${forageDc}. Rangers succeed automatically.`;
+    }
+    if (panel.hungryRest) {
+      panel.hungryRest.classList.toggle("hidden", !showHungryRest);
+      panel.hungryRest.disabled = !showHungryRest;
+      panel.hungryRest.textContent = inn ? (camp.innPersuasionAttempted ? "Rest Hungry" : `Ask for Supper (DC ${travelInnPersuasionDc()})`) : "Rest Hungry";
+      panel.hungryRest.title = inn
+        ? camp.innPersuasionAttempted
+          ? "Rest without food. Each hero gains one exhaustion level."
+          : "Try one Persuasion check for a free simple supper. Failure means resting hungry."
+        : showHungryRest ? "Rest without food. Each hero gains one exhaustion level." : "Only shown when cooking and foraging are no longer options.";
+    }
+    if (panel.longRest) panel.longRest.disabled = !mealResolved || rested;
+    if (panel.exploreHere) {
+      panel.exploreHere.classList.toggle("hidden", !rested);
+      panel.exploreHere.disabled = !rested;
+      panel.exploreHere.title = rested ? "Spend the next travel day exploring this hex. Your planned route stays intact." : "Finish the night's rest before spending another day here.";
+    }
+    if (panel.ventureOffTrack) {
+      panel.ventureOffTrack.classList.toggle("hidden", !rested || !nextRouteIsRoad);
+      panel.ventureOffTrack.disabled = !rested || !nextRouteIsRoad;
+      panel.ventureOffTrack.title = rested && nextRouteIsRoad
+        ? "Travel toward the next road hex without using the road, rolling normal wilderness events and dungeon chances."
+        : "Available after resting when the next route step is a road-linked hex.";
+    }
+    if (panel.continue) {
+      panel.continue.classList.toggle("hidden", !rested);
+      panel.continue.disabled = routeLength === 0 || !rested;
+    }
+  };
+  bindCampPanel("travelCamp");
+  bindCampPanel("campHome");
+}
+
+async function showTravelCampMenu() {
+  hideTravelMapMenu();
+  els.travelCampMenu?.classList.add("hidden");
+  await applyTravelCampRoom();
+  renderTravelCampMenu();
+  render();
+  showHomeMenu();
+}
+
+function hideTravelCampMenu() {
+  els.travelCampMenu?.classList.add("hidden");
+}
+
+function travelLongRestAtCamp() {
+  if (!state?.fighters) return;
+  const camp = travelCampState();
+  if (!travelCampMealResolved(camp)) {
+    addLog("The party needs food before settling into a long rest.", "important");
+    renderTravelCampMenu();
+    return;
+  }
+  travelFinishCampRest({ hungry: false });
+}
+
+function travelHungryRestAtCamp() {
+  const camp = travelCampState();
+  if (camp.rested) return;
+  if (travelCampMealResolved(camp)) {
+    travelLongRestAtCamp();
+    return;
+  }
+  if (travelCampIsInn(camp)) {
+    travelInnTryHungryFallback();
+    return;
+  }
+  if (travelRationCount() >= travelCampRationNeed()) {
+    addLog("The party still has enough rations. Cook at the fireplace or forage before choosing a hungry rest.", "important");
+    renderTravelCampMenu();
+    return;
+  }
+  travelFinishCampRest({ hungry: true });
+}
+
+function travelArriveHome(destinationName = "home") {
+  const saveSlotId = state.saveSlotId ?? activeSaveSlot;
+  const world = window.DepthboundWorldTravel?.normalizeWorldState?.(state.world) ?? state.world;
+  world.currentHex = { ...(world.homeHex ?? world.currentHex) };
+  world.travelPlan = [];
+  world.routeConfirmed = false;
+  world.travelCamp = { active: false };
+  hideTravelMapMenu();
+  hideTravelCampMenu();
+  hideHomeMenu();
+  state = createHomeState(rosterHeroes(), state.chest ?? [], state.chestMoney ?? {}, {
+    ...state.party,
+    worldDay: normalizeWorldDay(state.worldDay),
+    campaignProgress: state.campaignProgress ?? {},
+    questFlags: state.questFlags ?? {},
+    partyResources: state.partyResources ?? {},
+    partyTomes: state.partyTomes ?? [],
+    home: state.home,
+    monsterCompendium: state.monsterCompendium,
+    world,
+  });
+  state.saveSlotId = saveSlotId;
+  state.combatStarted = false;
+  roomIsBuilt = false;
+  addLog(`The party reaches ${destinationName} and returns home.`, "important");
+  render();
+  maybeUnlockNpcProgress();
+  maybeTriggerNpcArrivals();
+  window.DepthboundPlaytest?.syncNow?.();
+  centerViewOnHero();
+}
+
+function travelBiomeForHex(hex = null) {
+  const chunk = travelChunkForHex(hex);
+  const target = hex ?? state?.world?.currentHex ?? {};
+  return chunk?.tiles?.[target.row]?.[target.col] ?? "grassland";
+}
+
+function travelFeatureForHex(hex = null) {
+  const chunk = travelChunkForHex(hex);
+  const target = hex ?? state?.world?.currentHex ?? {};
+  return chunk ? travelPrimaryFeatureForCell(chunk, target.row, target.col) : null;
+}
+
+function travelBuilderHexCenter(hex = null) {
+  const target = hex ?? state?.world?.currentHex ?? {};
+  const hexHeight = 172;
+  const hexWidth = 149.2;
+  return {
+    x: target.col * hexWidth + (target.row % 2 ? hexWidth / 2 : 0) + hexWidth / 2,
+    y: target.row * hexHeight * 0.75 + hexHeight / 2,
+  };
+}
+
+function travelPointSegmentDistance(point, a, b) {
+  const ax = Number(a?.x) || 0;
+  const ay = Number(a?.y) || 0;
+  const bx = Number(b?.x) || 0;
+  const by = Number(b?.y) || 0;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= 0) return Math.hypot(point.x - ax, point.y - ay);
+  const t = Math.max(0, Math.min(1, ((point.x - ax) * dx + (point.y - ay) * dy) / lengthSquared));
+  return Math.hypot(point.x - (ax + t * dx), point.y - (ay + t * dy));
+}
+
+function travelPolylineNearHex(polyline = {}, hex = null, tolerance = 82) {
+  const points = Array.isArray(polyline.points) ? polyline.points : [];
+  if (points.length < 2) return false;
+  const center = travelBuilderHexCenter(hex);
+  for (let index = 1; index < points.length; index += 1) {
+    if (travelPointSegmentDistance(center, points[index - 1], points[index]) <= tolerance) return true;
+  }
+  return false;
+}
+
+function travelHexHasRouteOverlay(hex = null) {
+  const chunk = travelChunkForHex(hex);
+  if (!chunk) return false;
+  return [...(chunk.roads ?? []), ...(chunk.paths ?? [])].some((line) => travelPolylineNearHex(line, hex));
+}
+
+function travelHexHasHarborOrBoatAccess(hex = null) {
+  const feature = travelFeatureForHex(hex);
+  const kind = feature?.kind || feature?.nameKind || window.DepthboundWorldNames?.structureKind?.(feature?.tile) || "";
+  const biome = window.DepthboundWorldTravel?.biomeGroup?.(travelBiomeForHex(hex)) ?? "";
+  return kind === "harbor" || ["coast", "ocean"].includes(String(biome).toLowerCase());
+}
+
+function travelHexIsSaferRoute(hex = null) {
+  return travelRoadTouchesHex(hex);
+}
+
+function travelHexAtChunkEdge(hex = null) {
+  const world = state?.world;
+  const target = hex ?? world?.currentHex;
+  if (!world || !target) return false;
+  const width = Math.max(1, Math.floor(Number(world.chunkWidth) || 10));
+  const height = Math.max(1, Math.floor(Number(world.chunkHeight) || 10));
+  return target.row <= 0 || target.col <= 0 || target.row >= height - 1 || target.col >= width - 1;
+}
+
+function travelEdgeNeighborCoords(hex = null) {
+  const world = state?.world;
+  const target = hex ?? world?.currentHex;
+  if (!world || !target) return [];
+  const row = Math.floor(Number(target.row) || 0);
+  const col = Math.floor(Number(target.col) || 0);
+  const width = Math.max(1, Math.floor(Number(world.chunkWidth) || 10));
+  const height = Math.max(1, Math.floor(Number(world.chunkHeight) || 10));
+  const chunkX = Math.floor(Number(target.chunkX) || 0);
+  const chunkY = Math.floor(Number(target.chunkY) || 0);
+  const neighbors = [];
+  if (row <= 0) neighbors.push({ chunkX, chunkY: chunkY - 1 });
+  if (row >= height - 1) neighbors.push({ chunkX, chunkY: chunkY + 1 });
+  if (col <= 0) neighbors.push({ chunkX: chunkX - 1, chunkY });
+  if (col >= width - 1) neighbors.push({ chunkX: chunkX + 1, chunkY });
+  const seen = new Set();
+  return neighbors.filter((entry) => {
+    const key = window.DepthboundWorldTravel?.chunkKey?.(entry.chunkX, entry.chunkY) ?? `${entry.chunkX},${entry.chunkY}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function travelEventHistory() {
+  state.world.travelEventHistory = Array.isArray(state.world.travelEventHistory) ? state.world.travelEventHistory : [];
+  return state.world.travelEventHistory;
+}
+
+function travelRecentEventIds(limit = 8) {
+  return travelEventHistory().slice(-limit).map((entry) => entry.eventId).filter(Boolean);
+}
+
+function travelRecordEvent(event = null, context = {}) {
+  if (!event?.id || !state?.world) return;
+  const history = travelEventHistory();
+  history.push({
+    eventId: event.id,
+    title: event.title ?? "",
+    day: context.departureDay ?? normalizeWorldDay(state.worldDay),
+    hex: cloneData(context.to ?? state.world.currentHex),
+    structureId: context.feature?.id ?? "",
+    kind: context.kind ?? "",
+  });
+  if (history.length > 40) history.splice(0, history.length - 40);
+}
+
+async function travelRememberTeleportCircle(hex = null) {
+  const world = travelEnsureTeleportData();
+  if (!world || !hex) return false;
+  const feature = travelFeatureForHex(hex);
+  if (!travelFeatureIsTeleportSettlement(feature)) return false;
+  const id = travelTeleportCircleId(feature, hex);
+  const home = travelSameHex(hex, world.homeHex) || id === world.homeVillageId;
+  const firstKnownNonHome = !home && !Object.values(world.teleportCircles ?? {}).some((entry) => entry && !entry.home);
+  world.teleportCircles[id] = {
+    ...(world.teleportCircles[id] ?? {}),
+    id,
+    label: travelStructureDisplayLabel(feature) || travelPlaceLabelForHex(hex),
+    kind: travelFeatureKindLabel(feature),
+    hex: cloneData(hex),
+    home,
+    discoveredDay: world.teleportCircles[id]?.discoveredDay ?? normalizeWorldDay(state.worldDay),
+  };
+  if (!home) world.teleportUnlocked = true;
+  if (firstKnownNonHome && !world.teleportIntroShown) {
+    world.teleportIntroShown = true;
+    await showTravelMapNotice({
+      kicker: "Teleport Circle",
+      title: "Circle Learned",
+      message: `${travelStructureDisplayLabel(feature)} has an old teleportation circle. Now that the party has stood in it and learned its mark, the village Teleport entry can carry them back to known village and city circles.`,
+      confirmText: "Remember Circle",
+    });
+  }
+  return true;
+}
+
+async function travelEnsureEdgeNeighborChunks(hex = null) {
+  const world = state?.world;
+  const target = hex ?? world?.currentHex;
+  if (!world || !target || !window.DepthboundWorldTravel?.generateChunk) return [];
+  const generatedKeys = [];
+  const neighbors = travelEdgeNeighborCoords(target);
+  for (const neighbor of neighbors) {
+    const key = window.DepthboundWorldTravel.chunkKey(neighbor.chunkX, neighbor.chunkY);
+    if (world.chunks?.[key]) continue;
+    try {
+      const generated = await window.DepthboundWorldTravel.generateChunk(neighbor.chunkX, neighbor.chunkY, {
+        seed: world.seed,
+        project: world.worldProject,
+        chunkWidth: world.chunkWidth,
+        chunkHeight: world.chunkHeight,
+      });
+      world.worldProject = generated.project ?? world.worldProject;
+      world.chunks ??= {};
+      world.chunks[key] = generated.chunk;
+      generatedKeys.push(key);
+      addLog(`The party scouts beyond the chunk edge. The world map expands at chunk ${key}.`, "travel-event");
+    } catch (error) {
+      console.warn("Could not generate neighboring travel chunk.", error);
+    }
+  }
+  return generatedKeys;
+}
+
+function travelEventThemeForBiome(tile = "") {
+  const group = String(window.DepthboundWorldTravel?.biomeGroup?.(tile) ?? window.DepthboundWorldNames?.biomeGroup?.(tile) ?? tile ?? "").toLowerCase();
+  const map = {
+    arctic: "arctic",
+    tundra: "arctic",
+    snow: "arctic",
+    desert: "desertRuins",
+    badlands: "desertRuins",
+    forest: "forestOfTheBeasts",
+    jungle: "jungle",
+    swamp: "swamp",
+    mountain: "mountain",
+    hills: "mountain",
+    highlands: "mountain",
+    grassland: "grasslands",
+    savanna: "grasslands",
+    coast: "underwater",
+    ocean: "underwater",
+    lake: "underwater",
+    volcanic: "crucibleOfFlame",
+    volcano: "crucibleOfFlame",
+    lava: "crucibleOfFlame",
+  };
+  const themeId = map[group] ?? "forestOfTheBeasts";
+  return getContentDefinition("themes", themeId) ? themeId : defaultContent.theme;
+}
+
+function travelEventBestSkillHero(check = {}) {
+  const heroes = partyHeroes();
+  if (!heroes.length) return null;
+  if (Array.isArray(check.autoSuccessClasses)) {
+    const autoHero = heroes.find((hero) => check.autoSuccessClasses.includes(hero.classId));
+    if (autoHero) return autoHero;
+  }
+  return heroes
+    .slice()
+    .sort((a, b) => (skillCheckBonus(b, check.ability ?? "wis", check.skill ?? "survival") - skillCheckBonus(a, check.ability ?? "wis", check.skill ?? "survival")))
+    [0] ?? heroes[0];
+}
+
+function travelEventCheckResult(check = {}) {
+  const hero = travelEventBestSkillHero(check);
+  if (!hero) return { success: false, hero: null, text: "No hero is available for the check." };
+  if (Array.isArray(check.autoSuccessClasses) && check.autoSuccessClasses.includes(hero.classId)) {
+    return { success: true, hero, total: "auto", text: `${hero.name} handles the ${skillName(check.skill)} check automatically.` };
+  }
+  const roll = typeof rollSkillCheck === "function"
+    ? rollSkillCheck(hero, check.ability ?? "wis", check.skill ?? "survival", { guidance: true })
+    : { total: rollDie(20) + skillCheckBonus(hero, check.ability ?? "wis", check.skill ?? "survival"), roll: 0, bonus: 0, guidance: 0 };
+  const success = roll.total >= (check.dc ?? 10);
+  return {
+    success,
+    hero,
+    total: roll.total,
+    text: `${hero.name} rolls ${skillName(check.skill)} ${roll.total} vs DC ${check.dc ?? 10}.`,
+  };
+}
+
+function travelApplyEventRewards(rewards = {}) {
+  const rationReward = Math.max(0, Math.floor(Number(rewards.rations) || 0));
+  if (rationReward > 0) {
+    addTravelRations(rationReward);
+    addLog(`The party gains ${rationReward} ration${rationReward === 1 ? "" : "s"} in the party supplies.`, "important");
+  }
+  const moneyCp = moneyToCp(rewards.money ?? {});
+  if (moneyCp > 0) {
+    addMoney(partyPurse(), moneyCp);
+    addLog(`The party purse gains ${moneyText(cpToMoney(moneyCp))}.`, "important");
+  }
+}
+
+function travelOutcomeCategory(outcome = {}) {
+  if (outcome.dungeon) return "Dungeon";
+  if (outcome.fight) return "Fight";
+  if (outcome.rewards) return "Reward";
+  return "Result";
+}
+
+function travelOutcomeIcon(outcome = {}) {
+  if (outcome.campaign) return ">";
+  if (outcome.dungeon) return ">";
+  if (outcome.fight) return "!";
+  if (outcome.rewards?.rations) return "+";
+  if (outcome.rewards?.money) return "$";
+  return "*";
+}
+
+function travelDungeonSizePlayerLabel(size = "small") {
+  if (size === "medium") return "deeper";
+  if (size === "large") return "long";
+  return "hidden";
+}
+
+function travelIndefiniteArticle(text = "") {
+  return /^[aeiou]/i.test(String(text).trim()) ? "An" : "A";
+}
+
+function travelFightAttackSummary(outcome = {}, context = {}) {
+  const fight = outcome.fight ?? {};
+  const tile = context.tile ?? travelBiomeForHex(state.world?.currentHex);
+  const themeId = fight.themeId && getContentDefinition("themes", fight.themeId) ? fight.themeId : travelEventThemeForBiome(tile);
+  const template = travelMonsterTemplateForEvent(themeId, fight);
+  const monsterName = template?.name ?? "enemy";
+  const count = travelSkirmishMonsterCount(fight);
+  if (count <= 1) return `${travelIndefiniteArticle(monsterName)} ${monsterName} attacks!`;
+  return `${monsterName} and its allies attack!`;
+}
+
+function travelOutcomeSummary(event = {}, outcome = {}, check = null, context = {}) {
+  const parts = [];
+  if (check?.text) parts.push(check.text);
+  if (outcome.text) parts.push(outcome.text);
+  if (outcome.rewards?.rations) parts.push(`Rations +${Math.max(0, Math.floor(Number(outcome.rewards.rations) || 0))}.`);
+  if (moneyToCp(outcome.rewards?.money ?? {}) > 0) parts.push(`Coin +${moneyText(outcome.rewards.money)}.`);
+  if (outcome.fight) parts.push(travelFightAttackSummary(outcome, context));
+  if (outcome.campaign) parts.push("The marked mine opens into an old story path.");
+  if (outcome.dungeon) parts.push(`A ${travelDungeonSizePlayerLabel(outcome.dungeon.size)} way opens below.`);
+  return parts.join(" ");
+}
+
+async function travelShowEventResult(event = {}, outcome = {}, context = {}, check = null) {
+  const title = `${travelOutcomeIcon(outcome)} ${event.title ?? "Travel Event"} ${travelOutcomeCategory(outcome)}`;
+  const summary = travelOutcomeSummary(event, outcome, check, context) || "The party moves on.";
+  addLog(`${event.title ?? "Travel Event"}: ${summary}`, "travel-event");
+  render();
+  if (travelMapMenuVisible()) {
+    await showTravelMapNotice({
+      kicker: travelOutcomeCategory(outcome),
+      title,
+      message: summary,
+      confirmText: outcome.dungeon ? "Enter Dungeon" : outcome.fight ? "Begin Fight" : "Continue",
+    });
+  } else if (typeof showGameDialog === "function" && !outcome.fight && !outcome.dungeon) {
+    await showGameDialog({
+      title,
+      message: summary,
+      confirmText: "Continue",
+      cancelText: "Close",
+    });
+  }
+  return summary;
+}
+
+function travelMonsterTemplateForEvent(themeId, fight = {}) {
+  const explicitIds = Array.isArray(fight.monsterIds) ? fight.monsterIds : [];
+  const explicitTemplate = explicitIds.map(getMonsterTemplate).find(Boolean);
+  if (explicitTemplate) return explicitTemplate;
+
+  const tags = Array.isArray(fight.monsterTags) ? fight.monsterTags : [];
+  const themePool = dungeonMonsterIds(themeId).map(getMonsterTemplate).filter(Boolean);
+  const bossPool = fight.allowBoss ? dungeonBossMonsterIds(themeId).map(getMonsterTemplate).filter(Boolean) : [];
+  const themeMonsterIds = new Set([...themePool, ...bossPool].map((monster) => monster.id));
+  const tagged = tags.length
+    ? window.DungeonContent
+        ?.list("monsters")
+        ?.filter((monster) => tags.every((tag) => monster.tags?.includes(tag)))
+        ?.filter((monster) => fight.allowBoss || !monster.tags?.includes("boss"))
+        ?.sort((a, b) => {
+          const aThemeMatch = themeMonsterIds.has(a.id) ? 1 : 0;
+          const bThemeMatch = themeMonsterIds.has(b.id) ? 1 : 0;
+          if (aThemeMatch !== bThemeMatch) return bThemeMatch - aThemeMatch;
+          const aBoss = a.tags?.includes("boss") ? 1 : 0;
+          const bBoss = b.tags?.includes("boss") ? 1 : 0;
+          if (aBoss !== bBoss) return aBoss - bBoss;
+          return (a.category ?? 1) - (b.category ?? 1);
+        }) ?? []
+    : [];
+  return tagged[0] ?? themePool[0] ?? getMonsterTemplate(defaultContent.monster);
+}
+
+function travelSkirmishMonsterCount(fight = {}) {
+  const partySize = Math.max(1, partyHeroes().length);
+  if (fight.count === "small") return Math.max(1, Math.ceil(partySize / 2));
+  if (fight.count === "party") return Math.max(1, partySize);
+  const numeric = Math.floor(Number(fight.count) || 0);
+  return numeric > 0 ? numeric : Math.max(1, Math.min(3, partySize));
+}
+
+function travelPartyRecommendedMonsterCategory() {
+  const highestLevel = Math.max(1, ...partyHeroes().map((hero) => Math.floor(Number(hero.level) || 1)));
+  return categoryForHeroLevel(highestLevel);
+}
+
+function travelMonsterCategoryWarning(outcome = {}, context = {}) {
+  if (!outcome?.fight) return null;
+  const fight = outcome.fight;
+  const tile = context.tile ?? travelBiomeForHex(context.to ?? state.world?.currentHex);
+  const themeId = fight.themeId && getContentDefinition("themes", fight.themeId) ? fight.themeId : travelEventThemeForBiome(tile);
+  const template = travelMonsterTemplateForEvent(themeId, fight);
+  const monsterCategoryValue = Math.max(1, Math.floor(Number(monsterCategory(template)) || 1));
+  const recommendedCategory = travelPartyRecommendedMonsterCategory();
+  if (monsterCategoryValue <= recommendedCategory) return null;
+  return {
+    monsterName: template?.name ?? "the creature",
+    monsterCategory: monsterCategoryValue,
+    recommendedCategory,
+    text: `${template?.name ?? "This creature"} is Category ${monsterCategoryValue}. Your party is ready for about Category ${recommendedCategory}. This is a dangerous lair fight.`,
+  };
+}
+
+function travelChoiceDescriptionWithDanger(choice = {}, context = {}) {
+  const warning = travelMonsterCategoryWarning(choice.outcome ?? {}, context);
+  return [choice.description ?? "", warning ? `Warning: ${warning.text}` : ""].filter(Boolean).join(" ");
+}
+
+async function travelConfirmDangerousFight(outcome = {}, context = {}) {
+  const warning = travelMonsterCategoryWarning(outcome, context);
+  if (!warning) return true;
+  const choices = [
+    { value: "fight", label: "Take The Fight", description: "The party commits to the lair battle." },
+    { value: "leave", label: "Back Away", description: "The party withdraws before the creature fully engages." },
+  ];
+  const choice = travelMapMenuVisible()
+    ? await showTravelMapChoiceDialog({ kicker: "Dangerous Lair", title: warning.monsterName, message: warning.text, choices })
+    : await showChoiceDialog({ title: "Dangerous Lair", message: warning.text, choices });
+  return choice === "fight";
+}
+
+function travelPrepareReturnCamp(event, context = {}, options = {}) {
+  state.travelReturnCamp = {
+    eventId: event?.id ?? "",
+    eventTitle: event?.title ?? "Travel Event",
+    destinationName: context.destinationName ?? travelPlaceLabelForHex(state.world?.currentHex),
+    structureId: context.feature?.id ?? "",
+    boardQuestId: context.boardQuest?.id ?? "",
+    questTargetHex: context.boardQuest?.targetHex ? cloneData(context.boardQuest.targetHex) : null,
+    world: cloneData(state.world),
+    camp: cloneData(state.world?.travelCamp ?? null),
+    lockRetreat: Boolean(options.lockRetreat),
+    lockRetreatReason: options.lockRetreatReason ?? "",
+  };
+}
+
+async function travelStartEventDungeon(event, outcome = {}, context = {}) {
+  const dungeon = outcome.dungeon ?? {};
+  const tile = context.tile ?? travelBiomeForHex(state.world?.currentHex);
+  const themeId = dungeon.themeId && getContentDefinition("themes", dungeon.themeId) ? dungeon.themeId : travelEventThemeForBiome(tile);
+  const size = ["small", "medium", "large"].includes(dungeon.size) ? dungeon.size : "small";
+  const partyMembers = partyHeroes();
+  if (!partyMembers.length) return false;
+  travelPrepareReturnCamp(event, context);
+  const previousState = state;
+  state = createDungeonStateForParty(partyMembers, previousState, themeId, size);
+  state.travelReturnCamp = cloneData(previousState.travelReturnCamp);
+  state.customDungeon = {
+    ...(state.customDungeon ?? {}),
+    name: event?.title ?? "Travel Dungeon",
+    intro: outcome.text,
+    settlementBoardQuestId: context.boardQuest?.id ?? dungeon.boardQuestId ?? "",
+    goal: { type: "reachExit" },
+  };
+  settlementBoardApplyDungeonGoal(state, context.boardQuest);
+  state.log = [...(state.log ?? []), { text: `${event?.title ?? "Travel Event"}: ${outcome.text ?? "The party enters the place."}`, type: "important" }];
+  try {
+    await saveQuickstart(state);
+  } catch (error) {
+    updateSaveStatus(error?.message ?? "Could not write the dungeon restart save.");
+  }
+  hideTravelMapMenu();
+  hideTravelCampMenu();
+  hideHomeMenu();
+  render();
+  centerViewOnHero();
+  window.DepthboundPlaytest?.syncNow?.();
+  return true;
+}
+
+async function travelStartEventCampaign(event, outcome = {}, context = {}) {
+  const campaign = outcome.campaign ?? {};
+  const campaignId = campaign.id;
+  if (!campaignId || typeof startCampaignDungeon !== "function") return false;
+  travelPrepareReturnCamp(event, context);
+  hideTravelMapMenu();
+  hideTravelCampMenu();
+  hideHomeMenu();
+  await startCampaignDungeon(campaignId, { dungeonIndex: campaign.index ?? 1 });
+  if (state?.travelReturnCamp) state.travelReturnCamp = cloneData(state.travelReturnCamp);
+  return true;
+}
+
+async function travelStartEventSkirmish(event, outcome = {}, context = {}) {
+  const fight = outcome.fight ?? {};
+  const tile = context.tile ?? travelBiomeForHex(state.world?.currentHex);
+  const themeId = fight.themeId && getContentDefinition("themes", fight.themeId) ? fight.themeId : travelEventThemeForBiome(tile);
+  const partyMembers = partyHeroes();
+  if (!partyMembers.length) return false;
+  travelPrepareReturnCamp(event, context, {
+    lockRetreat: true,
+    lockRetreatReason: `${event?.title ?? "This encounter"} has to be settled before the party can leave.`,
+  });
+  const previousState = state;
+  const nextState = createDungeonStateForParty(partyMembers, previousState, themeId, "small");
+  const dungeon = generateDungeon({ gridSize: 18, roomCount: 1, roomMinSize: 8, roomMaxSize: 10 });
+  const room = dungeon.rooms[0];
+  const positions = dungeonStartPositions(dungeon, partyMembers.length);
+  partyMembers.forEach((hero, index) => {
+    const nextHero = nextState.fighters[hero.id];
+    if (nextHero) nextHero.position = { ...(positions[index] ?? dungeon.startPosition) };
+  });
+  const exit = createDungeonExit(dungeon, dungeon.startPosition);
+  const template = travelMonsterTemplateForEvent(themeId, fight);
+  const blocked = new Set([...positions, exit.position].map(positionKey));
+  const spawnCells = room.cells
+    .slice()
+    .filter((cell) => !blocked.has(positionKey(cell)))
+    .sort((a, b) => distance(b, dungeon.startPosition) - distance(a, dungeon.startPosition));
+  const difficultyHero = {
+    ...(partyMembers[0] ?? {}),
+    level: averagePartyLevel(partyMembers[0] ?? { level: 1 }),
+    partySize: partyMembers.length,
+  };
+  const monsters = {};
+  Array.from({ length: travelSkirmishMonsterCount(fight) }).forEach((_, index) => {
+    const monster = applyMonsterCategoryScaling(createCombatant({ ...template, id: `travel-${template.id}-${index + 1}` }), difficultyHero);
+    monster.position = { ...(spawnCells[index] ?? spawnCells.at(-1) ?? room.cells.at(-1) ?? dungeon.startPosition) };
+    monster.roomId = room.id;
+    monsters[monster.id] = monster;
+  });
+  nextState.themeId = themeId;
+  nextState.dungeonSizeId = "travel-encounter";
+  nextState.dungeonSizeName = "Roadside Fight";
+  nextState.encounterTarget = 1;
+  nextState.room = { id: dungeon.id, name: event?.title ?? "Roadside Fight", gridSize: dungeon.gridSize, tileSizePx };
+  nextState.dungeon = dungeon;
+  nextState.exploration = {
+    discoveredRoomIds: [dungeon.entranceRoomId],
+    openedDoorKeys: [],
+    openedCorridorKeys: [],
+    discoveredHiddenDoorKeys: [],
+    hiddenDoorSearchAttempts: {},
+  };
+  nextState.exit = exit;
+  nextState.dungeonObjects = [];
+  nextState.lootPiles = [];
+  nextState.fighters = {
+    ...Object.fromEntries(partyMembers.map((hero) => [hero.id, nextState.fighters[hero.id]]).filter((entry) => entry[1])),
+    ...monsters,
+  };
+  nextState.travelReturnCamp = cloneData(previousState.travelReturnCamp);
+  nextState.customDungeon = {
+    ...(nextState.customDungeon ?? {}),
+    name: event?.title ?? "Roadside Fight",
+    settlementBoardQuestId: context.boardQuest?.id ?? fight.boardQuestId ?? "",
+    goal: { type: "reachExit" },
+    lockRetreat: true,
+  };
+  nextState.log = [{ text: `${event?.title ?? "Travel Event"}: ${outcome.text ?? "The encounter turns violent."}`, type: "important" }];
+  state = nextState;
+  try {
+    await saveQuickstart(state);
+  } catch (error) {
+    updateSaveStatus(error?.message ?? "Could not write the dungeon restart save.");
+  }
+  hideTravelMapMenu();
+  hideTravelCampMenu();
+  hideHomeMenu();
+  render();
+  centerViewOnHero();
+  window.DepthboundPlaytest?.syncNow?.();
+  return true;
+}
+
+async function travelResolveEventOutcome(event, choice, context = {}) {
+  let outcome = choice?.outcome ?? {};
+  let checkResult = null;
+  if (choice?.check) {
+    checkResult = travelEventCheckResult(choice.check);
+    addLog(checkResult.text, "important");
+    outcome = checkResult.success ? (choice.success ?? {}) : (choice.failure ?? {});
+  }
+  if (outcome.fight && !(await travelConfirmDangerousFight(outcome, context))) {
+    const summary = "The party reads the danger in time and backs away from the lair.";
+    addLog(`${event?.title ?? "Travel Event"}: ${summary}`, "travel-event");
+    await showTravelMapNotice({
+      kicker: "Lair Avoided",
+      title: event?.title ?? "Dangerous Lair",
+      message: summary,
+      confirmText: "Make Camp",
+    });
+    if (context.feature && !outcome.noResolve) travelMarkStructureResolved(context.feature, event, { text: summary }, summary);
+    return "handled";
+  }
+  const resultSummary = await travelShowEventResult(event, outcome, context, checkResult);
+  travelApplyEventRewards(outcome.rewards);
+  if (context.feature && !outcome.noResolve) travelMarkStructureResolved(context.feature, event, outcome, resultSummary);
+  if (context.boardQuest && !outcome.fight && !outcome.dungeon && !outcome.campaign && !outcome.noResolve) completeSettlementBoardQuest(context.boardQuest);
+  if (outcome.fight) return (await travelStartEventSkirmish(event, outcome, context)) ? "dungeon" : "handled";
+  if (outcome.dungeon) return (await travelStartEventDungeon(event, outcome, context)) ? "dungeon" : "handled";
+  if (outcome.campaign) return (await travelStartEventCampaign(event, outcome, context)) ? "dungeon" : "handled";
+  return "handled";
+}
+
+function travelFallbackEventChoice(event = {}) {
+  return (event.choices ?? []).find((choice) => ["ignore", "avoid", "leave", "camp", "pass", "wait", "mark", "respect", "detour", "skip"].includes(choice.id)) ?? event.choices?.[0] ?? null;
+}
+
+async function travelResolveEmptyHexEvent(context = {}) {
+  if (travelFeatureForHex(context.to) && !context.forceWilderness) return "none";
+  const tile = travelBiomeForHex(context.to);
+  const biomeGroup = window.DepthboundWorldTravel?.biomeGroup?.(tile) ?? window.DepthboundWorldNames?.biomeGroup?.(tile) ?? String(tile).split("_")[0];
+  const boardQuest = settlementBoardQuestAtHex(context.to);
+  if (boardQuest) {
+    const event = settlementBoardEventForQuest(boardQuest);
+    if (event) {
+      travelRecordEvent(event, { ...context, tile, biomeGroup });
+      const choices = (event.choices ?? []).map((choice) => ({
+        value: choice.id,
+        label: choice.label,
+        description: travelChoiceDescriptionWithDanger(choice, { ...context, tile, biomeGroup, boardQuest }),
+      }));
+      const choiceId = travelMapMenuVisible()
+        ? await showTravelMapChoiceDialog({ kicker: "Quest Board", title: event.title, message: event.text, choices })
+        : await showChoiceDialog({ title: event.title, message: event.text, choices });
+      const choice = (event.choices ?? []).find((entry) => entry.id === choiceId) ?? travelFallbackEventChoice(event);
+      return travelResolveEventOutcome(event, choice, { ...context, tile, biomeGroup, boardQuest });
+    }
+  }
+  const event = window.DepthboundTravelEvents?.pickEmptyHexEvent?.({
+    seed: state.world?.seed,
+    day: context.departureDay,
+    hex: context.to,
+    biome: tile,
+    biomeGroup,
+    safeRoute: context.forceWilderness ? false : travelHexIsSaferRoute(context.to),
+    recentEventIds: travelRecentEventIds(),
+  });
+  if (!event) {
+    await showTravelMapNotice({
+      kicker: travelBiomeLabel(tile),
+      title: "Quiet Wilds",
+      message: context.forceWilderness
+        ? `The party leaves the road and searches the wild ground around ${context.destinationName ?? "the camp"}, but finds no trouble worth chasing today.`
+        : `${context.destinationName ?? "The destination"} offers no trouble today. The party has time to make camp and tend to the evening routine.`,
+      confirmText: "Make Camp",
+    });
+    return "none";
+  }
+  travelRecordEvent(event, { ...context, tile, biomeGroup });
+  const lastLog = state.world?.travelLog?.at?.(-1);
+  if (lastLog) lastLog.event = event.id;
+  const choices = (event.choices ?? []).map((choice) => ({
+    value: choice.id,
+    label: choice.label,
+    description: travelChoiceDescriptionWithDanger(choice, { ...context, tile, biomeGroup }),
+  }));
+  const choiceId = travelMapMenuVisible()
+    ? await showTravelMapChoiceDialog({ kicker: `${travelBiomeLabel(tile)} Event`, title: event.title, message: event.text, choices })
+    : await showChoiceDialog({ title: event.title, message: event.text, choices });
+  const choice = (event.choices ?? []).find((entry) => entry.id === choiceId) ?? travelFallbackEventChoice(event);
+  return travelResolveEventOutcome(event, choice, { ...context, tile, biomeGroup });
+}
+
+function travelRegisterStructureVisit(feature = null, day = normalizeWorldDay(state.worldDay)) {
+  if (!feature?.id || !state?.world) return 0;
+  state.world.visitedStructures = state.world.visitedStructures && typeof state.world.visitedStructures === "object" ? state.world.visitedStructures : {};
+  const previous = state.world.visitedStructures[feature.id] && typeof state.world.visitedStructures[feature.id] === "object"
+    ? state.world.visitedStructures[feature.id]
+    : { count: 0 };
+  const next = {
+    ...previous,
+    count: Math.max(0, Math.floor(Number(previous.count) || 0)) + 1,
+    lastVisitedDay: day,
+  };
+  state.world.visitedStructures[feature.id] = next;
+  return next.count;
+}
+
+function travelEmberveinClaimSiteEvent(feature = null) {
+  if (feature?.specialSite !== "embervein-first-claim") return null;
+  const firstClaim = window.DungeonCampaigns?.get?.("embervein-first-claim");
+  const firstProgress = Math.floor(Number(state?.campaignProgress?.["embervein-first-claim"]) || 0);
+  if (firstClaim && firstProgress < firstClaim.count) {
+    return {
+      id: "embervein-first-claim-site",
+      title: "The First Claim",
+      text: "The mine mouth bears a fresh Ashmantle mark. Heatless red light moves far below, like an old claim remembering its owner.",
+      choices: [
+        { id: "claim", label: "Enter The First Claim", description: "Follow Borren's claim-mark into the Embervein mine.", outcome: { text: "The party follows the Ashmantle mark into the old Embervein claim.", campaign: { id: "embervein-first-claim", index: firstProgress + 1 } } },
+        { id: "wait", label: "Return Later", description: "Leave the claim-mark untouched for now.", outcome: { text: "The mark glows once, then settles back into the stone." } },
+      ],
+    };
+  }
+  const emberOath = window.DungeonCampaigns?.get?.("dwarven-smithy-ember-oath");
+  const oathUnlocked = window.DungeonCampaigns?.isUnlocked?.("dwarven-smithy-ember-oath", state) ?? false;
+  const oathProgress = Math.floor(Number(state?.campaignProgress?.["dwarven-smithy-ember-oath"]) || 0);
+  if (emberOath && oathUnlocked && oathProgress < emberOath.count) {
+    return {
+      id: "ember-oath-claim-site",
+      title: "The Ember Oath",
+      text: "The returned claim-mark now points deeper, toward an older forge-road beneath the mine.",
+      choices: [
+        { id: "oath", label: "Follow The Ember Oath", description: "Descend from the claim mine into the next Ashmantle forge-road.", outcome: { text: "The party follows the claim-mark beyond the first mine and into the Ember Oath.", campaign: { id: "dwarven-smithy-ember-oath", index: oathProgress + 1 } } },
+        { id: "wait", label: "Return Later", description: "Leave the forge-road sealed for now.", outcome: { text: "The mark dims but does not disappear." } },
+      ],
+    };
+  }
+  return {
+    id: "embervein-quiet-claim",
+    title: "Quiet Claim",
+    text: "The Ashmantle mark is steady and warm. For now, the mine asks nothing more.",
+    choices: [
+      { id: "rest", label: "Camp Nearby", description: "Make camp near the old claim.", outcome: { text: "The party camps under the quiet mark." } },
+    ],
+  };
+}
+
+function travelMarkStructureResolved(feature = null, event = {}, outcome = {}, summary = "") {
+  if (!feature?.id || !state?.world?.visitedStructures) return;
+  const current = state.world.visitedStructures[feature.id] && typeof state.world.visitedStructures[feature.id] === "object"
+    ? state.world.visitedStructures[feature.id]
+    : { count: 1 };
+  const dangerous = Boolean(outcome.fight || outcome.dungeon);
+  state.world.visitedStructures[feature.id] = {
+    ...current,
+    resolved: true,
+    pending: dangerous,
+    cleared: Boolean(current.cleared || (!dangerous && outcome.cleared)),
+    lastEventId: event.id ?? "",
+    lastEventTitle: event.title ?? "",
+    lastOutcome: summary,
+    lastResolvedDay: normalizeWorldDay(state.worldDay),
+  };
+}
+
+async function travelResolveStructureEvent(context = {}) {
+  const feature = travelFeatureForHex(context.to);
+  if (!feature) return "none";
+  const tile = travelBiomeForHex(context.to);
+  const biomeGroup = window.DepthboundWorldTravel?.biomeGroup?.(tile) ?? window.DepthboundWorldNames?.biomeGroup?.(tile) ?? String(tile).split("_")[0];
+  const kind = feature.kind || feature.nameKind || window.DepthboundWorldNames?.structureKind?.(feature.tile) || "";
+  const visitCount = travelRegisterStructureVisit(feature, context.departureDay);
+  const boardQuest = settlementBoardQuestAtHex(context.to);
+  const event = settlementBoardEventForQuest(boardQuest) ?? travelEmberveinClaimSiteEvent(feature) ?? window.DepthboundTravelEvents?.pickStructureEvent?.({
+    seed: state.world?.seed,
+    day: context.departureDay,
+    visitCount,
+    hex: context.to,
+    feature,
+    kind,
+    tile: feature.tile,
+    biome: tile,
+    biomeGroup,
+    recentEventIds: travelRecentEventIds(),
+  });
+  if (!event) {
+    const place = travelStructureDisplayLabel(feature);
+    const message = `${place} is quiet today. The party makes camp nearby.`;
+    addLog(message, "important");
+    await showTravelMapNotice({
+      kicker: travelFeatureKindLabel(feature),
+      title: place,
+      message,
+      confirmText: "Make Camp",
+    });
+    return "handled";
+  }
+  travelRecordEvent(event, { ...context, feature, kind, tile, biomeGroup, visitCount, boardQuest });
+  const lastLog = state.world?.travelLog?.at?.(-1);
+  if (lastLog) {
+    lastLog.event = event.id;
+    lastLog.structureId = feature.id;
+  }
+  const place = travelStructureDisplayLabel(feature);
+  const kindLabel = travelFeatureKindLabel(feature);
+  const message = `${place}\n\n${event.text}`;
+  const choices = (event.choices ?? []).map((choice) => ({
+    value: choice.id,
+    label: choice.label,
+    description: travelChoiceDescriptionWithDanger(choice, { ...context, feature, kind, tile, biomeGroup, visitCount, boardQuest }),
+  }));
+  const choiceId = travelMapMenuVisible()
+    ? await showTravelMapChoiceDialog({ kicker: kindLabel, title: event.title, message, choices })
+    : await showChoiceDialog({ title: event.title, message, choices });
+  const choice = (event.choices ?? []).find((entry) => entry.id === choiceId) ?? travelFallbackEventChoice(event);
+  return travelResolveEventOutcome(event, choice, { ...context, feature, kind, tile, biomeGroup, visitCount, boardQuest });
+}
+
+async function travelOneDay(options = {}) {
+  state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state.world;
+  const route = travelRoute();
+  if (!route.length) {
+    renderTravelRouteFeedback("Select and confirm a route first.", "blocked");
+    return false;
+  }
+  if (!state.world.routeConfirmed) {
+    confirmTravelRoutePlan();
+    return false;
+  }
+  const activeCamp = state.world.travelCamp;
+  if (activeCamp?.active && !activeCamp.rested) {
+    addLog("The party should finish camp before continuing the route.", "important");
+    showTravelCampMenu();
+    return false;
+  }
+  const from = { ...(state.world.currentHex ?? { chunkX: 0, chunkY: 0, row: 0, col: 0 }) };
+  const firstStep = { ...route[0] };
+  let roadMode = options?.roadMode === "offroad" ? "offroad" : options?.roadMode === "road" ? "road" : null;
+  if (roadMode === "offroad" && !travelHexIsSaferRoute(firstStep)) {
+    addLog("The next route step is not on a built road.", "important");
+    showTravelCampMenu();
+    return false;
+  }
+  if (!roadMode) {
+    roadMode = await travelChooseRoadModeForNextHex(from, firstStep);
+    if (!roadMode) return false;
+  }
+  const forceWilderness = roadMode === "offroad";
+  const roadDoubleSpeed = !forceWilderness && travelCanUseRoadDoubleSpeed(from, firstStep, route[1]);
+  const to = roadDoubleSpeed ? { ...route[1] } : firstStep;
+  const via = roadDoubleSpeed ? firstStep : null;
+  const consumedSteps = roadDoubleSpeed ? 2 : 1;
+  const fromName = travelPlaceLabelForHex(from);
+  const destinationName = travelPlaceLabelForHex(to);
+  const departureDay = normalizeWorldDay(state.worldDay);
+  await travelPresentDayMovement({ from, to, departureDay, destinationName });
+  if (!forceWilderness && roadDoubleSpeed) {
+    buildExpeditionRoadSegmentIfNeeded(from, via);
+    buildExpeditionRoadSegmentIfNeeded(via, to);
+  } else if (!forceWilderness) {
+    buildExpeditionRoadSegmentIfNeeded(from, to);
+  }
+  state.world.currentHex = to;
+  state.world.travelPlan = route.slice(consumedSteps);
+  state.world.routeConfirmed = state.world.travelPlan.length > 0;
+  state.world.discoveredHexes ??= {};
+  if (via) state.world.discoveredHexes[window.DepthboundWorldTravel?.cellId?.(via.chunkX, via.chunkY, via.row, via.col) ?? `${via.chunkX},${via.chunkY}:${via.row},${via.col}`] = true;
+  state.world.discoveredHexes[window.DepthboundWorldTravel?.cellId?.(to.chunkX, to.chunkY, to.row, to.col) ?? `${to.chunkX},${to.chunkY}:${to.row},${to.col}`] = true;
+  advanceWorldDay(1);
+  state.world.travelLog = Array.isArray(state.world.travelLog) ? state.world.travelLog : [];
+  state.world.travelLog.push({
+    day: departureDay,
+    from,
+    to,
+    via,
+    roadDoubleSpeed,
+    offRoad: forceWilderness,
+    fromName,
+    destinationName,
+    event: "none"
+  });
+  await travelRememberTeleportCircle(to);
+  if (travelSameHex(to, state.world.homeHex)) {
+    addLog(`Travel day ${departureDay}: the party reaches ${destinationName}.`, "important");
+    travelArriveHome(destinationName);
+    return true;
+  }
+  const settlementRest = forceWilderness ? null : travelSettlementRestData(to, destinationName);
+  state.world.travelCamp = {
+    active: true,
+    ...(settlementRest ?? {}),
+    day: normalizeWorldDay(state.worldDay),
+    at: { ...to },
+    locationName: settlementRest?.locationName ?? destinationName,
+    summary: settlementRest
+      ? roadDoubleSpeed
+        ? `Following the built road at a hard pace from ${fromName}, the party reaches ${settlementRest.locationName} in one day. Rooms are available at ${settlementRest.innName}.`
+        : `After one day of travel from ${fromName}, the party reaches ${settlementRest.locationName}. Rooms are available at ${settlementRest.innName}.`
+      : forceWilderness
+        ? `The party leaves the built road from ${fromName} and reaches the rough ground around ${destinationName} by evening.`
+      : roadDoubleSpeed
+        ? `Following the built road at a hard pace from ${fromName}, the party reaches ${destinationName} in one day.`
+        : `After one day of travel from ${fromName}, the party reaches ${destinationName}.`,
+    mealResolved: false,
+    rested: false
+  };
+  await travelEnsureEdgeNeighborChunks(to);
+  addLog(`Travel day ${departureDay}: the party reaches ${destinationName}${roadDoubleSpeed ? " by road pace" : forceWilderness ? " after leaving the road" : ""}.`, "important");
+  if (settlementRest) {
+    showTravelCampMenu();
+    window.DepthboundPlaytest?.syncNow?.();
+    return true;
+  }
+  renderTravelMap();
+  render();
+  if (!forceWilderness) {
+    const structureEventResult = await travelResolveStructureEvent({ from, to, via, fromName, destinationName, departureDay, roadDoubleSpeed });
+    if (structureEventResult === "dungeon") return true;
+    if (structureEventResult === "handled") {
+      showTravelCampMenu();
+      window.DepthboundPlaytest?.syncNow?.();
+      return true;
+    }
+  }
+  const eventResult = await travelResolveEmptyHexEvent({ from, to, via, fromName, destinationName, departureDay, roadDoubleSpeed, forceWilderness });
+  if (eventResult === "dungeon") return true;
+  showTravelCampMenu();
+  window.DepthboundPlaytest?.syncNow?.();
+  return true;
+}
+
+async function travelStayHereOneDay(options = {}) {
+  state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state.world;
+  const offRoad = Boolean(options?.offRoad);
+  const activeCamp = state.world?.travelCamp;
+  if (!activeCamp?.active) {
+    addLog("The party needs an active travel camp before spending a day here.", "important");
+    return false;
+  }
+  if (!activeCamp.rested) {
+    addLog("The party should finish camp before spending another day here.", "important");
+    showTravelCampMenu();
+    return false;
+  }
+  const here = { ...(state.world.currentHex ?? activeCamp.at ?? state.world.homeHex ?? { chunkX: 0, chunkY: 0, row: 0, col: 0 }) };
+  if (offRoad && !travelHexIsSaferRoute(here)) {
+    addLog("There is no road here to leave behind.", "important");
+    showTravelCampMenu();
+    return false;
+  }
+  const placeName = travelPlaceLabelForHex(here);
+  const departureDay = normalizeWorldDay(state.worldDay);
+  hideTravelCampMenu();
+  showTravelMapMenu();
+  centerTravelMapOnHex(here, "smooth");
+  renderTravelRouteFeedback(`Day ${departureDay}: ${offRoad ? "venturing off the road near" : "staying near"} ${placeName}.`, "note");
+  await showTravelMapNotice({
+    kicker: offRoad ? "Off The Road" : "Stay",
+    title: placeName,
+    message: offRoad
+      ? `The party leaves the marked road for the day, pushing into the rough ground around ${placeName}. The planned route remains ready for tomorrow.`
+      : `The party spends the day exploring ${placeName} instead of moving on. The planned route remains ready for tomorrow.`,
+    confirmText: offRoad ? "Venture Out" : "Explore",
+  });
+  state.world.currentHex = here;
+  state.world.discoveredHexes ??= {};
+  state.world.discoveredHexes[window.DepthboundWorldTravel?.cellId?.(here.chunkX, here.chunkY, here.row, here.col) ?? `${here.chunkX},${here.chunkY}:${here.row},${here.col}`] = true;
+  advanceWorldDay(1);
+  state.world.travelLog = Array.isArray(state.world.travelLog) ? state.world.travelLog : [];
+  state.world.travelLog.push({
+    day: departureDay,
+    from: here,
+    to: here,
+    fromName: placeName,
+    destinationName: placeName,
+    event: offRoad ? "off-road" : "stay",
+  });
+  const settlementRest = travelSettlementRestData(here, placeName);
+  state.world.travelCamp = {
+    active: true,
+    ...(settlementRest ?? {}),
+    day: normalizeWorldDay(state.worldDay),
+    at: { ...here },
+    locationName: settlementRest?.locationName ?? placeName,
+    summary: settlementRest
+      ? offRoad
+        ? `After a day off the road near ${settlementRest.locationName}, the party returns to ${settlementRest.innName}.`
+        : `After a day spent in ${settlementRest.locationName}, the party returns to ${settlementRest.innName}.`
+      : offRoad
+        ? `After a full day away from the road near ${placeName}, the party makes camp in the same place.`
+        : `After a full day spent exploring ${placeName}, the party makes camp in the same place.`,
+    mealResolved: false,
+    rested: false,
+  };
+  await travelEnsureEdgeNeighborChunks(here);
+  addLog(`Travel day ${departureDay}: the party ${offRoad ? "ventures off the road near" : "stays to explore"} ${placeName}.`, "important");
+  if (settlementRest) {
+    showTravelCampMenu();
+    window.DepthboundPlaytest?.syncNow?.();
+    return true;
+  }
+  renderTravelMap();
+  render();
+  const context = { from: here, to: here, fromName: placeName, destinationName: placeName, departureDay, staying: true, forceWilderness: offRoad };
+  if (!offRoad) {
+    const structureEventResult = await travelResolveStructureEvent(context);
+    if (structureEventResult === "dungeon") return true;
+    if (structureEventResult === "handled") {
+      showTravelCampMenu();
+      window.DepthboundPlaytest?.syncNow?.();
+      return true;
+    }
+  }
+  const eventResult = await travelResolveEmptyHexEvent(context);
+  if (eventResult === "dungeon") return true;
+  showTravelCampMenu();
+  window.DepthboundPlaytest?.syncNow?.();
+  return true;
+}
+
+function showTravelMapMenu() {
+  if (!els.travelMapMenu) return;
+  state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state.world;
+  hideHomeMenu();
+  hideTravelCampMenu();
+  renderTravelMap();
+  els.travelMapMenu.classList.remove("hidden");
+}
+
+function hideTravelMapMenu() {
+  els.travelMapMenu?.classList.add("hidden");
+  hideTravelMapEvent();
+  renderTravelMapTooltip();
+}
+
 function setHomeMenuPanel(panel = "main") {
-  homeMenuPanel = panel === "custom-dungeons" && availableLocalCustomDungeons().length === 0 ? "adventure" : panel;
+  const camp = state?.world?.travelCamp;
+  const restLocked = travelCampIsActive() && (!travelCampIsInn(camp) || !camp.rested);
+  if (restLocked && panel !== "camp") {
+    homeMenuPanel = "camp";
+    renderHomeAdventurePanels();
+    return;
+  }
+  if (!adminEnabled() && ["random-dungeons", "custom-dungeons"].includes(panel)) {
+    homeMenuPanel = "adventure";
+    renderHomeAdventurePanels();
+    return;
+  }
+  homeMenuPanel = panel === "custom-dungeons" && !adminEnabled() && availableLocalCustomDungeons().length === 0 ? "adventure" : panel;
   renderHomeAdventurePanels();
 }
 
 function homeMenuTitleForPanel(panel = homeMenuPanel) {
+  if (panel === "camp") return travelCampIsInn() ? "Inn" : "Camp";
   if (panel === "adventure") return "Choose Adventure";
   if (panel === "main-story") return "Main Story";
   if (panel === "one-shot-dungeons") return "One-Shot Dungeons";
   if (panel === "random-dungeons") return "Random Runs";
   if (panel === "custom-dungeons") return "Custom Dungeons";
+  if (panel === "camp-gear") return "Camp Gear";
+  if (travelCampIsInn()) return state.world?.travelCamp?.innName ?? "Inn";
   return "Home";
+}
+
+function campGearPanelMarkup({ backAction = "main", backLabel = "Back" } = {}) {
+  travelCampEnsureData();
+  return `
+      <p class="small-note">Camp furniture is bought for the shared camp pack. Place it later inside a hero's assigned tent.</p>
+      <div class="store-wallet">Party Purse: ${escapeHtml(moneyText(partyPurse()))}</div>
+      <div class="store-list">
+        ${travelCampFurnitureOptions
+          .map((entry) => {
+            const owned = travelCampOwnedGearCount(null, entry.id);
+            const placed = travelCampTotalPlacedGearCount(entry.id);
+            const carried = Math.max(0, owned - placed);
+            const price = entry.priceCp ?? 0;
+            return `
+              <div class="store-row">
+                <div>
+                  <b>${escapeHtml(entry.name)}</b>
+                  <span>Pack: ${carried} - Placed: ${placed} - Comfort +${entry.comfort} - ${escapeHtml(priceText(price))}</span>
+                </div>
+                <button type="button" data-action="buy-camp-gear" data-furniture="${escapeAttribute(entry.id)}" ${moneyToCp(partyPurse()) >= price ? "" : "disabled"}>Buy</button>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+      <hr />
+      <button type="button" ${backAction === "village" ? `data-action="back-to-village-list"` : backAction === "settlement" ? `data-action="back-to-settlement-list"` : `data-home-menu="${escapeAttribute(backAction)}"`}>${escapeHtml(backLabel)}</button>
+    `;
+}
+
+function renderCampGearPanel() {
+  if (!els.campGearActions) return;
+  els.campGearActions.innerHTML = campGearPanelMarkup({ backAction: "main", backLabel: "Back" });
+}
+
+function renderVillageCampGearMenu() {
+  els.villageMenu?.classList.remove("npc-chat-open", "guild-open");
+  els.villageMenu?.classList.add("village-index-open");
+  setVillageBackButtonVisible(true);
+  setVillageMusicKey("");
+  els.villageBody.innerHTML = `
+    <section class="village-directory">
+      <header class="village-directory-hero">
+        <div>
+          <span>Travel Supplies</span>
+          <h3>Camp Outfitter</h3>
+          <p>Portable comforts, folding stools, field chests, and other small pieces for hero tents.</p>
+        </div>
+      </header>
+      <section class="village-directory-section village-group-shops">
+        <div class="village-section-heading">
+          <div>
+            <span>Camp Gear</span>
+            <h3>Pack Furniture</h3>
+          </div>
+          <small>Hero tents</small>
+        </div>
+        ${campGearPanelMarkup({ backAction: "village", backLabel: "Back to Village" })}
+      </section>
+    </section>
+  `;
+  resetVillageScroll();
+}
+
+const homeVillageDecorLivingClasses = new Set(["squalid", "poor"]);
+
+function homeDecorShopEntries(livingClasses = homeVillageDecorLivingClasses) {
+  return window.DungeonContent
+    .list("furniture")
+    .filter((entry) => {
+      const decor = objectComponent(entry.id, "homeDecor");
+      return decor && livingClasses.has(decor.livingClass);
+    })
+    .sort((a, b) => {
+      const decorA = objectComponent(a.id, "homeDecor");
+      const decorB = objectComponent(b.id, "homeDecor");
+      const classA = decorA?.livingClass ?? "";
+      const classB = decorB?.livingClass ?? "";
+      return classA.localeCompare(classB) || (decorA?.priceCp ?? 0) - (decorB?.priceCp ?? 0) || String(a.name ?? "").localeCompare(String(b.name ?? ""));
+    });
+}
+
+function homeDecorOwnedTotal(type = "") {
+  const placed = (state.home?.objects ?? state.dungeonObjects ?? []).filter((object) => object.homePlaced && object.type === type).length;
+  return homeDecorFurnitureItems(type).length + placed;
+}
+
+function renderVillageHomeDecorMenu() {
+  els.villageMenu?.classList.remove("npc-chat-open", "guild-open");
+  els.villageMenu?.classList.add("village-index-open");
+  setVillageBackButtonVisible(true);
+  setVillageMusicKey("");
+  const entries = homeDecorShopEntries();
+  els.villageBody.innerHTML = `
+    <section class="village-directory">
+      <header class="village-directory-hero">
+        <div>
+          <span>Home Goods</span>
+          <h3>Hearth & Humble Furnishings</h3>
+          <p>Simple, shabby, and poor household pieces. Bought decor goes into the party inventory and can be placed at home.</p>
+        </div>
+      </header>
+      <section class="village-directory-section village-group-shops">
+        <div class="village-section-heading">
+          <div>
+            <span>Village decor</span>
+            <h3>Furniture Deeds</h3>
+          </div>
+          <small>${escapeHtml(entries.length)} item${entries.length === 1 ? "" : "s"}</small>
+        </div>
+        <div class="store-wallet">Party Purse: ${escapeHtml(moneyText(partyPurse()))}</div>
+        <div class="store-list">
+          ${entries
+            .map((entry) => {
+              const decor = objectComponent(entry.id, "homeDecor");
+              const price = Math.max(0, Math.floor(Number(decor?.priceCp) || 0));
+              return `
+                <div class="store-row">
+                  <div>
+                    <b>${escapeHtml(entry.name)}</b>
+                    <span>${escapeHtml(decor?.livingClassLabel ?? decor?.livingClass ?? "Decor")} - Comfort +${escapeHtml(decor?.comfort ?? 0)} - Owned ${escapeHtml(homeDecorOwnedTotal(entry.id))} - ${escapeHtml(priceText(price))}</span>
+                  </div>
+                  <button type="button" data-action="buy-home-decor" data-furniture="${escapeAttribute(entry.id)}" ${moneyToCp(partyPurse()) >= price ? "" : "disabled"}>Buy</button>
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
+        <hr />
+        <button type="button" data-action="back-to-village-list">Back to Village</button>
+      </section>
+    </section>
+  `;
+  resetVillageScroll();
+}
+
+function buyHomeDecorFurniture(furnitureId = "") {
+  const template = objectTemplate(furnitureId);
+  const decor = objectComponent(furnitureId, "homeDecor");
+  if (!template || !decor || !homeVillageDecorLivingClasses.has(decor.livingClass)) return;
+  const price = Math.max(0, Math.floor(Number(decor.priceCp) || 0));
+  if (!spendMoney(partyPurse(), price)) return;
+  const item = createHomeDecorInventoryItem(furnitureId, "village-decor-shop");
+  if (!item) return;
+  addItemToPartyInventory(item, "home-decor");
+  addLog(`The party buys ${template.name}. It goes into the party inventory for home placement.`, "important");
+  render();
+  renderVillageHomeDecorMenu();
+}
+
+function travelCurrentSettlementProfile() {
+  if (!state?.world || !window.DepthboundSettlementStorefronts) return null;
+  state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state.world) ?? state.world;
+  const hex = state.world?.currentHex;
+  const feature = travelFeatureForHex(hex);
+  if (!hex || !travelFeatureIsTeleportSettlement(feature)) return null;
+  if (travelSameHex(hex, state.world.homeHex) || (feature?.id && feature.id === state.world.homeVillageId)) return null;
+  const tile = travelBiomeForHex(hex);
+  return window.DepthboundSettlementStorefronts.ensureProfile({
+    world: state.world,
+    hex,
+    feature,
+    biome: travelBiomeLabel(tile),
+    name: travelStructureDisplayLabel(feature),
+    day: normalizeWorldDay(state.worldDay),
+  });
+}
+
+function settlementStorefrontDefinition(storefrontId = "") {
+  return window.DepthboundSettlementStorefronts?.definitions?.[storefrontId] ?? null;
+}
+
+function settlementStorefronts(profile = null) {
+  return (profile?.storefronts ?? []).filter((id) => settlementStorefrontDefinition(id));
+}
+
+function settlementProfileSubtitle(profile = null) {
+  if (!profile) return "";
+  const type = profile.type === "city" ? "City" : "Village";
+  const traits = (profile.traits ?? []).map((trait) => travelTitleText(trait)).join(", ");
+  return [type, profile.biome, traits].filter(Boolean).join(" - ");
+}
+
+function settlementStorefrontCardMarkup(profile, storefrontId) {
+  const def = settlementStorefrontDefinition(storefrontId);
+  if (!def) return "";
+  const stock = window.DepthboundSettlementStorefronts?.stockFor?.(profile, storefrontId, normalizeWorldDay(state.worldDay)) ?? [];
+  const countLabel = def.special === "campGear" ? "Camp pack" : def.services?.length && !stock.length ? "Services" : `${stock.length} item${stock.length === 1 ? "" : "s"}`;
+  return `
+    <button class="village-entry-card" type="button" data-action="open-settlement-storefront" data-storefront="${escapeAttribute(storefrontId)}">
+      <span class="village-entry-icon empty">${escapeHtml(def.shortName?.slice(0, 2).toUpperCase() ?? "SH")}</span>
+      <span class="village-entry-copy">
+        <b>${escapeHtml(def.name)}</b>
+        <small>${escapeHtml(def.description)}</small>
+      </span>
+      <span class="village-entry-meta"><em>${escapeHtml(countLabel)}</em><i aria-hidden="true">&rsaquo;</i></span>
+    </button>
+  `;
+}
+
+function settlementFactionIds(profile = null) {
+  if (profile?.type !== "city") return [];
+  return ["fighting-pit"];
+}
+
+function settlementFactionCardMarkup(factionId = "") {
+  const npc = window.DungeonContent.get("npcs", factionId);
+  if (!npc) return "";
+  const label = npc.village?.label ?? npc.title ?? npc.name;
+  const description = npc.village?.description ?? npc.description ?? "Faction work and reputation paths.";
+  return `
+    <button class="village-entry-card" type="button" data-action="visit-settlement-faction" data-npc="${escapeAttribute(factionId)}">
+      ${villageNpcIconMarkup(npc)}
+      <span class="village-entry-copy">
+        <b>${escapeHtml(label)}</b>
+        <small>${escapeHtml(description)}</small>
+      </span>
+      <span class="village-entry-meta"><em>Faction</em><i aria-hidden="true">&rsaquo;</i></span>
+    </button>
+  `;
+}
+
+function tavernGuestsForProfile(profile = travelCurrentSettlementProfile()) {
+  if (!profile || !window.DepthboundTavernGuests) return [];
+  return window.DepthboundTavernGuests.ensureForProfile(profile, { state, day: normalizeWorldDay(state.worldDay) });
+}
+
+function tavernGuestRoleLabel(role = "") {
+  return {
+    faction: "Faction Contact",
+    recruit: "Recruit",
+    vendor: "Special Seller",
+    materialAsk: "Commission",
+    monsterAsk: "Field Tale",
+    rumor: "Rumor",
+    questHook: "Quest Hook",
+  }[role] ?? "Guest";
+}
+
+function tavernGuestDefinition(guestOrId) {
+  const defId = typeof guestOrId === "string" ? guestOrId : guestOrId?.defId;
+  return window.DepthboundTavernGuests?.definition?.(defId) ?? null;
+}
+
+function tavernVisitId(profile = travelCurrentSettlementProfile()) {
+  profile ??= travelCurrentSettlementProfile();
+  if (!profile) return 0;
+  profile.tavernGuests ??= {};
+  profile.tavernGuests.chatVisitId = Math.max(1, Math.floor(Number(profile.tavernGuests.chatVisitId) || 1));
+  return profile.tavernGuests.chatVisitId;
+}
+
+function startTavernConversationVisit(profile = travelCurrentSettlementProfile()) {
+  if (!profile) return 0;
+  profile.tavernGuests ??= {};
+  profile.tavernGuests.chatVisitId = Math.max(0, Math.floor(Number(profile.tavernGuests.chatVisitId) || 0)) + 1;
+  if (profile.tavernGuests.barkeeper) delete profile.tavernGuests.barkeeper.guestGossipVisitId;
+  return profile.tavernGuests.chatVisitId;
+}
+
+function tavernGuestChattedThisVisit(guest, profile = travelCurrentSettlementProfile()) {
+  return Boolean(guest && Math.floor(Number(guest.chattedVisitId) || 0) === tavernVisitId(profile));
+}
+
+function tavernGuestCardMarkup(guest) {
+  const def = tavernGuestDefinition(guest);
+  if (!guest || !def) return "";
+  const completed = guest.completed || guest.state === "completed" || guest.state === "recruited" || guest.state === "soldOut" || (def.unlockFlag && state.questFlags?.[def.unlockFlag]);
+  const daysLeft = Math.max(0, Math.floor(Number(guest.departureDay) || 0) - normalizeWorldDay(state.worldDay));
+  const meta = completed ? "Done" : daysLeft > 0 ? `${daysLeft}d` : tavernGuestRoleLabel(def.role);
+  return `
+    <button class="village-entry-card" type="button" data-action="visit-tavern-guest" data-guest="${escapeAttribute(guest.id)}">
+      <span class="village-entry-icon empty">${escapeHtml((guest.name ?? "?").slice(0, 2).toUpperCase())}</span>
+      <span class="village-entry-copy">
+        <b>${escapeHtml(guest.name ?? "Stranger")}</b>
+        <small>${escapeHtml(def.title ?? tavernGuestRoleLabel(def.role))}</small>
+      </span>
+      <span class="village-entry-meta"><em>${escapeHtml(meta)}</em><i aria-hidden="true">&rsaquo;</i></span>
+    </button>
+  `;
+}
+
+function tavernGuestSectionMarkup(profile) {
+  const guests = tavernGuestsForProfile(profile);
+  if (!guests.length) return "";
+  return `
+    <section class="village-directory-section village-group-guests">
+      <div class="village-section-heading">
+        <div>
+          <span>Guests are visible as tokens inside the inn.</span>
+          <h3>Common Room Guests</h3>
+        </div>
+        <small>${escapeHtml(guests.length)} guest${guests.length === 1 ? "" : "s"}</small>
+      </div>
+      <p class="empty-note">Walk up to a guest in the common room and click their token to talk.</p>
+    </section>
+  `;
+}
+
+function tavernGuestTokenColor(role = "") {
+  return {
+    faction: "#d9b178",
+    recruit: "#7ecfb2",
+    vendor: "#c99cff",
+    materialAsk: "#efb15f",
+    monsterAsk: "#8bc5ff",
+    rumor: "#b7d889",
+    questHook: "#f08db4",
+    barkeeper: "#e4c185",
+  }[role] ?? "#d9b178";
+}
+
+const tavernNpcPlacementVersion = 5;
+
+function tavernNpcTokenLabel(name = "NPC", fallback = "N") {
+  return String(name)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase() || fallback;
+}
+
+function tavernSeatPriority(object) {
+  const type = String(object?.type ?? "").toLowerCase();
+  const template = objectTemplate(object?.type);
+  const tags = new Set([...(template?.tags ?? []), type].map((tag) => String(tag).toLowerCase()));
+  if (tags.has("stool") || type.includes("barstool")) return 10;
+  if (tags.has("chair") || type.includes("chair")) return 20;
+  if (tags.has("bench") || type.includes("bench")) return 30;
+  if (tags.has("booth") || type.includes("booth")) return 35;
+  if (tags.has("seat")) return 40;
+  return 0;
+}
+
+function tavernFurnitureOccupiedKeys() {
+  return new Set((state.dungeonObjects ?? []).flatMap(objectCells).map(positionKey));
+}
+
+function tavernNpcSocialCandidatePositions() {
+  const walkableKeys = new Set((state.dungeon?.walkable ?? []).map(positionKey));
+  const blocked = tavernNpcBlockedKeys();
+  const furniture = tavernFurnitureOccupiedKeys();
+  const candidates = [];
+  for (const object of tavernSocialObjects()) {
+    const priority = tavernSeatPriority(object) || (object.type === "inn-bar" || objectHasTag(object, "bar") ? 12 : 50);
+    for (const cell of objectCells(object)) {
+      for (const candidate of window.DungeonGrid.neighbors(cell, currentGridSize(), true)) {
+        const key = positionKey(candidate);
+        if (!walkableKeys.has(key) || blocked.has(key) || furniture.has(key)) continue;
+        candidates.push({ ...candidate, source: object.id, priority });
+      }
+    }
+  }
+  const seen = new Map();
+  for (const candidate of candidates) {
+    const key = positionKey(candidate);
+    const existing = seen.get(key);
+    if (!existing || candidate.priority < existing.priority) seen.set(key, candidate);
+  }
+  return [...seen.values()].sort((a, b) => a.priority - b.priority || a.y - b.y || a.x - b.x);
+}
+
+function tavernBarObjects() {
+  return (state.dungeonObjects ?? []).filter((object) => object.type === "inn-bar" || objectHasTag(object, "bar"));
+}
+
+function tavernSocialObjects() {
+  return (state.dungeonObjects ?? []).filter((object) => {
+    const type = String(object?.type ?? "").toLowerCase();
+    const template = objectTemplate(object?.type);
+    const tags = new Set([...(template?.tags ?? []), type].map((tag) => String(tag).toLowerCase()));
+    return tags.has("table") || tags.has("booth") || tags.has("bench") || tags.has("seat") || tags.has("bar") || type.includes("table") || type.includes("booth") || type.includes("bench");
+  });
+}
+
+function tavernNpcBlockedKeys() {
+  return new Set(
+    (state.dungeonObjects ?? [])
+      .filter(objectBlocksMovement)
+      .flatMap(objectCells)
+      .map(positionKey),
+  );
+}
+
+function tavernNpcClearFloor(position) {
+  if (!position) return false;
+  const key = positionKey(position);
+  return !tavernNpcBlockedKeys().has(key) && !tavernFurnitureOccupiedKeys().has(key);
+}
+
+function tavernNpcApproachable(position) {
+  if (!position) return false;
+  const blocked = tavernNpcBlockedKeys();
+  const furniture = tavernFurnitureOccupiedKeys();
+  const walkableKeys = new Set((state.dungeon?.walkable ?? []).map(positionKey));
+  for (let y = -1; y <= 1; y += 1) {
+    for (let x = -1; x <= 1; x += 1) {
+      if (x === 0 && y === 0) continue;
+      const candidate = { x: position.x + x, y: position.y + y };
+      const key = positionKey(candidate);
+      if (walkableKeys.has(key) && !blocked.has(key) && !furniture.has(key)) return true;
+    }
+  }
+  return false;
+}
+
+function tavernNpcReachableApproach(position, usedKeys = new Set()) {
+  if (!position) return false;
+  const blocked = tavernNpcBlockedKeys();
+  const furniture = tavernFurnitureOccupiedKeys();
+  const walkableKeys = new Set((state.dungeon?.walkable ?? []).map(positionKey));
+  for (const candidate of window.DungeonGrid.neighbors(position, currentGridSize(), true)) {
+    const key = positionKey(candidate);
+    if (usedKeys.has(key) || blocked.has(key) || furniture.has(key)) continue;
+    if (walkableKeys.has(key)) return true;
+  }
+  return false;
+}
+
+function tavernPositionNextToBar(position) {
+  if (!position) return false;
+  return tavernBarObjects().some((bar) => objectCells(bar).some((cell) => Math.max(Math.abs(cell.x - position.x), Math.abs(cell.y - position.y)) <= 1));
+}
+
+function tavernPositionsAdjacent(a, b) {
+  if (!a || !b) return false;
+  return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= 1;
+}
+
+function tavernWalkableFreePositions(usedKeys = new Set(), anchor = state.dungeon?.startPosition ?? { x: 0, y: 0 }) {
+  const blocked = tavernNpcBlockedKeys();
+  const furniture = tavernFurnitureOccupiedKeys();
+  const socialCells = new Set(tavernSocialObjects().flatMap((object) => objectCells(object).flatMap((cell) => window.DungeonGrid.neighbors(cell, currentGridSize(), true))).map(positionKey));
+  return (state.dungeon?.walkable ?? [])
+    .filter((cell) => !blocked.has(positionKey(cell)) && !furniture.has(positionKey(cell)) && !usedKeys.has(positionKey(cell)) && tavernNpcApproachable(cell))
+    .slice(0, 160)
+    .slice()
+    .sort((a, b) => {
+      const aSocial = socialCells.has(positionKey(a)) ? 0 : 1;
+      const bSocial = socialCells.has(positionKey(b)) ? 0 : 1;
+      if (aSocial !== bSocial) return aSocial - bSocial;
+      return distance(a, anchor) - distance(b, anchor) || a.y - b.y || a.x - b.x;
+    })
+    .map((cell) => ({ ...cell, seated: false }));
+}
+
+function tavernNpcFarFromPlaced(position, positions = [], minimum = 2) {
+  if (!position) return false;
+  return positions.every((placed) => !placed || distance(position, placed) >= minimum);
+}
+
+function tavernBarkeeperPosition(usedKeys = new Set()) {
+  const blocked = tavernNpcBlockedKeys();
+  const furniture = tavernFurnitureOccupiedKeys();
+  const walkableKeys = new Set((state.dungeon?.walkable ?? []).map(positionKey));
+  const directions = [
+    { x: 0, y: 1 },
+    { x: 0, y: -1 },
+    { x: -1, y: 0 },
+    { x: 1, y: 0 },
+  ];
+  for (const bar of tavernBarObjects()) {
+    const cells = objectCells(bar);
+    for (const cell of cells) {
+      for (const direction of directions) {
+        const candidate = { x: cell.x + direction.x, y: cell.y + direction.y };
+        const key = positionKey(candidate);
+        if (!walkableKeys.has(key) || blocked.has(key) || furniture.has(key) || usedKeys.has(key)) continue;
+        return { ...candidate, source: bar.id, barkeeper: true };
+      }
+    }
+  }
+  return tavernWalkableFreePositions(usedKeys)[0] ?? null;
+}
+
+function ensureTavernNpcPositions(profile = travelCurrentSettlementProfile()) {
+  if (!travelCampIsInn() || !profile || !window.DepthboundTavernGuests) return null;
+  const guests = tavernGuestsForProfile(profile);
+  const barkeeper = window.DepthboundTavernGuests.ensureBarkeeper(profile, { state, day: normalizeWorldDay(state.worldDay) });
+  profile.tavernGuests ??= {};
+  if (profile.tavernGuests.placementVersion !== tavernNpcPlacementVersion) {
+    profile.tavernGuests.tokenPositions = {};
+    profile.tavernGuests.placementVersion = tavernNpcPlacementVersion;
+  }
+  profile.tavernGuests.tokenPositions = profile.tavernGuests.tokenPositions && typeof profile.tavernGuests.tokenPositions === "object" ? profile.tavernGuests.tokenPositions : {};
+  const positions = profile.tavernGuests.tokenPositions;
+  const walkableKeys = new Set((state.dungeon?.walkable ?? []).map(positionKey));
+  const guestIds = new Set(guests.map((guest) => guest.id));
+  for (const id of Object.keys(positions)) {
+    if (id !== "barkeeper" && !guestIds.has(id)) delete positions[id];
+  }
+  const validExisting = (position) => {
+    if (!position || !Number.isFinite(Number(position.x)) || !Number.isFinite(Number(position.y))) return false;
+    const key = positionKey(position);
+    return walkableKeys.has(key) && tavernNpcClearFloor(position) && tavernNpcApproachable(position);
+  };
+  for (const [id, position] of Object.entries(positions)) {
+    if (id === "barkeeper") {
+      if (!validExisting(position) || !tavernPositionNextToBar(position)) delete positions[id];
+    } else if (!validExisting(position)) {
+      delete positions[id];
+    }
+  }
+  const used = new Set(Object.values(positions).filter(Boolean).map(positionKey));
+  const placedPositions = Object.values(positions).filter(Boolean);
+  const barkeeperPosition = validExisting(positions.barkeeper) && tavernPositionNextToBar(positions.barkeeper) ? positions.barkeeper : tavernBarkeeperPosition(used);
+  if (barkeeperPosition) {
+    positions.barkeeper = barkeeperPosition;
+    used.add(positionKey(barkeeperPosition));
+    placedPositions.push(barkeeperPosition);
+  }
+  let social = tavernNpcSocialCandidatePositions()
+    .filter((position) => !used.has(positionKey(position)) && tavernNpcReachableApproach(position, used) && tavernNpcFarFromPlaced(position, placedPositions))
+    .slice(0, 40);
+  let standing = tavernWalkableFreePositions(used);
+  for (const guest of guests) {
+    if (validExisting(positions[guest.id])) {
+      used.add(positionKey(positions[guest.id]));
+      placedPositions.push(positions[guest.id]);
+      continue;
+    }
+    const socialPosition = social.find((position) => !used.has(positionKey(position)) && tavernNpcReachableApproach(position, used) && tavernNpcFarFromPlaced(position, placedPositions));
+    const position = socialPosition ?? standing.find((entry) => !used.has(positionKey(entry)) && tavernNpcFarFromPlaced(entry, placedPositions, 1.5));
+    if (!position) continue;
+    positions[guest.id] = position;
+    used.add(positionKey(position));
+    placedPositions.push(position);
+    social = social.filter((entry) => !used.has(positionKey(entry)) && distance(entry, position) >= 2);
+    standing = standing.filter((entry) => !used.has(positionKey(entry)));
+  }
+  return { profile, guests, barkeeper, positions };
+}
+
+function activeHeroNearTavernNpc(position) {
+  const hero = activeHero();
+  return Boolean(hero?.position && position && tavernPositionsAdjacent(hero.position, position));
+}
+
+function activeHeroNearTavernBar(hero = activeHero()) {
+  if (!hero?.position) return false;
+  return tavernBarObjects().some((bar) => objectCells(bar).some((cell) => tavernPositionsAdjacent(hero.position, cell)));
+}
+
+function openTavernGuestFromToken(guestId = "") {
+  const profile = travelCurrentSettlementProfile();
+  const position = profile?.tavernGuests?.tokenPositions?.[guestId];
+  const guest = tavernGuestsForProfile(profile).find((entry) => entry.id === guestId);
+  if (!guest) return;
+  if (!activeHeroNearTavernNpc(position)) {
+    addLog(`${activeHero()?.name ?? "A hero"} needs to stand next to ${guest.name} to talk.`, "important");
+    render();
+    return;
+  }
+  showVillageMenu();
+  visitTavernGuest(guestId);
+}
+
+function tavernGuestApproachPositions(guestId = "") {
+  const profile = travelCurrentSettlementProfile();
+  const position = profile?.tavernGuests?.tokenPositions?.[guestId];
+  const hero = activeHero();
+  if (!position || !hero) return [];
+  const blocked = tavernNpcBlockedKeys();
+  return window.DungeonGrid.neighbors(position, currentGridSize(), true)
+    .filter((candidate) => !blocked.has(positionKey(candidate)))
+    .filter((candidate) => canFighterOccupyPosition(hero, candidate, movementWalkableFor(hero), true))
+    .map((candidate) => ({ position: candidate, path: findMovementPath(hero, candidate) }))
+    .filter((entry) => Array.isArray(entry.path))
+    .sort((a, b) => a.path.length - b.path.length || distance(a.position, position) - distance(b.position, position) || a.position.y - b.position.y || a.position.x - b.position.x);
+}
+
+async function tavernWalkToGuestAndTalk(guestId = "") {
+  const profile = travelCurrentSettlementProfile();
+  const guest = tavernGuestsForProfile(profile).find((entry) => entry.id === guestId);
+  const position = profile?.tavernGuests?.tokenPositions?.[guestId];
+  const hero = activeHero();
+  if (!guest || !position || !hero) return;
+  hideVillageMenu();
+  hideHomeMenu();
+  if (!activeHeroNearTavernNpc(position)) {
+    const approach = tavernGuestApproachPositions(guestId)[0];
+    if (!approach) {
+      addLog(`${hero.name} cannot find a clear way to ${guest.name}.`, "important");
+      render();
+      return;
+    }
+    const moved = approach.path.length === 0 ? true : await moveFighterAlongPath(hero, approach.path);
+    if (!moved) {
+      addLog(`${hero.name} cannot reach ${guest.name} right now.`, "important");
+      render();
+      return;
+    }
+  }
+  if (!activeHeroNearTavernNpc(position)) {
+    addLog(`${hero.name} needs to get closer to ${guest.name}.`, "important");
+    render();
+    return;
+  }
+  showVillageMenu();
+  visitTavernGuest(guestId);
+}
+
+function tavernBarkeeperContext() {
+  const profile = travelCurrentSettlementProfile();
+  if (!profile || !window.DepthboundTavernGuests) return null;
+  const barkeeper = window.DepthboundTavernGuests.ensureBarkeeper(profile, { state, day: normalizeWorldDay(state.worldDay) });
+  return { profile, barkeeper, position: profile.tavernGuests?.tokenPositions?.barkeeper ?? null };
+}
+
+function openTavernBarkeeperFromToken() {
+  const context = tavernBarkeeperContext();
+  if (!context?.barkeeper) return;
+  if (!activeHeroNearTavernBar()) {
+    addLog(`${activeHero()?.name ?? "A hero"} needs to stand next to the bar to talk with ${context.barkeeper.name}.`, "important");
+    render();
+    return;
+  }
+  showVillageMenu();
+  renderTavernBarkeeperMenu();
+}
+
+function renderTavernBarkeeperMenu() {
+  const context = tavernBarkeeperContext();
+  if (!context?.barkeeper || !els.villageBody) return;
+  const camp = travelCampState();
+  const mealResolved = travelCampMealResolved(camp);
+  const rationNeed = travelCampRationNeed();
+  const simplePrice = travelInnRefreshmentPrice(travelInnRefreshmentOptions[0]);
+  const refreshmentRows = travelInnRefreshmentOptions
+    .map((option) => {
+      const price = travelInnRefreshmentPrice(option);
+      return `
+        <div class="store-row barkeeper-service-row">
+          <div>
+            <b>${escapeHtml(option.label)}</b>
+            <span>${escapeHtml(option.description)} ${escapeHtml(priceText(price))}, comfort +${escapeHtml(option.comfort)}.</span>
+          </div>
+          <button type="button" data-action="inn-buy-refreshment" data-refreshment="${escapeAttribute(option.id)}" ${mealResolved || moneyToCp(partyPurse()) < price ? "disabled" : ""}>Buy</button>
+        </div>
+      `;
+    })
+    .join("");
+  const gossipReady = Math.floor(Number(context.barkeeper.guestGossipVisitId) || 0) === tavernVisitId(context.profile);
+  const gossipMarkup = tavernBarkeeperGuestGossipMarkup(context, gossipReady);
+  setVillageBackButtonVisible(true);
+  els.backVillageList.dataset.action = "back-to-settlement-list";
+  els.backVillageList.textContent = "Back";
+  els.villageMenu?.classList.remove("village-index-open", "npc-chat-open", "guild-open");
+  els.villageBody.innerHTML = `
+    <section class="village-directory">
+      <header class="village-directory-hero">
+        <div>
+          <span>${escapeHtml(camp.innName ?? `${context.profile.name} Inn`)}</span>
+          <h3>${escapeHtml(context.barkeeper.name)}</h3>
+          <p>Barkeeper. Food, drink, gossip, and one last plea when the purse is empty.</p>
+        </div>
+        <button type="button" data-action="back-to-settlement-list">Back</button>
+      </header>
+      <section class="village-directory-section village-group-guests">
+        <div class="village-section-heading">
+          <div>
+            <span>Common Room</span>
+            <h3>Ask About Guests</h3>
+          </div>
+          <small>${escapeHtml(gossipReady ? "Known" : "Chat")}</small>
+        </div>
+        ${gossipMarkup}
+      </section>
+      <section class="village-directory-section village-group-shops">
+        <div class="village-section-heading">
+          <div>
+            <span>Bar</span>
+            <h3>Food and Drink</h3>
+          </div>
+          <small>${escapeHtml(moneyText(partyPurse()))}</small>
+        </div>
+        <div class="store-list barkeeper-service-list">
+          ${refreshmentRows}
+          <div class="store-row barkeeper-service-row">
+            <div>
+              <b>Eat Carried Rations</b>
+              <span>${escapeHtml(`Use ${rationNeed} ration${rationNeed === 1 ? "" : "s"} from the party pack. Available ${travelRationCount()} / ${rationNeed}.`)}</span>
+            </div>
+            <button type="button" data-action="camp-use-rations" ${mealResolved || travelRationCount() < rationNeed ? "disabled" : ""}>Eat</button>
+          </div>
+          <div class="store-row barkeeper-service-row">
+            <div>
+              <b>Ask for Supper</b>
+              <span>${escapeHtml(`When coin and rations are gone, ask for mercy. Persuasion DC ${travelInnPersuasionDc()}.`)}</span>
+            </div>
+            <button type="button" data-action="inn-hungry-fallback" ${mealResolved || moneyToCp(partyPurse()) >= simplePrice || travelRationCount() >= rationNeed ? "disabled" : ""}>Ask</button>
+          </div>
+        </div>
+      </section>
+    </section>
+  `;
+  resetVillageScroll();
+}
+
+function tavernBarkeeperGuestGossipMarkup(context, gossipReady = false) {
+  const guests = tavernGuestsForProfile(context.profile);
+  if (!guests.length) {
+    return `<p class="empty-note">${escapeHtml(`${context.barkeeper.name} says the common room is quiet tonight.`)}</p>`;
+  }
+  if (!gossipReady) {
+    return `
+      <article class="guild-contract-row ready">
+        <div>
+          <b>Who's in tonight?</b>
+          <span>${escapeHtml(`${context.barkeeper.name} can point out the interesting faces in the room.`)}</span>
+        </div>
+        <button type="button" data-action="tavern-barkeeper-guests">Ask</button>
+      </article>
+    `;
+  }
+  return `
+    <div class="store-list barkeeper-service-list">
+      ${guests
+        .map((guest) => {
+          const def = tavernGuestDefinition(guest);
+          const role = tavernGuestRoleLabel(def?.role);
+          return `
+            <div class="store-row barkeeper-service-row">
+              <div>
+                <b>${escapeHtml(guest.name ?? "Stranger")}</b>
+                <span>${escapeHtml(`${def?.title ?? role}. ${tavernBarkeeperGuestHint(guest, def)}`)}</span>
+              </div>
+              <button type="button" data-action="tavern-walk-to-guest" data-guest="${escapeAttribute(guest.id)}">Talk</button>
+            </div>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function tavernBarkeeperGuestHint(guest, def) {
+  return {
+    faction: `They are asking careful questions about parties worth introducing to ${def?.factionLabel ?? "their people"}.`,
+    recruit: "They are looking for paid road work.",
+    vendor: "They have a private bundle of goods, if you can get them talking.",
+    materialAsk: "They are buying specific field materials.",
+    monsterAsk: "They pay for true monster accounts.",
+    rumor: "They trade in local talk, road warnings, and half-useful certainties.",
+    questHook: "They are waiting for the right sort of listener.",
+  }[def?.role] ?? "They have business of their own.";
+}
+
+function tavernNpcTokenMarkup(label) {
+  const span = document.createElement("span");
+  span.className = "token-label";
+  span.textContent = label;
+  return span;
+}
+
+function createTavernNpcToken({ id, name, title, position, role = "guest", guestId = "", tokenArt = "" }) {
+  const token = document.createElement("button");
+  token.type = "button";
+  token.className = `token monster-token tavern-npc-token tavern-npc-${role}`;
+  token.dataset.tavernNpc = id;
+  if (guestId) token.dataset.guest = guestId;
+  token.title = `${name} - ${title}`;
+  token.style.setProperty("--token-ring-color", tavernGuestTokenColor(role));
+  const tokenImage = document.createElement("img");
+  tokenImage.className = "token-art hidden";
+  tokenImage.alt = name;
+  tokenImage.draggable = false;
+  tokenImage.addEventListener("load", () => showCombatantTokenArt(token));
+  tokenImage.addEventListener("error", () => hideCombatantTokenArt(token));
+  token.append(tokenImage, tavernNpcTokenMarkup(tavernNpcTokenLabel(name, role === "barkeeper" ? "BK" : "N")));
+  setCombatantTokenArt(token, tokenArt);
+  token.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (isHomeBuilderOpen()) return;
+    if (role === "barkeeper") {
+      openTavernBarkeeperFromToken();
+    } else {
+      openTavernGuestFromToken(guestId);
+    }
+  });
+  token.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (role === "barkeeper") openTavernBarkeeperFromToken();
+    else openTavernGuestFromToken(guestId);
+  });
+  const scaledTileSizePx = currentTileSizePx();
+  token.style.left = `${(position.x + 0.5) * scaledTileSizePx}px`;
+  token.style.top = `${(position.y + 0.5) * scaledTileSizePx}px`;
+  return token;
+}
+
+function renderTavernNpcTokens() {
+  const layer = els.room.querySelector(".tavern-npc-layer");
+  if (!layer) return;
+  layer.innerHTML = "";
+  if (!travelCampIsInn()) return;
+  const context = ensureTavernNpcPositions();
+  if (!context) return;
+  const { guests, barkeeper, positions } = context;
+  if (barkeeper && positions.barkeeper) {
+    layer.append(createTavernNpcToken({
+      id: "barkeeper",
+      name: barkeeper.name,
+      title: barkeeper.title ?? "Barkeeper",
+      position: positions.barkeeper,
+      tokenArt: barkeeper.tokenArt ?? "",
+      role: "barkeeper",
+    }));
+  }
+  for (const guest of guests) {
+    const def = tavernGuestDefinition(guest);
+    const position = positions[guest.id];
+    if (!def || !position) continue;
+    layer.append(createTavernNpcToken({
+      id: guest.id,
+      guestId: guest.id,
+      name: guest.name,
+      title: def.title ?? tavernGuestRoleLabel(def.role),
+      position,
+      tokenArt: guest.tokenArt ?? "",
+      role: def.role,
+    }));
+  }
+}
+
+const settlementBoardRefreshDays = 7;
+
+const settlementBoardBurrowMonsters = {
+  burrow_dragon: "lairYoungCragDragon",
+  burrow_wyvernpeak: "lairCliffWyvern",
+  burrow_manticorecliffs: "lairCliffManticore",
+  burrow_giantnest: "lairHillGiantNestkeeper",
+  burrow_chimeranest: "lairTwoMawChimera",
+  burrow_trollbridge: "lairFungalTroll",
+  burrow_beastden: "lairRootfangBeast",
+  burrow_forest: "lairRootfangBeast",
+  burrow_spiders: "lairWebmotherSpider",
+  burrow_hydraswamp: "venomBogHydra",
+};
+
+function settlementBoardState() {
+  state.questFlags ??= {};
+  state.questFlags.settlementQuestBoards = state.questFlags.settlementQuestBoards && typeof state.questFlags.settlementQuestBoards === "object"
+    ? state.questFlags.settlementQuestBoards
+    : {};
+  return state.questFlags.settlementQuestBoards;
+}
+
+function settlementBoardHomeProfile() {
+  if (!state?.world?.homeHex) return null;
+  const homeHex = state.world.homeHex;
+  const feature = travelFeatureForHex(homeHex);
+  return {
+    id: state.world.homeVillageId || feature?.id || "home-village",
+    name: travelHomePlaceLabel(),
+    type: "village",
+    biome: travelBiomeLabel(travelBiomeForHex(homeHex)),
+    hex: cloneData(homeHex),
+    feature: feature ? cloneData(feature) : null,
+    home: true,
+  };
+}
+
+function settlementBoardProfile(profile = null) {
+  const settlement = profile ?? travelCurrentSettlementProfile();
+  if (settlement) return settlement;
+  if (state?.mode === "home" || travelSameHex(state?.world?.currentHex, state?.world?.homeHex)) return settlementBoardHomeProfile();
+  return null;
+}
+
+function settlementBoardId(profile = null) {
+  const active = settlementBoardProfile(profile);
+  if (!active) return "";
+  if (active.home) return `home:${active.id || "village"}`;
+  if (active.id) return `settlement:${active.id}`;
+  const hex = active.hex ?? state?.world?.currentHex;
+  return `settlement:${travelHexKey(hex?.row ?? 0, hex?.col ?? 0, hex?.chunkX ?? 0, hex?.chunkY ?? 0)}`;
+}
+
+function settlementBoardQuestCount(profile = null) {
+  return settlementBoardProfile(profile)?.type === "city" ? 5 : 3;
+}
+
+function settlementBoardRadius(profile = null) {
+  return settlementBoardProfile(profile)?.type === "city" ? 8 : 5;
+}
+
+function settlementBoardHash(text = "") {
+  let hash = 2166136261;
+  for (let index = 0; index < String(text).length; index += 1) {
+    hash ^= String(text).charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function settlementBoardRandom(seed) {
+  let value = seed >>> 0;
+  return () => {
+    value = Math.imul(value + 0x6d2b79f5, 1);
+    let t = value;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function settlementBoardPick(list = [], random = Math.random) {
+  if (!list.length) return null;
+  return list[Math.floor(random() * list.length)] ?? list[0];
+}
+
+function settlementBoardGlobalHex(hex = null) {
+  const target = travelNormalizeHex(hex) ?? { chunkX: 0, chunkY: 0, row: 0, col: 0 };
+  const width = Math.max(1, Math.floor(Number(state?.world?.chunkWidth) || 10));
+  const height = Math.max(1, Math.floor(Number(state?.world?.chunkHeight) || 10));
+  return {
+    row: target.chunkY * height + target.row,
+    col: target.chunkX * width + target.col,
+  };
+}
+
+function settlementBoardHexDistance(a = null, b = null) {
+  const first = settlementBoardGlobalHex(a);
+  const second = settlementBoardGlobalHex(b);
+  const aq = first.col - Math.floor(first.row / 2);
+  const ar = first.row;
+  const bq = second.col - Math.floor(second.row / 2);
+  const br = second.row;
+  return Math.max(Math.abs(aq - bq), Math.abs(ar - br), Math.abs((aq + ar) - (bq + br)));
+}
+
+function settlementBoardStructureTheme(feature = null, biomeTile = "") {
+  const tile = String(feature?.tile ?? "").toLowerCase();
+  const kind = travelFeatureKind(feature);
+  if (tile.includes("wizardtower")) return "wizardTower";
+  if (tile.includes("goblin")) return "goblinWarren";
+  if (tile.includes("bandit") || tile.includes("camp_siege") || tile.includes("camp_pallisade") || tile.includes("camp_palisade") || tile.includes("camp_border")) return "outlawCamp";
+  if (kind === "castle" || tile.includes("castle")) return "castleKeep";
+  if (kind === "tower" || tile.includes("watchtower") || tile.includes("tower_broken")) return "castleKeep";
+  if (tile.includes("mine") || kind === "mine") return "emberveinDeepworks";
+  if (tile.includes("air")) return "crucibleOfStorms";
+  if (tile.includes("fire") || tile.includes("flame") || tile.includes("volcan")) return "crucibleOfFlame";
+  if (tile.includes("earth") || tile.includes("stone")) return "crucibleOfStone";
+  if (tile.includes("water") || tile.includes("tide")) return "crucibleOfTides";
+  if (tile.includes("desert") || tile.includes("ruin") || kind === "ruin") return "desertRuins";
+  if (tile.includes("crypt") || tile.includes("grave") || tile.includes("shrine")) return "oldGuardroom";
+  return travelEventThemeForBiome(biomeTile);
+}
+
+function settlementBoardBurrowMonster(feature = null) {
+  const tile = String(feature?.tile ?? "").toLowerCase();
+  return settlementBoardBurrowMonsters[tile] ?? (tile.includes("hydra") ? "venomBogHydra" : tile.includes("spider") ? "lairWebmotherSpider" : "");
+}
+
+function settlementBoardCandidateForHex(hex, chunk, row, col, originHex, radius) {
+  const distanceDays = settlementBoardHexDistance(originHex, hex);
+  if (distanceDays <= 0 || distanceDays > radius) return null;
+  const tile = chunk.tiles?.[row]?.[col] ?? "grassland";
+  const feature = travelPrimaryFeatureForCell(chunk, row, col);
+  const biome = travelBiomeLabel(tile);
+  if (feature) {
+    const kind = travelFeatureKind(feature);
+    const featureTile = String(feature.tile ?? "").toLowerCase();
+    if (travelFeatureIsTeleportSettlement(feature) || featureTile.startsWith("lake_") || kind === "lake" || kind === "harbor") return null;
+    const burrowMonster = kind === "burrow" || featureTile.includes("burrow") ? settlementBoardBurrowMonster(feature) : "";
+    const isBurrow = Boolean(burrowMonster);
+    const priority = isBurrow
+      ? 120
+      : featureTile.includes("mine")
+        ? 95
+        : featureTile.includes("shrine") || featureTile.includes("ruin") || featureTile.includes("crypt")
+          ? 85
+          : featureTile.includes("bandit") || featureTile.includes("goblin") || featureTile.includes("castle") || featureTile.includes("tower")
+            ? 82
+            : 60;
+    return {
+      hex,
+      tile,
+      biome,
+      feature: cloneData(feature),
+      distanceDays,
+      priority,
+      questKind: isBurrow ? "burrowBoss" : "structureDungeon",
+      themeId: isBurrow ? travelEventThemeForBiome(tile) : settlementBoardStructureTheme(feature, tile),
+      monsterId: burrowMonster,
+    };
+  }
+  return {
+    hex,
+    tile,
+    biome,
+    distanceDays,
+    priority: 25,
+    questKind: "biomeDungeon",
+    themeId: travelEventThemeForBiome(tile),
+  };
+}
+
+function settlementBoardNearbyCandidates(profile = null) {
+  const active = settlementBoardProfile(profile);
+  const originHex = active?.hex ?? state?.world?.currentHex ?? state?.world?.homeHex;
+  if (!originHex || !state?.world?.chunks) return [];
+  const radius = settlementBoardRadius(active);
+  const candidates = [];
+  for (const [key, chunk] of Object.entries(state.world.chunks ?? {})) {
+    if (!chunk?.tiles?.length) continue;
+    const [chunkXText, chunkYText] = key.split(",");
+    const chunkX = Math.floor(Number(chunk.chunkX ?? chunkXText) || 0);
+    const chunkY = Math.floor(Number(chunk.chunkY ?? chunkYText) || 0);
+    chunk.tiles.forEach((rowTiles, row) => {
+      rowTiles.forEach((_tile, col) => {
+        const hex = travelHexForCell(row, col, chunkX, chunkY);
+        const candidate = settlementBoardCandidateForHex(hex, chunk, row, col, originHex, radius);
+        if (candidate) candidates.push(candidate);
+      });
+    });
+  }
+  return candidates.sort((a, b) => b.priority - a.priority || a.distanceDays - b.distanceDays);
+}
+
+function settlementBoardQuestTitle(candidate = {}, random = Math.random) {
+  const place = settlementBoardTargetLabel(candidate, { article: false });
+  const site = settlementBoardTargetLabel(candidate, { article: true });
+  if (candidate.questKind === "burrowBoss") {
+    const monster = getMonsterTemplate(candidate.monsterId);
+    return `Slay ${monster?.name ? `the ${monster.name}` : "the Lair Beast"} at ${site}`;
+  }
+  if (candidate.questKind === "structureDungeon") {
+    if (candidate.goalType === "recoverItem") return `${settlementBoardPick(["Recover", "Retrieve", "Find"], random)} ${settlementBoardQuestItemShortName(candidate, random)}`;
+    const verbs = candidate.goalType === "killBoss" ? ["Slay", "Break", "Defeat"] : ["Explore", "Secure", "Survey", "Clear"];
+    return `${settlementBoardPick(verbs, random)} ${place}`;
+  }
+  const verbs = candidate.goalType === "recoverItem" ? ["Recover", "Retrieve", "Find"] : candidate.goalType === "killBoss" ? ["Hunt", "Defeat", "Clear"] : ["Chart", "Explore", "Search", "Scout"];
+  return `${settlementBoardPick(verbs, random)} ${site}`;
+}
+
+function settlementBoardQuestObjective(candidate = {}) {
+  if (candidate.questKind === "burrowBoss") {
+    const monster = getMonsterTemplate(candidate.monsterId);
+    return `Travel there and kill ${monster?.name ? `the ${monster.name}` : "the lair monster"}.`;
+  }
+  if (candidate.goalType === "killBoss") return "Travel there, enter the dungeon, and defeat its leader.";
+  if (candidate.goalType === "recoverItem") return "Travel there, enter the dungeon, recover the marked item from the site leader, and bring it out.";
+  if (candidate.questKind === "structureDungeon") return "Travel there, survey the site, and reach the way out.";
+  return "Travel there, enter the wild site, and reach the way out.";
+}
+
+function settlementBoardStructureNoun(feature = null) {
+  const tile = String(feature?.tile ?? "").toLowerCase();
+  const kind = String(travelFeatureKind(feature) || feature?.kind || "").toLowerCase();
+  if (tile.includes("farm") || kind.includes("farm")) return "farmstead";
+  if (tile.includes("mine") || kind.includes("mine")) return "mine entrance";
+  if (tile.includes("ruin") || kind.includes("ruin")) return "ruins";
+  if (tile.includes("crypt") || tile.includes("grave") || kind.includes("crypt")) return "crypt";
+  if (tile.includes("tower") || kind.includes("tower")) return "tower";
+  if (tile.includes("camp") || kind.includes("camp")) return "camp";
+  if (tile.includes("shrine") || kind.includes("shrine")) return "shrine";
+  if (kind && kind !== "generic") return travelTitleText(kind);
+  return "site";
+}
+
+function settlementBoardTargetLabel(candidate = {}, options = {}) {
+  if (!candidate?.feature) {
+    const biome = candidate?.biome ?? "wilds";
+    return options.article ? `the ${biome}` : biome;
+  }
+  if (typeof travelStructureDisplayLabel === "function" && !["village", "city", "lake"].includes(String(candidate.feature.kind || candidate.feature.nameKind || "").toLowerCase())) {
+    const display = travelStructureDisplayLabel(candidate.feature);
+    if (options.article) {
+      const lower = display.toLowerCase();
+      return /^(the|a|an)\s/.test(lower) ? display : `the ${display.toLowerCase()}`;
+    }
+    return display;
+  }
+  const label = travelStructureLabel(candidate.feature);
+  const noun = settlementBoardStructureNoun(candidate.feature);
+  const generic = !label || label.toLowerCase() === noun.toLowerCase() || label.toLowerCase() === String(candidate.feature?.kind ?? "").toLowerCase();
+  if (generic) return options.article ? `the ${noun}` : travelTitleText(noun);
+  return label;
+}
+
+function settlementBoardQuestItemShortName(candidate = {}, random = Math.random) {
+  const noun = settlementBoardStructureNoun(candidate.feature);
+  if (noun === "farmstead") return settlementBoardPick(["Farm Ledger", "Harvest Ledger", "Sealed Deed"], random);
+  if (noun === "mine entrance") return settlementBoardPick(["Mine Ledger", "Ore Survey", "Claim Satchel"], random);
+  if (noun === "ruins") return settlementBoardPick(["Ruin Charter", "Recovered Reliquary", "Survey Casket"], random);
+  if (noun === "crypt") return settlementBoardPick(["Burial Ledger", "Sealed Reliquary", "Grave Register"], random);
+  if (noun === "tower") return settlementBoardPick(["Tower Notes", "Arcane Ledger", "Sealed Satchel"], random);
+  return settlementBoardPick(["Sealed Satchel", "Marked Reliquary", "Survey Casket", "Recovered Ledger", "Wrapped Idol"], random);
+}
+
+function sentenceStart(text = "") {
+  const value = String(text || "").trim();
+  return value ? value[0].toUpperCase() + value.slice(1) : value;
+}
+
+function settlementBoardGoalType(candidate = {}, random = Math.random) {
+  if (candidate.questKind === "burrowBoss") return "burrowBoss";
+  const roll = random();
+  if (candidate.questKind === "structureDungeon") {
+    if (roll < 0.42) return "killBoss";
+    if (roll < 0.76) return "recoverItem";
+    return "survey";
+  }
+  if (roll < 0.3) return "killBoss";
+  if (roll < 0.58) return "recoverItem";
+  return "survey";
+}
+
+function settlementBoardCreateQuest(profile, candidate, index, windowStartDay) {
+  const seed = settlementBoardHash(`${state?.world?.seed ?? "world"}:${settlementBoardId(profile)}:${windowStartDay}:${index}:${travelHexKey(candidate.hex.row, candidate.hex.col, candidate.hex.chunkX, candidate.hex.chunkY)}`);
+  const random = settlementBoardRandom(seed);
+  candidate.goalType = settlementBoardGoalType(candidate, random);
+  const rewardCp = Math.max(75, Math.round((candidate.distanceDays * 55 + (candidate.priority >= 100 ? 300 : 120) + random() * 120) / 5) * 5);
+  const targetLabel = candidate.feature ? settlementBoardTargetLabel(candidate, { article: false }) : `${candidate.biome} (${candidate.hex.row}, ${candidate.hex.col})`;
+  const targetDescriptionLabel = candidate.feature ? sentenceStart(settlementBoardTargetLabel(candidate, { article: true })) : `The ${candidate.biome} site`;
+  const questItemId = candidate.goalType === "recoverItem" ? `settlement-board-relic-${seed.toString(36)}` : "";
+  const questItemName = questItemId
+    ? `${settlementBoardQuestItemShortName(candidate, random)} from ${settlementBoardTargetLabel(candidate, { article: true })}`
+    : "";
+  return {
+    id: `board-${seed.toString(36)}`,
+    boardId: settlementBoardId(profile),
+    sourceName: settlementBoardProfile(profile)?.name ?? "Settlement",
+    status: "available",
+    title: settlementBoardQuestTitle(candidate, random),
+    description: `${targetDescriptionLabel} lies about ${candidate.distanceDays} day${candidate.distanceDays === 1 ? "" : "s"} out. ${settlementBoardQuestObjective(candidate)}`,
+    objective: settlementBoardQuestObjective(candidate),
+    targetLabel,
+    targetHex: cloneData(candidate.hex),
+    targetFeatureId: candidate.feature?.id ?? "",
+    targetKind: candidate.questKind,
+    goalType: candidate.goalType,
+    structureKind: candidate.feature ? travelFeatureKind(candidate.feature) : "",
+    themeId: candidate.themeId,
+    monsterId: candidate.monsterId ?? "",
+    questItemId,
+    questItemName,
+    rewardCp,
+    generatedDay: normalizeWorldDay(state.worldDay),
+    expiresDay: windowStartDay + settlementBoardRefreshDays,
+  };
+}
+
+function settlementBoardEnsure(profile = null) {
+  const active = settlementBoardProfile(profile);
+  const boardId = settlementBoardId(active);
+  if (!active || !boardId) return null;
+  const boards = settlementBoardState();
+  const day = normalizeWorldDay(state.worldDay);
+  const windowStartDay = Math.floor(day / settlementBoardRefreshDays) * settlementBoardRefreshDays;
+  const existing = boards[boardId] && typeof boards[boardId] === "object" ? boards[boardId] : {};
+  const accepted = (existing.quests ?? []).filter((quest) => quest?.status === "accepted" || quest?.status === "completed" || quest?.status === "claimed");
+  if (existing.windowStartDay !== windowStartDay || !Array.isArray(existing.quests)) {
+    const usedHexes = new Set(accepted.map((quest) => travelHexKey(quest.targetHex?.row, quest.targetHex?.col, quest.targetHex?.chunkX, quest.targetHex?.chunkY)));
+    const candidates = settlementBoardNearbyCandidates(active).filter((candidate) => !usedHexes.has(travelHexKey(candidate.hex.row, candidate.hex.col, candidate.hex.chunkX, candidate.hex.chunkY)));
+    const random = settlementBoardRandom(settlementBoardHash(`${state?.world?.seed ?? "world"}:${boardId}:${windowStartDay}:board`));
+    const selected = [];
+    const preferred = candidates.filter((candidate) => candidate.priority >= 60);
+    const fallback = candidates.filter((candidate) => candidate.priority < 60);
+    while (selected.length < settlementBoardQuestCount(active) && (preferred.length || fallback.length)) {
+      const pool = preferred.length ? preferred : fallback;
+      const pickedIndex = Math.floor(random() * pool.length);
+      const [picked] = pool.splice(pickedIndex, 1);
+      selected.push(picked);
+    }
+    boards[boardId] = {
+      boardId,
+      settlementName: active.name,
+      type: active.type === "city" ? "city" : "village",
+      windowStartDay,
+      refreshDay: windowStartDay + settlementBoardRefreshDays,
+      quests: [
+        ...accepted,
+        ...selected.map((candidate, index) => settlementBoardCreateQuest(active, candidate, index, windowStartDay)),
+      ],
+    };
+  }
+  return boards[boardId];
+}
+
+function settlementBoardAcceptedQuests() {
+  return Object.values(settlementBoardState())
+    .flatMap((board) => Array.isArray(board?.quests) ? board.quests : [])
+    .filter((quest) => quest?.status === "accepted");
+}
+
+function settlementBoardQuestAtHex(hex = null) {
+  return settlementBoardAcceptedQuests().find((quest) => travelSameHex(quest.targetHex, hex)) ?? null;
+}
+
+function settlementBoardQuestById(questId = "") {
+  for (const board of Object.values(settlementBoardState())) {
+    const quest = (board?.quests ?? []).find((entry) => entry.id === questId);
+    if (quest) return { board, quest };
+  }
+  return null;
+}
+
+function settlementBoardCardMarkup(profile = null) {
+  const board = settlementBoardEnsure(profile);
+  if (!board) return "";
+  const available = (board.quests ?? []).filter((quest) => quest.status === "available").length;
+  const accepted = (board.quests ?? []).filter((quest) => quest.status === "accepted").length;
+  return `
+    <button class="village-entry-card" type="button" data-action="open-settlement-quest-board">
+      <span class="village-entry-icon empty">QB</span>
+      <span class="village-entry-copy">
+        <b>Quest Board</b>
+        <small>Local dungeon work, marked sites, and dangerous lairs.</small>
+      </span>
+      <span class="village-entry-meta"><em>${escapeHtml(available)} new${accepted ? `, ${accepted} active` : ""}</em><i aria-hidden="true">&rsaquo;</i></span>
+    </button>
+  `;
+}
+
+function settlementBoardQuestRowMarkup(quest = {}) {
+  const accepted = quest.status === "accepted";
+  const completed = quest.status === "completed";
+  const claimed = quest.status === "claimed";
+  const action = completed ? "claim-settlement-board-quest" : accepted || claimed ? "noop" : "accept-settlement-board-quest";
+  const disabled = accepted || claimed;
+  const label = completed ? "Claim" : claimed ? "Paid" : accepted ? "Accepted" : "Accept";
+  return `
+    <article class="store-row settlement-board-row ${accepted ? "accepted" : ""} ${completed || claimed ? "completed" : ""}">
+      <div>
+        <b>${escapeHtml(quest.title ?? "Quest")}</b>
+        <span>${escapeHtml(quest.description ?? "")} Reward: ${escapeHtml(priceText(quest.rewardCp ?? 0))}. ${claimed ? "Paid." : completed ? "Completed. Return it here to collect the reward." : accepted ? "Accepted and marked on the travel map." : `Refreshes on day ${quest.expiresDay}.`}</span>
+      </div>
+      <button type="button" data-action="${action}" data-quest="${escapeAttribute(quest.id)}" ${disabled ? "disabled" : ""}>${label}</button>
+    </article>
+  `;
+}
+
+function renderSettlementQuestBoardMenu(profile = null) {
+  const active = settlementBoardProfile(profile);
+  const board = settlementBoardEnsure(active);
+  if (!active || !board || !els.villageBody) return;
+  els.villageMenu?.classList.remove("npc-chat-open", "guild-open");
+  els.villageMenu?.classList.add("village-index-open");
+  setVillageBackButtonVisible(true);
+  setVillageMusicKey("");
+  els.villageBody.innerHTML = `
+    <section class="village-directory">
+      <header class="village-directory-hero">
+        <div>
+          <span>${escapeHtml(active.name)}</span>
+          <h3>Quest Board</h3>
+          <p>${escapeHtml(active.type === "city" ? "City contracts reach up to eight travel days out." : "Village contracts reach up to five travel days out.")} Unaccepted notices refresh on day ${escapeHtml(board.refreshDay)}.</p>
+        </div>
+        <button type="button" data-action="${active.home ? "back-to-village-list" : "back-to-settlement-list"}">Back</button>
+      </header>
+      <section class="village-directory-section village-group-adventure">
+        <div class="store-list">
+          ${(board.quests ?? []).length ? board.quests.map(settlementBoardQuestRowMarkup).join("") : `<p class="empty-note">No suitable nearby dungeon work is posted yet. Scout more map around this settlement.</p>`}
+        </div>
+      </section>
+    </section>
+  `;
+  resetVillageScroll();
+}
+
+function acceptSettlementBoardQuest(questId = "") {
+  const entry = settlementBoardQuestById(questId);
+  if (!entry?.quest || entry.quest.status !== "available") return false;
+  entry.quest.status = "accepted";
+  entry.quest.acceptedDay = normalizeWorldDay(state.worldDay);
+  addLog(`${entry.quest.title} is accepted. The target is marked on the travel map.`, "important");
+  render();
+  renderSettlementQuestBoardMenu();
+  return true;
+}
+
+function cancelSettlementBoardQuest(questId = "") {
+  const entry = settlementBoardQuestById(questId);
+  if (!entry?.quest || entry.quest.status !== "accepted") return false;
+  entry.quest.status = "available";
+  delete entry.quest.acceptedDay;
+  addLog(`${entry.quest.title} is returned to the board.`, "important");
+  return true;
+}
+
+function completeSettlementBoardQuest(quest = null) {
+  if (!quest || quest.status !== "accepted") return false;
+  quest.status = "completed";
+  quest.completedDay = normalizeWorldDay(state.worldDay);
+  addLog(`${quest.title} is complete. Return to ${quest.sourceName ?? "the quest board"} to claim the reward.`, "important");
+  return true;
+}
+
+function claimSettlementBoardQuest(questId = "") {
+  const entry = settlementBoardQuestById(questId);
+  if (!entry?.quest || entry.quest.status !== "completed") return false;
+  const reward = Math.max(0, Math.floor(Number(entry.quest.rewardCp) || 0));
+  if (reward > 0) addMoney(partyPurse(), reward);
+  entry.quest.status = "claimed";
+  entry.quest.claimedDay = normalizeWorldDay(state.worldDay);
+  addLog(`${entry.quest.title} is turned in. The party earns ${priceText(reward)} from ${entry.quest.sourceName ?? "the quest board"}.`, "important");
+  render();
+  renderSettlementQuestBoardMenu();
+  window.DepthboundPlaytest?.syncNow?.();
+  return true;
+}
+
+function completeSettlementBoardQuestForHex(hex = null) {
+  const quest = settlementBoardQuestAtHex(hex);
+  return completeSettlementBoardQuest(quest);
+}
+
+function completeSettlementBoardQuestForTravelReturn(travelReturnCamp = null, questFlags = null) {
+  const boards = questFlags?.settlementQuestBoards;
+  const hex = travelReturnCamp?.questTargetHex ?? travelReturnCamp?.camp?.at;
+  if (!boards || !hex) return null;
+  for (const board of Object.values(boards)) {
+    const quest = (board?.quests ?? []).find((entry) => entry?.status === "accepted" && travelSameHex(entry.targetHex, hex));
+    if (!quest) continue;
+    quest.status = "completed";
+    quest.completedDay = normalizeWorldDay(state.worldDay);
+    return { title: quest.title, rewardCp: Math.max(0, Math.floor(Number(quest.rewardCp) || 0)), sourceName: quest.sourceName ?? "the quest board" };
+  }
+  return null;
+}
+
+function settlementBoardEventForQuest(quest = null) {
+  if (!quest || quest.status !== "accepted") return null;
+  if (quest.targetKind === "burrowBoss") {
+    const monster = getMonsterTemplate(quest.monsterId);
+    return {
+      id: `settlement-board-${quest.id}`,
+      title: quest.title,
+      text: `${quest.targetLabel} is exactly where the board said it would be. The lair goes quiet, then something inside answers the intrusion.`,
+      choices: [
+        {
+          id: "fight",
+          label: "Face The Lair",
+          description: "Finish the posted hunt.",
+          outcome: {
+            text: `${monster?.name ?? "The lair beast"} comes for the party.`,
+            fight: { monsterIds: quest.monsterId ? [quest.monsterId] : [], allowBoss: true, count: 1, themeId: quest.themeId },
+          },
+        },
+        { id: "wait", label: "Return Later", description: "Leave the lair for now.", outcome: { text: "The party marks the lair and withdraws for now.", noResolve: true } },
+      ],
+    };
+  }
+  return {
+    id: `settlement-board-${quest.id}`,
+    title: quest.title,
+    text: `The marked site matches the board notice. The way in is clear enough for a careful delve.`,
+    choices: [
+      {
+        id: "enter",
+        label: "Enter",
+        description: quest.objective ?? "Complete the posted delve.",
+        outcome: {
+          text: "The party follows the posted lead into danger.",
+          dungeon: { themeId: quest.themeId, size: quest.targetKind === "structureDungeon" ? "medium" : "small", boardQuestId: quest.id },
+        },
+      },
+      { id: "wait", label: "Return Later", description: "Leave the work posted for another day.", outcome: { text: "The party leaves the marked place untouched.", noResolve: true } },
+    ],
+  };
+}
+
+function settlementBoardRegisterQuestItem(quest = null) {
+  if (!quest?.questItemId) return null;
+  const existing = getItemTemplate(quest.questItemId);
+  if (existing) return existing;
+  const name = quest.questItemName || `Marked Parcel from ${quest.targetLabel ?? "the dungeon"}`;
+  const valueGp = Math.max(1, Math.ceil((Number(quest.rewardCp) || 100) / 300));
+  const item = {
+    id: quest.questItemId,
+    name,
+    type: "treasure",
+    category: "quest relic",
+    cost: { amount: 0, unit: "gp", text: "0 gp" },
+    weightLb: 1,
+    slots: [],
+    stackable: false,
+    rarityTier: "quest",
+    tags: ["quest", "settlement-board", "treasure", "quest relic"],
+    sell: { rate: 0, reason: "quest item" },
+    treasure: {
+      kind: "quest relic",
+      valueGp,
+      valueCp: valueGp * 100,
+      condition: "marked",
+      description: `A posted quest item from ${quest.targetLabel ?? "a marked dungeon"}.`,
+    },
+    description: `A marked quest item requested by ${quest.sourceName ?? "a settlement quest board"}.`,
+  };
+  window.DungeonContent?.register?.("items", quest.questItemId, item);
+  return item;
+}
+
+function settlementBoardDifficultyHero() {
+  const heroes = partyHeroes();
+  const leader = heroes[0] ?? activeHero?.();
+  return {
+    ...(leader ?? {}),
+    level: averagePartyLevel(leader ?? { level: 1 }),
+    partySize: Math.max(1, heroes.length),
+  };
+}
+
+function settlementBoardBossTemplate(themeId = defaultContent.theme) {
+  const difficulty = settlementBoardDifficultyHero();
+  const preferredId = bossMonsterIdForHero?.(difficulty, themeId);
+  const preferred = preferredId ? getMonsterTemplate(preferredId) : null;
+  if (preferred) return preferred;
+  const targetCategory = categoryForHeroLevel(difficulty.level ?? 1);
+  const bosses = dungeonBossMonsterIds(themeId).map(getMonsterTemplate).filter(Boolean);
+  if (bosses.length) {
+    return bosses
+      .slice()
+      .sort((a, b) => Math.abs(monsterCategory(a) - targetCategory) - Math.abs(monsterCategory(b) - targetCategory))[0];
+  }
+  return dungeonMonsterIds(themeId).map(getMonsterTemplate).filter(Boolean)
+    .sort((a, b) => Math.abs(monsterCategory(a) - targetCategory) - Math.abs(monsterCategory(b) - targetCategory))[0] ?? getMonsterTemplate(defaultContent.monster);
+}
+
+function settlementBoardDungeonBlockedKeys(dungeonState) {
+  const blocked = new Set(
+    (dungeonState.dungeonObjects ?? [])
+      .filter(objectBlocksMovement)
+      .flatMap(objectCells)
+      .map(positionKey),
+  );
+  Object.values(dungeonState.fighters ?? {})
+    .filter((fighter) => fighter?.alive)
+    .forEach((fighter) => window.DungeonGrid?.fighterCells?.(fighter)?.forEach((cell) => blocked.add(positionKey(cell))));
+  return blocked;
+}
+
+function settlementBoardEnsureDungeonBoss(dungeonState, quest = null) {
+  const existing = Object.values(dungeonState.fighters ?? {}).find((fighter) => fighter?.alive && (fighter.customBoss || fighter.id?.startsWith("boss-") || fighter.tags?.includes("boss")));
+  if (existing) return existing;
+  const template = settlementBoardBossTemplate(quest?.themeId ?? dungeonState.themeId);
+  if (!template) return null;
+  const dungeon = dungeonState.dungeon;
+  const room = (dungeon.rooms ?? []).find((entry) => entry.id === dungeonState.exit?.roomId) ?? dungeon.rooms?.at?.(-1) ?? dungeon.rooms?.[0];
+  if (!room) return null;
+  const difficulty = settlementBoardDifficultyHero();
+  const boss = createCombatant({
+    ...template,
+    id: `boss-board-${quest?.id ?? Date.now()}`,
+    name: template.name,
+    baseMonsterId: template.id,
+    templateId: template.id,
+  });
+  boss.customBoss = true;
+  boss.tags = Array.from(new Set([...(boss.tags ?? []), "boss"]));
+  applyMonsterCategoryScaling(boss, difficulty);
+  const blocked = settlementBoardDungeonBlockedKeys(dungeonState);
+  const origin = dungeonState.exit?.position ?? dungeon.startPosition;
+  boss.position = safeRoomSpawnCell(room, origin, blocked, dungeon.gridSize, spawnFloorKeysForDungeon(dungeon), boss);
+  if (!boss.position) return null;
+  boss.roomId = room.id;
+  dungeonState.fighters[boss.id] = boss;
+  return boss;
+}
+
+function settlementBoardApplyDungeonGoal(dungeonState, quest = null) {
+  if (!dungeonState || !quest) return;
+  dungeonState.customDungeon ??= {};
+  dungeonState.customDungeon.settlementBoardQuestId = quest.id;
+  dungeonState.customDungeon.monsterSummary = customDungeonMonsterSummary?.(dungeonState.fighters ?? {}) ?? {};
+  if (quest.goalType === "killBoss") {
+    settlementBoardEnsureDungeonBoss(dungeonState, quest);
+    dungeonState.customDungeon.goal = { type: "killBoss" };
+    dungeonState.customDungeon.outro = {
+      text: `With the leader defeated, the way back to ${quest.sourceName ?? "the quest board"} is clear.`,
+    };
+    return;
+  }
+  if (quest.goalType === "recoverItem" && quest.questItemId) {
+    settlementBoardRegisterQuestItem(quest);
+    const carrier = settlementBoardEnsureDungeonBoss(dungeonState, quest) ??
+      Object.values(dungeonState.fighters ?? {}).find((fighter) => fighter?.alive && !isPartyHeroId(fighter.id));
+    if (carrier) {
+      carrier.extraLoot = [...(carrier.extraLoot ?? []), { kind: "item", itemId: quest.questItemId }];
+    }
+    dungeonState.customDungeon.goal = {
+      type: "collectItem",
+      itemId: quest.questItemId,
+      consumeOnComplete: true,
+      hint: "The marked item is carried by the site leader. Defeat them and loot the body before leaving.",
+    };
+    dungeonState.customDungeon.outro = {
+      text: `${quest.questItemName ?? "The marked item"} is secured for ${quest.sourceName ?? "the quest board"}.`,
+    };
+    return;
+  }
+  dungeonState.customDungeon.goal = { type: "reachExit" };
+  dungeonState.customDungeon.outro = {
+    text: `The party has surveyed ${quest.targetLabel ?? "the marked site"} and can report back to ${quest.sourceName ?? "the quest board"}.`,
+  };
+}
+
+function settlementBoardQuestLogEntries() {
+  return settlementBoardAcceptedQuests().map((quest) => ({
+    id: `settlement-board-${quest.id}`,
+    giver: `${quest.sourceName ?? "Settlement"} Quest Board`,
+    title: quest.title,
+    description: `${quest.description} The target is marked on the travel map.`,
+    cancelable: true,
+    cancelType: "settlement-board",
+    questId: quest.id,
+    objectives: [
+      {
+        label: quest.objective ?? "Complete posted work",
+        progress: 0,
+        target: 1,
+      },
+    ],
+  }));
+}
+
+function renderSettlementMenu(profile = travelCurrentSettlementProfile()) {
+  if (!profile || !els.villageBody) {
+    renderVillageMenu();
+    return;
+  }
+  travelEnsureTeleportData();
+  els.villageMenu?.classList.remove("npc-chat-open", "guild-open");
+  els.villageMenu?.classList.add("village-index-open");
+  setVillageBackButtonVisible(false);
+  setVillageMusicKey("");
+  const shops = settlementStorefronts(profile);
+  const factions = settlementFactionIds(profile);
+  els.villageBody.innerHTML = `
+    <section class="village-directory">
+      <header class="village-directory-hero">
+        <div>
+          <span>${escapeHtml(settlementProfileSubtitle(profile))}</span>
+          <h3>${escapeHtml(profile.name)}</h3>
+          <p>Local shops and services. Stock refreshes every ${escapeHtml(window.DepthboundSettlementStorefronts?.refreshDays ?? 7)} days.</p>
+        </div>
+        <button type="button" data-action="close-village">Back</button>
+      </header>
+      <section class="village-directory-section village-group-shops">
+        <div class="village-section-heading">
+          <div>
+            <span>Shops and services</span>
+            <h3>Storefronts</h3>
+          </div>
+          <small>${escapeHtml(shops.length)} place${shops.length === 1 ? "" : "s"}</small>
+        </div>
+        <div class="village-entry-grid">
+          ${shops.map((id) => settlementStorefrontCardMarkup(profile, id)).join("")}
+        </div>
+      </section>
+      ${
+        factions.length
+          ? `<section class="village-directory-section village-group-guilds">
+              <div class="village-section-heading">
+                <div>
+                  <span>Faction boards, arena work, and reputation paths.</span>
+                  <h3>Guilds & Boards</h3>
+                </div>
+                <small>${escapeHtml(factions.length)} place${factions.length === 1 ? "" : "s"}</small>
+              </div>
+              <div class="village-entry-grid">
+                ${factions.map(settlementFactionCardMarkup).join("")}
+              </div>
+            </section>`
+          : ""
+      }
+      <section class="village-directory-section village-group-adventure">
+        <div class="village-section-heading">
+          <div>
+            <span>Temporary home</span>
+            <h3>${escapeHtml(state.world?.travelCamp?.innName ?? `${profile.name} Inn`)}</h3>
+          </div>
+          <small>Rooms, meals, travel</small>
+        </div>
+        <div class="village-entry-grid">
+          ${settlementBoardCardMarkup(profile)}
+          <button class="village-entry-card" type="button" data-action="settlement-return-inn">
+            <span class="village-entry-icon empty">IN</span>
+            <span class="village-entry-copy">
+              <b>Return to Inn</b>
+              <small>Go back to the nightly inn room and travel controls.</small>
+            </span>
+            <span class="village-entry-meta"><em>Rest</em><i aria-hidden="true">&rsaquo;</i></span>
+          </button>
+        </div>
+      </section>
+      ${villageTeleportCardMarkup()}
+    </section>
+  `;
+  resetVillageScroll();
+}
+
+function settlementItemPriceCp(item, storefrontId = "") {
+  const multiplier = storefrontId === "general-market" || storefrontId === "village-smith" ? 1 : storefrontId === "temple" ? 1.2 : 1.05;
+  return storeItemBuyValueCp(item, { shop: { buyPriceMultiplier: multiplier } });
+}
+
+function settlementStockEntryMarkup(entry, storefrontId) {
+  if (entry?.kind === "homeDecor") {
+    const template = objectTemplate(entry.id);
+    const decor = objectComponent(entry.id, "homeDecor");
+    if (!template || !decor) return "";
+    const price = Math.max(0, Math.floor(Number(decor.priceCp) || 0));
+    return `
+      <div class="store-row">
+        <div>
+          <b>${escapeHtml(template.name)}</b>
+          <span>${escapeHtml(decor.livingClassLabel ?? decor.livingClass ?? "Decor")} - Comfort +${escapeHtml(decor.comfort ?? 0)} - Owned ${escapeHtml(homeDecorOwnedTotal(entry.id))} - ${escapeHtml(priceText(price))}</span>
+        </div>
+        <button type="button" data-action="buy-settlement-stock" data-storefront="${escapeAttribute(storefrontId)}" data-stock="${escapeAttribute(entry.id)}" ${moneyToCp(partyPurse()) >= price ? "" : "disabled"}>Buy</button>
+      </div>
+    `;
+  }
+  const item = window.DungeonContent.get("items", entry?.id);
+  if (!item) return "";
+  const price = settlementItemPriceCp(item, storefrontId);
+  return `
+    <div class="store-row">
+      <div>
+        <b>${escapeHtml(item.name)}</b>
+        <span>${escapeHtml(itemDetails(item))} - ${escapeHtml(priceText(price))}</span>
+      </div>
+      <button type="button" data-action="buy-settlement-stock" data-storefront="${escapeAttribute(storefrontId)}" data-stock="${escapeAttribute(item.id)}" ${moneyToCp(partyPurse()) >= price ? "" : "disabled"}>Buy</button>
+    </div>
+  `;
+}
+
+function settlementServiceMarkup(profile, storefrontId) {
+  const def = settlementStorefrontDefinition(storefrontId);
+  if (!def?.services?.length) return "";
+  const diseaseEntries = def.services.includes("disease") || def.services.includes("disease-basic") ? apothecaryTreatmentEntries() : [];
+  const hungerEntries = def.services.includes("hunger-exhaustion")
+    ? partyHeroes()
+        .map((hero) => ({ hero, level: travelHungerExhaustionLevel(hero) }))
+        .filter((entry) => entry.level > 0)
+    : [];
+  const diseaseMarkup = diseaseEntries
+    .map((entry) => {
+      const basePrice = diseaseCurePriceCp(entry.effect.diseaseId);
+      const price = def.services.includes("disease-basic") ? Math.ceil(basePrice * 1.15) : basePrice;
+      return `
+        <div class="store-row">
+          <div>
+            <b>${escapeHtml(entry.hero.name)} - ${escapeHtml(entry.disease?.name ?? entry.effect.label ?? "Disease")}</b>
+            <span>${escapeHtml(entry.disease?.description ?? entry.effect.conditionDescription ?? "Disease treatment.")} Treatment: ${escapeHtml(priceText(price))}</span>
+          </div>
+          <button type="button" data-action="settlement-cure-disease" data-storefront="${escapeAttribute(storefrontId)}" data-hero="${escapeAttribute(entry.hero.id)}" data-disease="${escapeAttribute(entry.effect.diseaseId)}" ${moneyToCp(partyPurse()) >= price ? "" : "disabled"}>Treat</button>
+        </div>
+      `;
+    })
+    .join("");
+  const hungerMarkup = hungerEntries
+    .map((entry) => {
+      const price = Math.max(100, entry.level * 250);
+      return `
+        <div class="store-row">
+          <div>
+            <b>${escapeHtml(entry.hero.name)} - Exhaustion ${escapeHtml(entry.level)}</b>
+            <span>Warm food, clean rest, and travel care remove hunger exhaustion. Care: ${escapeHtml(priceText(price))}</span>
+          </div>
+          <button type="button" data-action="settlement-treat-exhaustion" data-storefront="${escapeAttribute(storefrontId)}" data-hero="${escapeAttribute(entry.hero.id)}" ${moneyToCp(partyPurse()) >= price ? "" : "disabled"}>Treat</button>
+        </div>
+      `;
+    })
+    .join("");
+  const revivalMarkup = def.services.includes("revival-placeholder") ? settlementTempleRevivalMarkup(storefrontId) : "";
+  if (!diseaseMarkup && !hungerMarkup && !revivalMarkup) return "";
+  return `
+    <section class="store-section">
+      <h3>Services</h3>
+      <div class="store-list">
+        ${diseaseMarkup || ""}
+        ${hungerMarkup || ""}
+        ${revivalMarkup || ""}
+      </div>
+    </section>
+  `;
+}
+
+const settlementTempleRevivalRites = [
+  { spellId: "revivify", priceCp: 36000, note: "For a very fresh death or a body held fresh by Gentle Repose." },
+  { spellId: "raise-dead", priceCp: 150000, note: "For a body that has not passed beyond ordinary decay." },
+  { spellId: "resurrection", priceCp: 1200000, note: "For a body too far gone for Raise Dead." },
+  { spellId: "true-resurrection", priceCp: 3000000, note: "The strongest rite the temple can arrange." },
+];
+
+function settlementTempleRiteSpell(rite) {
+  const spell = window.DungeonContent.get("spells", rite.spellId);
+  return spell ? spellWithCastLevel(spell, spellBaseLevel(spell)) : null;
+}
+
+function settlementTempleRiteWindowSeconds(rite) {
+  if (rite.spellId === "revivify") return corpseRevivifyWindowSeconds;
+  if (rite.spellId === "raise-dead") return corpseRaiseDeadWindowSeconds;
+  return Number.POSITIVE_INFINITY;
+}
+
+function settlementTempleCanRevive(corpse, rite) {
+  if (!corpse?.dead || !rite) return { ok: false, reason: "No corpse." };
+  const spell = settlementTempleRiteSpell(rite);
+  if (!spell?.effect || spell.effect.kind !== "revive") return { ok: false, reason: "Rite unavailable." };
+  const effectiveAge = corpseEffectiveAgeSeconds(corpse);
+  const windowSeconds = settlementTempleRiteWindowSeconds(rite);
+  if (effectiveAge > windowSeconds) {
+    return { ok: false, reason: `${spell.name} can no longer reach this death.` };
+  }
+  if (moneyToCp(partyPurse()) < rite.priceCp) return { ok: false, reason: "Need coin." };
+  return { ok: true, spell };
+}
+
+function settlementTempleRevivalMarkup(storefrontId = "temple") {
+  const dead = deadRosterHeroes();
+  if (!dead.length) return `<p class="empty-note">No dead companions need temple rites.</p>`;
+  return `
+    <div class="graveyard-list settlement-temple-rites">
+      ${dead
+        .map((corpse) => {
+          ensureHeroCorpseState(corpse);
+          const status = corpseDecompositionStatus(corpse);
+          const location = heroCorpseLocation(corpse) === "base" ? "At base" : "Away from base";
+          return `
+            <section class="graveyard-entry">
+              <div>
+                <b>${escapeHtml(corpse.name)}</b>
+                <span>${escapeHtml(`${location} - ${status.label}`)}</span>
+                <small>${escapeHtml(status.detail)} Temple rites abstract the body logistics once the party has reached this settlement.</small>
+              </div>
+              <div class="object-actions">
+                ${settlementTempleRevivalRites
+                  .map((rite) => {
+                    const spell = settlementTempleRiteSpell(rite);
+                    const check = settlementTempleCanRevive(corpse, rite);
+                    return `
+                      <button type="button" data-action="settlement-revive-corpse" data-storefront="${escapeAttribute(storefrontId)}" data-corpse="${escapeAttribute(corpse.id)}" data-rite="${escapeAttribute(rite.spellId)}" ${check.ok ? "" : "disabled"} title="${escapeAttribute(check.ok ? rite.note : check.reason)}">
+                        ${escapeHtml(spell?.name ?? travelTitleText(rite.spellId))} <small>${escapeHtml(priceText(rite.priceCp))}</small>
+                      </button>
+                    `;
+                  })
+                  .join("")}
+              </div>
+            </section>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function settlementReviveCorpse(corpseId = "", riteId = "", storefrontId = "temple") {
+  const def = settlementStorefrontDefinition(storefrontId);
+  if (!def?.services?.includes("revival-placeholder")) return;
+  const corpse = corpseById(corpseId);
+  const rite = settlementTempleRevivalRites.find((entry) => entry.spellId === riteId);
+  if (!corpse || !rite) return;
+  const check = settlementTempleCanRevive(corpse, rite);
+  if (!check.ok || !check.spell) {
+    addLog(check.reason || `${corpse.name} cannot be restored by that rite.`, "important");
+    renderSettlementStorefrontMenu(storefrontId);
+    return;
+  }
+  if (!spendMoney(partyPurse(), rite.priceCp)) return;
+  const spell = check.spell;
+  const reviveHp = Math.max(1, Math.floor(corpse.maxHp * (spell.effect?.hpFraction ?? 0)) || (spell.effect?.hp ?? 1));
+  corpse.dead = false;
+  corpse.alive = true;
+  corpse.hp = Math.min(corpse.maxHp, reviveHp);
+  corpse.temporaryHp = 0;
+  corpse.stableAtZero = false;
+  corpse.deathSaves = { successes: 0, failures: 0 };
+  corpse.deathLootDropped = false;
+  corpse.corpse = {
+    ...(corpse.corpse ?? {}),
+    revivedAtDungeonTimeSeconds: dungeonElapsedSeconds({ sync: false }),
+    revivedAtCampaignTimeSeconds: campaignElapsedSeconds({ sync: false }),
+    location: null,
+  };
+  corpse.corpseAtBase = false;
+  state.party.rosterIds = uniqueValues([...(state.party.rosterIds ?? []), corpse.id]);
+  if (state.world?.travelCamp?.active || state.mode !== "home") state.party.heroIds = uniqueValues([...(state.party.heroIds ?? []), corpse.id]);
+  if (!state.party.activeHeroId || state.fighters[state.party.activeHeroId]?.dead) state.party.activeHeroId = corpse.id;
+  refreshDerivedStats(corpse);
+  addLog(`${corpse.name} is restored by ${spell.name} at the temple for ${priceText(rite.priceCp)} and returns with ${corpse.hp} HP.`, "important");
+  render();
+  renderSettlementStorefrontMenu(storefrontId);
+}
+
+function renderSettlementStorefrontMenu(storefrontId = "", options = {}) {
+  const profile = travelCurrentSettlementProfile();
+  const def = settlementStorefrontDefinition(storefrontId);
+  if (!profile || !def || !els.villageBody) return;
+  const preserveScroll = Boolean(options.preserveScroll);
+  const previousScrollTop = preserveScroll ? els.villageBody.scrollTop : 0;
+  if (def.special === "campGear") {
+    els.villageMenu?.classList.remove("npc-chat-open", "guild-open");
+    els.villageMenu?.classList.add("village-index-open");
+    setVillageBackButtonVisible(true);
+    setVillageMusicKey("");
+    els.villageBody.innerHTML = `
+      <section class="village-directory">
+        <header class="village-directory-hero">
+          <div>
+            <span>${escapeHtml(profile.name)}</span>
+            <h3>${escapeHtml(def.name)}</h3>
+            <p>${escapeHtml(def.description)}</p>
+          </div>
+        </header>
+        <section class="village-directory-section village-group-shops">
+          <div class="village-section-heading">
+            <div>
+              <span>Camp Gear</span>
+              <h3>Pack Furniture</h3>
+            </div>
+            <small>Hero tents</small>
+          </div>
+          ${campGearPanelMarkup({ backAction: "settlement", backLabel: `Back to ${profile.name}` })}
+        </section>
+      </section>
+    `;
+    if (preserveScroll) els.villageBody.scrollTop = previousScrollTop;
+    else resetVillageScroll();
+    return;
+  }
+  els.villageMenu?.classList.remove("npc-chat-open", "guild-open");
+  els.villageMenu?.classList.add("village-index-open");
+  setVillageBackButtonVisible(true);
+  setVillageMusicKey("");
+  const stock = window.DepthboundSettlementStorefronts?.stockFor?.(profile, storefrontId, normalizeWorldDay(state.worldDay)) ?? [];
+  els.villageBody.innerHTML = `
+    <section class="village-directory">
+      <header class="village-directory-hero">
+        <div>
+          <span>${escapeHtml(profile.name)}</span>
+          <h3>${escapeHtml(def.name)}</h3>
+          <p>${escapeHtml(def.description)}</p>
+        </div>
+        <button type="button" data-action="back-to-settlement-list">Back</button>
+      </header>
+      <section class="village-directory-section village-group-shops">
+        <div class="village-section-heading">
+          <div>
+            <span>${escapeHtml(def.tag ?? "SHOP")}</span>
+            <h3>Stock</h3>
+          </div>
+          <small>Refreshes day ${escapeHtml((profile.stockLastRefreshDay ?? 0) + (window.DepthboundSettlementStorefronts?.refreshDays ?? 7))}</small>
+        </div>
+        <div class="store-wallet">Party Purse: ${escapeHtml(moneyText(partyPurse()))}</div>
+        <div class="store-list">
+          ${stock.length ? stock.map((entry) => settlementStockEntryMarkup(entry, storefrontId)).join("") : `<p class="empty-note">Nothing for sale here today.</p>`}
+        </div>
+      </section>
+      ${settlementServiceMarkup(profile, storefrontId)}
+    </section>
+  `;
+  if (preserveScroll) els.villageBody.scrollTop = previousScrollTop;
+  else resetVillageScroll();
+}
+
+function buySettlementStorefrontStock(storefrontId = "", stockId = "") {
+  const profile = travelCurrentSettlementProfile();
+  const def = settlementStorefrontDefinition(storefrontId);
+  if (!profile || !def || !stockId) return;
+  const stock = window.DepthboundSettlementStorefronts?.stockFor?.(profile, storefrontId, normalizeWorldDay(state.worldDay)) ?? [];
+  if (!stock.some((entry) => entry.id === stockId)) return;
+  if (def.special === "homeDecor" || stock.some((entry) => entry.kind === "homeDecor" && entry.id === stockId)) {
+    const template = objectTemplate(stockId);
+    const decor = objectComponent(stockId, "homeDecor");
+    if (!template || !decor) return;
+    const price = Math.max(0, Math.floor(Number(decor.priceCp) || 0));
+    if (!spendMoney(partyPurse(), price)) return;
+    const item = createHomeDecorInventoryItem(stockId, "settlement-furnisher");
+    if (!item) {
+      addMoney(partyPurse(), price);
+      return;
+    }
+    addItemToPartyInventory(item, "home-decor");
+    addLog(`The party buys ${template.name} in ${profile.name}. It goes into the party inventory for home placement.`, "important");
+    render();
+    renderSettlementStorefrontMenu(storefrontId, { preserveScroll: true });
+    return;
+  }
+  const itemTemplate = window.DungeonContent.get("items", stockId);
+  if (!itemTemplate) return;
+  const price = settlementItemPriceCp(itemTemplate, storefrontId);
+  if (!spendMoney(partyPurse(), price)) return;
+  addItemToPartyInventory(createItemInstance(stockId, "settlement-store"), "settlement-store");
+  addLog(`The party buys ${itemTemplate.name} in ${profile.name}.`, "important");
+  render();
+  renderSettlementStorefrontMenu(storefrontId, { preserveScroll: true });
+}
+
+function settlementCureDisease(heroId = "", diseaseId = "", storefrontId = "") {
+  const def = settlementStorefrontDefinition(storefrontId);
+  if (!def?.services?.some((service) => service.startsWith("disease"))) return;
+  const target = state.fighters?.[heroId];
+  if (!target || !diseaseId) return;
+  const basePrice = diseaseCurePriceCp(diseaseId);
+  const price = def.services.includes("disease-basic") ? Math.ceil(basePrice * 1.15) : basePrice;
+  if (!spendMoney(partyPurse(), price)) return;
+  const removed = typeof cureFighterDisease === "function" ? cureFighterDisease(target, diseaseId) : [];
+  if (!removed.length) {
+    addMoney(partyPurse(), price);
+    return;
+  }
+  const disease = typeof diseaseDefinition === "function" ? diseaseDefinition(diseaseId) : window.DungeonAfflictions?.diseases?.[diseaseId];
+  addLog(`${target.name}'s ${disease?.name ?? removed[0]?.label ?? "disease"} is treated for ${priceText(price)}.`, "important");
+  render();
+  renderSettlementStorefrontMenu(storefrontId);
+}
+
+function settlementTreatExhaustion(heroId = "", storefrontId = "") {
+  const def = settlementStorefrontDefinition(storefrontId);
+  if (!def?.services?.includes("hunger-exhaustion")) return;
+  const target = state.fighters?.[heroId];
+  const level = travelHungerExhaustionLevel(target);
+  if (!target || level <= 0) return;
+  const price = Math.max(100, level * 250);
+  if (!spendMoney(partyPurse(), price)) return;
+  removeTravelHungerExhaustion(target);
+  addLog(`${target.name} receives proper food and care. Hunger exhaustion is removed.`, "important");
+  render();
+  renderSettlementStorefrontMenu(storefrontId);
 }
 
 function campaignProgressText(campaignId, count) {
@@ -8254,17 +13616,30 @@ function renderHomeAdventurePanels() {
   const customDungeons = availableLocalCustomDungeons();
   const oneShotDungeons = availableOneShotDungeons();
   const oneShotCompletions = completedOneShotDungeons();
-  if (homeMenuPanel === "custom-dungeons" && customDungeons.length === 0) homeMenuPanel = "adventure";
+  if (travelCampIsActive() && (!travelCampIsInn() || !state.world?.travelCamp?.rested)) homeMenuPanel = "camp";
+  if (travelCampIsInn() && state.world?.travelCamp?.rested && homeMenuPanel === "camp") homeMenuPanel = "main";
+  if (!adminEnabled() && ["random-dungeons", "custom-dungeons"].includes(homeMenuPanel)) homeMenuPanel = "adventure";
+  if (homeMenuPanel === "custom-dungeons" && !adminEnabled() && customDungeons.length === 0) homeMenuPanel = "adventure";
   const panels = {
     main: els.homeMainActions,
+    camp: els.campMainActions,
     adventure: els.homeAdventureActions,
     "main-story": els.homeMainStoryActions,
     "one-shot-dungeons": els.homeOneShotDungeonActions,
     "random-dungeons": els.homeRandomDungeonActions,
     "custom-dungeons": els.homeCustomDungeonActions,
+    "camp-gear": els.campGearActions,
   };
   Object.entries(panels).forEach(([key, panel]) => panel?.classList.toggle("hidden", key !== homeMenuPanel));
   if (els.homeMenuTitle) els.homeMenuTitle.textContent = homeMenuTitleForPanel();
+  if (homeMenuPanel === "camp") {
+    renderTravelCampMenu();
+    return;
+  }
+  if (homeMenuPanel === "camp-gear") {
+    renderCampGearPanel();
+    return;
+  }
   const barrowCompleted = state.campaignProgress?.["barrow-crown"] ?? 0;
   const thornwoodCompleted = state.campaignProgress?.["thornwood-pact"] ?? 0;
   const emberveinCompleted = state.campaignProgress?.["embervein-first-claim"] ?? 0;
@@ -8275,7 +13650,8 @@ function renderHomeAdventurePanels() {
   els.goEmberveinFirstClaim?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${emberveinCompleted}/1`));
   els.goDwarvenSmithyEmberOath?.querySelector("[data-campaign-progress]")?.replaceChildren(document.createTextNode(`${smithyCompleted}/8`));
   els.goDwarvenSmithyEmberOath?.classList.toggle("hidden", !smithyUnlocked);
-  els.homeAdventureActions?.querySelector('[data-home-menu="custom-dungeons"]')?.classList.toggle("hidden", customDungeons.length === 0);
+  els.homeAdventureActions?.querySelector('[data-home-menu="random-dungeons"]')?.classList.toggle("hidden", !adminEnabled());
+  els.homeAdventureActions?.querySelector('[data-home-menu="custom-dungeons"]')?.classList.toggle("hidden", !adminEnabled());
 
   if (els.homeOneShotDungeonActions) {
     els.homeOneShotDungeonActions.innerHTML = `
@@ -8295,14 +13671,14 @@ function renderHomeAdventurePanels() {
     const themes = window.DungeonContent
       .list("themes")
       .filter((theme) => !theme.hidden)
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => dungeonThemePlayerName(a).localeCompare(dungeonThemePlayerName(b)));
     els.homeRandomDungeonActions.innerHTML = `
       ${themes
         .map(
           (theme) => `
             <button type="button" class="random-dungeon-theme-button" data-random-dungeon-theme="${escapeAttribute(theme.id)}">
-              <span>${escapeHtml(theme.name)}</span>
-              ${theme.description ? `<small>${escapeHtml(theme.description)}</small>` : ""}
+              <span>${escapeHtml(dungeonThemePlayerName(theme))}</span>
+              ${dungeonThemePlayerDescription(theme) ? `<small>${escapeHtml(dungeonThemePlayerDescription(theme))}</small>` : ""}
             </button>
           `,
         )
@@ -8326,7 +13702,19 @@ function renderHomeAdventurePanels() {
 }
 
 function showHomeMenu() {
+  if (travelCampIsActive()) {
+    els.homeMenu.classList.add("camp-dock");
+    els.homeMenu.classList.toggle("inn-dock", travelCampIsInn(state.world?.travelCamp));
+    els.closeHomeMenu?.classList.toggle("hidden", !travelCampIsInn(state.world?.travelCamp));
+    els.buildHome?.classList.toggle("hidden", travelCampIsInn(state.world?.travelCamp));
+    setHomeMenuPanel(travelCampIsInn(state.world?.travelCamp) && state.world.travelCamp.rested ? "main" : "camp");
+    els.homeMenu.classList.remove("hidden");
+    return;
+  }
   maybeUnlockNpcProgress();
+  els.homeMenu.classList.remove("camp-dock", "inn-dock");
+  els.closeHomeMenu?.classList.remove("hidden");
+  els.buildHome?.classList.remove("hidden");
   const hero = activeHero();
   const canTrain = canTrainAsSidekick(hero);
   const canReplaceCompanion = canReplaceDeadBeastMasterCompanion(hero);
@@ -8342,6 +13730,8 @@ function showHomeMenu() {
 
 function hideHomeMenu() {
   els.homeMenu.classList.add("hidden");
+  els.homeMenu.classList.remove("camp-dock", "inn-dock");
+  els.closeHomeMenu?.classList.remove("hidden");
   homeMenuPanel = "main";
 }
 
@@ -8471,7 +13861,11 @@ function resetVillageScroll() {
 }
 
 function setVillageBackButtonVisible(visible) {
-  els.backVillageList?.classList.toggle("hidden", !visible);
+  if (!els.backVillageList) return;
+  const profile = travelCurrentSettlementProfile();
+  els.backVillageList.textContent = profile ? `Back to ${profile.name}` : "Back to Village";
+  els.backVillageList.dataset.action = profile ? "back-to-settlement-list" : "back-to-village-list";
+  els.backVillageList.classList.toggle("hidden", !visible);
 }
 
 const factionSymbolDefinitions = {
@@ -8484,6 +13878,82 @@ const factionSymbolDefinitions = {
   "fighting-pit": { name: "Fighting Pit", src: "assets/factions/fighting-pit-symbol.png", fallback: "FP" },
 };
 
+const factionFirstContactDefinitions = [
+  {
+    id: "monster-guild",
+    unlockFlag: "flag.village.monsterHunterGuildUnlocked",
+    title: "The Trophy Lodge Arrives",
+    welcome: "Kessa Briarhook plants a scarred ledger on the village table and introduces the Trophy Lodge as hunters who turn monster fear into coin, records, and practical survival lessons.",
+    work: "She posts contracts for dangerous creatures, pays for clean trophies and field proof, and values notes that help the next party come home with all their fingers.",
+    ranks: "Reputation raises the party from fresh hands to trusted hunters, opening tougher contracts and better rewards.",
+    gear: "Their boons lean toward hunter equipment, trophy work, and gear for parties who expect claws, venom, and bad footing.",
+    ask: "Kessa asks the heroes to help the Lodge grow here by bringing back proof instead of campfire stories.",
+  },
+  {
+    id: "gravebinders",
+    unlockFlag: "flag.village.gravebindersUnlocked",
+    title: "The Gravebinders Arrive",
+    welcome: "Odran Vellshade arrives with a black-oak candle ledger and a voice soft enough to make the room listen. The Gravebinders exist to keep restless dead, curses, and grave debts from spilling into living homes.",
+    work: "They offer undead contracts, cursed-remains work, haunt reports, and careful rewards for materials taken from places where the dead refuse boundaries.",
+    ranks: "Higher standing marks the party as reliable wardens, unlocking sterner work and deeper trust from the order.",
+    gear: "Their equipment favors warding, gravecraft, anti-undead tools, and quiet protection for heroes who walk among tombs.",
+    ask: "Odran hopes the heroes will help the Gravebinders make this village a place where old bones stay properly still.",
+  },
+  {
+    id: "crucible-collegium",
+    unlockFlag: "flag.village.crucibleCollegiumUnlocked",
+    title: "The Crucible Collegium Arrives",
+    welcome: "Tavren Quillflare unfolds scorch-marked charts and introduces the Crucible Collegium as scholars of elemental violence, planar pressure, shrine phenomena, and magic that behaves badly.",
+    work: "They pay for elemental contracts, cores, motes, shrine observations, and reports from places that burn, freeze, crackle, or argue with gravity.",
+    ranks: "Each rank proves the party can collect data without becoming data, which opens stronger commissions and more volatile research.",
+    gear: "Their sets focus on elemental resistance, focused power, and tools for heroes willing to stand close to impossible weather.",
+    ask: "Tavren wants the heroes to bring the Collegium honest field results and help build a serious research post in the village.",
+  },
+  {
+    id: "antiquarian-society",
+    unlockFlag: "flag.village.antiquarianSocietyUnlocked",
+    title: "The Antiquarian Society Arrives",
+    welcome: "Professor Seraphel Inkglass arrives behind a mobile archive desk and declares that treasure becomes useful the moment someone labels it correctly.",
+    work: "The Antiquarian Society pays for relics, inscriptions, old tomes, seals, field notes, and properly cataloged discoveries from ruins and forgotten places.",
+    ranks: "Reputation turns the party from enthusiastic diggers into trusted field agents with access to richer commissions.",
+    gear: "Their rewards lean toward relic handling, scholarly tools, old protections, and equipment for heroes who treat dust as evidence.",
+    ask: "Seraphel asks the heroes to bring back history before looters, weather, or careless polishing ruin it.",
+  },
+  {
+    id: "expedition-board",
+    unlockFlag: "flag.village.expeditionBoardUnlocked",
+    title: "The Expedition Board Arrives",
+    welcome: "Nella Waymark pins a fresh route board to the village wall and introduces the Expedition Board as the patient enemy of bad maps and worse reports.",
+    work: "The Board rewards completed delves, scouted sites, mapped routes, recovered supplies, and reliable travel notes. Later, roads and outposts will build on that work.",
+    ranks: "Standing with the Board marks the party as dependable explorers, unlocking broader assignments and better supply support.",
+    gear: "Their boons favor expedition kits, pathfinding help, durable field gear, and rewards for parties who can prove where they have been.",
+    ask: "Nella asks the heroes to make the wilds readable, one survived route at a time.",
+  },
+  {
+    id: "boom-club",
+    unlockFlag: "flag.village.boomClubUnlocked",
+    title: "Fizzwick's Boom Club Arrives",
+    welcome: "Fizzwick Boomwhistle arrives with goggles, forms, and several vials that everyone agrees should remain upright. The Boom Club studies volatile reagents and discoveries that make cautious people step backward.",
+    work: "They commission field tests, strange minerals, explosive reagents, pressure cores, and reports from dungeons where sparks are not merely decorative.",
+    ranks: "Higher reputation proves the party can survive experiments and write down what happened, unlocking riskier work and louder rewards.",
+    gear: "Their equipment favors bombs, volatile tools, strange alchemy, and cheerful solutions to stubborn obstacles.",
+    ask: "Fizzwick hopes the heroes will expand the club's reach without expanding the village crater count.",
+  },
+  {
+    id: "fighting-pit",
+    unlockFlag: "flag.village.fightingPitUnlocked",
+    title: "The Fighting Pit Arrives",
+    welcome: "Brakka Ironbell rings a brass bell once and introduces the Fighting Pit as honest public danger: blunted steel, medics ready, no funerals, and a crowd that remembers winners.",
+    work: "The Pit offers arena bouts, wave fights, prize purses, boss brackets, and renown for parties who can prove themselves where everyone can see.",
+    ranks: "Renown raises the party through harder brackets and better purses, with each rank drawing stronger opposition.",
+    gear: "Their rewards focus on arena gear, bruiser sets, and boons for heroes who win under pressure.",
+    ask: "Brakka asks the heroes to help make the village pit famous enough that challengers come looking for them.",
+  },
+];
+
+let factionFirstContactScheduled = false;
+let factionFirstContactRunning = false;
+
 function factionSymbolMarkup(factionId, className = "guild-symbol") {
   const symbol = factionSymbolDefinitions[factionId];
   const fallback = symbol?.fallback ?? String(factionId ?? "?").slice(0, 2).toUpperCase();
@@ -8494,6 +13964,87 @@ function factionSymbolMarkup(factionId, className = "guild-symbol") {
       <img src="${escapeAttribute(symbol.src)}" alt="" onerror="const parent=this.parentElement; this.remove(); if(parent){ parent.classList.add('empty'); parent.innerHTML='<span>${escapeAttribute(fallback)}</span>'; }" />
     </div>
   `;
+}
+
+function factionFirstContactSeenMap() {
+  if (!state) return {};
+  state.questFlags = state.questFlags ?? {};
+  if (!state.questFlags.factionFirstContactSeen || typeof state.questFlags.factionFirstContactSeen !== "object") {
+    state.questFlags.factionFirstContactSeen = {};
+  }
+  return state.questFlags.factionFirstContactSeen;
+}
+
+function factionFirstContactPendingDefinitions() {
+  if (!state?.questFlags) return [];
+  const seen = factionFirstContactSeenMap();
+  return factionFirstContactDefinitions.filter((definition) => Boolean(state.questFlags[definition.unlockFlag]) && !seen[definition.id]);
+}
+
+function factionFirstContactCanPresent() {
+  if (!gameHasStarted || !state || state.mode !== "home") return false;
+  if (travelCampIsActive()) return false;
+  if (typeof partyHeroes === "function" && !partyHeroes().length) return false;
+  if (els.gameDialog && !els.gameDialog.classList.contains("hidden")) return false;
+  return true;
+}
+
+function factionFirstContactMessage(definition, npc) {
+  const factionLabel = npc?.village?.label ?? factionSymbolDefinitions[definition.id]?.name ?? "the faction";
+  const npcName = npc?.name ?? factionLabel;
+  const npcTitle = npc?.title ? `${npc.title} ` : "";
+  const home = travelHomePlaceLabel();
+  return [
+    `${npcTitle}${npcName} has reached ${home} and presents ${factionLabel} to the heroes.`,
+    definition.welcome,
+    definition.work,
+    definition.ranks,
+    definition.gear,
+    definition.ask,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+async function presentFactionFirstContacts() {
+  if (factionFirstContactRunning || !factionFirstContactCanPresent()) return;
+  factionFirstContactRunning = true;
+  try {
+    while (factionFirstContactCanPresent()) {
+      const definition = factionFirstContactPendingDefinitions()[0];
+      if (!definition) break;
+      const npc = window.DungeonContent?.get?.("npcs", definition.id);
+      const seen = factionFirstContactSeenMap();
+      seen[definition.id] = true;
+      addLog(`${npc?.name ?? factionSymbolDefinitions[definition.id]?.name ?? "A faction representative"} arrives in ${travelHomePlaceLabel()}.`, "important");
+      await showChoiceDialog({
+        title: definition.title,
+        message: factionFirstContactMessage(definition, npc),
+        choices: [
+          {
+            value: "welcome",
+            label: "Welcome Them",
+            description: "Their faction is now ready to work from the home village.",
+          },
+        ],
+      });
+      window.DepthboundPlaytest?.syncNow?.();
+      render();
+    }
+  } finally {
+    factionFirstContactRunning = false;
+  }
+}
+
+function scheduleFactionFirstContacts() {
+  if (factionFirstContactScheduled || factionFirstContactRunning) return;
+  if (!factionFirstContactCanPresent()) return;
+  if (!factionFirstContactPendingDefinitions().length) return;
+  factionFirstContactScheduled = true;
+  window.setTimeout(() => {
+    factionFirstContactScheduled = false;
+    void presentFactionFirstContacts();
+  }, 80);
 }
 
 function guildNpcNameButtonMarkup(npc, fallbackName = "Faction Contact") {
@@ -8519,9 +14070,81 @@ function villageNpcCardMarkup(npc) {
       </span>
       <span class="village-entry-meta">
         <em>${escapeHtml(villageNpcTypeLabel(npc))}</em>
-        <i aria-hidden="true">›</i>
+        <i aria-hidden="true">&rsaquo;</i>
       </span>
     </button>
+  `;
+}
+
+function villageCampOutfitterCardMarkup() {
+  return `
+    <button class="village-entry-card" type="button" data-action="open-camp-gear">
+      <span class="village-entry-icon empty">CG</span>
+      <span class="village-entry-copy">
+        <b>Camp Gear</b>
+        <small>Buy portable furniture for hero tents.</small>
+      </span>
+      <span class="village-entry-meta"><em>Vendor</em><i aria-hidden="true">&rsaquo;</i></span>
+    </button>
+  `;
+}
+
+function villageHomeDecorCardMarkup() {
+  return `
+    <button class="village-entry-card" type="button" data-action="open-home-decor">
+      <span class="village-entry-icon empty">HD</span>
+      <span class="village-entry-copy">
+        <b>Home Decor</b>
+        <small>Buy shabby and poor furniture for your home.</small>
+      </span>
+      <span class="village-entry-meta"><em>Vendor</em><i aria-hidden="true">&rsaquo;</i></span>
+    </button>
+  `;
+}
+
+function villageTeleportCardMarkup() {
+  const circles = travelKnownTeleportCircles();
+  if (!state?.world?.teleportUnlocked || circles.length <= 1) return "";
+  return `
+    <section class="village-directory-section village-directory-teleport">
+      <div class="village-section-heading">
+        <div>
+          <span>Known circles</span>
+          <h3>Teleportation</h3>
+        </div>
+        <small>${escapeHtml(circles.length)} circle${circles.length === 1 ? "" : "s"}</small>
+      </div>
+      <button class="village-entry-card" type="button" data-action="open-teleport-circles">
+        <span class="village-entry-icon empty">TC</span>
+        <span class="village-entry-copy">
+          <b>Teleport</b>
+          <small>Step through a circle whose mark the party has learned.</small>
+        </span>
+        <span class="village-entry-meta"><em>Travel</em><i aria-hidden="true">&rsaquo;</i></span>
+      </button>
+    </section>
+  `;
+}
+
+function villageGraveyardSectionMarkup(graveyardCount = 0) {
+  return `
+    <section class="village-directory-section village-directory-memorial">
+      <div class="village-section-heading">
+        <div>
+          <span>Records</span>
+          <h3>Memorials</h3>
+        </div>
+        <small>${escapeHtml(graveyardCount ? `${graveyardCount} recorded` : "Clear")}</small>
+      </div>
+      <button class="village-entry-card graveyard-card" type="button" data-action="open-graveyard">
+        <span class="village-entry-icon empty">GY</span>
+        <span class="village-entry-copy">
+          <b>Graveyard</b>
+          <small>${graveyardCount ? `${graveyardCount} dead companion${graveyardCount === 1 ? "" : "s"} in memory or keeping` : "No dead companions"}</small>
+        </span>
+        <span class="village-entry-meta"><em>Records</em><i aria-hidden="true">&rsaquo;</i></span>
+      </button>
+    </section>
   `;
 }
 
@@ -8568,6 +14191,7 @@ function renderVillageMenu() {
   els.villageMenu?.classList.add("village-index-open");
   setVillageBackButtonVisible(false);
   setVillageMusicKey("");
+  travelEnsureTeleportData();
   const npcs = villageNpcs();
   const graveyardCount = deadRosterHeroes().length;
   const groups = new Map();
@@ -8587,23 +14211,6 @@ function renderVillageMenu() {
         </div>
         <button type="button" data-action="close-village">Back</button>
       </header>
-      <section class="village-directory-section village-directory-memorial">
-        <div class="village-section-heading">
-          <div>
-            <span>Records</span>
-            <h3>Memorials</h3>
-          </div>
-          <small>${escapeHtml(graveyardCount ? `${graveyardCount} recorded` : "Clear")}</small>
-        </div>
-        <button class="village-entry-card graveyard-card" type="button" data-action="open-graveyard">
-          <span class="village-entry-icon empty">GY</span>
-          <span class="village-entry-copy">
-            <b>Graveyard</b>
-            <small>${graveyardCount ? `${graveyardCount} dead companion${graveyardCount === 1 ? "" : "s"} in memory or keeping` : "No dead companions"}</small>
-          </span>
-          <span class="village-entry-meta"><em>Records</em><i aria-hidden="true">›</i></span>
-        </button>
-      </section>
       ${groupedEntries
         .map(
           (group) => `
@@ -8613,15 +14220,30 @@ function renderVillageMenu() {
                   <span>${escapeHtml(group.note)}</span>
                   <h3>${escapeHtml(group.title)}</h3>
                 </div>
-                <small>${escapeHtml(group.entries.length)} place${group.entries.length === 1 ? "" : "s"}</small>
+                <small>${escapeHtml(group.entries.length + (group.id === "shops" ? 2 : 0))} place${group.entries.length + (group.id === "shops" ? 2 : 0) === 1 ? "" : "s"}</small>
               </div>
               <div class="village-entry-grid">
                 ${group.entries.map(villageNpcCardMarkup).join("")}
+                ${group.id === "shops" ? `${villageCampOutfitterCardMarkup()}${villageHomeDecorCardMarkup()}` : ""}
               </div>
             </section>
           `,
         )
         .join("")}
+      <section class="village-directory-section village-group-adventure">
+        <div class="village-section-heading">
+          <div>
+            <span>Posted work near home.</span>
+            <h3>Quest Board</h3>
+          </div>
+          <small>Local jobs</small>
+        </div>
+        <div class="village-entry-grid">
+          ${settlementBoardCardMarkup(settlementBoardHomeProfile())}
+        </div>
+      </section>
+      ${villageTeleportCardMarkup()}
+      ${villageGraveyardSectionMarkup(graveyardCount)}
     </section>
   `;
 }
@@ -8664,9 +14286,102 @@ function renderGraveyardMenu() {
   resetVillageScroll();
 }
 
+function renderTeleportCirclesMenu() {
+  const circles = travelKnownTeleportCircles();
+  const settlementProfile = travelCurrentSettlementProfile();
+  els.villageMenu?.classList.remove("npc-chat-open", "guild-open");
+  els.villageMenu?.classList.add("village-index-open");
+  setVillageBackButtonVisible(true);
+  setVillageMusicKey("");
+  const current = state?.world?.currentHex;
+  els.villageBody.innerHTML = `
+    <section class="village-directory">
+      <header class="village-directory-hero">
+        <div>
+          <span>Teleportation Circle</span>
+          <h3>Known circles</h3>
+          <p>Only circles the party has stood within can be used as destinations.</p>
+        </div>
+        <button type="button" data-action="${settlementProfile ? "back-to-settlement-list" : "back-to-village-list"}">Back</button>
+      </header>
+      <section class="village-directory-section village-directory-teleport">
+        <div class="village-entry-grid">
+          ${
+            circles.length
+              ? circles
+                  .map((circle) => {
+                    const here = current && travelSameHex(current, circle.hex);
+                    return `
+                      <button class="village-entry-card" type="button" data-action="teleport-circle" data-circle="${escapeAttribute(circle.id)}" ${here ? "disabled" : ""}>
+                        <span class="village-entry-icon empty">${circle.home ? "HM" : "TC"}</span>
+                        <span class="village-entry-copy">
+                          <b>${escapeHtml(circle.label ?? "Known Circle")}</b>
+                          <small>${escapeHtml(circle.kind ?? "Settlement")} - Chunk ${escapeHtml(circle.hex.chunkX)}, ${escapeHtml(circle.hex.chunkY)} / Hex ${escapeHtml(circle.hex.row)}, ${escapeHtml(circle.hex.col)}${here ? " - current location" : ""}</small>
+                        </span>
+                        <span class="village-entry-meta"><em>${circle.home ? "Home" : "Known"}</em><i aria-hidden="true">&rsaquo;</i></span>
+                      </button>
+                    `;
+                  })
+                  .join("")
+              : `<p class="empty-note">No teleportation circles are known yet.</p>`
+          }
+        </div>
+      </section>
+    </section>
+  `;
+  els.villageMenu.classList.remove("hidden");
+  resetVillageScroll();
+}
+
+function teleportToKnownCircle(circleId = "") {
+  const world = travelEnsureTeleportData();
+  const circle = world?.teleportCircles?.[circleId];
+  if (!circle?.hex) return;
+  if (circle.home || travelSameHex(circle.hex, world.homeHex)) {
+    world.currentHex = cloneData(circle.hex);
+    addLog(`The party steps through the teleportation circle and returns to ${circle.label ?? "home"}.`, "important");
+    travelArriveHome(circle.label ?? "home");
+    return;
+  }
+  const settlementRest = travelSettlementRestData(circle.hex, circle.label ?? "known circle");
+  world.currentHex = cloneData(circle.hex);
+  world.travelPlan = [];
+  world.routeConfirmed = false;
+  world.travelCamp = settlementRest
+    ? {
+        active: true,
+        ...settlementRest,
+        day: normalizeWorldDay(state.worldDay),
+        at: cloneData(circle.hex),
+        summary: `The party arrives through the teleportation circle and takes rooms at ${settlementRest.innName}.`,
+        mealResolved: false,
+        rested: false,
+      }
+    : { active: false };
+  world.discoveredHexes ??= {};
+  world.discoveredHexes[window.DepthboundWorldTravel?.cellId?.(circle.hex.chunkX, circle.hex.chunkY, circle.hex.row, circle.hex.col) ?? `${circle.hex.chunkX},${circle.hex.chunkY}:${circle.hex.row},${circle.hex.col}`] = true;
+  addLog(`The party steps through the teleportation circle and arrives at ${circle.label ?? "a known circle"}.`, "important");
+  hideVillageMenu();
+  hideHomeMenu();
+  if (settlementRest) {
+    showTravelCampMenu();
+  } else {
+    showTravelMapMenu();
+    centerTravelMapOnHex(circle.hex, "smooth");
+    renderTravelRouteFeedback(`Arrived by teleportation circle at ${circle.label ?? "known circle"}.`, "note");
+    render();
+  }
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
 function showVillageMenu() {
   hideHomeMenu();
-  renderVillageMenu();
+  const settlementProfile = travelCurrentSettlementProfile();
+  if (settlementProfile) {
+    renderSettlementMenu(settlementProfile);
+  } else {
+    renderVillageMenu();
+  }
   els.villageMenu.classList.remove("hidden");
 }
 
@@ -8692,6 +14407,798 @@ function visitVillageNpc(npcId) {
   }
   renderVillageMenu();
 }
+
+function visitSettlementFaction(npcId) {
+  const profile = travelCurrentSettlementProfile();
+  if (!profile || !settlementFactionIds(profile).includes(npcId)) return;
+  const npc = window.DungeonContent.get("npcs", npcId);
+  const behavior = npcBehavior(npcId);
+  if (!npc || !behavior?.visit) return;
+  els.villageMenu?.classList.remove("village-index-open");
+  setVillageBackButtonVisible(true);
+  behavior.visit(npc);
+}
+
+function currentTavernGuest(guestId = "") {
+  const profile = travelCurrentSettlementProfile();
+  const guest = tavernGuestsForProfile(profile).find((entry) => entry.id === guestId);
+  return guest ? { profile, guest, def: tavernGuestDefinition(guest) } : null;
+}
+
+function tavernBestSkillHero(def) {
+  const heroes = partyHeroes().filter((hero) => heroCanAct(hero));
+  if (!heroes.length) return activeHero();
+  const ability = def?.ability ?? skillDefinitions?.[def?.skill]?.ability ?? "cha";
+  const skillId = def?.skill ?? "persuasion";
+  return heroes
+    .map((hero) => ({ hero, bonus: typeof skillCheckBonus === "function" ? skillCheckBonus(hero, ability, skillId) : 0 }))
+    .sort((a, b) => b.bonus - a.bonus)[0]?.hero ?? activeHero();
+}
+
+function tavernKnownMonsterEntries() {
+  state.monsterCompendium = normalizeMonsterCompendium(state.monsterCompendium);
+  return Object.entries(state.monsterCompendium ?? {})
+    .filter(([, progress]) => progress?.encountered || progress?.kills > 0)
+    .map(([monsterId, progress]) => ({ monsterId, progress, monster: getMonsterTemplate(monsterId) }))
+    .filter((entry) => entry.monster)
+    .sort((a, b) => String(a.monster.name).localeCompare(String(b.monster.name)));
+}
+
+function tavernGuestFillText(text = "", guest = null, def = null) {
+  return String(text ?? "")
+    .replaceAll("{name}", guest?.name ?? "the guest")
+    .replaceAll("{home}", travelHomePlaceLabel())
+    .replaceAll("{town}", travelCurrentSettlementProfile()?.name ?? "town")
+    .replaceAll("{faction}", def?.factionLabel ?? "their people")
+    .replaceAll("{title}", def?.title ?? tavernGuestRoleLabel(def?.role));
+}
+
+function tavernGuestDefaultChatOptions(guest, def) {
+  const name = guest?.name ?? "The guest";
+  const role = def?.role ?? "";
+  const optionsByRole = {
+    faction: [
+      { id: "intro", label: "Who are you?", text: `${name} names ${def?.factionLabel ?? "their faction"} carefully, as if the wrong ears might invoice the word. They are not here to hire the party outright; they are watching for people worth introducing to someone with authority.` },
+      { id: "offer", label: "What do they offer?", text: `${def?.factionLabel ?? "The faction"} wants reports that survive scrutiny. Contracts, faction gear, and reputation work can follow once a real representative reaches ${travelHomePlaceLabel()}.` },
+      { id: "test", label: "Why test us?", text: `"Because taverns are full of heroes before breakfast," ${name} says. "I need the kind who can explain what happened after the smoke clears."` },
+    ],
+    recruit: [
+      { id: "intro", label: "Who are you?", text: `${name} gives the short version: road work, bad beds, worse employers, and enough skill to still be alive. They are looking for a paid contract, not charity.` },
+      { id: "terms", label: "What are your terms?", text: `The contract is simple: coin up front for ten days, fair food, and no heroic speeches used as payment. They will fight as a paid recruit while the wages keep coming.` },
+      { id: "warning", label: "Any warnings?", text: `${name} taps the table twice. "If you want someone fearless, hire a statue. I know when to duck. That is why I cost money."` },
+    ],
+    vendor: [
+      { id: "intro", label: "What are you selling?", text: `${name} does not open the bundle yet. The goods are practical, portable, and priced for people who need them tonight rather than next market day.` },
+      { id: "source", label: "Where did this come from?", text: `"Roads have pockets," ${name} says. "Caravans overpack, guards undercount, and sometimes a locked chest wants a more appreciative owner."` },
+      { id: "risk", label: "Any tricks?", text: `${name} smiles without denying it. The prices are higher than a storefront, but the stock is here, warm, and willing to leave quietly.` },
+    ],
+    materialAsk: [
+      { id: "intro", label: "What do you need?", text: `${name} has an order with a deadline and no appetite for collecting it personally. The request is narrow, the payment clean, and the patience limited.` },
+      { id: "use", label: "What is it for?", text: `They explain enough to sound legitimate and not enough to copy the recipe. Materials from the field become straps, reagents, salves, proofs, or favors owed elsewhere.` },
+      { id: "pay", label: "How do you pay?", text: `${name} shows the coin before asking for trust. No promises, no exposure, no "come back next season". Bring the goods, take the purse.` },
+    ],
+    monsterAsk: [
+      { id: "intro", label: "What stories count?", text: `${name} wants field truth: how the monster moved, what hurt it, what failed, and which details bards always ruin.` },
+      { id: "ledger", label: "Why collect this?", text: `Their ledger is full of crossed-out rumors. A survived account can save the next party from learning the same lesson with blood.` },
+      { id: "pay", label: "What is it worth?", text: `${name} pays for one useful account from the party's known creatures. The uglier the memory, the more carefully they write.` },
+    ],
+    rumor: [
+      { id: "intro", label: "What have you heard?", text: `${name} leans in with the pleasure of someone who has been waiting to be asked. The first rumor is free because the second one needs an audience.` },
+      { id: "local", label: "Anything local?", text: `They talk about roads, doors, shops, and the sort of quiet that means someone in ${travelCurrentSettlementProfile()?.name ?? "town"} is pretending not to be afraid.` },
+      { id: "danger", label: "What should we avoid?", text: `${name} does not call anything safe. They only rank the ways it might become expensive.` },
+    ],
+    questHook: [
+      { id: "intro", label: "What kind of work?", text: `${name} is waiting for a particular kind of party and a particular kind of trouble. The hook is not ready to fire, but this is where it will live later.` },
+      { id: "later", label: "Why not now?", text: `The job needs one more piece: a name, a map, a debt, or a dungeon that has not finished becoming a problem.` },
+    ],
+  };
+  return optionsByRole[role] ?? [
+    { id: "intro", label: "Talk", text: `Hi. I'm ${name}, passing through tonight. I have business in the common room, if you have a moment.` },
+  ];
+}
+
+function tavernGuestChatOptions(guest, def) {
+  const options = Array.isArray(def?.chatOptions) && def.chatOptions.length ? def.chatOptions : tavernGuestDefaultChatOptions(guest, def);
+  return options.map((option, index) => ({
+    id: String(option.id ?? `option-${index}`),
+    label: option.label ?? "Ask",
+    text: tavernGuestFillText(option.text ?? option.response ?? "", guest, def),
+  }));
+}
+
+function tavernGuestChatText(guest, def, optionId = "") {
+  const options = tavernGuestChatOptions(guest, def);
+  return (options.find((option) => option.id === optionId) ?? options[0])?.text ?? "";
+}
+
+function tavernJsArg(value = "") {
+  return escapeAttribute(JSON.stringify(String(value ?? "")));
+}
+
+function tavernDataText(value = "") {
+  return escapeAttribute(String(value ?? ""));
+}
+
+function tavernGuestChatGateMarkup(context) {
+  const { guest } = context;
+  const chatted = tavernGuestChattedThisVisit(guest, context.profile);
+  return `
+    <article class="guild-contract-row ready">
+      <div>
+        <b>${escapeHtml(chatted ? "Chat More" : "Chat")}</b>
+        <span>${escapeHtml(chatted ? `${guest.name ?? "The guest"} is still willing to answer a few questions.` : `${guest.name ?? "The guest"} is willing to talk before getting down to business.`)}</span>
+      </div>
+      <button type="button" data-action="tavern-chat-guest" data-guest="${escapeAttribute(guest.id)}">Chat</button>
+    </article>
+  `;
+}
+
+function tavernGuestChatSceneMarkup(context) {
+  const { guest, def } = context;
+  const chatText = guest.chatText ?? "";
+  if (!chatText) {
+    const options = tavernGuestChatOptions(guest, def);
+    return `
+      <article class="tavern-chat-card">
+        <span>Conversation</span>
+        <p>${escapeHtml(tavernGuestFillText(def?.chatIntro ?? def?.opener ?? `${guest.name ?? "The guest"} waits for the first question.`, guest, def))}</p>
+        <div class="tavern-chat-options">
+          ${options
+            .map(
+              (option) => `
+                <button
+                  type="button"
+                  data-action="tavern-chat-option"
+                  data-guest="${escapeAttribute(guest.id)}"
+                  data-option="${escapeAttribute(option.id)}"
+                  data-response="${tavernDataText(option.text)}"
+                  onclick="window.tavernShowChatResponseFromButton(this); return false;"
+                >${escapeHtml(option.label)}</button>
+              `,
+            )
+            .join("")}
+        </div>
+      </article>
+    `;
+  }
+  return `
+    <article class="tavern-chat-card">
+      <span>Conversation</span>
+      <p>${escapeHtml(chatText)}</p>
+      <div class="tavern-chat-options">
+        <button type="button" data-action="tavern-chat-more" data-guest="${escapeAttribute(guest.id)}">Ask Another Question</button>
+        <button type="button" data-action="tavern-finish-chat-guest" data-guest="${escapeAttribute(guest.id)}">Done Talking</button>
+      </div>
+    </article>
+  `;
+}
+
+function tavernShowChatResponseFromButton(button) {
+  if (!button) return false;
+  const guestId = button.dataset.guest ?? "";
+  const optionId = button.dataset.option ?? "";
+  const response = button.dataset.response ?? tavernGuestChatText(currentTavernGuest(guestId)?.guest, currentTavernGuest(guestId)?.def, optionId);
+  const context = currentTavernGuest(guestId);
+  if (context?.guest) {
+    context.guest.chatOpenVisitId = tavernVisitId(context.profile);
+    context.guest.chatOptionId = optionId;
+    context.guest.chatText = response;
+  }
+  const card = button.closest(".tavern-chat-card");
+  if (card) {
+    card.innerHTML = `
+      <span>Conversation</span>
+      <p>${escapeHtml(response)}</p>
+      <div class="tavern-chat-options">
+        <button type="button" data-action="tavern-chat-more" data-guest="${escapeAttribute(guestId)}" onclick="window.tavernReturnToGuestChatFromButton(this); return false;">Ask Another Question</button>
+        <button type="button" data-action="tavern-finish-chat-guest" data-guest="${escapeAttribute(guestId)}" onclick="window.tavernFinishGuestChatFromButton(this); return false;">Done Talking</button>
+      </div>
+    `;
+  } else if (context?.guest) {
+    visitTavernGuest(guestId);
+  }
+  window.DepthboundPlaytest?.syncNow?.();
+  return false;
+}
+
+function tavernFinishGuestChatFromButton(button) {
+  const guestId = button?.dataset?.guest ?? "";
+  const context = currentTavernGuest(guestId);
+  if (context?.guest) {
+    context.guest.chattedVisitId = tavernVisitId(context.profile);
+    delete context.guest.chatOpenVisitId;
+    delete context.guest.chatOptionId;
+    delete context.guest.chatText;
+    visitTavernGuest(guestId);
+  } else {
+    const card = button?.closest?.(".tavern-chat-card");
+    if (card) card.innerHTML = `<span>Conversation</span><p>The conversation ends.</p>`;
+  }
+  window.DepthboundPlaytest?.syncNow?.();
+  return false;
+}
+
+function tavernReturnToGuestChatFromButton(button) {
+  const guestId = button?.dataset?.guest ?? "";
+  tavernReturnToGuestChat(guestId);
+  return false;
+}
+
+function bindTavernGuestBodyActions() {
+  if (!els.villageBody || els.villageBody.dataset.tavernGuestActionsBound === "true") return;
+  els.villageBody.dataset.tavernGuestActionsBound = "true";
+  els.villageBody.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button || !els.villageBody.contains(button)) return;
+    const action = button.dataset.action;
+    if (!action?.startsWith("tavern-")) return;
+    if (action === "tavern-chat-option") {
+      event.preventDefault();
+      event.stopPropagation();
+      tavernShowChatResponseFromButton(button);
+      return;
+    }
+    if (action === "tavern-chat-guest") {
+      event.preventDefault();
+      event.stopPropagation();
+      tavernChatWithGuest(button.dataset.guest);
+      return;
+    }
+    if (action === "tavern-finish-chat-guest") {
+      event.preventDefault();
+      event.stopPropagation();
+      tavernFinishGuestChat(button.dataset.guest);
+      return;
+    }
+    if (action === "tavern-chat-more") {
+      event.preventDefault();
+      event.stopPropagation();
+      tavernReturnToGuestChat(button.dataset.guest);
+      return;
+    }
+    if (action === "tavern-ask-rumor") {
+      event.preventDefault();
+      event.stopPropagation();
+      tavernAskRumor(button.dataset.guest);
+    }
+  });
+}
+
+function tavernGuestBodyMarkup(context) {
+  const { guest, def } = context;
+  if (!def) return "";
+  const item = def.itemId ? getItemTemplate(def.itemId) : null;
+  const knownMonsters = def.role === "monsterAsk" ? tavernKnownMonsterEntries() : [];
+  const factionAlreadyUnlocked = def.role === "faction" && def.unlockFlag && state.questFlags?.[def.unlockFlag];
+  const checkHero = def.role === "faction" ? tavernBestSkillHero(def) : null;
+  const skillLabel = def.skill ? skillName(def.skill) : "";
+  const roleLabel = tavernGuestRoleLabel(def.role);
+  const walletCp = moneyToCp(partyPurse());
+  const stock = (def.stock ?? []).map((itemId) => getItemTemplate(itemId)).filter(Boolean);
+  const daysLeft = Math.max(0, Math.floor(Number(guest.departureDay) || 0) - normalizeWorldDay(state.worldDay));
+  const recruitTier = def.role === "recruit" ? tavernRecruitTier(def) : null;
+  const recruitPrice = recruitTier?.costCp ?? def.costCp ?? 0;
+  const recruitLabel = recruitTier?.label ?? def.className ?? "Hireling";
+  const recruitAvailable = def.role !== "recruit" || Boolean(recruitTier?.monsterId);
+  const chattedThisVisit = tavernGuestChattedThisVisit(guest, context.profile);
+  const chatOpen = Math.floor(Number(guest.chatOpenVisitId) || 0) === tavernVisitId(context.profile);
+  return `
+    <section class="village-directory">
+      <header class="village-directory-hero">
+        <div>
+          <span>${escapeHtml(roleLabel)}</span>
+          <h3>${escapeHtml(guest.name ?? "Stranger")}</h3>
+          <p>${escapeHtml(def.title ?? roleLabel)}</p>
+        </div>
+        <button type="button" data-action="back-to-settlement-list">Back</button>
+      </header>
+      <section class="village-directory-section village-group-guests">
+        <div class="store-wallet">${escapeHtml(daysLeft > 0 ? `In town for ${daysLeft} more day${daysLeft === 1 ? "" : "s"}.` : "Leaving soon.")}</div>
+        ${!chattedThisVisit && !chatOpen ? `<p class="empty-note">${escapeHtml(def.opener ?? "They watch the common room and wait for the right conversation.")}</p>` : ""}
+        ${
+          !chatOpen && guest.lastResult
+            ? `<article class="guild-contract-row ready"><div><b>Last Word</b><span>${escapeHtml(guest.lastResult)}</span></div></article>`
+            : ""
+        }
+        ${chatOpen ? tavernGuestChatSceneMarkup(context) : tavernGuestChatGateMarkup(context)}
+        ${
+          chattedThisVisit && def.role === "faction"
+            ? `<article class="guild-contract-row ${guest.factionExplained ? "ready" : ""}">
+                <div>
+                  <b>${escapeHtml(def.factionLabel ?? "Faction Contact")}</b>
+                  <span>${escapeHtml(guest.factionExplained ? def.about ?? "They have explained their work." : "Ask what they do before trying to win their trust.")}</span>
+                </div>
+                <button type="button" data-action="tavern-faction-explain" data-guest="${escapeAttribute(guest.id)}" ${guest.factionExplained ? "disabled" : ""}>Ask About Faction</button>
+              </article>
+              <article class="guild-contract-row ${factionAlreadyUnlocked || guest.completed ? "ready" : ""}">
+                <div>
+                  <b>${escapeHtml(def.factionLabel ?? "Faction Contact")}</b>
+                  <span>${escapeHtml(factionAlreadyUnlocked || guest.completed ? `Their representative is expected in ${travelHomePlaceLabel()}.` : guest.factionExplained ? `${checkHero?.name ?? "The party"} can try ${skillLabel} DC ${def.dc ?? 12}.` : "First learn what this faction is offering.")}</span>
+                </div>
+                <button type="button" data-action="tavern-faction-check" data-guest="${escapeAttribute(guest.id)}" ${factionAlreadyUnlocked || guest.completed || !guest.factionExplained ? "disabled" : ""}>Impress Contact</button>
+              </article>`
+            : ""
+        }
+        ${
+          chattedThisVisit && def.role === "recruit"
+            ? `<article class="guild-contract-row ${guest.completed ? "ready" : ""}">
+                <div>
+                  <b>${escapeHtml(recruitLabel)}</b>
+                  <span>${escapeHtml(guest.completed ? `Recruited. Next wage due day ${state.fighters?.[guest.recruitedAllyId]?.hireNextDueDay ?? "soon"}.` : recruitAvailable ? `Recruitable. Fee: ${priceText(recruitPrice)} per 10 days.` : "No suitable humanoid hireling template is available.")}</span>
+                </div>
+                <button type="button" data-action="tavern-recruit-guest" data-guest="${escapeAttribute(guest.id)}" ${guest.completed || !recruitAvailable || walletCp < recruitPrice ? "disabled" : ""}>Hire</button>
+              </article>`
+            : ""
+        }
+        ${
+          chattedThisVisit && def.role === "vendor"
+            ? `<div class="store-wallet">Party Purse: ${escapeHtml(moneyText(partyPurse()))}</div>
+              <div class="store-list">
+                ${stock
+                  .map((stockItem) => {
+                    const price = Math.max(1, Math.ceil(storeItemBuyValueCp(stockItem, { shop: { buyPriceMultiplier: def.priceMultiplier ?? 1.25 } })));
+                    return `
+                      <div class="store-row">
+                        <div>
+                          <b>${escapeHtml(stockItem.name)}</b>
+                          <span>${escapeHtml(itemDetails(stockItem))} - ${escapeHtml(priceText(price))}</span>
+                        </div>
+                        <button type="button" data-action="tavern-buy-guest-item" data-guest="${escapeAttribute(guest.id)}" data-item="${escapeAttribute(stockItem.id)}" ${walletCp >= price ? "" : "disabled"}>Buy</button>
+                      </div>
+                    `;
+                  })
+                  .join("")}
+              </div>`
+            : ""
+        }
+        ${
+          chattedThisVisit && def.role === "materialAsk"
+            ? `<article class="guild-contract-row ${guest.completed ? "ready" : ""}">
+                <div>
+                  <b>${escapeHtml(def.request ?? "Bring requested materials.")}</b>
+                  <span>${escapeHtml(`${item?.name ?? def.itemId}: ${partyResourceCount(def.itemId)} / ${def.quantity ?? 1}. Reward: ${priceText(def.rewardCp ?? 0)}.`)}</span>
+                </div>
+                <button type="button" data-action="tavern-complete-material-ask" data-guest="${escapeAttribute(guest.id)}" ${guest.completed || partyResourceCount(def.itemId) < (def.quantity ?? 1) ? "disabled" : ""}>Hand Over</button>
+              </article>`
+            : ""
+        }
+        ${
+          chattedThisVisit && def.role === "monsterAsk"
+            ? `<article class="guild-contract-row ${guest.completed ? "ready" : ""}">
+                <div>
+                  <b>${escapeHtml(def.request ?? "Share a monster account.")}</b>
+                  <span>${escapeHtml(knownMonsters.length ? `Known creatures: ${knownMonsters.length}. Reward: ${priceText(def.rewardCp ?? 0)}.` : "No known creature yet. Encounter a monster first.")}</span>
+                </div>
+                <button type="button" data-action="tavern-complete-monster-ask" data-guest="${escapeAttribute(guest.id)}" ${guest.completed || !knownMonsters.length ? "disabled" : ""}>Tell Tale</button>
+              </article>`
+            : ""
+        }
+        ${
+          chattedThisVisit && def.role === "rumor"
+            ? `<article class="guild-contract-row ${guest.rumorVisitId === tavernVisitId(context.profile) ? "ready" : ""}">
+                <div>
+                  <b>Ask For A Rumor</b>
+                  <span>${escapeHtml(guest.rumorVisitId === tavernVisitId(context.profile) ? guest.lastResult ?? "They have said their piece for now." : "Ask what they have heard about the roads, shops, and trouble nearby.")}</span>
+                </div>
+                <button type="button" data-action="tavern-ask-rumor" data-guest="${escapeAttribute(guest.id)}" ${guest.rumorVisitId === tavernVisitId(context.profile) ? "disabled" : ""}>Ask</button>
+              </article>`
+            : ""
+        }
+        ${
+          chattedThisVisit && def.role === "questHook"
+            ? `<article class="guild-contract-row">
+                <div>
+                  <b>${escapeHtml(def.request ?? "Future quest hook")}</b>
+                  <span>Hook point ready for later named quest unlock NPCs.</span>
+                </div>
+                <button type="button" disabled>Not Yet</button>
+              </article>`
+            : ""
+        }
+      </section>
+    </section>
+  `;
+}
+
+function visitTavernGuest(guestId = "") {
+  const context = currentTavernGuest(guestId);
+  if (!context || !els.villageBody) return;
+  els.villageMenu?.classList.remove("village-index-open", "npc-chat-open", "guild-open");
+  setVillageBackButtonVisible(true);
+  els.backVillageList.dataset.action = "back-to-settlement-list";
+  els.backVillageList.textContent = "Back";
+  bindTavernGuestBodyActions();
+  els.villageBody.innerHTML = tavernGuestBodyMarkup(context);
+  resetVillageScroll();
+}
+
+function tavernChatWithGuest(guestId = "") {
+  const context = currentTavernGuest(guestId);
+  if (!context?.guest || !context.def) return;
+  context.guest.chatOpenVisitId = tavernVisitId(context.profile);
+  delete context.guest.chatText;
+  delete context.guest.chatOptionId;
+  visitTavernGuest(guestId);
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function tavernChooseGuestChatOption(guestId = "", optionId = "") {
+  const context = currentTavernGuest(guestId);
+  if (!context?.guest || !context.def) return;
+  context.guest.chatOpenVisitId = tavernVisitId(context.profile);
+  context.guest.chatOptionId = optionId;
+  context.guest.chatText = tavernGuestChatText(context.guest, context.def, optionId);
+  visitTavernGuest(guestId);
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function tavernReturnToGuestChat(guestId = "") {
+  const context = currentTavernGuest(guestId);
+  if (!context?.guest || !context.def) return;
+  context.guest.chatOpenVisitId = tavernVisitId(context.profile);
+  delete context.guest.chatText;
+  delete context.guest.chatOptionId;
+  visitTavernGuest(guestId);
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function tavernFinishGuestChat(guestId = "") {
+  const context = currentTavernGuest(guestId);
+  if (!context?.guest) return;
+  context.guest.chattedVisitId = tavernVisitId(context.profile);
+  delete context.guest.chatOpenVisitId;
+  delete context.guest.chatOptionId;
+  delete context.guest.chatText;
+  visitTavernGuest(guestId);
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function tavernBarkeeperChatGuests() {
+  const context = tavernBarkeeperContext();
+  if (!context?.barkeeper) return;
+  context.barkeeper.guestGossipVisitId = tavernVisitId(context.profile);
+  const guests = tavernGuestsForProfile(context.profile);
+  const guestText = guests.length
+    ? guests.map((guest) => `${guest.name} (${tavernGuestRoleLabel(tavernGuestDefinition(guest)?.role)})`).join(", ")
+    : "no one unusual";
+  addLog(`${context.barkeeper.name} points out ${guestText}.`, "important");
+  renderTavernBarkeeperMenu();
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function tavernMarkGuestDone(guest, result) {
+  if (!guest) return;
+  guest.completed = true;
+  guest.state = "completed";
+  guest.lastResult = result;
+}
+
+function tavernRecruitTier(def = {}) {
+  const tiers = Array.isArray(def.tiers) ? def.tiers.filter((tier) => tavernRecruitMonsterIsHumanoid(tier.monsterId)) : [];
+  if (!tiers.length && tavernRecruitMonsterIsHumanoid(def.allyMonsterId)) return { monsterId: def.allyMonsterId, costCp: def.costCp ?? 0, label: def.className ?? "Hireling" };
+  if (!tiers.length) return null;
+  const targetCategory = typeof partyTargetMonsterCategory === "function" ? partyTargetMonsterCategory(activeHero()) : categoryForHeroLevel(Math.round(averagePartyLevel(activeHero())));
+  return tiers.find((tier) => targetCategory <= Math.max(1, Math.floor(Number(tier.maxCategory) || 1))) ?? tiers[tiers.length - 1];
+}
+
+function tavernRecruitMonsterIsHumanoid(monsterId = "") {
+  const monster = getMonsterTemplate(monsterId);
+  return Boolean(monster && (monster.tags ?? []).map((tag) => String(tag).toLowerCase()).includes("humanoid"));
+}
+
+function dismissTavernHireling(heroId = "", reason = "") {
+  const ally = state.fighters?.[heroId];
+  if (!ally?.tavernRecruit) return false;
+  state.party.heroIds = (state.party.heroIds ?? []).filter((id) => id !== heroId);
+  state.party.rosterIds = (state.party.rosterIds ?? []).filter((id) => id !== heroId);
+  state.initiative = (state.initiative ?? []).filter((entry) => entry.fighterId !== heroId);
+  selectedHeroIds?.delete?.(heroId);
+  delete state.fighters[heroId];
+  if (state.party.activeHeroId === heroId) state.party.activeHeroId = state.party.heroIds.find((id) => state.fighters[id] && !isAutonomousAlly(state.fighters[id])) ?? state.party.heroIds[0] ?? "hero";
+  addLog(`${ally.name} leaves the party${reason ? `: ${reason}` : "."}`, "important");
+  roomIsBuilt = false;
+  return true;
+}
+
+function processTavernHirelingPayments() {
+  const day = normalizeWorldDay(state?.worldDay);
+  if (!state?.fighters || !state?.party) return;
+  for (const ally of Object.values(state.fighters).filter((fighter) => fighter?.tavernRecruit)) {
+    const cost = Math.max(0, Math.floor(Number(ally.hireCostCp) || 0));
+    const period = Math.max(1, Math.floor(Number(ally.hirePeriodDays) || 10));
+    ally.hireNextDueDay = Math.max(day + period, Math.floor(Number(ally.hireNextDueDay) || day + period));
+    while (day >= ally.hireNextDueDay) {
+      if (cost <= 0 || spendMoney(partyPurse(), cost)) {
+        addLog(`${ally.name}'s hireling wage is paid for another ${period} days (${priceText(cost)}).`, "important");
+        ally.hireLastPaidDay = ally.hireNextDueDay;
+        ally.hireNextDueDay += period;
+      } else {
+        dismissTavernHireling(ally.id, `their ${priceText(cost)} wage could not be paid`);
+        break;
+      }
+    }
+  }
+}
+
+function tavernHirelingStatusText(ally) {
+  if (!ally?.tavernRecruit) return "";
+  const due = Math.max(1, Math.floor(Number(ally.hireNextDueDay) || normalizeWorldDay(state.worldDay)));
+  const cost = Math.max(0, Math.floor(Number(ally.hireCostCp) || 0));
+  return `Hireling contract: ${priceText(cost)} due day ${due}.`;
+}
+
+function dismissTavernHirelingFromParty(heroId = "") {
+  if (!dismissTavernHireling(heroId, "dismissed from service")) return;
+  render();
+  if (!els.fighterInfo?.classList.contains("hidden")) showPlanningTableInfo();
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function tavernFactionExplain(guestId = "") {
+  const context = currentTavernGuest(guestId);
+  if (!context?.def || context.def.role !== "faction") return;
+  context.guest.factionExplained = true;
+  addLog(`${context.guest.name} explains ${context.def.factionLabel ?? "their faction"}.`, "important");
+  visitTavernGuest(guestId);
+}
+
+function tavernFactionCheck(guestId = "") {
+  const context = currentTavernGuest(guestId);
+  if (!context?.def || context.def.role !== "faction") return;
+  const { guest, def } = context;
+  if (!guest.factionExplained) {
+    addLog(`${guest.name} wants to explain ${def.factionLabel ?? "the faction"} before testing the party.`, "important");
+    visitTavernGuest(guest.id);
+    return;
+  }
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  if (def.unlockFlag && state.questFlags[def.unlockFlag]) {
+    guest.completed = true;
+    guest.lastResult = `A representative is already bound for ${travelHomePlaceLabel()}.`;
+    visitTavernGuest(guest.id);
+    return;
+  }
+  const hero = tavernBestSkillHero(def);
+  const ability = def.ability ?? skillDefinitions?.[def.skill]?.ability ?? "cha";
+  const skillId = def.skill ?? "persuasion";
+  const roll = typeof rollSkillCheck === "function" ? rollSkillCheck(hero, ability, skillId, { guidance: true }) : { total: 10, roll: 10, bonus: 0, guidance: 0 };
+  const dc = Math.max(1, Math.floor(Number(def.dc) || 12));
+  const success = roll.total >= dc;
+  const guidanceText = roll.guidance ? ` + Guidance ${roll.guidance}` : "";
+  const checkText = `${hero?.name ?? "The party"} tries to impress ${guest.name}: ${skillName(skillId)} ${roll.roll} ${abilityLabel(roll.bonus)}${guidanceText} = ${roll.total} vs DC ${dc}.`;
+  addLog(checkText, "important");
+  if (typeof recordD20OutcomeForFighter === "function" && hero) recordD20OutcomeForFighter(hero, success);
+  if (success) {
+    if (def.unlockFlag) state.questFlags[def.unlockFlag] = true;
+    npcBehavior(def.factionId)?.questLogEntries?.();
+    const result = String(def.success ?? "They agree to send a representative to {home}.").replaceAll("{home}", travelHomePlaceLabel());
+    tavernMarkGuestDone(guest, result);
+    addLog(`${guest.name}: ${result}`, "important");
+    renderQuestLogButton();
+  } else {
+    guest.failedToday = true;
+    guest.lastResult = def.failure ?? "They are not convinced yet.";
+    addLog(`${guest.name}: ${guest.lastResult}`, "important");
+  }
+  visitTavernGuest(guest.id);
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function tavernBuyGuestItem(guestId = "", itemId = "") {
+  const context = currentTavernGuest(guestId);
+  if (!context?.def || context.def.role !== "vendor" || !context.def.stock?.includes(itemId)) return;
+  const template = getItemTemplate(itemId);
+  if (!template) return;
+  const price = Math.max(1, Math.ceil(storeItemBuyValueCp(template, { shop: { buyPriceMultiplier: context.def.priceMultiplier ?? 1.25 } })));
+  if (!spendMoney(partyPurse(), price)) return;
+  const item = createItemInstance(itemId, "tavern-guest");
+  addItemToPartyInventory(item, "tavern-guest");
+  addLog(`The party buys ${template.name} from ${context.guest.name}. It goes into the party inventory.`, "important");
+  visitTavernGuest(guestId);
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function tavernRecruitGuest(guestId = "") {
+  const context = currentTavernGuest(guestId);
+  if (!context?.def || context.def.role !== "recruit" || context.guest.completed) return;
+  const { guest, def } = context;
+  const tier = tavernRecruitTier(def);
+  if (!tier?.monsterId || !tavernRecruitMonsterIsHumanoid(tier.monsterId)) {
+    addLog(`${guest.name} is not available as a hireling right now.`, "important");
+    visitTavernGuest(guest.id);
+    return;
+  }
+  const cost = Math.max(0, Math.floor(Number(tier?.costCp ?? def.costCp) || 0));
+  if (!spendMoney(partyPurse(), cost)) return;
+  const leader = activeHero();
+  const monsterId = tier?.monsterId ?? def.allyMonsterId;
+  const ally = createFriendlyBeastFromMonster(monsterId, {
+    id: `tavern-ally-${monsterId}-${Date.now()}`,
+    name: guest.name,
+    position: cloneData(leader?.position ?? { x: 5, y: 5 }),
+    kind: "ally",
+    control: "ai",
+    className: def.className ?? "Hired Ally",
+    followHeroId: leader?.id ?? null,
+  });
+  if (!ally) return;
+  applyMonsterCategoryScaling(ally, { level: Math.max(1, Math.round(averagePartyLevel(leader))), partySize: partyHeroes().length });
+  ally.hp = ally.maxHp;
+  ally.tavernRecruit = true;
+  ally.tavernRecruitGuestId = guest.id;
+  ally.hireCostCp = cost;
+  ally.hirePeriodDays = 10;
+  ally.hireStartDay = normalizeWorldDay(state.worldDay);
+  ally.hireLastPaidDay = normalizeWorldDay(state.worldDay);
+  ally.hireNextDueDay = normalizeWorldDay(state.worldDay) + 10;
+  ally.hireTierLabel = tier?.label ?? def.className ?? "Hireling";
+  ally.hiredAtSettlementId = context.profile?.id ?? null;
+  addRecruitedAllyToParty(ally);
+  const result = String(def.success ?? "{name} joins the party.").replaceAll("{name}", guest.name);
+  tavernMarkGuestDone(guest, result);
+  guest.recruitedAllyId = ally.id;
+  addLog(result, "important");
+  addLog(`${ally.name}'s first 10 days are paid (${priceText(cost)}). Next wage is due on day ${ally.hireNextDueDay}.`, "important");
+  render();
+  visitTavernGuest(guest.id);
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function tavernCompleteMaterialAsk(guestId = "") {
+  const context = currentTavernGuest(guestId);
+  if (!context?.def || context.def.role !== "materialAsk" || context.guest.completed) return;
+  const { guest, def } = context;
+  const quantity = Math.max(1, Math.floor(Number(def.quantity) || 1));
+  if (!consumePartyResource(def.itemId, quantity)) return;
+  addMoney(partyPurse(), Math.max(0, Math.floor(Number(def.rewardCp) || 0)));
+  tavernMarkGuestDone(guest, def.success ?? "They accept the materials and pay the party.");
+  addLog(`${guest.name}: ${guest.lastResult}`, "important");
+  visitTavernGuest(guest.id);
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function tavernCompleteMonsterAsk(guestId = "") {
+  const context = currentTavernGuest(guestId);
+  if (!context?.def || context.def.role !== "monsterAsk" || context.guest.completed) return;
+  const known = tavernKnownMonsterEntries();
+  const entry = known[0];
+  if (!entry) return;
+  addMoney(partyPurse(), Math.max(0, Math.floor(Number(context.def.rewardCp) || 0)));
+  const result = `${context.def.success ?? "They pay for the account."} ${entry.monster.name} is added to their notes.`;
+  tavernMarkGuestDone(context.guest, result);
+  addLog(`${context.guest.name}: ${result}`, "important");
+  visitTavernGuest(context.guest.id);
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+function tavernRumorMemory() {
+  state.world ??= {};
+  state.world.rumoredHexes = state.world.rumoredHexes && typeof state.world.rumoredHexes === "object" ? state.world.rumoredHexes : {};
+  state.world.tavernRumors = Array.isArray(state.world.tavernRumors) ? state.world.tavernRumors : [];
+  return state.world;
+}
+
+function tavernRememberRumor(hex = null, rumor = {}) {
+  if (!hex) return;
+  const world = tavernRumorMemory();
+  const key = travelHexKey(hex.row, hex.col, hex.chunkX, hex.chunkY);
+  world.rumoredHexes[key] = {
+    key,
+    hex: cloneData(hex),
+    title: rumor.title ?? "Local Rumor",
+    text: rumor.text ?? "",
+    source: rumor.source ?? "",
+    day: normalizeWorldDay(state.worldDay),
+  };
+  world.discoveredHexes ??= {};
+  world.discoveredHexes[key] = true;
+  world.tavernRumors.push(world.rumoredHexes[key]);
+  if (world.tavernRumors.length > 30) world.tavernRumors.splice(0, world.tavernRumors.length - 30);
+}
+
+function tavernRumorCandidatePools(profile, def) {
+  const radius = Math.max(3, settlementBoardRadius(profile));
+  const candidates = settlementBoardNearbyCandidates(profile).filter((candidate) => candidate.distanceDays <= radius);
+  const id = String(def?.id ?? "");
+  if (id.includes("mine")) return [candidates.filter((candidate) => String(candidate.feature?.tile ?? "").includes("mine")), candidates.filter((candidate) => candidate.feature)];
+  if (id.includes("shepherd")) return [candidates.filter((candidate) => candidate.questKind === "burrowBoss"), candidates.filter((candidate) => candidate.priority >= 60)];
+  if (id.includes("watchman")) return [
+    candidates.filter((candidate) => /crypt|grave|shrine|undead|oldguard/i.test(`${candidate.feature?.tile ?? ""} ${candidate.themeId ?? ""}`)),
+    candidates.filter((candidate) => candidate.feature),
+  ];
+  if (id.includes("cartographer")) return [candidates.filter((candidate) => candidate.feature), candidates];
+  if (id.includes("clerk")) return [candidates.filter((candidate) => candidate.priority >= 60), candidates];
+  return [candidates.filter((candidate) => candidate.priority >= 60), candidates];
+}
+
+function tavernPickRumorCandidate(profile, def, random) {
+  for (const pool of tavernRumorCandidatePools(profile, def)) {
+    if (pool.length) return pool[Math.floor(random() * pool.length)] ?? pool[0];
+  }
+  return null;
+}
+
+function tavernRumorPlaceHint(candidate = {}, random = Math.random) {
+  const place = candidate.feature ? settlementBoardTargetLabel(candidate, { article: true }) : `the ${candidate.biome}`;
+  const monster = candidate.monsterId ? getMonsterTemplate(candidate.monsterId) : null;
+  if (candidate.questKind === "burrowBoss") {
+    return `${place} is about ${candidate.distanceDays} day${candidate.distanceDays === 1 ? "" : "s"} out. People avoid it because ${monster?.name ? `a ${monster.name}` : "something large"} has made the ground there its own.`;
+  }
+  if (candidate.questKind === "structureDungeon") {
+    const hints = [
+      `${place} has fresh tracks and old trouble. It is about ${candidate.distanceDays} day${candidate.distanceDays === 1 ? "" : "s"} away.`,
+      `${place} is not as empty as it looks. The route is roughly ${candidate.distanceDays} day${candidate.distanceDays === 1 ? "" : "s"} from here.`,
+      `Someone came back from ${place} with a torn pack and no appetite. It lies about ${candidate.distanceDays} day${candidate.distanceDays === 1 ? "" : "s"} away.`,
+    ];
+    return settlementBoardPick(hints, random);
+  }
+  return `There is a patch of ${candidate.biome} about ${candidate.distanceDays} day${candidate.distanceDays === 1 ? "" : "s"} out where travelers keep losing time and supplies.`;
+}
+
+function tavernRumorShopText(profile, random = Math.random) {
+  const storefrontIds = settlementStorefronts(profile);
+  const picked = storefrontIds.length ? settlementBoardPick(storefrontIds, random) : "";
+  const def = picked ? settlementStorefrontDefinition(picked) : null;
+  if (!def) return "";
+  return `${profile.name} has a ${def.name}. ${def.description} The better stock changes with local need, so check it before leaving town.`;
+}
+
+function tavernRumorBoardText(profile, random = Math.random) {
+  const board = settlementBoardEnsure(profile);
+  const available = (board?.quests ?? []).filter((quest) => quest.status === "available");
+  const quest = available.length ? settlementBoardPick(available, random) : null;
+  if (!quest) return null;
+  tavernRememberRumor(quest.targetHex, {
+    title: quest.title,
+    text: quest.description,
+    source: profile?.name ?? "Quest Board",
+  });
+  return `The local board has a fresh posting: ${quest.title}. ${quest.description}`;
+}
+
+function tavernBuildRumor(context, random) {
+  const { guest, def, profile } = context;
+  const baseRumors = Array.isArray(def.rumors) ? def.rumors : [];
+  const base = tavernGuestFillText(baseRumors[Math.floor(random() * Math.max(1, baseRumors.length))] ?? "They have heard the road is not as empty as it looks.", guest, def);
+  const shopText = String(def.id ?? "").includes("clerk") && random() < 0.45 ? tavernRumorShopText(profile, random) : "";
+  if (shopText) return { text: [base, shopText].join(" "), title: "Shop Tip" };
+  const boardText = random() < 0.35 ? tavernRumorBoardText(profile, random) : null;
+  if (boardText) return { text: [base, boardText].join(" "), title: "Board Rumor" };
+  const candidate = tavernPickRumorCandidate(profile, def, random);
+  if (!candidate) return { text: base, title: "Local Rumor" };
+  const place = candidate.feature ? settlementBoardTargetLabel(candidate, { article: false }) : candidate.biome;
+  const hint = tavernRumorPlaceHint(candidate, random);
+  const text = [base, hint].filter(Boolean).join(" ");
+  tavernRememberRumor(candidate.hex, {
+    title: place,
+    text,
+    source: guest.name ?? def.title ?? "Rumor",
+  });
+  return { text, title: place, hex: candidate.hex };
+}
+
+function tavernAskRumor(guestId = "") {
+  const context = currentTavernGuest(guestId);
+  if (!context?.def || context.def.role !== "rumor") return;
+  const { guest, def, profile } = context;
+  const visit = tavernVisitId(profile);
+  if (guest.rumorVisitId === visit) return;
+  const random = settlementBoardRandom(settlementBoardHash(`${profile?.id ?? profile?.name ?? "inn"}:${guest.id}:${visit}:rumor`));
+  const rumor = tavernBuildRumor(context, random);
+  const text = rumor.text;
+  guest.rumorVisitId = visit;
+  guest.lastResult = text;
+  addLog(`${guest.name}: ${text}`, "travel-event");
+  visitTavernGuest(guest.id);
+  renderTravelMap();
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
+window.tavernChooseGuestChatOption = tavernChooseGuestChatOption;
+window.tavernAskRumor = tavernAskRumor;
+window.tavernShowChatResponseFromButton = tavernShowChatResponseFromButton;
+window.tavernFinishGuestChatFromButton = tavernFinishGuestChatFromButton;
+window.tavernReturnToGuestChatFromButton = tavernReturnToGuestChatFromButton;
 
 function npcBehavior(npcId) {
   return window.DungeonNpcBehaviors?.[npcId] ?? null;
@@ -9080,7 +15587,7 @@ function factionSetPurchaseReason(hero, item, rank, method) {
     return (hero.inventory?.heroTokens ?? 0) >= price ? "" : "Need Hero Tokens";
   }
   const price = Math.max(0, Math.floor(Number(item.purchase?.goldCp) || itemValueCp(item)));
-  return moneyToCp(hero.inventory?.money ?? {}) >= price ? "" : "Need Coin";
+  return moneyToCp(partyPurse()) >= price ? "" : "Need Coin";
 }
 
 function factionSetShopRow(item, rank, hero) {
@@ -9233,7 +15740,7 @@ function buyFactionSetItem(factionId, itemId, method = "gold") {
     hero.inventory.heroTokens = Math.max(0, Math.floor(Number(hero.inventory.heroTokens) || 0) - price);
   } else {
     const price = Math.max(0, Math.floor(Number(template.purchase?.goldCp) || itemValueCp(template)));
-    if (!spendMoney(hero.inventory.money, price)) return;
+    if (!spendMoney(partyPurse(), price)) return;
   }
   const item = createItemInstance(itemId, "faction-set");
   if (!item) return;
@@ -9245,8 +15752,12 @@ function buyFactionSetItem(factionId, itemId, method = "gold") {
     item.sell = { ...(item.sell ?? {}), valueCp: 0, rate: 0 };
     item.resaleValueCp = 0;
   }
-  addItemToInventory(hero, item, "faction-set-stack");
-  addLog(`${hero.name} buys ${template.name}${method === "heroTokens" ? " with Hero Tokens. It binds to them." : "."}`, "important");
+  if (method === "heroTokens") {
+    addItemToInventory(hero, item, "faction-set-stack");
+  } else {
+    addItemToPartyInventory(item, "faction-set-stack");
+  }
+  addLog(`${hero.name} buys ${template.name}${method === "heroTokens" ? " with Hero Tokens. It binds to them." : ". It goes into the party inventory."}`, "important");
   render();
   renderFactionSetShopOwner(factionId);
 }
@@ -9391,7 +15902,7 @@ function completeMonsterHunterContract(contractId) {
   const contractState = monsterHunterContractState(contract.id);
   contractState.status = "completed";
   contractState.completedAt = Date.now();
-  addMoney(activeHero().inventory.money, contract.rewardCp);
+  addMoney(partyPurse(), contract.rewardCp);
   const progress = monsterHunterProgress();
   progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
   progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
@@ -9405,7 +15916,7 @@ function completeMonsterHunterTurnIn(turnInId) {
   if (!turnIn || !monsterHunterTurnInReady(turnIn)) return;
   const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
   if (!consumeMaterialsForRequirement(turnIn.requirement, quantity)) return;
-  addMoney(activeHero().inventory.money, turnIn.rewardCp);
+  addMoney(partyPurse(), turnIn.rewardCp);
   const progress = monsterHunterProgress();
   progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
   progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
@@ -9930,7 +16441,7 @@ function completeGravebinderContract(contractId) {
   const contractState = gravebinderContractState(contract.id);
   contractState.status = "completed";
   contractState.completedAt = Date.now();
-  addMoney(activeHero().inventory.money, contract.rewardCp);
+  addMoney(partyPurse(), contract.rewardCp);
   const progress = gravebinderProgress();
   progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
   progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
@@ -9944,7 +16455,7 @@ function completeGravebinderTurnIn(turnInId) {
   if (!turnIn || !gravebinderTurnInReady(turnIn)) return;
   const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
   if (!consumeMaterialsForRequirement(turnIn.requirement, quantity)) return;
-  addMoney(activeHero().inventory.money, turnIn.rewardCp);
+  addMoney(partyPurse(), turnIn.rewardCp);
   const progress = gravebinderProgress();
   progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
   progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
@@ -10471,7 +16982,7 @@ function completeCrucibleContract(contractId) {
   const contractState = crucibleContractState(contract.id);
   contractState.status = "completed";
   contractState.completedAt = Date.now();
-  addMoney(activeHero().inventory.money, contract.rewardCp);
+  addMoney(partyPurse(), contract.rewardCp);
   const progress = crucibleProgress();
   progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
   progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
@@ -10485,7 +16996,7 @@ function completeCrucibleTurnIn(turnInId) {
   if (!turnIn || !crucibleTurnInReady(turnIn)) return;
   const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
   if (!consumeMaterialsForRequirement(turnIn.requirement, quantity)) return;
-  addMoney(activeHero().inventory.money, turnIn.rewardCp);
+  addMoney(partyPurse(), turnIn.rewardCp);
   const progress = crucibleProgress();
   progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
   progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
@@ -11044,7 +17555,7 @@ function completeAntiquarianContract(contractId) {
   const contractState = antiquarianContractState(contract.id);
   contractState.status = "completed";
   contractState.completedAt = Date.now();
-  addMoney(activeHero().inventory.money, contract.rewardCp);
+  addMoney(partyPurse(), contract.rewardCp);
   const progress = antiquarianProgress();
   progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
   progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
@@ -11058,7 +17569,7 @@ function completeAntiquarianTurnIn(turnInId) {
   if (!turnIn || !antiquarianTurnInReady(turnIn)) return;
   const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
   if (!consumeAntiquarianTurnIn(turnIn, quantity)) return;
-  addMoney(activeHero().inventory.money, turnIn.rewardCp);
+  addMoney(partyPurse(), turnIn.rewardCp);
   const progress = antiquarianProgress();
   progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
   progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
@@ -11214,7 +17725,8 @@ function createCompactGuildBoard(config) {
   const ranks = config.ranks ?? [];
   const contracts = config.contracts ?? [];
   const turnIns = config.turnIns ?? [];
-  const panels = new Set(["contracts", "turnins", ...(config.factionSetShopTitle ? ["shop", "catalog"] : [])]);
+  const extraPanels = Array.isArray(config.extraPanels) ? config.extraPanels : [];
+  const panels = new Set(["contracts", "turnins", ...extraPanels.map((panel) => panel.id).filter(Boolean), ...(config.factionSetShopTitle ? ["shop", "catalog"] : [])]);
   let activePanel = "contracts";
 
   function progress() {
@@ -11441,6 +17953,7 @@ function createCompactGuildBoard(config) {
         <button type="button" data-action="show-quest-log">Quest Log</button>
         ${panelButton("contracts", config.contractsButtonLabel ?? config.contractsTitle ?? "Contracts")}
         ${panelButton("turnins", config.turnInsButtonLabel ?? config.turnInsTitle ?? "Turn-Ins")}
+        ${extraPanels.map((panel) => panelButton(panel.id, panel.label ?? panel.title ?? panel.id)).join("")}
         ${config.factionSetShopTitle ? panelButton("shop", config.factionSetShopTitle) : ""}
         ${config.factionSetCatalogTitle ? panelButton("catalog", "See Sets") : ""}
         <div>
@@ -11458,6 +17971,8 @@ function createCompactGuildBoard(config) {
 
   function mainPanelMarkup(entry) {
     if (activePanel === "turnins") return turnInsMarkup();
+    const extraPanel = extraPanels.find((panel) => panel.id === activePanel);
+    if (extraPanel && typeof extraPanel.render === "function") return extraPanel.render({ entry, progress, rank, renderGuild });
     if (activePanel === "shop" && config.factionSetShopTitle) return factionSetShopMarkup(config.id, rank(entry), config.factionSetShopTitle);
     if (activePanel === "catalog" && config.factionSetCatalogTitle) return factionSetCatalogMarkup(config.id, rank(entry), config.factionSetCatalogTitle);
     return contractsMarkup();
@@ -11510,7 +18025,7 @@ function createCompactGuildBoard(config) {
     const entry = contractState(contract.id);
     entry.status = "completed";
     entry.completedAt = Date.now();
-    addMoney(activeHero().inventory.money, contract.rewardCp);
+    addMoney(partyPurse(), contract.rewardCp);
     const guildProgress = progress();
     guildProgress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
     guildProgress.completedContracts[contract.id] = (guildProgress.completedContracts[contract.id] ?? 0) + 1;
@@ -11524,7 +18039,7 @@ function createCompactGuildBoard(config) {
     if (!turnIn || !turnInReady(turnIn)) return;
     const quantity = Math.max(1, Math.floor(Number(turnIn.quantity) || 1));
     if (!consumeMaterialsForRequirement(turnIn.requirement, quantity)) return;
-    addMoney(activeHero().inventory.money, turnIn.rewardCp);
+    addMoney(partyPurse(), turnIn.rewardCp);
     const guildProgress = progress();
     guildProgress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
     guildProgress.turnIns[turnIn.id] = (guildProgress.turnIns[turnIn.id] ?? 0) + 1;
@@ -11576,7 +18091,8 @@ function createCompactGuildBoard(config) {
   }
 
   function questLogEntries() {
-    return contracts
+    return [
+      ...contracts
       .filter((contract) => contractState(contract.id).status === "accepted")
       .map((contract) => {
         const entry = contractState(contract.id);
@@ -11599,7 +18115,9 @@ function createCompactGuildBoard(config) {
             },
           ],
         };
-      });
+      }),
+      ...(typeof config.extraQuestLogEntries === "function" ? config.extraQuestLogEntries() : []),
+    ];
   }
 
   function adminProgressEntries() {
@@ -11699,6 +18217,380 @@ function itemSearchText(item) {
     .toLowerCase();
 }
 
+function expeditionRoadFeatureEntries() {
+  const entries = [];
+  const seen = new Set();
+  for (const [key, chunk] of Object.entries(state?.world?.chunks ?? {})) {
+    const [chunkXText, chunkYText] = key.split(",");
+    const chunkX = Math.floor(Number(chunk?.chunkX ?? chunkXText) || 0);
+    const chunkY = Math.floor(Number(chunk?.chunkY ?? chunkYText) || 0);
+    for (const object of chunk?.middleObjects ?? []) {
+      const cell = object?.generatedCell ?? { row: Math.floor(Number(object?.y) || 0), col: Math.floor(Number(object?.x) || 0) };
+      const hex = travelNormalizeHex({ chunkX, chunkY, row: cell.row, col: cell.col });
+      const feature = travelPrimaryFeatureForCell(chunk, cell.row, cell.col);
+      if (!hex || !feature || feature !== object) continue;
+      const id = feature.id || travelHexKeyForHex(hex);
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      entries.push({
+        id,
+        hex,
+        feature,
+        label: travelStructureDisplayLabel(feature),
+        kind: travelFeatureKind(feature),
+        settlement: travelFeatureIsTeleportSettlement(feature),
+      });
+    }
+  }
+  return entries;
+}
+
+function expeditionRoadConnectedAnchors() {
+  const roadState = travelRoadState();
+  const homeHex = travelNormalizeHex(state?.world?.homeHex);
+  const anchors = [];
+  if (homeHex) {
+    const homeFeature = travelFeatureForHex(homeHex);
+    anchors.push({
+      id: state?.world?.homeVillageId || travelHexKeyForHex(homeHex),
+      label: travelHomePlaceLabel(),
+      hex: homeHex,
+      home: true,
+      settlement: true,
+      feature: homeFeature,
+    });
+  }
+  for (const entry of Object.values(roadState.connectedTargets ?? {})) {
+    const hex = travelNormalizeHex(entry?.hex);
+    if (!hex) continue;
+    anchors.push({
+      id: entry.id || travelHexKeyForHex(hex),
+      label: entry.label || travelPlaceLabelForHex(hex),
+      hex,
+      settlement: Boolean(entry.settlement),
+      feature: travelFeatureForHex(hex),
+    });
+  }
+  const seen = new Set();
+  return anchors.filter((entry) => {
+    const key = travelHexKeyForHex(entry.hex);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function expeditionRoadShortestPath(startHex = null, targetHex = null, maxSteps = 32) {
+  const start = travelNormalizeHex(startHex);
+  const target = travelNormalizeHex(targetHex);
+  if (!start || !target || travelSameHex(start, target)) return [];
+  const targetKey = travelHexKeyForHex(target);
+  const queue = [{ hex: start, path: [] }];
+  const seen = new Set([travelHexKeyForHex(start)]);
+  while (queue.length) {
+    const current = queue.shift();
+    if (current.path.length >= maxSteps) continue;
+    for (const neighbor of travelNeighborHexes(current.hex)) {
+      if (!travelHexInChunk(neighbor)) continue;
+      const key = travelHexKeyForHex(neighbor);
+      if (seen.has(key)) continue;
+      const path = [...current.path, neighbor];
+      if (key === targetKey) return path;
+      seen.add(key);
+      queue.push({ hex: neighbor, path });
+    }
+  }
+  return [];
+}
+
+function expeditionRoadProjectId(startHex = null, targetHex = null) {
+  return `road:${travelHexKeyForHex(startHex)}>${travelHexKeyForHex(targetHex)}`.replace(/[^a-zA-Z0-9:|,>_-]/g, "");
+}
+
+function expeditionRoadProjectBuiltCount(project = null) {
+  if (!project?.path?.length) return 0;
+  const steps = [project.start, ...project.path].map((hex) => travelNormalizeHex(hex)).filter(Boolean);
+  let built = 0;
+  for (let index = 1; index < steps.length; index += 1) {
+    if (travelRoadEdgeBuilt(steps[index - 1], steps[index])) built += 1;
+  }
+  return built;
+}
+
+function expeditionRoadProjectComplete(project = null) {
+  return Boolean(project?.path?.length && expeditionRoadProjectBuiltCount(project) >= project.path.length);
+}
+
+function expeditionRoadKnownProjectIds() {
+  const roadState = travelRoadState();
+  return new Set(Object.keys(roadState.projects ?? {}));
+}
+
+function expeditionRoadCandidateProjects() {
+  const roadState = travelRoadState();
+  const knownIds = expeditionRoadKnownProjectIds();
+  const anchors = expeditionRoadConnectedAnchors();
+  const features = expeditionRoadFeatureEntries();
+  const connectedKeys = new Set(anchors.map((anchor) => travelHexKeyForHex(anchor.hex)));
+  const candidates = [];
+  const pushCandidate = (anchor, target, type) => {
+    if (!anchor?.hex || !target?.hex) return;
+    const id = expeditionRoadProjectId(anchor.hex, target.hex);
+    if (knownIds.has(id) || candidates.some((entry) => entry.id === id)) return;
+    const path = expeditionRoadShortestPath(anchor.hex, target.hex, type === "settlement" ? 36 : 18);
+    if (!path.length) return;
+    candidates.push({
+      id,
+      type,
+      start: cloneData(anchor.hex),
+      startLabel: anchor.label,
+      target: cloneData(target.hex),
+      targetId: target.id,
+      targetLabel: target.label,
+      targetKind: target.kind,
+      settlement: Boolean(target.settlement),
+      path: path.map((hex) => cloneData(hex)),
+      rewardCp: Math.max(type === "settlement" ? 6000 : 3500, path.length * (type === "settlement" ? 1400 : 900)),
+      reputation: Math.max(type === "settlement" ? 18 : 10, path.length * (type === "settlement" ? 3 : 2)),
+      bonusKits: Math.max(1, Math.ceil(path.length / (type === "settlement" ? 3 : 4))),
+    });
+  };
+  for (const anchor of anchors) {
+    const settlementTargets = features
+      .filter((entry) => entry.settlement && !connectedKeys.has(travelHexKeyForHex(entry.hex)))
+      .map((entry) => ({ ...entry, path: expeditionRoadShortestPath(anchor.hex, entry.hex, 36) }))
+      .filter((entry) => entry.path.length)
+      .sort((a, b) => a.path.length - b.path.length);
+    if (settlementTargets[0]) pushCandidate(anchor, settlementTargets[0], "settlement");
+    const poiTargets = features
+      .filter((entry) => !entry.settlement && !["lake", "harbor"].includes(entry.kind) && !connectedKeys.has(travelHexKeyForHex(entry.hex)))
+      .map((entry) => ({ ...entry, path: expeditionRoadShortestPath(anchor.hex, entry.hex, 18) }))
+      .filter((entry) => entry.path.length && entry.path.length <= 12)
+      .sort((a, b) => a.path.length - b.path.length || String(a.label).localeCompare(String(b.label)));
+    for (const target of poiTargets.slice(0, 2)) pushCandidate(anchor, target, "poi");
+  }
+  return candidates.sort((a, b) => (a.type === b.type ? a.path.length - b.path.length : a.type === "settlement" ? -1 : 1)).slice(0, 6);
+}
+
+function expeditionRoadProjectSummary(project) {
+  const built = expeditionRoadProjectBuiltCount(project);
+  const total = Math.max(1, project?.path?.length ?? 1);
+  return `${project.startLabel} to ${project.targetLabel}: ${built}/${total} road segment${total === 1 ? "" : "s"} built.`;
+}
+
+function expeditionRoadProjectRow(project, { offered = false } = {}) {
+  const built = expeditionRoadProjectBuiltCount(project);
+  const total = Math.max(1, project.path?.length ?? 1);
+  const complete = expeditionRoadProjectComplete(project);
+  const status = project.status ?? (offered ? "offered" : "available");
+  return `
+    <article class="guild-contract-row ${complete ? "ready" : ""}">
+      <div>
+        <b>${escapeHtml(project.type === "settlement" ? `Road to ${project.targetLabel}` : `Road Spur to ${project.targetLabel}`)}</b>
+        <span>${escapeHtml(project.startLabel)} -> ${escapeHtml(project.targetLabel)}. ${escapeHtml(project.type === "settlement" ? "Survey and build a safe settlement road." : "Build a marked spur to a useful site.")}</span>
+        <small>${escapeHtml(built)}/${escapeHtml(total)} segments - ${escapeHtml(priceText(project.rewardCp))}, ${escapeHtml(project.reputation)} rep, ${escapeHtml(project.bonusKits)} bonus kit${project.bonusKits === 1 ? "" : "s"}</small>
+      </div>
+      ${
+        status === "completed"
+          ? `<button type="button" disabled>Filed</button>`
+          : complete
+            ? `<button type="button" data-action="claim-road-project" data-project="${escapeAttribute(project.id)}">File Road</button>`
+            : status === "accepted"
+              ? `<button type="button" disabled>${escapeHtml(travelRoadKitCount())} Kits</button>`
+              : `<button type="button" data-action="accept-road-project" data-project="${escapeAttribute(project.id)}">Accept</button>`
+      }
+    </article>
+  `;
+}
+
+function expeditionRoadProjectsMarkup() {
+  const roadState = travelRoadState();
+  const active = Object.values(roadState.projects ?? {}).filter((project) => project.status === "accepted");
+  const ready = active.filter(expeditionRoadProjectComplete);
+  const offered = expeditionRoadCandidateProjects();
+  const builtCount = Object.keys(roadState.builtEdges ?? {}).length;
+  return `
+    <section class="guild-section expedition-road-projects">
+      <h3>Road Projects</h3>
+      <p class="small-note">Accept a project to receive one Road-Building Kit per segment. Travel along the marked route; each matching step spends one kit and leaves a visible road on the map.</p>
+      <div class="guild-status compact-road-status">
+        <div><span>Road Kits</span><b>${escapeHtml(travelRoadKitCount())}</b></div>
+        <div><span>Built Segments</span><b>${escapeHtml(builtCount)}</b></div>
+        <div><span>Ready Reports</span><b>${escapeHtml(ready.length)}</b></div>
+      </div>
+      <div class="guild-contract-list">
+        ${
+          active.length
+            ? active.map((project) => expeditionRoadProjectRow(project)).join("")
+            : `<p class="empty-note">No active road projects. Nella has a pencil ready.</p>`
+        }
+      </div>
+      <h3>Available Surveys</h3>
+      <div class="guild-contract-list">
+        ${
+          offered.length
+            ? offered.map((project) => expeditionRoadProjectRow(project, { offered: true })).join("")
+            : `<p class="empty-note">No reachable road projects in the generated map yet. Scout more edges or discover more settlements and sites.</p>`
+        }
+      </div>
+    </section>
+  `;
+}
+
+function expeditionFindRoadProject(projectId = "") {
+  const roadState = travelRoadState();
+  return roadState.projects?.[projectId] ?? expeditionRoadCandidateProjects().find((project) => project.id === projectId) ?? null;
+}
+
+function acceptExpeditionRoadProject(projectId = "") {
+  const project = expeditionFindRoadProject(projectId);
+  if (!project || project.status === "completed") return;
+  const roadState = travelRoadState();
+  if (roadState.projects[project.id]?.status === "accepted") return;
+  roadState.projects[project.id] = {
+    ...cloneData(project),
+    status: "accepted",
+    acceptedAt: Date.now(),
+  };
+  addTravelRoadKits(Math.max(1, project.path.length));
+  addLog(`Nella issues ${project.path.length} Road-Building Kit${project.path.length === 1 ? "" : "s"} for ${project.targetLabel}.`, "important");
+  expeditionBoardApi.setBoardPanel?.("roads");
+  renderQuestLogButton();
+}
+
+function claimExpeditionRoadProject(projectId = "") {
+  const roadState = travelRoadState();
+  const project = roadState.projects?.[projectId];
+  if (!project || project.status !== "accepted" || !expeditionRoadProjectComplete(project)) return;
+  project.status = "completed";
+  project.completedAt = Date.now();
+  const progress = expeditionBoardApi.progress();
+  progress.reputation += Math.max(0, Math.floor(Number(project.reputation) || 0));
+  addMoney(partyPurse(), project.rewardCp);
+  addTravelRoadKits(Math.max(1, Math.floor(Number(project.bonusKits) || 1)));
+  roadState.connectedTargets[project.targetId || travelHexKeyForHex(project.target)] = {
+    id: project.targetId || travelHexKeyForHex(project.target),
+    label: project.targetLabel,
+    hex: cloneData(project.target),
+    settlement: Boolean(project.settlement),
+    connectedAt: Date.now(),
+  };
+  addLog(`The Expedition Board files ${project.targetLabel} as road-linked. ${priceText(project.rewardCp)} and ${project.bonusKits} spare kit${project.bonusKits === 1 ? "" : "s"} added. Reputation +${project.reputation}.`, "important");
+  render();
+  expeditionBoardApi.setBoardPanel?.("roads");
+}
+
+function buildExpeditionRoadSegmentIfNeeded(from = null, to = null) {
+  if (!from || !to) return false;
+  const roadState = travelRoadState();
+  const edgeKey = travelRoadEdgeKey(from, to);
+  if (!edgeKey || roadState.builtEdges[edgeKey]) return false;
+  const activeProject = Object.values(roadState.projects ?? {}).find((project) => {
+    if (project.status !== "accepted") return false;
+    const steps = [project.start, ...(project.path ?? [])].map((hex) => travelNormalizeHex(hex)).filter(Boolean);
+    for (let index = 1; index < steps.length; index += 1) {
+      if (travelRoadEdgeKey(steps[index - 1], steps[index]) === edgeKey) return true;
+    }
+    return false;
+  });
+  if (!activeProject) return false;
+  if (!consumePartyResource(roadBuildingKitItemId, 1)) {
+    addLog(`The party reaches a planned road segment, but has no Road-Building Kit left. Return to the Expedition Board or finish another project for more kits.`, "important");
+    return false;
+  }
+  roadState.builtEdges[edgeKey] = {
+    key: edgeKey,
+    from: cloneData(from),
+    to: cloneData(to),
+    projectId: activeProject.id,
+    builtAtDay: normalizeWorldDay(state.worldDay),
+  };
+  addLog(`The party spends a Road-Building Kit and marks a usable road toward ${activeProject.targetLabel}.`, "important");
+  if (expeditionRoadProjectComplete(activeProject)) addLog(`Road project ready to file: ${activeProject.targetLabel}.`, "important");
+  renderQuestLogButton();
+  return true;
+}
+
+function expeditionRoadQuestLogEntries() {
+  const roadState = travelRoadState();
+  return Object.values(roadState.projects ?? {})
+    .filter((project) => project.status === "accepted")
+    .map((project) => {
+      const total = Math.max(1, project.path?.length ?? 1);
+      const built = expeditionRoadProjectBuiltCount(project);
+      return {
+        id: `expedition-road-${project.id}`,
+        giver: "Expedition Board",
+        title: project.type === "settlement" ? `Road to ${project.targetLabel}` : `Road Spur to ${project.targetLabel}`,
+        description: `${expeditionRoadProjectSummary(project)} Travel the planned edges with Road-Building Kits, then file the completed road at the Expedition Board.`,
+        ready: built >= total,
+        cancelable: false,
+        objectives: [
+          {
+            label: "Road segments built",
+            progress: built,
+            target: total,
+          },
+        ],
+      };
+    });
+}
+
+const expeditionMilepostMissionNames = [
+  "Survey the Bad Mile",
+  "Clear the Wayhouse",
+  "The Lantern Run",
+  "The Last Milepost",
+];
+
+function expeditionMilepostContractState() {
+  return expeditionBoardApi.progress().contracts?.["campaign-mileposts"] ?? null;
+}
+
+function expeditionMilepostCampaignMarkup() {
+  const contract = expeditionMilepostContractState();
+  const accepted = contract?.status === "accepted";
+  const completedContract = contract?.status === "completed";
+  const completed = Math.max(0, Math.floor(Number(state?.campaignProgress?.["expedition-mileposts"]) || 0));
+  const currentReports = Math.min(2, Math.max(0, Math.floor(Number(contract?.progress) || 0)));
+  const progressText = completedContract
+    ? "Filed with the Board."
+    : accepted
+      ? `${currentReports} / 2 mission reports ready`
+      : "Accept Campaign Mileposts from the Postings desk to open these special road missions.";
+  return `
+    <section class="guild-section expedition-mileposts">
+      <h3>The Milepost Ledger</h3>
+      <p>${escapeHtml(progressText)}</p>
+      <div class="store-list">
+        ${expeditionMilepostMissionNames.map((name, index) => {
+          const number = index + 1;
+          const done = completed >= number;
+          const unlocked = accepted && number <= completed + 1;
+          return `
+            <article class="store-row ${done ? "completed" : ""}">
+              <div>
+                <b>${escapeHtml(number)}. ${escapeHtml(name)}</b>
+                <span>${escapeHtml(done ? "The Board has this proof in the ledger." : "A straight road-line delve using the linear generator.")}</span>
+              </div>
+              <button type="button" data-action="start-expedition-milepost" data-index="${number}" ${unlocked && !done ? "" : "disabled"}>${escapeHtml(done ? "Report Filed" : unlocked ? "Start Mission" : "Locked")}</button>
+            </article>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+async function startExpeditionMilepostMission(index) {
+  const missionIndex = Math.max(1, Math.min(expeditionMilepostMissionNames.length, Math.floor(Number(index) || 1)));
+  const completed = Math.max(0, Math.floor(Number(state?.campaignProgress?.["expedition-mileposts"]) || 0));
+  const contract = expeditionMilepostContractState();
+  if (contract?.status !== "accepted" || missionIndex > completed + 1) return;
+  hideVillageMenu();
+  await startCampaignDungeon("expedition-mileposts", { dungeonIndex: missionIndex });
+}
+
 const expeditionBoardApi = createCompactGuildBoard({
   id: "expedition-board",
   stateKey: "expeditionBoard",
@@ -11711,6 +18603,11 @@ const expeditionBoardApi = createCompactGuildBoard({
   contractsButtonLabel: "Postings",
   turnInsTitle: "Supply Turn-Ins",
   turnInsButtonLabel: "Supply Turn-Ins",
+  extraPanels: [
+    { id: "roads", label: "Road Projects", render: expeditionRoadProjectsMarkup },
+    { id: "mileposts", label: "Milepost Missions", render: expeditionMilepostCampaignMarkup },
+  ],
+  extraQuestLogEntries: expeditionRoadQuestLogEntries,
   factionSetShopTitle: "Expedition Gear",
   factionSetCatalogTitle: "Expedition Set Catalog",
   readyContractText: "posting",
@@ -11739,8 +18636,8 @@ const expeditionBoardApi = createCompactGuildBoard({
       id: "prove-the-road",
       name: "Prove the Road",
       group: "Route Work",
-      summary: "Complete delves and return with enough confidence for Nella to mark the route as survivable.",
-      objective: { type: "dungeonComplete", count: 2, label: "Dungeons completed" },
+      summary: "Complete wild biome delves and return with enough confidence for Nella to mark the route as survivable.",
+      objective: { type: "biomeDungeonComplete", count: 2, label: "Biome delves completed" },
       rewardCp: 9000,
       reputation: 30,
       minRank: 0,
@@ -11750,7 +18647,7 @@ const expeditionBoardApi = createCompactGuildBoard({
       name: "Campaign Mileposts",
       group: "Route Work",
       summary: "Finish campaign-linked expeditions so the Board can stop calling those roads 'optimistic'.",
-      objective: { type: "campaignDungeon", count: 2, label: "Campaign expeditions completed" },
+      objective: { type: "campaignDungeon", count: 2, label: "Milepost missions completed" },
       rewardCp: 16000,
       reputation: 50,
       minRank: 1,
@@ -11797,8 +18694,10 @@ const expeditionBoardApi = createCompactGuildBoard({
   ],
   dungeonMatchesContract(context, contract) {
     const objective = contract?.objective ?? {};
+    const biomeDungeonThemes = new Set(["arctic", "desertRuins", "forestOfTheBeasts", "grasslands", "jungle", "mountain", "swamp", "underwater", "crucibleOfFlame"]);
+    if (objective.type === "biomeDungeonComplete") return biomeDungeonThemes.has(String(context?.themeId ?? ""));
     if (objective.type === "dungeonComplete") return true;
-    if (objective.type === "campaignDungeon") return Boolean(context?.campaignId);
+    if (objective.type === "campaignDungeon") return context?.campaignId === "expedition-mileposts";
     return false;
   },
 });
@@ -12051,10 +18950,9 @@ function payFightingPitRewardToMainHero(run = fightingPitCurrentRun()) {
   const unpaidCp = Math.max(0, rewardCp - paidCp);
   const hero = fightingPitMainHero();
   if (unpaidCp > 0 && hero) {
-    hero.inventory = normalizeInventory(hero.inventory);
-    addMoney(hero.inventory.money, unpaidCp);
+    addMoney(partyPurse(), unpaidCp);
     run.rewardPaidCp = paidCp + unpaidCp;
-    addLog(`${hero.name} receives the Fighting Pit purse: ${priceText(unpaidCp)}.`, "important");
+    addLog(`The Fighting Pit purse adds ${priceText(unpaidCp)} to the party purse.`, "important");
   }
   return { hero, paidCp: unpaidCp };
 }
@@ -12620,7 +19518,7 @@ function itemIsArmorsmithStock(item) {
 }
 
 function itemIsGeneralMerchantStock(item) {
-  return itemIsStandardNonMagic(item) && (item.type === "ammunition" || item.id === "potion-healing" || ["torch", "hooded-lantern", "lantern-oil"].includes(item.id));
+  return itemIsStandardNonMagic(item) && (item.type === "ammunition" || item.id === "potion-healing" || ["torch", "hooded-lantern", "lantern-oil", "trail-ration"].includes(item.id));
 }
 
 function itemIsAlchemistStock(item) {
@@ -12848,8 +19746,7 @@ function completeBorrenClaimHammerQuest() {
   const quest = borrenClaimHammerState();
   if (quest.status === "completed" || borrenClaimHammerCount() < 1) return;
   if (!consumeMaterialsForRequirement(borrenClaimHammerRequirement(), 1)) return;
-  const hero = activeHero();
-  addMoney(hero.inventory.money, 10000);
+  addMoney(partyPurse(), 10000);
   addPartyResourceItem(getItemTemplate("embervein-ore"), 3);
   quest.status = "completed";
   quest.completedAt = Date.now();
@@ -12917,7 +19814,7 @@ function applySmithMaterialCommissionHandIn(npcId, commission, contributions) {
   if (error) return;
   for (const entry of contributions) consumePartyResource(entry.itemId, entry.quantity);
   const rewardCp = smithMaterialCommissionRewardCp(commission);
-  addMoney(activeHero().inventory.money, rewardCp);
+  addMoney(partyPurse(), rewardCp);
   commission.status = "completed";
   commission.completedAt = Date.now();
   const materialText = contributions
@@ -13097,6 +19994,7 @@ function acceptedQuestLogEntries() {
   return [
     ...campaignQuestLogEntries(),
     ...Object.values(window.DungeonNpcBehaviors ?? {}).flatMap((behavior) => behavior.questLogEntries?.() ?? []),
+    ...settlementBoardQuestLogEntries(),
     ...materialCommissionQuestLogEntries(),
     ...borrenClaimHammerQuestLogEntries(),
   ].filter(Boolean);
@@ -13165,6 +20063,7 @@ function cancelQuestLogEntry(entry) {
   if (entry.cancelType === "antiquarian") return cancelAntiquarianContract(entry.questId);
   if (entry.cancelType === "expedition-board") return cancelExpeditionContract(entry.questId);
   if (entry.cancelType === "boom-club") return cancelBoomClubContract(entry.questId);
+  if (entry.cancelType === "settlement-board") return cancelSettlementBoardQuest(entry.questId);
   if (entry.cancelType === "commission") return cancelSmithMaterialCommission(entry.npcId);
   if (entry.cancelType === "borren-claim-hammer") {
     const quest = borrenClaimHammerState();
@@ -13312,7 +20211,7 @@ function storeBuyRowMarkup(item, npc, hero) {
         <b>${escapeHtml(item.name)}</b>
         <span>${escapeHtml(itemDetails(item))} - ${escapeHtml(priceText(price))}</span>
       </div>
-      <button type="button" data-action="buy-store-item" data-item="${item.id}" ${moneyToCp(hero.inventory.money) >= price ? "" : "disabled"}>Buy</button>
+      <button type="button" data-action="buy-store-item" data-item="${item.id}" ${moneyToCp(partyPurse()) >= price ? "" : "disabled"}>Buy</button>
     </div>
   `;
 }
@@ -13368,7 +20267,6 @@ function apothecaryTreatmentEntries() {
 
 function apothecaryTreatmentMarkup(npc) {
   if (npc?.shop?.type !== "apothecary") return "";
-  const hero = activeHero();
   const entries = apothecaryTreatmentEntries();
   return `
     <section class="store-section">
@@ -13378,7 +20276,7 @@ function apothecaryTreatmentMarkup(npc) {
           entries.length
             ? entries
                 .map((entry) => {
-                  const affordable = moneyToCp(hero.inventory.money) >= entry.priceCp;
+                  const affordable = moneyToCp(partyPurse()) >= entry.priceCp;
                   return `
                     <div class="store-row">
                       <div>
@@ -13400,14 +20298,13 @@ function apothecaryTreatmentMarkup(npc) {
 function apothecaryCureDisease(heroId, diseaseId) {
   const npc = storeNpcDefinition();
   if (npc?.shop?.type !== "apothecary") return;
-  const payer = activeHero();
   const target = state.fighters[heroId];
   if (!target || !diseaseId) return;
   const price = diseaseCurePriceCp(diseaseId);
-  if (!spendMoney(payer.inventory.money, price)) return;
+  if (!spendMoney(partyPurse(), price)) return;
   const removed = typeof cureFighterDisease === "function" ? cureFighterDisease(target, diseaseId) : [];
   if (!removed.length) {
-    addMoney(payer.inventory.money, price);
+    addMoney(partyPurse(), price);
     return;
   }
   const disease = typeof diseaseDefinition === "function" ? diseaseDefinition(diseaseId) : window.DungeonAfflictions?.diseases?.[diseaseId];
@@ -13477,9 +20374,11 @@ function wizardRemoveCurse(heroId, options = {}) {
   renderStoreMenu();
 }
 
-function renderStoreMenu() {
+function renderStoreMenu(options = {}) {
   const hero = activeHero();
   const npc = storeNpcDefinition();
+  const preserveScroll = Boolean(options.preserveScroll);
+  const previousScrollTop = preserveScroll ? els.storeBody?.scrollTop ?? 0 : 0;
   document.querySelector("#store-title").textContent = npc.title ?? "Store";
   const equippedIds = new Set(Object.values(hero.equipment).filter(Boolean));
   const query = storeSearch.trim().toLowerCase();
@@ -13497,7 +20396,7 @@ function renderStoreMenu() {
         <p>${escapeHtml(npcEntryLine(npc) || npc.description || "Welcome.")}</p>
       </div>
     </section>
-    <div class="store-wallet">${escapeHtml(moneyText(hero.inventory.money))}</div>
+    <div class="store-wallet">Party Purse: ${escapeHtml(moneyText(partyPurse()))}</div>
     ${borrenClaimHammerMarkup(npc)}
     ${smithMaterialCommissionMarkup(npc)}
     ${apothecaryTreatmentMarkup(npc)}
@@ -13544,6 +20443,7 @@ function renderStoreMenu() {
           </section>`
     }
   `;
+  if (preserveScroll && els.storeBody) els.storeBody.scrollTop = previousScrollTop;
 }
 
 function showStoreMenu(npcId = "general-merchant") {
@@ -13560,7 +20460,6 @@ function hideStoreMenu() {
 }
 
 function buyStoreItem(itemId) {
-  const hero = activeHero();
   const template = getItemTemplate(itemId);
   if (!template) return;
 
@@ -13568,11 +20467,11 @@ function buyStoreItem(itemId) {
   if (!storeStockItems(npc).some((item) => item.id === itemId)) return;
   if (npc?.shop?.type !== "arcanist" && (template.store?.buyable === false || template.tags?.includes("loot:magic") || template.type === "treasure")) return;
   const price = storeItemBuyValueCp(template, npc);
-  if (!spendMoney(hero.inventory.money, price)) return;
-  addItemToInventory(hero, createItemInstance(itemId, "store"), "store-stack");
-  addLog(`${hero.name} buys ${template.name}.`, "important");
+  if (!spendMoney(partyPurse(), price)) return;
+  addItemToPartyInventory(createItemInstance(itemId, "store"), "store-stack");
+  addLog(`The party buys ${template.name}. It goes into the party inventory.`, "important");
   render();
-  renderStoreMenu();
+  renderStoreMenu({ preserveScroll: true });
 }
 
 function sellStoreItem(itemId) {
@@ -13586,10 +20485,10 @@ function sellStoreItem(itemId) {
   if (!storeAcceptsSoldItem(item, npc)) return;
   hero.inventory.items = hero.inventory.items.filter((entry) => entry.id !== itemId);
   const saleValue = storeItemSellValueCp(item, npc);
-  addMoney(hero.inventory.money, saleValue);
-  addLog(`${hero.name} sells ${item.name} for ${priceText(saleValue)}.${item.starterEquipment ? " Starter equipment has no resale value." : ""}`, "important");
+  addMoney(partyPurse(), saleValue);
+  addLog(`${hero.name} sells ${item.name} for ${priceText(saleValue)}. The coin goes into the party purse.${item.starterEquipment ? " Starter equipment has no resale value." : ""}`, "important");
   render();
-  renderStoreMenu();
+  renderStoreMenu({ preserveScroll: true });
 }
 
 function fighterClassFeatureNames(level) {
@@ -14740,7 +21639,7 @@ const beastMasterCompanionOptions = [
     id: "pteranodon",
     monsterId: "summonRangerPteranodon",
     name: "Pteranodon",
-    description: "Flying skirmisher. Fast aerial reach, but wants careful positioning.",
+    description: "Fast aerial fighter with strong reach, but wants careful positioning.",
     attackAbility: "dex",
     abilityScores: { str: 12, dex: 15, con: 10, int: 2, wis: 9, cha: 5 },
     savingThrowProficiencies: ["dex"],
@@ -14810,7 +21709,7 @@ const beastMasterCompanionOptions = [
     id: "otter",
     monsterId: "marshOtter",
     name: "River Otter",
-    description: "Creative skirmisher. Balanced, nimble, and useful in wet dungeon spaces.",
+    description: "Creative, nimble fighter that stays useful in wet dungeon spaces.",
     attackAbility: "dex",
     abilityScores: { str: 8, dex: 16, con: 12, int: 3, wis: 12, cha: 8 },
     savingThrowProficiencies: ["dex"],
@@ -15631,7 +22530,7 @@ async function useUsableInventoryItem(itemId, targetId = null, options = {}) {
     applyStatusEffect(target, status);
     addLog(`${hero.name} casts Gravebreaker's Lantern onto ${target.name}. ${target.name} cannot benefit from invisibility${monsterIsUndead(target) ? " or regain HP" : ""} until ${hero.name}'s next turn.`, "important");
   } else {
-    addLog(`${hero.name} uses ${item.name}. Its special effect is not implemented in the current item-use UI yet.`, "important");
+    addLog(`${hero.name} studies ${item.name}, but nothing useful happens right now.`, "important");
   }
 
   refreshDerivedStats(hero);
@@ -17357,7 +24256,7 @@ function isItemEquippedInAnotherHand(itemId, targetSlot) {
 function canDropInventoryData(data, target) {
   if (!data?.itemId || !target) return false;
   if (target.dataset.dropAdminTrash) return data.source !== "admin";
-  if (target.dataset.dropChest) return state.mode === "home" && data.source !== "admin" && data.source !== "chest";
+  if (target.dataset.dropChest) return ["home", "camp"].includes(state.mode) && data.source !== "admin" && data.source !== "chest";
   if (target.dataset.dropInventory) return data.source !== "inventory";
 
   const slotId = target.dataset.dropSlot;
@@ -17595,12 +24494,13 @@ function renderControls() {
     shortRestHeroes().length === 0 ||
     !partyNeedsShortRest();
   const fleeStatus = state.mode === "combat" ? fleeCombatStatus() : { ok: false, reason: "" };
+  const retreatLocked = travelEncounterLocksRetreat();
   els.returnHome.disabled =
     state.mode === "combat"
       ? movementInProgress || !fleeStatus.ok
-      : !gameHasStarted || movementInProgress || state.mode === "home" || partyHeroes().length === 0;
-  els.returnHome.textContent = state.mode === "combat" ? "Flee Combat [H]" : "Return Home [H]";
-  els.returnHome.title = state.mode === "combat" ? fleeStatus.reason : "";
+      : !gameHasStarted || movementInProgress || retreatLocked || state.mode === "home" || partyHeroes().length === 0;
+  els.returnHome.textContent = state.mode === "combat" ? "Flee Combat [H]" : state.travelReturnCamp ? "Return to Camp [H]" : "Return Home [H]";
+  els.returnHome.title = state.mode === "combat" ? fleeStatus.reason : retreatLocked ? state.travelReturnCamp?.lockRetreatReason ?? "This encounter must be finished before the party can leave." : "";
   els.endTurn.disabled = movementInProgress || !heroTurn;
 
   const selectableCount = selectableHeroIds().size;
@@ -17625,7 +24525,7 @@ function renderControls() {
   setDockControlVisible(els.useItem, heroCanUseItem);
   setDockControlVisible(els.abilities, heroCanOpenAbilities);
   setDockControlVisible(els.shortRest, !els.shortRest.disabled);
-  setDockControlVisible(els.returnHome, state.mode === "combat" || (gameHasStarted && state.mode !== "home" && partyHeroes().length > 0));
+  setDockControlVisible(els.returnHome, !retreatLocked && (state.mode === "combat" || (gameHasStarted && state.mode !== "home" && state.mode !== "camp" && partyHeroes().length > 0)));
   setDockControlVisible(els.endTurn, state.mode === "combat");
 
   els.saveGame.disabled = !gameHasStarted || Boolean(state.isTutorial);

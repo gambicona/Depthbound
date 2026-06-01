@@ -1147,8 +1147,7 @@ window.DungeonNpcBehaviors.oldLady = (() => {
 
   function unlockIntro() {
     state.questFlags = { ...(state.questFlags ?? {}) };
-    if (state.questFlags.oldLadyAvailable) return false;
-    state.questFlags.oldLadyAvailable = true;
+    if (state.questFlags.oldLadyAvailable || state.questFlags.oldLadyIntroPending) return false;
     state.questFlags.oldLadyGreenVinesAccepted = true;
     state.questFlags.oldLadyIntroPending = true;
     return true;

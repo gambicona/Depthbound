@@ -487,6 +487,18 @@ lightGear("hooded-lantern", "Lantern", gp(5), 2, { brightRadiusFeet: 30, dimRadi
 });
 lightGear("bullseye-lantern", "Bullseye Lantern", gp(10), 2, { brightRadiusFeet: 60, dimRadiusFeet: 120, color: "#ffe0a3" }, "A focused lantern. The cone is approximated as a longer light radius in the dungeon view.");
 adventuringSupply("lantern-oil", "Lantern Oil", sp(1), 1, "A flask of lantern oil. A hooded lantern consumes one flask for each hour of light.", { category: "light", tags: ["light", "fuel"] });
+window.DungeonContent.register("items", "trail-ration", {
+  name: "Trail Ration",
+  type: "consumable",
+  category: "supplies",
+  cost: sp(5),
+  weightLb: 2,
+  stackable: true,
+  quantity: 1,
+  resourceInventory: "party",
+  tags: ["supply", "food", "ration", "travel", "party-resource"],
+  description: "A day of preserved food packed for travel. Rations are stored with the party supplies and cooked at camp.",
+});
 
 instrument("instrument-bagpipes", "Bagpipes", gp(30), 6, [
   { id: "bagpipes-barley-roar", name: "Barley Roar", src: "assets/sounds/music/instruments/bagpipes-Barley Roar.mp3" },

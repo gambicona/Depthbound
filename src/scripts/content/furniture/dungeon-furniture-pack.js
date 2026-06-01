@@ -172,6 +172,24 @@ const D = {
   "drill-rig": "A drill rig towers over the floor, its bit aimed like a metal spear.",
   "locked-supply-locker": "A locked supply locker stands against the wall. The door is dented, but the lock remains serious.",
   "undead-crate": "A chained crate hums with old binding marks. Bone scrapes softly inside, waiting for the latch to fail.",
+  "tall-grass-patch": "A patch of shoulder-high grass bends in waves, hiding low movement and whatever waits inside it.",
+  "weathered-standing-stone": "A lichen-marked standing stone leans over the grass, old enough to have gathered scratches, offerings, and stories.",
+  "dry-creek-bed": "A shallow stony wash cuts through the ground. The old channel is dry, uneven, and good at turning ankles.",
+  snowdrift: "A deep snowdrift fills the corner in wind-packed layers. It muffles sound and hides the floor beneath.",
+  "ice-spire": "A blue-white ice spire rises from the floor, sharp, brittle, and clear enough to bend light through its heart.",
+  "frozen-carcass": "A frozen carcass lies half-buried in frost. Scavenger marks and trapped supplies are both possible.",
+  "thin-ice-patch": "A skin of thin ice clouds the floor. It flexes under weight with a sound like cracking glass.",
+  "cliff-ledge": "A broken ledge of high stone narrows the path, offering cover to those who trust their footing.",
+  "wind-carved-shrine": "A small shrine has been carved smooth by years of mountain wind. Coins, feathers, and old knots rest in its cracks.",
+  "goat-trail-scree": "A narrow spill of loose stones marks a steep trail. Each step skitters and broadcasts movement.",
+  "coral-growth": "A hard coral growth branches across the floor in bright ridges, beautiful enough to distract from its sharp edges.",
+  "kelp-forest": "Tall kelp fronds sway through the flooded room, turning lines of sight into wavering shadows.",
+  "shipwreck-planks": "Broken planks from an old wreck lie tangled together, waterlogged but still useful as cover.",
+  "air-bubble-vent": "A steady stream of bubbles rises from a cracked vent, gathering into a breathable shimmer before it breaks.",
+  "market-stall-wreckage": "A collapsed market stall spills broken boards, torn awning cloth, and small goods across the ground.",
+  "sewer-grate": "An iron sewer grate is set into the floor, slick with runoff and wide enough to hide a nasty drop.",
+  "stacked-crates": "A stack of battered crates leans against itself, useful as cover and tempting to search.",
+  "street-lamp": "A street lamp stands crooked but burning, throwing a hard pool of amber light across the stones.",
 };
 
 const floorLevelFeatures = new Set([
@@ -233,6 +251,18 @@ const floorLevelFeatures = new Set([
   "storm-current-floor",
   "unstable-stone-floor",
   "tidal-current-floor",
+  "tall-grass-patch",
+  "dry-creek-bed",
+  "snowdrift",
+  "frozen-carcass",
+  "thin-ice-patch",
+  "cliff-ledge",
+  "goat-trail-scree",
+  "coral-growth",
+  "kelp-forest",
+  "shipwreck-planks",
+  "market-stall-wreckage",
+  "sewer-grate",
 ]);
 
 function feature(id, name, tags, options = {}) {
@@ -590,6 +620,9 @@ feature("tidal-current-floor", "Tidal Current Floor", ["terrain-floor", "water",
 ].forEach(([id, name, tags, options]) => feature(id, name, tags, { spawnChance: 0.035, ...options }));
 
 [
+  ["tall-grass-patch", "Tall Grass Patch", ["grasslands", "wilds"], { inspectable: true, symbol: "\"", components: [C.concealment(), C.difficult, C.hiddenLoot({ dc: 13, chance: 0.2 })] }],
+  ["weathered-standing-stone", "Weathered Standing Stone", ["grasslands", "wilds", "stone", "landmark"], { blocksMovement: true, blocksLineOfSight: true, inspectable: true, symbol: "S", weight: 2800, components: [C.cover("full"), C.hiddenLoot({ dc: 14, chance: 0.25 })] }],
+  ["dry-creek-bed", "Dry Creek Bed", ["grasslands", "wilds", "stone"], { symbol: "~", components: [C.difficult, C.hiddenLoot({ dc: 12, chance: 0.2 })] }],
   ["large-tree", "Large Tree", ["forest", "wilds"], { blocksMovement: true, blocksLineOfSight: true, symbol: "T", weight: 666, components: [C.cover("full")] }],
   ["ancient-tree", "Ancient Tree", ["forest", "wilds"], { blocksMovement: true, blocksLineOfSight: true, inspectable: true, symbol: "T", weight: 666, components: [C.cover("full")] }],
   ["hollow-tree", "Hollow Tree", ["forest", "wilds"], { blocksMovement: true, blocksLineOfSight: true, inspectable: true, symbol: "T", weight: 666, components: [C.hiddenLoot({ dc: 12 }), C.ambush({ chance: 0.15 })] }],
@@ -674,6 +707,13 @@ feature("tidal-current-floor", "Tidal Current Floor", ["terrain-floor", "water",
 ].forEach(([id, name, tags, options]) => feature(id, name, tags, { spawnChance: 0.035, ...options }));
 
 [
+  ["snowdrift", "Snowdrift", ["arctic", "snow", "ice"], { symbol: "s", components: [C.difficult, C.concealment(), C.hiddenLoot({ dc: 13, chance: 0.18 })] }],
+  ["ice-spire", "Ice Spire", ["arctic", "ice", "crystal"], { blocksMovement: true, blocksLineOfSight: true, inspectable: true, symbol: "I", weight: 900, components: [C.cover("full"), C.destructible(8, 12), C.hazardEnter({ damage: { count: 1, sides: 4, type: "cold" } })] }],
+  ["frozen-carcass", "Frozen Carcass", ["arctic", "ice", "remains"], { inspectable: true, symbol: "c", weight: 170, components: [C.difficult, C.hiddenLoot({ dc: 12, chance: 0.55 }), C.ambush({ chance: 0.12 })] }],
+  ["thin-ice-patch", "Thin Ice Patch", ["arctic", "ice", "hazard"], { symbol: "_", components: [C.difficult, C.hazardEnter({ damage: { count: 1, sides: 4, type: "cold" } })] }],
+  ["cliff-ledge", "Cliff Ledge", ["mountain", "cliff", "stone"], { blocksMovement: true, inspectable: true, symbol: "L", weight: 1600, components: [C.cover("half"), C.hazardEnter({ damage: { count: 1, sides: 6, type: "bludgeoning" } })] }],
+  ["wind-carved-shrine", "Wind-Carved Shrine", ["mountain", "shrine", "stone", "landmark"], { blocksMovement: true, inspectable: true, symbol: "S", weight: 1100, components: [C.hiddenLoot({ dc: 14, reward: "smallGold" }), C.unique({ label: "Read Wind Marks", effect: "futureReflection", dc: 14, skills: ["nature", "religion", "history"], timeSeconds: 300, tooltip: "Nature, Religion, or History DC 14; takes 5 minutes. Read the marks for a small omen.", failureDamage: { count: 1, sides: 4, type: "psychic" } })] }],
+  ["goat-trail-scree", "Goat-Trail Scree", ["mountain", "scree", "stone"], { symbol: "s", components: [C.difficult, C.spawn({ trigger: "noise" })] }],
   ["stalagmite", "Stalagmite", ["underdark", "cave"], { blocksMovement: true, symbol: "^", weight: 900, components: [C.cover("half")] }],
   ["stalactite-cluster", "Stalactite Cluster", ["underdark", "cave"], { symbol: "v", components: [C.hazardEnter({ damage: { count: 1, sides: 6, type: "piercing" }, once: true })] }],
   ["crystal-growth", "Crystal Growth", ["underdark", "cave", "arcane"], { blocksMovement: true, inspectable: true, symbol: "*", weight: 700, components: [C.harvest("crystal-shard"), C.destructible(10, 12)] }],
@@ -732,6 +772,10 @@ feature("tidal-current-floor", "Tidal Current Floor", ["terrain-floor", "water",
 ].forEach(([id, name, tags, options]) => feature(id, name, tags, { spawnChance: 0.035, ...options }));
 
 [
+  ["coral-growth", "Coral Growth", ["underwater", "coral", "reef"], { inspectable: true, symbol: "c", components: [C.difficult, C.hazardMove({ damage: { count: 1, sides: 4, type: "piercing" } }), C.harvest("crystal-shard", { chance: 0.25 })] }],
+  ["kelp-forest", "Kelp Forest", ["underwater", "kelp", "plant"], { symbol: "k", components: [C.difficult, C.concealment()] }],
+  ["shipwreck-planks", "Shipwreck Planks", ["underwater", "shipwreck", "wood", "container"], { blocksMovement: true, inspectable: true, symbol: "P", weight: 220, components: [C.cover("half"), C.hiddenLoot({ dc: 12, chance: 0.45 }), C.destructible(8, 10)] }],
+  ["air-bubble-vent", "Air Bubble Vent", ["underwater", "air", "vent"], { inspectable: true, symbol: "o", components: [C.light(3, "#b8f4ff", 0, "cool-blue"), C.concealment(), C.healingPool({ dice: { count: 1, sides: 4 } })] }],
   ["bog-pool", "Bog Pool", ["swamp", "bog", "rot"], { inspectable: true, symbol: "~", components: [C.difficult, C.hazardEnter({ damage: { count: 1, sides: 4, type: "poison" } }), C.unique({ label: "Test the Water", effect: "safePool", dc: 13, skills: ["nature", "medicine", "survival"], timeSeconds: 300, tooltip: "Nature, Medicine, or Survival DC 13; takes 5 minutes. Carefully skim usable water for healing and cleansing.", failureDamage: { count: 1, sides: 4, type: "poison" } })] }],
   ["deep-mud", "Deep Mud", ["swamp", "bog", "rot"], { symbol: "m", components: [C.difficult, C.hazardEnter({ damage: { count: 1, sides: 4, type: "bludgeoning" } })] }],
   ["rotting-stump", "Rotting Stump", ["swamp", "bog", "rot"], { blocksMovement: true, inspectable: true, symbol: "s", weight: 220, components: [C.ambush({ chance: 0.15 }), C.cover("half")] }],
@@ -783,6 +827,13 @@ feature("tidal-current-floor", "Tidal Current Floor", ["terrain-floor", "water",
     weight: 220,
     components: [C.loot({ count: 2 }), C.lock({ dc: 14, chance: 1 }), C.trap({ source: "container", chance: 0.25 })],
   }],
+].forEach(([id, name, tags, options]) => feature(id, name, tags, { spawnChance: 0.035, ...options }));
+
+[
+  ["market-stall-wreckage", "Market Stall Wreckage", ["urban", "market", "ruin", "wood"], { blocksMovement: true, inspectable: true, symbol: "M", weight: 180, components: [C.cover("half"), C.hiddenLoot({ dc: 11, reward: "smallGold" }), C.destructible(8, 10)] }],
+  ["sewer-grate", "Sewer Grate", ["urban", "sewer", "metal"], { inspectable: true, symbol: "#", components: [C.difficult, C.trap({ chance: 0.2, damage: { count: 1, sides: 6, type: "bludgeoning" } }), C.hiddenLoot({ dc: 13, chance: 0.2 })] }],
+  ["stacked-crates", "Stacked Crates", ["urban", "container", "loot", "wood"], { blocksMovement: true, inspectable: true, symbol: "C", weight: 140, components: [C.cover("half"), C.hiddenLoot({ dc: 10, chance: 0.55 }), C.destructible(8, 10)] }],
+  ["street-lamp", "Street Lamp", ["urban", "light", "street"], { blocksMovement: true, inspectable: true, placement: "wall-adjacent", symbol: "L", weight: 120, components: [C.light(6, "#f0bd63", 3, "lantern-amber"), C.hazardEnter({ damage: { count: 1, sides: 4, type: "fire" } })] }],
 ].forEach(([id, name, tags, options]) => feature(id, name, tags, { spawnChance: 0.035, ...options }));
 
 feature("undead-crate", "Undead Crate", ["old-guardroom", "dungeon", "crypt", "ruin", "undead", "container"], {

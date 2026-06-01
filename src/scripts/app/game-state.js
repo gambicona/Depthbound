@@ -1,7 +1,7 @@
 const dungeonSizeOptions = [
-  { id: "small", name: "Small", roomCount: 10, encounterRange: [4, 5], description: "A small dungeon which is best suited for Lone Wolves." },
-  { id: "medium", name: "Medium", roomCount: 15, encounterRange: [6, 8], description: "A medium-sized dungeon, suitable for a small party." },
-  { id: "large", name: "Large", roomCount: 20, encounterRange: [8, 10], description: "A large dungeon for a full party." },
+  { id: "small", name: "Short Delve", roomCount: 10, encounterRange: [4, 5], description: "A brief descent with a few dangerous chambers." },
+  { id: "medium", name: "Deep Delve", roomCount: 15, encounterRange: [6, 8], description: "A longer push with more rooms, risks, and chances for treasure." },
+  { id: "large", name: "Full Expedition", roomCount: 20, encounterRange: [8, 10], description: "A long venture for a prepared party with supplies and nerve." },
   { id: "massive", name: "Massive", roomCount: 30, encounterRange: [10, 15], description: "A massive dungeon, for the experienced adventurers." },
   {
     id: "insane",
@@ -30,7 +30,7 @@ function dungeonArrivalLogText(dungeonName = "the dungeon", entranceRoomName = "
   return `The party leaves home and arrives in the ${entranceRoomName} of the ${dungeonName}.`;
 }
 
-function createInitialState(heroNameOverride = "", heroForDifficulty = null, heroOptions = {}, themeId = defaultContent.theme, dungeonSizeId = "large") {
+function createInitialState(heroNameOverride = "", heroForDifficulty = null, heroOptions = {}, themeId = defaultContent.theme, dungeonSizeId = "large", generatorOverrides = {}) {
   dungeonClockRuntimePaused = false;
   const dungeonDefinition = getContentDefinition("dungeons", defaultContent.dungeon);
   const theme = getContentDefinition("themes", themeId);
@@ -49,6 +49,7 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
   if (categoryRoomCount && (category !== 1 || partySize <= 1)) dungeonOptions.roomCount = categoryRoomCount;
   if (dungeonSize?.roomCount) dungeonOptions.roomCount = dungeonSize.roomCount;
   if (dungeonSize?.gridSize) dungeonOptions.gridSize = dungeonSize.gridSize;
+  Object.assign(dungeonOptions, generatorOverrides ?? {});
   const dungeon = generateDungeon(dungeonOptions);
   const classId = heroOptions.classId ?? defaultContent.heroClass;
   const heroTemplate = applyHeroCreationOptions(
@@ -114,12 +115,14 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
     questFlags: {},
     partyResources: {},
     partyTomes: [],
+    world: null,
     lootPiles: [],
     dungeonObjects,
     party: {
       activeHeroId: "hero",
       heroIds: ["hero"],
       rosterIds: ["hero"],
+      travelRationsInitialized: false,
     },
     fighters: {
       hero,
@@ -500,14 +503,14 @@ function consumeMaterialsForRequirement(requirement = {}, quantity = 1) {
   return remaining <= 0;
 }
 
-function createDungeonStateForParty(partyMembers, previousState, themeId = defaultContent.theme, dungeonSizeId = "large") {
+function createDungeonStateForParty(partyMembers, previousState, themeId = defaultContent.theme, dungeonSizeId = "large", generatorOverrides = {}) {
   const leader = partyMembers[0] ?? previousState?.fighters?.hero;
   const partyDifficulty = {
     ...(leader ?? {}),
     level: averagePartyLevel({ level: leader?.level ?? 1 }),
     partySize: partyMembers.length,
   };
-  const nextState = createInitialState(leader?.name ?? getHeroTemplate().name, partyDifficulty, {}, themeId, dungeonSizeId);
+  const nextState = createInitialState(leader?.name ?? getHeroTemplate().name, partyDifficulty, {}, themeId, dungeonSizeId, generatorOverrides);
   const blockedKeys = new Set((nextState.dungeonObjects ?? []).filter(objectBlocksMovement).flatMap(objectCells).map(positionKey));
   const positions = dungeonStartPositions(nextState.dungeon, partyMembers.length, blockedKeys);
   const partyIds = new Set(partyMembers.map((hero) => hero.id));
@@ -544,6 +547,7 @@ function createDungeonStateForParty(partyMembers, previousState, themeId = defau
     activeHeroId: partyMembers[0]?.id ?? "hero",
     heroIds: partyMembers.map((hero) => hero.id),
     rosterIds: previousRosterIds,
+    travelRationsInitialized: Boolean(previousState?.party?.travelRationsInitialized),
   };
   nextState.saveSlotId = previousState?.saveSlotId ?? activeSaveSlot;
   nextState.chest = previousState?.chest ?? [];
@@ -558,6 +562,7 @@ function createDungeonStateForParty(partyMembers, previousState, themeId = defau
   nextState.questFlags = cloneData(previousState?.questFlags ?? {});
   nextState.partyResources = normalizePartyResources(previousState?.partyResources ?? {});
   nextState.partyTomes = permanentPartyTomes(previousState?.partyTomes ?? []);
+  nextState.world = window.DepthboundWorldTravel?.normalizeWorldState?.(previousState?.world) ?? previousState?.world ?? null;
   return nextState;
 }
 
@@ -764,12 +769,14 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
     questFlags: cloneData(previousState?.questFlags ?? {}),
     partyResources: normalizePartyResources(previousState?.partyResources ?? {}),
     partyTomes: permanentPartyTomes(previousState?.partyTomes ?? []),
+    world: window.DepthboundWorldTravel?.normalizeWorldState?.(previousState?.world) ?? previousState?.world ?? null,
     lootPiles: [],
     dungeonObjects: objects,
     party: {
       activeHeroId: partyMembers[0]?.id ?? "hero",
       heroIds: partyMembers.map((hero) => hero.id),
       rosterIds: previousRosterIds,
+      travelRationsInitialized: Boolean(previousState?.party?.travelRationsInitialized),
     },
     saveSlotId: previousState?.saveSlotId ?? activeSaveSlot,
     fighters: {
@@ -2250,6 +2257,7 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
       : heroIds.find((id) => fighters[id] && !fighters[id].dead && !isAutonomousAlly(fighters[id])) ?? livingRosterIds.find((id) => fighters[id] && !isAutonomousAlly(fighters[id])) ?? "hero";
   const questFlags = cloneData(normalizedPartyData?.questFlags ?? state?.questFlags ?? {});
   resetSmithMaterialCommissionsOnHomeArrival(questFlags);
+  const world = window.DepthboundWorldTravel?.normalizeWorldState?.(normalizedPartyData?.world ?? state?.world) ?? normalizedPartyData?.world ?? state?.world ?? null;
 
   return {
     combatStarted: false,
@@ -2301,12 +2309,14 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
     questFlags,
     partyResources: normalizePartyResources(partyResources),
     partyTomes: permanentPartyTomes(partyTomes),
+    world,
     lootPiles: [],
     dungeonObjects: home.objects,
     party: {
       activeHeroId,
       heroIds: heroIds.filter((id) => fighters[id] && !fighters[id].dead),
       rosterIds: rosterIds.filter((id) => fighters[id]),
+      travelRationsInitialized: Boolean(normalizedPartyData?.travelRationsInitialized ?? state?.party?.travelRationsInitialized),
     },
     fighters,
     log: [
@@ -5441,6 +5451,42 @@ function spendMoney(money, cpAmount) {
   return true;
 }
 
+function partyPurse() {
+  state.chestMoney = normalizeMoney(state.chestMoney ?? {});
+  return state.chestMoney;
+}
+
+function partyInventoryItems() {
+  state.chest = Array.isArray(state.chest) ? state.chest : [];
+  return state.chest;
+}
+
+function addItemToPartyInventory(item, prefix = "party") {
+  if (!item) return [];
+  const holder = { inventory: { items: partyInventoryItems(), money: {}, heroTokens: 0 } };
+  const added = addItemToInventory(holder, item, prefix);
+  state.chest = holder.inventory.items;
+  return added;
+}
+
+function moveHeroCoinsToPartyPurse(heroes = rosterHeroes()) {
+  const purse = partyPurse();
+  let moved = 0;
+  for (const hero of heroes ?? []) {
+    if (!hero?.inventory?.money) continue;
+    const amount = moneyToCp(hero.inventory.money);
+    if (amount <= 0) continue;
+    addMoney(purse, amount);
+    hero.inventory.money = normalizeMoney();
+    moved += amount;
+  }
+  return moved;
+}
+
+function travelEncounterLocksRetreat() {
+  return Boolean(state?.travelReturnCamp?.lockRetreat || state?.customDungeon?.lockRetreat);
+}
+
 function createItemInstance(templateId, prefix = "item") {
   const template = getItemTemplate(templateId);
   if (!template) return null;
@@ -6747,6 +6793,7 @@ function normalizeLoadedState(loadedState) {
           : Array.isArray(loadedState.party?.heroIds) && loadedState.party.heroIds.length
             ? loadedState.party.heroIds
             : ["hero"],
+      travelRationsInitialized: Boolean(loadedState.party?.travelRationsInitialized),
     },
     exploration: {
       ...freshState.exploration,
@@ -6770,6 +6817,7 @@ function normalizeLoadedState(loadedState) {
     questFlags: cloneData(loadedState.questFlags ?? freshState.questFlags ?? {}),
     partyResources: normalizePartyResources(loadedState.partyResources ?? freshState.partyResources ?? {}),
     partyTomes: loadedMode === "home" ? permanentPartyTomes(loadedState.partyTomes ?? freshState.partyTomes ?? []) : normalizePartyTomes(loadedState.partyTomes ?? freshState.partyTomes ?? []),
+    world: window.DepthboundWorldTravel?.normalizeWorldState?.(loadedState.world ?? freshState.world) ?? loadedState.world ?? freshState.world ?? null,
     lootPiles: Array.isArray(loadedState.lootPiles) ? loadedState.lootPiles : [],
     dungeonObjects: Array.isArray(loadedState.dungeonObjects) ? loadedState.dungeonObjects : [],
     log: Array.isArray(loadedState.log) ? loadedState.log : [],

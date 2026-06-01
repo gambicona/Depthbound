@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Depthbound</title>
+    <script>
+      if (window.location.protocol === "file:") document.documentElement.classList.add("file-protocol");
+    </script>
     <link rel="stylesheet" href="src/styles/main.css" />
   </head>
   <body>
@@ -252,8 +255,37 @@
             <button id="go-village" type="button">Village</button>
             <button id="build-home" type="button">Build Your Home</button>
             <button id="go-adventure" type="button" data-ui-icon="explore">Adventure</button>
+            <button class="ghost-button" type="button" data-action="open-party-inventory">Party Inventory</button>
+          </div>
+          <div id="camp-main-actions" class="home-menu-panel travel-camp-home-panel hidden">
+            <span id="camp-home-kicker" class="travel-camp-kicker">Day Travel</span>
+            <b id="camp-home-location" class="travel-camp-home-location">Unknown</b>
+            <p id="camp-home-details" class="small-note">The party makes camp for the night.</p>
+            <div id="camp-home-tents" class="travel-camp-tents travel-camp-home-tents"></div>
+            <div class="travel-camp-supplies" aria-label="Camp supplies">
+              <div>
+                <span>Rations</span>
+                <b id="camp-home-rations">0</b>
+              </div>
+              <div>
+                <span>Meal</span>
+                <b id="camp-home-meal">Needed</b>
+              </div>
+            </div>
+            <button id="camp-home-use-rations" type="button">Use Rations</button>
+            <button id="camp-home-forage" class="ghost-button" type="button">Forage</button>
+            <button id="camp-home-hungry-rest" class="ghost-button" type="button">Rest Hungry</button>
+            <button id="camp-home-long-rest" type="button">Long Rest</button>
+            <button id="camp-home-review-route" class="ghost-button" type="button">Review Route</button>
+            <button class="ghost-button" type="button" data-action="open-party-inventory">Party Inventory</button>
+            <div class="travel-camp-next-actions">
+              <button id="camp-home-continue" type="button">Travel On</button>
+              <button id="camp-home-explore-here" type="button">Explore Here</button>
+              <button id="camp-home-venture-off-track" class="ghost-button" type="button">Venture Off Track</button>
+            </div>
           </div>
           <div id="home-adventure-actions" class="home-menu-panel hidden">
+            <button id="go-travel" type="button">Travel</button>
             <button type="button" data-home-menu="main-story">Main Story Dungeons</button>
             <button type="button" data-home-menu="one-shot-dungeons">One-Shot Dungeons</button>
             <button type="button" data-home-menu="random-dungeons">Random Runs</button>
@@ -272,6 +304,7 @@
           <div id="home-random-dungeon-actions" class="home-menu-panel hidden"></div>
           <div id="home-one-shot-dungeon-actions" class="home-menu-panel hidden"></div>
           <div id="home-custom-dungeon-actions" class="home-menu-panel hidden"></div>
+          <div id="camp-gear-actions" class="home-menu-panel hidden"></div>
         </div>
       </div>
     </div>
@@ -299,6 +332,108 @@
           </div>
         </div>
         <div id="store-body" class="fighter-info-body"></div>
+      </div>
+    </div>
+
+    <div id="travel-map-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="travel-map-title">
+      <div class="fighter-info-panel travel-map-panel">
+        <div class="panel-heading">
+          <h2 id="travel-map-title">Travel</h2>
+          <div class="panel-actions">
+            <div class="zoom-controls travel-zoom-controls" aria-label="Travel map zoom controls">
+              <button id="travel-zoom-out" class="icon-button ghost-button" type="button" title="Zoom out" aria-label="Zoom out">-</button>
+              <span id="travel-zoom-label">100%</span>
+              <input id="travel-zoom-slider" type="range" min="55" max="180" step="5" value="100" aria-label="Travel map zoom" />
+              <button id="travel-zoom-in" class="icon-button ghost-button" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+            </div>
+            <button id="travel-generate-chunks" class="ghost-button panel-back-button" type="button" disabled>Scout Edge</button>
+            <button id="close-travel-map" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+          </div>
+        </div>
+        <div class="fighter-info-body travel-map-body">
+          <section class="travel-map-summary" aria-label="Travel summary">
+            <div>
+              <span>Current</span>
+              <b id="travel-current-label">Unknown</b>
+            </div>
+            <div>
+              <span>Home</span>
+              <b id="travel-home-label">Unknown</b>
+            </div>
+            <div>
+              <span>Route</span>
+              <b id="travel-route-label">Phase 3</b>
+            </div>
+          </section>
+          <section class="travel-map-layout">
+            <div id="travel-map-scroll" class="travel-map-scroll" aria-label="Scrollable world map">
+              <section id="travel-map-event" class="travel-map-event hidden" aria-live="polite">
+                <span id="travel-map-event-kicker">Travel</span>
+                <b id="travel-map-event-title">On the Road</b>
+                <p id="travel-map-event-message">The party travels onward.</p>
+                <div id="travel-map-event-actions" class="travel-map-event-actions"></div>
+              </section>
+              <div id="travel-map-grid" class="travel-map-grid"></div>
+            </div>
+            <aside id="travel-map-tooltip" class="travel-map-tooltip" aria-live="polite">
+              <div id="travel-map-tooltip-content" class="travel-map-tooltip-content">
+                <span>Hover a hex</span>
+                <b>World Map</b>
+                <p>Biomes, structures, your current location, and home village are visible here.</p>
+              </div>
+              <div class="travel-map-route-actions">
+                <button id="travel-confirm-route" type="button" disabled>Confirm Route</button>
+                <button id="travel-start-route" type="button" disabled>Start Travel</button>
+                <button id="travel-clear-route" class="ghost-button" type="button" disabled>Clear Route</button>
+              </div>
+            </aside>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="travel-camp-menu" class="fighter-info hidden" role="dialog" aria-modal="true" aria-labelledby="travel-camp-title">
+      <div class="fighter-info-panel travel-camp-panel">
+        <div class="panel-heading">
+          <h2 id="travel-camp-title">Camp</h2>
+          <div class="panel-actions">
+            <button id="travel-camp-review-route" class="ghost-button panel-back-button" type="button">Review Route</button>
+            <button id="close-travel-camp" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+          </div>
+        </div>
+        <div class="fighter-info-body travel-camp-body">
+          <section class="travel-camp-scene" aria-label="Travel camp">
+            <div class="travel-camp-fire" aria-hidden="true"></div>
+            <div id="travel-camp-tents" class="travel-camp-tents"></div>
+          </section>
+          <section class="travel-camp-summary">
+            <span id="travel-camp-kicker">Day Travel</span>
+            <b id="travel-camp-location">Unknown</b>
+            <p id="travel-camp-details">The party makes camp for the night.</p>
+            <div class="travel-camp-supplies" aria-label="Camp supplies">
+              <div>
+                <span>Rations</span>
+                <b id="travel-camp-rations">0</b>
+              </div>
+              <div>
+                <span>Meal</span>
+                <b id="travel-camp-meal">Needed</b>
+              </div>
+            </div>
+            <div class="travel-camp-actions">
+              <button id="travel-camp-use-rations" type="button">Use Rations</button>
+              <button id="travel-camp-forage" class="ghost-button" type="button">Forage</button>
+              <button id="travel-camp-hungry-rest" class="ghost-button" type="button">Rest Hungry</button>
+              <button id="travel-camp-long-rest" type="button">Long Rest</button>
+              <button class="ghost-button" type="button" data-action="open-party-inventory">Party Inventory</button>
+              <div class="travel-camp-next-actions">
+                <button id="travel-camp-continue" type="button">Travel On</button>
+                <button id="travel-camp-explore-here" type="button">Explore Here</button>
+                <button id="travel-camp-venture-off-track" class="ghost-button" type="button">Venture Off Track</button>
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
 
@@ -390,6 +525,8 @@
     <script src="src/scripts/content/monsters/forest-beast-pack.js" defer></script>
     <script src="src/scripts/content/monsters/beast-biome-pack.js" defer></script>
     <script src="src/scripts/content/monsters/beast-biome-high-tier-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/lair-boss-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/humanoid-enemy-pack.js" defer></script>
     <script src="src/scripts/content/furniture/dungeon-furniture-pack.js?v=unique-interactions-1" defer></script>
     <script src="src/scripts/content/furniture/resource-nodes.js?v=resource-nodes-3" defer></script>
     <script src="src/scripts/content/furniture/desert-ruins-pack.js?v=unique-interactions-1" defer></script>
@@ -401,6 +538,7 @@
     <script src="src/scripts/content/loot/basic-dungeon.js" defer></script>
     <script src="src/scripts/content/themes/old-guardroom.js?v=magic-loot-1" defer></script>
     <script src="src/scripts/content/themes/forest-of-the-beasts.js?v=magic-loot-1" defer></script>
+    <script src="src/scripts/content/themes/jungle.js" defer></script>
     <script src="src/scripts/content/themes/desert-ruins.js?v=magic-loot-1" defer></script>
     <script src="src/scripts/content/themes/depths-of-hells.js?v=magic-loot-1" defer></script>
     <script src="src/scripts/content/themes/underdark-depths.js?v=magic-loot-1" defer></script>
@@ -409,21 +547,37 @@
     <script src="src/scripts/content/themes/crucible-of-storms.js" defer></script>
     <script src="src/scripts/content/themes/crucible-of-stone.js" defer></script>
     <script src="src/scripts/content/themes/crucible-of-tides.js" defer></script>
+    <script src="src/scripts/content/themes/grasslands.js" defer></script>
+    <script src="src/scripts/content/themes/swamp.js" defer></script>
+    <script src="src/scripts/content/themes/arctic.js" defer></script>
+    <script src="src/scripts/content/themes/mountain.js" defer></script>
+    <script src="src/scripts/content/themes/underwater.js" defer></script>
+    <script src="src/scripts/content/themes/urban.js" defer></script>
+    <script src="src/scripts/content/themes/outlaw-camp.js" defer></script>
+    <script src="src/scripts/content/themes/goblin-warren.js" defer></script>
+    <script src="src/scripts/content/themes/wizard-tower.js" defer></script>
+    <script src="src/scripts/content/themes/castle-keep.js" defer></script>
     <script src="src/scripts/dice.js" defer></script>
     <script src="src/scripts/grid.js" defer></script>
     <script src="src/scripts/dungeon.js" defer></script>
     <script src="src/scripts/custom-dungeons.js" defer></script>
     <script src="src/scripts/campaigns.js" defer></script>
     <script src="src/scripts/one-shot-dungeons.js" defer></script>
+    <script src="src/scripts/settlement-layouts.js?v=tavern-perf-fix-2" defer></script>
     <script src="src/scripts/save.js" defer></script>
+    <script src="src/scripts/shared/world-name-generator.js" defer></script>
     <script src="src/scripts/app/bootstrap.js?v=home-adventure-menu-1" defer></script>
+    <script src="src/scripts/app/world-travel.js?v=tavern-perf-fix-2" defer></script>
+    <script src="src/scripts/app/settlement-storefronts.js" defer></script>
+    <script src="src/scripts/app/tavern-guests.js?v=tavern-perf-fix-2" defer></script>
+    <script src="src/scripts/app/travel-events.js" defer></script>
     <script src="src/scripts/app/game-state.js?v=playtest-sync-38" defer></script>
     <script src="src/scripts/app/ui-dialogs-character.js?v=home-adventure-menu-1" defer></script>
     <script src="src/scripts/app/combat-map.js?v=playtest-sync-41" defer></script>
     <script src="src/scripts/app/movement-ai-input.js?v=playtest-sync-31" defer></script>
-    <script src="src/scripts/app/rendering-inventory.js?v=unique-interactions-1" defer></script>
+    <script src="src/scripts/app/rendering-inventory.js?v=tavern-perf-fix-2" defer></script>
     <script src="src/scripts/app/home-comfort-bonuses.js" defer></script>
-    <script src="src/scripts/app.js?v=unique-interactions-1" defer></script>
+    <script src="src/scripts/app.js?v=tavern-perf-fix-2" defer></script>
     <script src="src/scripts/playtest-overlay.js?v=playtest-sync-37" defer></script>
   </body>
 </html>

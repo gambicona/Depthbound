@@ -1604,7 +1604,7 @@ window.DungeonContent.register("monsters", "theEmberveinAwakened", {
   damageImmunities: ["poison"],
   conditionImmunities: ["poisoned", "exhaustion", "prone", "grappled", "restrained", "frightened"],
   specialAbility: [
-    "Wake the Deepworks", // Boss phase ability: activates every furnace, conveyor, valve, gear, and minecart hazard in the room in sequence.
+    "Wake the Mine", // Boss phase ability: activates every furnace, conveyor, valve, gear, and minecart hazard in the room in sequence.
     "Heart of Ore and Flame", // At low HP: becomes vulnerable to cold/thunder but gains a fire aura and summons slag elementals.
   ],
   initiativeBonus: 5,
