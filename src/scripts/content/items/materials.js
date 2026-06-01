@@ -672,8 +672,8 @@ component("road-building-kit", "Road-Building Kit", {
   cost: gp(5),
   tags: ["road", "expedition", "construction", "supply", "trade-good"],
   professions: ["carpenter", "mason", "scout"],
-  short: "A packed kit for one road segment.",
-  description: "Survey stakes, gravel markers, simple tools, and packed materials for making one travel hex edge into a usable road.",
+  short: "A packed kit automatically spent while traveling a road project segment.",
+  description: "Survey stakes, gravel markers, simple tools, and packed materials for one travel-map road edge. Accept an Expedition Board road project, plan a route through the marked hexes, then press Start Travel; the kit is spent automatically when the party crosses a matching project edge.",
 });
 
 component("stone-chip", "Stone Chip", {
