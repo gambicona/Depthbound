@@ -39,6 +39,15 @@ const writableCampaignDungeons = new Map([
   ["thornwood-pact", { folder: "campaigns/the-thornwood-pact", count: 8 }],
   ["embervein-first-claim", { folder: "campaigns/the-first-claim-of-embervein", count: 1 }],
   ["dwarven-smithy-ember-oath", { folder: "campaigns/the-dwarven-smithy-ember-oath", count: 8 }],
+  ["expedition-mileposts", { folder: "campaigns/the-milepost-ledger", count: 4 }],
+]);
+
+const writableSettlementLayouts = new Map([
+  ["travel-camp", "travel-camp.json"],
+  ["inn-common-hall", "inn-common-hall.json"],
+  ["inn-side-taproom", "inn-side-taproom.json"],
+  ["inn-lodge-corners", "inn-lodge-corners.json"],
+  ["inn-longhouse", "inn-longhouse.json"],
 ]);
 
 const writableHelperRegistries = new Map([
@@ -113,6 +122,10 @@ function writableSourcePath(payload) {
     const index = Math.floor(Number(payload.index));
     if (!campaign || index < 1 || index > campaign.count) return null;
     return path.resolve(root, campaign.folder, `Dungeon${index}.json`);
+  }
+  if (payload?.kind === "settlement-layout") {
+    const file = writableSettlementLayouts.get(payload.id);
+    return file ? path.resolve(root, "settlement-layouts", file) : null;
   }
   return null;
 }
@@ -465,7 +478,13 @@ const server = http.createServer((request, response) => {
           return;
         }
         const json = `${JSON.stringify(payload.template, null, 2)}\n`;
-        fs.writeFile(filePath, json, "utf8", (error) => {
+        fs.mkdir(path.dirname(filePath), { recursive: true }, (mkdirError) => {
+          if (mkdirError) {
+            logEvent("error", "Failed to prepare source dungeon directory", { filePath, error: mkdirError.message });
+            sendJson(response, 500, { saved: false, error: "Write failed." });
+            return;
+          }
+          fs.writeFile(filePath, json, "utf8", (error) => {
           if (error) {
             logEvent("error", "Failed to save source dungeon", { filePath, error: error.message });
             sendJson(response, 500, { saved: false, error: "Write failed." });
@@ -473,6 +492,7 @@ const server = http.createServer((request, response) => {
           }
           logEvent("info", "Saved source dungeon", { filePath: path.relative(root, filePath) });
           sendJson(response, 200, { saved: true, file: path.relative(root, filePath).replace(/\\/g, "/") });
+          });
         });
       } catch (error) {
         logEvent("warn", "Invalid source dungeon save JSON", { bytes: Buffer.byteLength(body, "utf8"), error: error.message });

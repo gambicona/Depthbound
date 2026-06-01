@@ -10,6 +10,92 @@ const emberveinFirstClaimText = window.DungeonNpcQuestText?.borren?.questChains?
   description: "A compact one-dungeon Embervein adventure.",
 };
 
+const expeditionMilepostMissions = [
+  {
+    name: "Survey the Bad Mile",
+    themeId: "grasslands",
+    dungeonSizeId: "small",
+    roomCount: 6,
+    intro: "Nella's ledger marks one stretch of road as guessed, smudged, and therefore embarrassing. Walk it end to end, mark the bad turns, and come back with proof that a cart could survive the route.",
+    outro: "The last marker is set. The bad mile is no longer guesswork.",
+    goal: { type: "reachExit" },
+  },
+  {
+    name: "Clear the Wayhouse",
+    themeId: "outlawCamp",
+    dungeonSizeId: "medium",
+    roomCount: 7,
+    intro: "A roofless wayhouse sits across the planned road line. Someone has been using it as a toll knife. Clear the rooms and leave the route fit for honest boots.",
+    outro: "The wayhouse falls quiet. The road can pass through without asking permission.",
+    goal: { type: "reachExit" },
+  },
+  {
+    name: "The Lantern Run",
+    themeId: "oldGuardroom",
+    dungeonSizeId: "medium",
+    roomCount: 8,
+    intro: "The Board wants lantern posts tested under pressure: one straight push, no pretty detours, light every stretch, and prove the line holds when the dark presses back.",
+    outro: "The final lantern catches. Behind the party, the road line shines in a clean, stubborn row.",
+    goal: { type: "reachExit" },
+  },
+  {
+    name: "The Last Milepost",
+    themeId: "castleKeep",
+    dungeonSizeId: "medium",
+    roomCount: 9,
+    intro: "Nella opens the sealed page at the back of the ledger. One old route still has no honest end-marker. Carry the Board's last milepost through the broken watchline and make the road official.",
+    outro: "The last milepost is hammered into place. The route has a name now, and the Board has a road it can defend.",
+    goal: { type: "reachExit" },
+  },
+];
+
+function generatedExitForDungeon(dungeon) {
+  const start = dungeon?.startPosition ?? { x: 0, y: 0 };
+  const exitRoom = dungeon?.rooms?.at?.(-1) ?? dungeon?.rooms?.[0];
+  const position = exitRoom?.cells
+    ?.slice()
+    .sort((a, b) => Math.abs(b.x - start.x) + Math.abs(b.y - start.y) - (Math.abs(a.x - start.x) + Math.abs(a.y - start.y)))?.[0] ?? start;
+  return { roomId: exitRoom?.id ?? dungeon?.entranceRoomId ?? "room-0", position: { ...position } };
+}
+
+function expeditionMilepostTemplate(campaignId, index) {
+  const mission = expeditionMilepostMissions[index - 1];
+  if (!mission || !window.DungeonGenerator?.generateDungeon) return null;
+  const generatorOverrides = {
+    layout: "linear",
+    roomCount: mission.roomCount,
+    gridSize: 96,
+    corridorLength: { min: 4, max: 7 },
+    corridorWidth: 1,
+    linearRoomShapes: ["rectangle", "square"],
+    linearRoomWidth: { min: 5, max: 8 },
+    linearRoomHeight: { min: 4, max: 7 },
+  };
+  const dungeon = window.DungeonGenerator.generateDungeon(generatorOverrides);
+  const id = `${campaignId}-${index}`;
+  return {
+    id,
+    name: mission.name,
+    themeId: mission.themeId,
+    dungeonSizeId: mission.dungeonSizeId,
+    generated: {
+      themeId: mission.themeId,
+      dungeonSizeId: mission.dungeonSizeId,
+      generatorOverrides,
+    },
+    dungeon,
+    exit: generatedExitForDungeon(dungeon),
+    goal: mission.goal,
+    intro: { text: mission.intro, images: [] },
+    outro: { text: mission.outro, images: [] },
+    customItems: [],
+    objects: [],
+    monsters: [],
+    campaignId,
+    campaignIndex: index,
+  };
+}
+
 const campaigns = [
   {
   id: "barrow-crown",
@@ -98,6 +184,23 @@ If the Barrow Crown is not found, the first king will rise — and every oath on
 These are placeholder campaign slots using the same 8-dungeon template lineup as the Forest of the Beasts main story, ready for Smithy dungeons to be pasted into place.`,
     count: 8,
     folder: "campaigns/the-dwarven-smithy-ember-oath",
+  },
+  {
+    id: "expedition-mileposts",
+    name: "The Milepost Ledger",
+    quest: {
+      giver: "Nella Waymark",
+      initialTitle: "Open the Milepost Ledger",
+      initialDescription: "The Expedition Board has special road missions for parties trusted with real route work.",
+      progressTitle: "Prove the Mileposts",
+      progressDescription: "Complete the Board's straight-line road missions and bring the route proofs home.",
+      completedTitle: "The Ledger Holds",
+      completedDescription: "The Expedition Board has enough proof to mark the first real mileposts.",
+    },
+    description: "Special Expedition Board missions built as straight road-line delves.",
+    count: expeditionMilepostMissions.length,
+    folder: "campaigns/the-milepost-ledger",
+    generator: expeditionMilepostTemplate,
   },
 ];
 
@@ -189,13 +292,27 @@ async function dungeon(campaignId, index) {
   const override = getOverride(campaignId, index);
   if (override) return override;
   if (!cache.has(key)) {
-    cache.set(
-      key,
-      fetch(`${campaign.folder}/Dungeon${index}.json`)
-        .then((response) => (response.ok ? response.json() : null))
-        .then((template) => template ? { ...template, campaignId, campaignIndex: index } : null)
-        .catch(() => null),
-    );
+    if (typeof campaign.generator === "function") {
+      cache.set(
+        key,
+        fetch(`${campaign.folder}/Dungeon${index}.json`)
+          .then((response) => (response.ok ? response.json() : null))
+          .then((template) => {
+            if (!template) return campaign.generator(campaignId, index);
+            const { generated, ...savedTemplate } = template;
+            return { ...savedTemplate, campaignId, campaignIndex: index };
+          })
+          .catch(() => campaign.generator(campaignId, index)),
+      );
+    } else {
+      cache.set(
+        key,
+        fetch(`${campaign.folder}/Dungeon${index}.json`)
+          .then((response) => (response.ok ? response.json() : null))
+          .then((template) => template ? { ...template, campaignId, campaignIndex: index } : null)
+          .catch(() => null),
+      );
+    }
   }
   return cache.get(key);
 }
@@ -203,6 +320,7 @@ async function dungeon(campaignId, index) {
 async function originalDungeon(campaignId, index) {
   const campaign = campaigns.find((entry) => entry.id === campaignId);
   if (!campaign || index < 1 || index > campaign.count) return null;
+  if (typeof campaign.generator === "function") return campaign.generator(campaignId, index);
   return fetch(`${campaign.folder}/Dungeon${index}.json`)
     .then((response) => (response.ok ? response.json() : null))
     .then((template) => template ? { ...template, campaignId, campaignIndex: index } : null)

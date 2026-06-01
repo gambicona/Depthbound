@@ -249,6 +249,25 @@ function connectRooms(a, b, corridors, rooms, options = {}) {
   return true;
 }
 
+function connectLinearRooms(a, b, corridors, options = {}) {
+  const aConnection = nearestBoundaryDoor(a, center(b));
+  const bConnection = nearestBoundaryDoor(b, center(a));
+  if (!aConnection || !bConnection) return false;
+
+  const corridor = widenPath(
+    carvePath(aConnection.outside, bConnection.outside, options.corridorStyle ?? "horizontal-first"),
+    options.corridorWidth ?? 1,
+  );
+  const passage = makeCorridorPassage(corridors.passages.length, corridor);
+  corridors.cells.push(...corridor);
+  corridors.passages.push(passage);
+  a.doors.push({ ...aConnection.door, corridor: { ...aConnection.outside }, to: b.id });
+  b.doors.push({ ...bConnection.door, corridor: { ...bConnection.outside }, to: a.id });
+  a.connections.push(b.id);
+  b.connections.push(a.id);
+  return true;
+}
+
 function roomStartPosition(room) {
   const firstDoor = room.doors[0] ?? center(room);
   const doorKeys = new Set((room.doors ?? []).map(key));
@@ -259,10 +278,80 @@ function roomStartPosition(room) {
   return sorted[0] ?? center(room);
 }
 
+function estimateLinearGridSize(options = {}, roomCount = 8) {
+  const baseGridSize = options.gridSize ?? 72;
+  const maxWidth = options.roomWidth?.max ?? options.squareSize?.max ?? 9;
+  const maxGap = options.corridorLength?.max ?? 6;
+  const neededWidth = 8 + roomCount * (maxWidth + maxGap + 2);
+  return Math.max(baseGridSize, Math.min(180, neededWidth));
+}
+
+function generateLinearDungeon(options = {}) {
+  const roomCount = Math.max(1, Math.floor(Number(options.roomCount) || 8));
+  const gridSize = estimateLinearGridSize(options, roomCount);
+  const rooms = [];
+  const corridors = { cells: [], passages: [] };
+  const entranceShape = options.entranceShape ?? "rectangle";
+  const lineOptions = {
+    ...options,
+    roomShapes: options.linearRoomShapes ?? options.roomShapes ?? ["rectangle", "square"],
+    roomWidth: options.linearRoomWidth ?? options.roomWidth ?? { min: 5, max: 8 },
+    roomHeight: options.linearRoomHeight ?? options.roomHeight ?? { min: 4, max: 7 },
+    squareSize: options.linearSquareSize ?? options.squareSize ?? { min: 5, max: 7 },
+    corridorStyle: "horizontal-first",
+  };
+
+  let cursorX = 3;
+  const baseY = Math.floor(gridSize / 2);
+  for (let index = 0; index < roomCount; index += 1) {
+    const shape = index === 0 ? entranceShape : pick(lineOptions.roomShapes, "rectangle");
+    const room = makeRoom(index, cursorX, baseY - 3, lineOptions, shape);
+    if (!isInBounds(room, gridSize)) break;
+    if (rooms.length > 0 && !connectLinearRooms(rooms[rooms.length - 1], room, corridors, lineOptions)) break;
+    rooms.push(room);
+    cursorX = room.x + room.width + rangeValue(options.corridorLength, 4, 7) + 2;
+  }
+
+  pruneDanglingDoors(rooms, corridors.cells);
+
+  const walkable = new Set();
+  const doors = [];
+  for (const room of rooms) {
+    room.cells.forEach((cell) => walkable.add(key(cell)));
+    room.doors.forEach((door) => {
+      walkable.add(key(door));
+      doors.push({ ...door, roomId: room.id });
+    });
+  }
+  corridors.cells.forEach((cell) => walkable.add(key(cell)));
+
+  const entranceRoom = rooms[0];
+  const entranceDoor = entranceRoom?.doors?.[0] ?? center(entranceRoom);
+  const startPosition = roomStartPosition(entranceRoom);
+
+  return {
+    id: `dungeon-${Date.now()}`,
+    gridSize,
+    roomCount: rooms.length,
+    rooms,
+    corridors: corridors.cells,
+    corridorPassages: corridors.passages,
+    doors,
+    entranceRoomId: entranceRoom.id,
+    entranceDoor,
+    startPosition,
+    walkable: Array.from(walkable).map((cellKey) => {
+      const [x, y] = cellKey.split(",").map(Number);
+      return { x, y };
+    }),
+  };
+}
+
 function generateDungeon(options = {}) {
   const gridSize = options.gridSize ?? 72;
   const roomCount = options.roomCount ?? 20;
   const layout = options.layout ?? "branching";
+  if (layout === "linear") return generateLinearDungeon({ ...options, gridSize, roomCount });
   const entranceShape = options.entranceShape ?? "rectangle";
   const rooms = [makeRoom(0, Math.floor(gridSize / 2) - 4, Math.floor(gridSize / 2) - 3, options, entranceShape)];
   const corridors = { cells: [], passages: [] };

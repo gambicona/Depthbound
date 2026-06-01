@@ -664,6 +664,18 @@ component("wood-bundle", "Wood Bundle", {
   description: "Cut wood that can become shafts, handles, braces, or building components.",
 });
 
+component("road-building-kit", "Road-Building Kit", {
+  category: "expedition supply",
+  kind: "building material",
+  material: "mixed",
+  form: "kit",
+  cost: gp(5),
+  tags: ["road", "expedition", "construction", "supply", "trade-good"],
+  professions: ["carpenter", "mason", "scout"],
+  short: "A packed kit for one road segment.",
+  description: "Survey stakes, gravel markers, simple tools, and packed materials for making one travel hex edge into a usable road.",
+});
+
 component("stone-chip", "Stone Chip", {
   category: "stone",
   kind: "building material",
