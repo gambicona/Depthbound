@@ -148,9 +148,23 @@ function furnitureIconFilename(template, type) {
     .replace(/^-+|-+$/g, "");
 }
 
-function furnitureIconPath(template, type) {
+function furnitureIconPathCandidates(template, type) {
+  const candidates = [];
+  const add = (path) => {
+    if (path && !candidates.includes(path)) candidates.push(path);
+  };
+  const id = template?.id || type || "";
   const filename = furnitureIconFilename(template, type);
-  return filename ? `assets/furniture/${filename}.png` : "";
+  if (type === "camp-fireplace") return ["assets/furniture/camp-fireplace.png"];
+  if (type === "inn-bar") return ["assets/furniture/inn-bar.png"];
+  if (type === "water-floor") return ["assets/furniture/underground-pool.png"];
+  add(id ? `assets/furniture/${id}.png` : "");
+  add(filename ? `assets/furniture/${filename}.png` : "");
+  return candidates;
+}
+
+function furnitureIconPath(template, type) {
+  return furnitureIconPathCandidates(template, type)[0] || "";
 }
 
 function activateCreatorFurnitureImages(root = document) {

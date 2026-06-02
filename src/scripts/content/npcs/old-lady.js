@@ -716,7 +716,7 @@ const oldLadyNpc = {
     description: "Mara's warm, suspiciously well-stocked hut.",
     hiddenUntilUnlocked: true,
     order: 60,
-    lockText: "Someone may come calling after the first Thornwood errand.",
+    lockText: "Someone may come calling after the party stirs old, root-bound trouble.",
   },
   arrival: {
     title: "A Knock at the Door",
@@ -725,6 +725,11 @@ const oldLadyNpc = {
     paragraphs: [
       "Old Lady Mara arrives wrapped in shawls, smelling of pepper and woodsmoke.",
       "\"May I come in, honey? I heard you have been venturing into the forest. I might need a thing or two from there, if you care for an Old Lady like me.\"",
+      "She introduces herself as the keeper of a little hut near the village edge. She gives you her first errand into your hands: bring her 3 Green Vines from the beast-haunted forest, and she will make something that keeps adventurers alive.",
+    ],
+    barrowParagraphs: [
+      "Old Lady Mara arrives wrapped in shawls, smelling of pepper and woodsmoke.",
+      "\"May I come in, honey? I heard you have been venturing into the old crypts. I might need a thing or two before the dead start thinking too loudly, if you care for an Old Lady like me.\"",
       "She introduces herself as the keeper of a little hut near the village edge. She gives you her first errand into your hands: bring her 3 Green Vines from the beast-haunted forest, and she will make something that keeps adventurers alive.",
     ],
   },
@@ -758,7 +763,7 @@ const oldLadyNpc = {
       "Tell me what followed you home before it finds the windows.",
     ],
     firstMeeting:
-      "May I come in, honey? I heard you have been venturing into the forest. I might need a thing or two from there, if you care for an Old Lady like me.",
+      "May I come in, honey? I heard you have been venturing where old things wake up hungry. I might need a thing or two, if you care for an Old Lady like me.",
     greetingDefault:
       "Back again? Sit if you are bleeding. Stand if you are pretending not to be.",
     greetingNoQuestAvailable:
@@ -1115,13 +1120,16 @@ window.DungeonNpcBehaviors.oldLady = (() => {
 
   function showArrivalDialog() {
     const mara = npc();
+    const paragraphs = state.questFlags?.oldLadyIntroSource === "barrow-crown"
+      ? mara.arrival?.barrowParagraphs ?? mara.arrival?.paragraphs ?? []
+      : mara.arrival?.paragraphs ?? [];
     return new Promise((resolve) => {
       restoreDialogInputField();
       els.gameDialogTitle.textContent = mara.arrival?.title ?? "A Knock at the Door";
       els.gameDialogMessage.innerHTML = `
         <section class="npc-inspection">
           ${npcPortraitMarkup(mara, "npc-inspection-portrait", { clickable: false })}
-          ${(mara.arrival?.paragraphs ?? []).map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
+          ${paragraphs.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
         </section>
       `;
       els.gameDialogField.classList.add("hidden");
@@ -1145,11 +1153,12 @@ window.DungeonNpcBehaviors.oldLady = (() => {
     });
   }
 
-  function unlockIntro() {
+  function unlockIntro(source = "forest") {
     state.questFlags = { ...(state.questFlags ?? {}) };
     if (state.questFlags.oldLadyAvailable || state.questFlags.oldLadyIntroPending) return false;
     state.questFlags.oldLadyGreenVinesAccepted = true;
     state.questFlags.oldLadyIntroPending = true;
+    state.questFlags.oldLadyIntroSource = source;
     return true;
   }
 
@@ -1209,12 +1218,14 @@ window.DungeonNpcBehaviors.oldLady = (() => {
 
   return {
     maybeUnlockFromProgress() {
-      if ((state.campaignProgress?.["thornwood-pact"] ?? 0) < 1) return false;
-      return unlockIntro();
+      if ((state.campaignProgress?.["thornwood-pact"] ?? 0) >= 1) return unlockIntro("forest");
+      if ((state.campaignProgress?.["barrow-crown"] ?? 0) >= 2) return unlockIntro("barrow-crown");
+      return false;
     },
     onDungeonComplete(context = {}) {
-      if (context.themeId !== "forestOfTheBeasts" && context.campaignId !== "thornwood-pact") return false;
-      return unlockIntro();
+      if (context.themeId === "forestOfTheBeasts" || context.campaignId === "thornwood-pact") return unlockIntro("forest");
+      if (context.campaignId === "barrow-crown" && Math.max(Number(context.campaignIndex) || 0, Number(state?.campaignProgress?.["barrow-crown"]) || 0) >= 2) return unlockIntro("barrow-crown");
+      return false;
     },
     maybeTriggerArrival() {
       if (state.mode !== "home" || !state.questFlags?.oldLadyIntroPending) return false;

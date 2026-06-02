@@ -2731,7 +2731,7 @@ function showDungeonObjectInfo(object) {
   const isHomePlacedContainer = homeObjectIsStorage(object, template);
   const isHomeStorage = isHomeChest || isHomePlacedContainer;
   const homeBed = state.mode === "home" && object.homePlaced ? objectComponent(object.type, "homeBed") : null;
-  const playableInstrument = state.mode === "home" && object.homePlaced ? objectComponent(object.type, "playableInstrument") : null;
+  const playableInstrument = objectComponent(object.type, "playableInstrument");
   const objectLocked = !isHomeChest && object.locked === true;
   const specialLock = normalizeSpecialLock(object.specialLock);
   const canLootObject = (objectHasLoot(object) || isHomeChest || isHomePlacedContainer) && objectAdjacent && canActInCombat && !objectLocked;
@@ -2758,7 +2758,8 @@ function showDungeonObjectInfo(object) {
   const canFarmResourceNode = Boolean(resourceNode && state.mode !== "combat" && objectAdjacent && canActInCombat);
   const canReachInstrument = Boolean(playableInstrument && objectAdjacent && canActInCombat);
   const instrumentTool = playableInstrument?.requiredTool ?? playableInstrument?.instrument;
-  const hasInstrumentProficiency = Boolean(instrumentTool && heroHasToolProficiency(hero, instrumentTool));
+  const instrumentNeedsProficiency = Boolean(instrumentTool && !playableInstrument?.magicalAutoplay && !playableInstrument?.ignoreProficiency);
+  const hasInstrumentProficiency = !instrumentNeedsProficiency || heroHasToolProficiency(hero, instrumentTool);
   const canPlayInstrument = Boolean(canReachInstrument && hasInstrumentProficiency && playableInstrument?.songs?.length);
   const instrumentLockText = playableInstrument
     ? !objectAdjacent
@@ -2832,7 +2833,12 @@ function showDungeonObjectInfo(object) {
       playableInstrument
         ? `<section class="object-inventory">
             <h3>Music</h3>
-            <p class="empty-note">${escapeHtml(instrumentLockText || `${hero.name} can play ${toolName(instrumentTool)} here.`)}</p>
+            <p class="empty-note">${escapeHtml(
+              instrumentLockText ||
+                (playableInstrument.magicalAutoplay
+                  ? `${hero.name} can let the magic in this instrument answer.`
+                  : `${hero.name} can play ${toolName(instrumentTool)} here.`),
+            )}</p>
             <button type="button" data-action="play-home-instrument" data-object="${escapeAttribute(object.id)}" ${canPlayInstrument ? "" : "disabled"} ${
               instrumentLockText ? `title="${escapeAttribute(instrumentLockText)}"` : ""
             }>Play</button>
@@ -2910,7 +2916,7 @@ function showDungeonObjectInfo(object) {
         : ""
     }
     ${
-      objectHasLoot(object) && !isHomePlacedContainer && !objectLocked
+      objectHasLoot(object) && !isHomeStorage && !objectLocked
         ? `
           <section class="object-inventory">
             <h3>Contents</h3>
@@ -2942,7 +2948,7 @@ function showDungeonObjectInfo(object) {
         ? `
           ${
             isHomeChest
-              ? `<section class="object-inventory">
+              ? `<section class="object-inventory home-storage-panel">
                   <h3>Party Purse</h3>
                   <div class="chest-money">
                     <div><b>Carried Coins</b><span>${escapeHtml(moneyText(hero.inventory.money))}</span></div>
@@ -2963,7 +2969,7 @@ function showDungeonObjectInfo(object) {
                 </section>`
               : ""
           }
-          <section class="object-inventory">
+          <section class="object-inventory home-storage-panel">
             <h3>Bag</h3>
             <div class="chest-money-actions">
               <button type="button" data-action="home-store-all-items" data-object="${escapeAttribute(object.id)}" ${unequippedInventoryItems(hero).length ? "" : "disabled"}>Deposit All</button>
@@ -2983,7 +2989,7 @@ function showDungeonObjectInfo(object) {
                 : `<p class="empty-note">No carried bag items.</p>`
             }
           </section>
-          <section class="object-inventory">
+          <section class="object-inventory home-storage-panel">
             <h3>Chest Contents</h3>
             <div class="chest-money-actions">
               <button type="button" data-action="home-take-all-items" data-object="${escapeAttribute(object.id)}" ${chestItems.length ? "" : "disabled"}>Withdraw All</button>
@@ -3041,14 +3047,14 @@ async function playHomeInstrument(objectId) {
   const object = dungeonObjectForId(objectId);
   const instrument = object ? objectComponent(object.type, "playableInstrument") : null;
   const hero = activeHero();
-  if (!object || !instrument || state.mode !== "home") return;
+  if (!object || !instrument) return;
   const requiredTool = instrument.requiredTool ?? instrument.instrument;
   if (!instrumentPerformerAdjacent(hero, object)) {
     object.lastResult = `${hero.name} needs to stand next to ${objectTemplate(object.type)?.name ?? "the instrument"} to play.`;
     showDungeonObjectInfo(object);
     return;
   }
-  if (!heroHasToolProficiency(hero, requiredTool)) {
+  if (!instrument.magicalAutoplay && !instrument.ignoreProficiency && !heroHasToolProficiency(hero, requiredTool)) {
     object.lastResult = `${hero.name} needs ${toolName(requiredTool)} proficiency to play.`;
     showDungeonObjectInfo(object);
     return;
@@ -3080,7 +3086,9 @@ async function playHomeInstrument(objectId) {
     songId: song.id,
     songs,
   };
-  object.lastResult = `${hero.name} plays ${song.name ?? "a piece"} on the ${toolName(requiredTool)}.`;
+  object.lastResult = instrument.magicalAutoplay
+    ? `${hero.name} touches the ${objectTemplate(object.type)?.name ?? "instrument"}, and ${song.name ?? "a piece"} answers through the pipes.`
+    : `${hero.name} plays ${song.name ?? "a piece"} on the ${toolName(requiredTool)}.`;
   addLog(object.lastResult, "important");
   updateBackgroundMusic();
   showDungeonObjectInfo(object);
@@ -8596,13 +8604,13 @@ function travelFeatureKind(object = null) {
 
 const travelClearableThreatCooldownDays = 10;
 const travelRepeatableAdventureKinds = new Set(["mine", "shrine", "portal", "ruin", "ruins", "temple", "lake", "harbor", "castle"]);
-const travelClearableThreatKinds = new Set(["burrow", "camp", "hideout", "lair", "den", "warren"]);
+const travelClearableThreatKinds = new Set(["burrow", "hideout", "lair", "den", "warren"]);
 const travelClearableThreatTilePatterns = [
   /burrow/i,
   /bandit/i,
   /goblin/i,
   /outlaw/i,
-  /camp_(goblin|siege|palisade|pallisade|border)/i,
+  /camp_(bandit|goblin|siege|palisade|pallisade|border)/i,
 ];
 
 function travelFeatureIsRepeatableAdventureSite(feature = null) {
@@ -8616,6 +8624,7 @@ function travelFeatureIsClearableRoadThreat(feature = null) {
   if (!feature || travelFeatureIsTeleportSettlement(feature) || travelFeatureIsRepeatableAdventureSite(feature)) return false;
   const kind = travelFeatureKind(feature);
   const tile = String(feature?.tile ?? "").toLowerCase();
+  if (kind === "camp" && !travelClearableThreatTilePatterns.some((pattern) => pattern.test(tile))) return false;
   if (travelClearableThreatKinds.has(kind)) return true;
   return travelClearableThreatTilePatterns.some((pattern) => pattern.test(tile));
 }
@@ -8636,6 +8645,14 @@ function travelRefreshClearableStructureThreat(feature = null, day = normalizeWo
     lastOutcome: "New danger has moved into the site.",
   };
   return "respawned";
+}
+
+function travelStructureCooldownMessage(feature = null, day = normalizeWorldDay(state.worldDay)) {
+  if (!feature?.id || !state?.world?.visitedStructures) return "";
+  const visit = state.world.visitedStructures[feature.id];
+  const until = Math.max(0, Math.floor(Number(visit?.cooldownUntilDay) || 0));
+  if (until <= Math.floor(Number(day) || 0)) return "";
+  return `${travelStructureDisplayLabel(feature)} needs more time before it can be harvested again. It should be ready around day ${until}.`;
 }
 
 function travelFeatureIsTeleportSettlement(object = null) {
@@ -10431,6 +10448,7 @@ function travelCampPartySize() {
 }
 
 const travelRationItemId = "trail-ration";
+const travelFoodMaterialRequirement = { type: "component", category: "food ingredient" };
 
 function migrateTravelRationsToPartyInventory() {
   state.partyResources = state.partyResources && typeof state.partyResources === "object" ? state.partyResources : {};
@@ -10464,6 +10482,95 @@ function setTravelRationCount(count) {
 
 function addTravelRations(count = 1) {
   setTravelRationCount(travelRationCount() + Math.max(0, Math.floor(Number(count) || 0)));
+}
+
+function travelFoodMaterialStacks() {
+  return materialStacksForRequirement(travelFoodMaterialRequirement)
+    .filter((stack) => stack.itemId !== travelRationItemId && (stack.item?.baseItemId ?? stack.item?.itemId ?? stack.item?.id) !== travelRationItemId);
+}
+
+function travelFoodMaterialCount() {
+  return travelFoodMaterialStacks().reduce((sum, stack) => sum + Math.max(0, Math.floor(Number(stack.quantity) || 0)), 0);
+}
+
+function travelFoodMaterialSummary(limit = 3) {
+  const stacks = travelFoodMaterialStacks();
+  if (!stacks.length) return "no food ingredients";
+  const names = stacks.slice(0, limit).map((stack) => `${stack.item?.name ?? stack.itemId} x${Math.max(1, Math.floor(Number(stack.quantity) || 1))}`);
+  const extra = stacks.length > limit ? `, +${stacks.length - limit} more` : "";
+  return `${names.join(", ")}${extra}`;
+}
+
+function consumeTravelFoodMaterials(quantity = 1) {
+  let remaining = Math.max(1, Math.floor(Number(quantity) || 1));
+  const consumedStacks = [];
+  for (const stack of travelFoodMaterialStacks()) {
+    if (remaining <= 0) break;
+    const available = Math.max(0, Math.floor(Number(stack.quantity) || 0));
+    const consumed = Math.min(remaining, available);
+    if (consumed <= 0) continue;
+    consumedStacks.push({
+      itemId: stack.itemId,
+      name: stack.item?.name ?? stack.itemId,
+      quantity: consumed,
+    });
+    if (stack.source === "party") {
+      consumePartyResource(stack.itemId, consumed);
+    } else if (stack.source === "hero") {
+      const item = (stack.hero.inventory?.items ?? []).find((entry) => entry.id === stack.itemId);
+      const itemQuantity = Math.max(1, Math.floor(Number(item?.quantity) || 1));
+      if (item && itemQuantity > consumed) {
+        item.quantity = itemQuantity - consumed;
+      } else {
+        stack.hero.inventory.items = (stack.hero.inventory?.items ?? []).filter((entry) => entry.id !== stack.itemId);
+      }
+    } else if (stack.source === "chest") {
+      const item = (state.chest ?? []).find((entry) => entry.id === stack.itemId);
+      const itemQuantity = Math.max(1, Math.floor(Number(item?.quantity) || 1));
+      if (item && itemQuantity > consumed) {
+        item.quantity = itemQuantity - consumed;
+      } else {
+        state.chest = (state.chest ?? []).filter((entry) => entry.id !== stack.itemId);
+      }
+    }
+    remaining -= consumed;
+  }
+  return { ok: remaining <= 0, consumed: consumedStacks, missing: Math.max(0, remaining) };
+}
+
+function travelStoredFoodCount() {
+  return travelRationCount() + travelFoodMaterialCount();
+}
+
+function travelConsumedFoodText(consumed = {}) {
+  const parts = [];
+  if (consumed.rations > 0) parts.push(`${consumed.rations} ration${consumed.rations === 1 ? "" : "s"}`);
+  const materials = consumed.materials ?? [];
+  if (materials.length) {
+    const names = materials
+      .slice(0, 3)
+      .map((entry) => `${entry.name} x${entry.quantity}`);
+    const extra = materials.length > 3 ? `, +${materials.length - 3} more` : "";
+    parts.push(`${names.join(", ")}${extra}`);
+  }
+  return parts.join(" and ") || "stored food";
+}
+
+function travelConsumeStoredFood(quantity = 1) {
+  let remaining = Math.max(1, Math.floor(Number(quantity) || 1));
+  const availableRations = travelRationCount();
+  const rationUse = Math.min(remaining, availableRations);
+  if (rationUse > 0) {
+    setTravelRationCount(availableRations - rationUse);
+    remaining -= rationUse;
+  }
+  const materialUse = remaining > 0 ? consumeTravelFoodMaterials(remaining) : { ok: true, consumed: [], missing: 0 };
+  return {
+    ok: materialUse.ok,
+    rations: rationUse,
+    materials: materialUse.consumed ?? [],
+    missing: materialUse.missing ?? 0,
+  };
 }
 
 function travelCampMealResolved(camp = travelCampState()) {
@@ -10540,7 +10647,9 @@ function travelForageForCamp() {
       camp.foodSource = "forage";
       addLog(`${forager.hero.name} forages the ${forageProfile.label}: Survival ${roll.total} vs DC ${dc}. They find ${forageProfile.success}, enough to cook for camp.`, "important");
     } else {
-      const fallback = travelRationCount() >= needed ? "Rations can still cover the meal." : "Without enough rations, the party may need to rest hungry.";
+      const fallback = travelStoredFoodCount() >= needed
+        ? "Stored food can still cover the meal."
+        : "Without enough food, the party may need to rest hungry.";
       addLog(`${forager.hero.name} forages the ${forageProfile.label}: Survival ${roll.total} vs DC ${dc}. ${forageProfile.failure}. ${fallback}`, "important");
     }
   }
@@ -10606,18 +10715,24 @@ function travelUseCampRations() {
     const camp = travelCampState();
     if (travelCampMealResolved(camp)) return;
     const needed = travelCampRationNeed();
-    const available = travelRationCount();
+    const available = travelStoredFoodCount();
     if (available < needed) {
-      addLog(`The party cannot afford supper and only has ${available}/${needed} ration${needed === 1 ? "" : "s"}.`, "important");
+      addLog(`The party cannot afford supper and only has ${available}/${needed} carried food.`, "important");
       renderTravelCampMenu();
       return;
     }
-    setTravelRationCount(available - needed);
+    const consumed = travelConsumeStoredFood(needed);
+    if (!consumed.ok) {
+      addLog(`The party cannot gather enough carried food for supper.`, "important");
+      renderTravelCampMenu();
+      return;
+    }
     camp.mealResolved = true;
-    camp.foodSource = "rations";
-    camp.rationsConsumed = needed;
+    camp.foodSource = consumed.materials.length ? (consumed.rations > 0 ? "stored-food" : "food-materials") : "rations";
+    camp.rationsConsumed = consumed.rations;
+    camp.foodMaterialsConsumed = consumed.materials;
     camp.hungryRest = false;
-    addLog(`The party eats ${needed} carried ration${needed === 1 ? "" : "s"} in ${camp.innName || "the inn"}.`, "important");
+    addLog(`The party eats ${travelConsumedFoodText(consumed)} in ${camp.innName || "the inn"}.`, "important");
     renderTravelCampMenu();
     render();
     return;
@@ -10625,19 +10740,25 @@ function travelUseCampRations() {
   const camp = travelCampState();
   if (travelCampMealResolved(camp)) return;
   const needed = travelCampRationNeed();
-  const available = travelRationCount();
+  const available = travelStoredFoodCount();
   if (available < needed) {
-    addLog(`The party needs ${needed} ration${needed === 1 ? "" : "s"} for camp, but only has ${available}.`, "important");
+    addLog(`The party needs ${needed} food portion${needed === 1 ? "" : "s"} for camp, but only has ${available}.`, "important");
     renderTravelCampMenu();
     return;
   }
-  setTravelRationCount(available - needed);
+  const consumed = travelConsumeStoredFood(needed);
+  if (!consumed.ok) {
+    addLog(`The party cannot gather enough carried food for camp.`, "important");
+    renderTravelCampMenu();
+    return;
+  }
   camp.mealResolved = true;
-  camp.foodSource = "rations";
-  camp.rationsConsumed = needed;
+  camp.foodSource = consumed.materials.length ? (consumed.rations > 0 ? "stored-food" : "food-materials") : "rations";
+  camp.rationsConsumed = consumed.rations;
+  camp.foodMaterialsConsumed = consumed.materials;
   camp.hungryRest = false;
   const comfortNote = needed < travelCampPartySize() ? ` Camp comfort reduces the meal need to ${needed}.` : "";
-  addLog(`The party consumes ${needed} ration${needed === 1 ? "" : "s"} at camp.${comfortNote}`, "important");
+  addLog(`The party cooks ${travelConsumedFoodText(consumed)} at camp.${comfortNote}`, "important");
   renderTravelCampMenu();
   render();
 }
@@ -10675,7 +10796,7 @@ function travelInnTryHungryFallback() {
   const simple = travelInnRefreshmentOptions[0];
   const price = travelInnRefreshmentPrice(simple);
   const needed = travelCampRationNeed();
-  if (moneyToCp(partyPurse()) >= price || travelRationCount() >= needed) {
+  if (moneyToCp(partyPurse()) >= price || travelStoredFoodCount() >= needed) {
     addLog("The party still has a way to eat tonight before asking for charity.", "important");
     renderTravelCampMenu();
     return;
@@ -10708,7 +10829,7 @@ function travelInnTryHungryFallback() {
     }
     addLog(`${persuader.hero.name} asks the innkeeper for mercy: Persuasion ${roll.total} vs DC ${dc}. The answer is kind, but firm. The party goes to bed hungry.`, "important");
   } else {
-    addLog(`No coin and no rations remain. The party goes to bed hungry at ${camp.innName || "the inn"}.`, "important");
+    addLog(`No coin and no food remain. The party goes to bed hungry at ${camp.innName || "the inn"}.`, "important");
   }
   travelFinishCampRest({ hungry: true });
 }
@@ -10768,19 +10889,33 @@ function renderTravelCampMenu() {
   const mealResolved = travelCampMealResolved(camp);
   const rested = Boolean(camp.rested);
   const rationCount = travelRationCount();
+  const foodMaterialCount = travelFoodMaterialCount();
+  const storedFoodCount = rationCount + foodMaterialCount;
+  const storedFoodSummary = travelFoodMaterialSummary();
   const rationNeed = travelCampRationNeed();
   const forageAttempted = Boolean(camp.forage);
-  const canCookMeal = !inn && !mealResolved && rationCount >= rationNeed;
+  const canUseStoredFood = !mealResolved && storedFoodCount >= rationNeed;
+  const canCookMeal = !inn && canUseStoredFood;
   const canForage = !inn && !mealResolved && !forageAttempted && Boolean(travelBestForager()?.hero);
   const innSimplePrice = travelInnRefreshmentPrice(travelInnRefreshmentOptions[0]);
   const canBuyInnMeal = inn && !mealResolved && moneyToCp(partyPurse()) >= innSimplePrice;
-  const canEatInnRations = inn && !mealResolved && !canBuyInnMeal && rationCount >= rationNeed;
-  const showHungryRest = !mealResolved && (inn ? !canBuyInnMeal && !canEatInnRations : !canCookMeal && !canForage);
+  const canEatInnStoredFood = inn && !canBuyInnMeal && canUseStoredFood;
+  const showHungryRest = !mealResolved && (inn ? !canBuyInnMeal && !canEatInnStoredFood : !canCookMeal && !canForage);
   const totalComfort = travelCampTotalComfort();
   const kicker = inn ? `Day ${normalizeWorldDay(state?.worldDay)} Inn` : `Day ${normalizeWorldDay(state?.worldDay)} Camp`;
   const location = inn ? (camp.innName || `${camp.locationName || travelPlaceLabelForHex(state?.world?.currentHex)} Inn`) : camp.locationName || travelPlaceLabelForHex(state?.world?.currentHex);
   const remaining = routeLength ? `${routeLength} day${routeLength === 1 ? "" : "s"} remain on the route.` : "No route steps remain.";
-  const mealSourceText = camp.foodSource === "inn" ? camp.refreshmentName || "inn food and drink" : camp.foodSource === "forage" ? "foraging" : camp.foodSource === "hungry" ? "a hungry rest" : "rations";
+  const mealSourceText = camp.foodSource === "inn"
+    ? camp.refreshmentName || "inn food and drink"
+    : camp.foodSource === "forage"
+      ? "foraging"
+      : camp.foodSource === "hungry"
+        ? "a hungry rest"
+        : camp.foodSource === "food-materials"
+          ? "food ingredients"
+          : camp.foodSource === "stored-food"
+            ? "stored food"
+            : "rations";
   const forageProfile = travelCampForageProfile();
   const forageDc = forageProfile.dc;
   const forageTerrain = forageProfile.comfortReduction > 0
@@ -10789,14 +10924,16 @@ function renderTravelCampMenu() {
   const innPersuasionText = inn && camp.innPersuasion
     ? ` Last plea: Persuasion ${camp.innPersuasion.total} vs DC ${camp.innPersuasion.dc}.`
     : "";
-  const food = inn ? ` Food and drink are available at the bar. Party purse: ${moneyText(partyPurse())}; rations ${rationCount}/${rationNeed}. Cheapest supper: ${priceText(innSimplePrice)}.${innPersuasionText}` : ` Food: ${rationCount}/${rationNeed} ration${rationNeed === 1 ? "" : "s"} needed; ${forageTerrain}.`;
+  const food = inn
+    ? ` Food and drink are available at the bar. Party purse: ${moneyText(partyPurse())}; carried food ${storedFoodCount}/${rationNeed} (${rationCount} ration${rationCount === 1 ? "" : "s"}, ${foodMaterialCount} ingredient${foodMaterialCount === 1 ? "" : "s"}). Cheapest supper: ${priceText(innSimplePrice)}.${innPersuasionText}`
+    : ` Food: ${storedFoodCount}/${rationNeed} carried food portion${rationNeed === 1 ? "" : "s"} (${rationCount} ration${rationCount === 1 ? "" : "s"}, ${foodMaterialCount} ingredient${foodMaterialCount === 1 ? "" : "s"}); ${forageTerrain}.`;
   const meal = inn
     ? mealResolved
       ? ` Supper handled by ${mealSourceText}.`
       : canBuyInnMeal
         ? " Buy food and drinks at the bar before sleeping."
-        : canEatInnRations
-          ? " Eat carried rations here or ask the innkeeper for mercy."
+        : canEatInnStoredFood
+          ? " Eat carried food here or ask the innkeeper for mercy."
           : " Ask the innkeeper for mercy or go to bed hungry."
     : mealResolved
       ? ` Meal handled by ${mealSourceText}.`
@@ -10812,7 +10949,9 @@ function renderTravelCampMenu() {
     : "";
   const details = `${camp.summary || (inn ? "The party takes rooms for the night." : "The party makes camp for the night.")} ${remaining}${food}${meal}${!inn && forageResult ? ` Forage: ${forageResult}` : ""}${roadWork}${comfort}${hunger}${rest}`;
   const tents = inn ? travelInnRefreshmentButtonsMarkup() : travelCampTentPanelMarkup();
-  const mealLabel = mealResolved ? (camp.foodSource === "inn" ? "Inn Table" : camp.foodSource === "forage" ? "Foraged" : camp.foodSource === "hungry" ? "Hungry" : "Rations") : "Needed";
+  const mealLabel = mealResolved
+    ? (camp.foodSource === "inn" ? "Inn Table" : camp.foodSource === "forage" ? "Foraged" : camp.foodSource === "hungry" ? "Hungry" : camp.foodSource === "food-materials" ? "Ingredients" : camp.foodSource === "stored-food" ? "Stored Food" : "Rations")
+    : "Needed";
   const bindCampPanel = (prefix) => {
     const panel = {
       kicker: els[`${prefix}Kicker`],
@@ -10836,9 +10975,9 @@ function renderTravelCampMenu() {
     if (panel.details) panel.details.textContent = details;
     if (panel.tents) panel.tents.innerHTML = tents;
     if (panel.rations) {
-      panel.rations.textContent = inn ? moneyText(partyPurse()) : `${rationCount} / ${rationNeed}`;
+      panel.rations.textContent = inn ? moneyText(partyPurse()) : `${storedFoodCount} / ${rationNeed}`;
       const label = panel.rations.closest("div")?.querySelector("span");
-      if (label) label.textContent = inn ? "Purse" : "Rations";
+      if (label) label.textContent = inn ? "Purse" : "Food";
     }
     if (panel.meal) {
       panel.meal.textContent = mealLabel;
@@ -10846,15 +10985,17 @@ function renderTravelCampMenu() {
       if (label) label.textContent = inn ? "Table" : "Meal";
     }
     if (panel.useRations) {
-      panel.useRations.textContent = inn ? (canEatInnRations ? "Eat Rations" : "Buy Supper") : "Cook Meal";
-      panel.useRations.disabled = mealResolved || (inn ? !canBuyInnMeal && !canEatInnRations : !canCookMeal);
+      panel.useRations.textContent = inn
+        ? (canBuyInnMeal ? "Buy Supper" : rationCount >= rationNeed ? "Eat Rations" : "Eat Food Ingredients")
+        : (rationCount >= rationNeed ? "Cook Meal" : "Cook Food Ingredients");
+      panel.useRations.disabled = mealResolved || (inn ? !canBuyInnMeal && !canEatInnStoredFood : !canCookMeal);
       panel.useRations.title = inn
         ? canBuyInnMeal
           ? "Buy the simple inn supper for the party."
-          : canEatInnRations
-            ? "Eat carried rations in the inn common room."
-            : `Needs ${priceText(innSimplePrice)} or ${rationNeed} ration${rationNeed === 1 ? "" : "s"}.`
-        : canCookMeal ? "Cook a camp meal from party rations." : `Needs ${rationNeed} ration${rationNeed === 1 ? "" : "s"}.`;
+          : canEatInnStoredFood
+            ? `Eat carried food in the inn common room. Ingredients: ${storedFoodSummary}.`
+            : `Needs ${priceText(innSimplePrice)} or ${rationNeed} carried food.`
+        : canCookMeal ? `Cook a camp meal from carried food. Ingredients: ${storedFoodSummary}.` : `Needs ${rationNeed} carried food.`;
     }
     if (panel.forage) {
       panel.forage.classList.toggle("hidden", inn);
@@ -10941,8 +11082,8 @@ function travelHungryRestAtCamp() {
     travelInnTryHungryFallback();
     return;
   }
-  if (travelRationCount() >= travelCampRationNeed()) {
-    addLog("The party still has enough rations. Cook at the fireplace or forage before choosing a hungry rest.", "important");
+  if (travelStoredFoodCount() >= travelCampRationNeed()) {
+    addLog("The party still has enough carried food. Cook at the fireplace or forage before choosing a hungry rest.", "important");
     renderTravelCampMenu();
     return;
   }
@@ -11311,6 +11452,62 @@ function travelApplyEventRewards(rewards = {}) {
     addMoney(partyPurse(), moneyCp);
     addLog(`The party purse gains ${moneyText(cpToMoney(moneyCp))}.`, "important");
   }
+  const itemRewards = Array.isArray(rewards.items)
+    ? rewards.items
+    : Object.entries(rewards.items ?? {}).map(([id, quantity]) => ({ id, quantity }));
+  for (const entry of itemRewards) {
+    const id = String(entry?.id ?? "").trim();
+    const quantity = Math.max(1, Math.floor(Number(entry?.quantity) || 1));
+    const template = id ? getItemTemplate(id) : null;
+    if (!template) continue;
+    for (let index = 0; index < quantity; index += 1) {
+      addItemToPartyInventory(createItemInstance(id, "travel-reward"), "travel-reward");
+    }
+    addLog(`The party stores ${quantity} ${template.name}${quantity === 1 ? "" : "s"} in the party inventory.`, "important");
+  }
+}
+
+function travelApplyEventCost(outcome = {}) {
+  const costCp = moneyToCp(outcome.cost ?? {});
+  if (costCp <= 0) return true;
+  if (moneyToCp(partyPurse()) < costCp) {
+    addLog(`The party needs ${priceText(costCp)} for this.`, "important");
+    return false;
+  }
+  spendMoney(partyPurse(), costCp);
+  addLog(`The party pays ${priceText(costCp)}.`, "important");
+  return true;
+}
+
+function travelApplyEventService(service = null) {
+  const type = String(service?.type ?? "").trim();
+  if (!type) return null;
+  if (type === "cureDisease") {
+    const entry = partyHeroes()
+      .map((hero) => ({ hero, diseases: typeof fighterDiseases === "function" ? fighterDiseases(hero) : [] }))
+      .find((candidate) => candidate.diseases.length > 0);
+    if (!entry) return { blocked: true, text: "No one in the party needs disease treatment today." };
+    const disease = entry.diseases[0];
+    const price = Math.max(2500, Math.floor(Number(service.costCp) || diseaseCurePriceCp(disease.diseaseId)));
+    if (!spendMoney(partyPurse(), price)) return { blocked: true, text: `The treatment costs ${priceText(price)}, and the party does not have enough coin.` };
+    const removed = typeof cureFighterDisease === "function" ? cureFighterDisease(entry.hero, disease.diseaseId) : [];
+    if (!removed.length) {
+      addMoney(partyPurse(), price);
+      return { blocked: true, text: "The treatment fails to find anything it can cure." };
+    }
+    return { text: `${entry.hero.name}'s ${disease.label ?? "disease"} is treated.` };
+  }
+  if (type === "treatHungerExhaustion") {
+    const entry = partyHeroes()
+      .map((hero) => ({ hero, level: travelHungerExhaustionLevel(hero) }))
+      .find((candidate) => candidate.level > 0);
+    if (!entry) return { blocked: true, text: "No one in the party needs exhaustion treatment from hunger today." };
+    const price = Math.max(1000, Math.floor(Number(service.costCp) || entry.level * 1000));
+    if (!spendMoney(partyPurse(), price)) return { blocked: true, text: `The treatment costs ${priceText(price)}, and the party does not have enough coin.` };
+    setTravelHungerExhaustionLevel(entry.hero, 0);
+    return { text: `${entry.hero.name}'s hunger exhaustion is treated.` };
+  }
+  return null;
 }
 
 function travelOutcomeCategory(outcome = {}) {
@@ -11355,7 +11552,18 @@ function travelOutcomeSummary(event = {}, outcome = {}, check = null, context = 
   if (check?.text) parts.push(check.text);
   if (outcome.text) parts.push(outcome.text);
   if (outcome.rewards?.rations) parts.push(`Rations +${Math.max(0, Math.floor(Number(outcome.rewards.rations) || 0))}.`);
+  if (moneyToCp(outcome.cost ?? {}) > 0) parts.push(`Cost ${priceText(moneyToCp(outcome.cost))}.`);
   if (moneyToCp(outcome.rewards?.money ?? {}) > 0) parts.push(`Coin +${moneyText(outcome.rewards.money)}.`);
+  const itemRewards = Array.isArray(outcome.rewards?.items)
+    ? outcome.rewards.items
+    : Object.entries(outcome.rewards?.items ?? {}).map(([id, quantity]) => ({ id, quantity }));
+  if (itemRewards.length) {
+    parts.push(itemRewards.map((entry) => {
+      const template = getItemTemplate(entry.id);
+      const quantity = Math.max(1, Math.floor(Number(entry.quantity) || 1));
+      return `${template?.name ?? entry.id} +${quantity}`;
+    }).join(", ") + ".");
+  }
   if (outcome.fight) parts.push(travelFightAttackSummary(outcome, context));
   if (outcome.campaign) parts.push("The marked mine opens into an old story path.");
   if (outcome.dungeon) parts.push(`A ${travelDungeonSizePlayerLabel(outcome.dungeon.size)} way opens below.`);
@@ -11513,9 +11721,10 @@ async function travelStartEventDungeon(event, outcome = {}, context = {}) {
     name: event?.title ?? "Travel Dungeon",
     intro: outcome.text,
     settlementBoardQuestId: context.boardQuest?.id ?? dungeon.boardQuestId ?? "",
-    goal: { type: "reachExit" },
+    goal: dungeon.goal ?? { type: "reachExit" },
   };
   settlementBoardApplyDungeonGoal(state, context.boardQuest);
+  travelEnsureDungeonBossForGoal(state, themeId, partyMembers);
   state.log = [...(state.log ?? []), { text: `${event?.title ?? "Travel Event"}: ${outcome.text ?? "The party enters the place."}`, type: "important" }];
   try {
     await saveQuickstart(state);
@@ -11542,6 +11751,40 @@ async function travelStartEventCampaign(event, outcome = {}, context = {}) {
   await startCampaignDungeon(campaignId, { dungeonIndex: campaign.index ?? 1 });
   if (state?.travelReturnCamp) state.travelReturnCamp = cloneData(state.travelReturnCamp);
   return true;
+}
+
+function travelEnsureDungeonBossForGoal(gameState = state, themeId = defaultContent.theme, partyMembers = partyHeroes()) {
+  const goal = gameState?.customDungeon?.goal;
+  if (goal?.type !== "killBoss") return;
+  const existingBoss = Object.values(gameState.fighters ?? {}).some((fighter) => fighter?.alive && (fighter.id?.startsWith("boss-") || fighter.tags?.includes("boss")));
+  if (existingBoss) return;
+  const dungeon = gameState.dungeon;
+  const exitRoom = dungeon?.rooms?.find((room) => room.id === gameState.exit?.roomId) ?? dungeon?.rooms?.at?.(-1);
+  if (!dungeon || !exitRoom) return;
+  const difficultyHero = {
+    ...(partyMembers[0] ?? {}),
+    level: averagePartyLevel(partyMembers[0] ?? { level: 1 }),
+    partySize: partyMembers.length,
+  };
+  const bossId = bossMonsterIdForHero(difficultyHero, themeId) ?? dungeonBossMonsterIds(themeId)[0];
+  const template = bossId ? getMonsterTemplate(bossId) : null;
+  if (!template) return;
+  const blockedKeys = new Set([
+    ...Object.values(gameState.fighters ?? {}).filter((fighter) => fighter?.alive).flatMap((fighter) => window.DungeonGrid.fighterCells(fighter)),
+    ...(gameState.dungeonObjects ?? []).filter(objectBlocksMovement).flatMap(objectCells),
+    gameState.exit?.position,
+  ].filter(Boolean).map(positionKey));
+  const boss = createCombatant({
+    ...template,
+    baseMonsterId: template.id,
+    templateId: template.id,
+    id: `boss-${exitRoom.id}`,
+    name: template.name,
+  });
+  applyMonsterCategoryScaling(boss, difficultyHero);
+  boss.roomId = exitRoom.id;
+  boss.position = safeRoomSpawnCell(exitRoom, dungeon.startPosition, blockedKeys, dungeon.gridSize, spawnFloorKeysForDungeon(dungeon), boss);
+  if (boss.position) gameState.fighters[boss.id] = boss;
 }
 
 async function travelStartEventSkirmish(event, outcome = {}, context = {}) {
@@ -11648,6 +11891,16 @@ async function travelResolveEventOutcome(event, choice, context = {}) {
       travelRememberBlockedRoadDanger(context, event, choice, outcome);
       return "road-blocked";
     }
+    return "handled";
+  }
+  const serviceResult = travelApplyEventService(outcome.service);
+  if (serviceResult?.blocked) {
+    await travelShowEventResult(event, { text: serviceResult.text }, context, checkResult);
+    return "handled";
+  }
+  if (serviceResult?.text) outcome = { ...outcome, text: [outcome.text, serviceResult.text].filter(Boolean).join(" ") };
+  if (!travelApplyEventCost(outcome)) {
+    await travelShowEventResult(event, { text: "The party does not have enough coin for that." }, context, checkResult);
     return "handled";
   }
   const resultSummary = await travelShowEventResult(event, outcome, context, checkResult);
@@ -11814,7 +12067,7 @@ function travelClearableThreatFallbackEvent(feature = null, kind = "") {
       title: "Goblin Holdout",
       text: `${place} looks quiet from the road, but smoke still leaks from hidden holes. The site has to be cleared before a road can safely pass.`,
       choices: [
-        { id: "clear", label: "Clear The Holdout", description: "Enter the goblin hideout and drive them out.", outcome: { text: "The party follows the smoke holes into the goblin den.", dungeon: { size: "small", themeId: "goblinWarren" } } },
+        { id: "clear", label: "Clear The Holdout", description: "Enter the goblin hideout and defeat its boss.", outcome: { text: "The party follows the smoke holes into the goblin den.", dungeon: { size: "small", themeId: "goblinWarren", goal: { type: "killBoss" } } } },
         { id: "leave", label: "Leave It For Now", description: "Do not risk the road crew here yet.", outcome: { text: "The party marks the danger and camps out of bowshot." } },
       ],
     };
@@ -11825,7 +12078,7 @@ function travelClearableThreatFallbackEvent(feature = null, kind = "") {
       title: "Occupied Camp",
       text: `${place} has gone still, but the tracks are fresh. Someone will contest a road unless the camp is broken.`,
       choices: [
-        { id: "clear", label: "Break The Camp", description: "Push through the camp and clear its heart.", outcome: { text: "The party pushes into the camp before the lookouts can scatter.", dungeon: { size: "small", themeId: "outlawCamp" } } },
+        { id: "clear", label: "Break The Camp", description: "Push through the camp and defeat its boss.", outcome: { text: "The party pushes into the camp before the lookouts can scatter.", dungeon: { size: "small", themeId: "outlawCamp", goal: { type: "killBoss" } } } },
         { id: "wait", label: "Wait", description: "Leave the camp alone for now.", outcome: { text: "The party keeps the camp marked and makes no road claim today." } },
       ],
     };
@@ -11854,6 +12107,7 @@ function travelMarkStructureResolved(feature = null, event = {}, outcome = {}, s
     pending: dangerous,
     cleared,
     clearedDay: cleared ? Math.max(0, Math.floor(Number(current.clearedDay ?? normalizeWorldDay(state.worldDay)) || 0)) : current.clearedDay,
+    cooldownUntilDay: outcome.cooldownDays ? normalizeWorldDay(state.worldDay) + Math.max(1, Math.floor(Number(outcome.cooldownDays) || 1)) : current.cooldownUntilDay,
     lastEventId: event.id ?? "",
     lastEventTitle: event.title ?? "",
     lastOutcome: summary,
@@ -11867,6 +12121,18 @@ async function travelResolveStructureEvent(context = {}) {
   const tile = travelBiomeForHex(context.to);
   const biomeGroup = window.DepthboundWorldTravel?.biomeGroup?.(tile) ?? window.DepthboundWorldNames?.biomeGroup?.(tile) ?? String(tile).split("_")[0];
   const kind = feature.kind || feature.nameKind || window.DepthboundWorldNames?.structureKind?.(feature.tile) || "";
+  const cooldownMessage = travelStructureCooldownMessage(feature, context.departureDay);
+  if (cooldownMessage) {
+    travelRegisterStructureVisit(feature, context.departureDay);
+    addLog(cooldownMessage, "important");
+    await showTravelMapNotice({
+      kicker: travelFeatureKindLabel(feature),
+      title: travelStructureDisplayLabel(feature),
+      message: cooldownMessage,
+      confirmText: "Make Camp",
+    });
+    return "handled";
+  }
   const threatState = travelRefreshClearableStructureThreat(feature, context.departureDay);
   if (threatState === "quiet") {
     travelRegisterStructureVisit(feature, context.departureDay);
@@ -12828,6 +13094,9 @@ function renderTavernBarkeeperMenu() {
   const camp = travelCampState();
   const mealResolved = travelCampMealResolved(camp);
   const rationNeed = travelCampRationNeed();
+  const rationCount = travelRationCount();
+  const foodMaterialCount = travelFoodMaterialCount();
+  const storedFoodCount = rationCount + foodMaterialCount;
   const simplePrice = travelInnRefreshmentPrice(travelInnRefreshmentOptions[0]);
   const refreshmentRows = travelInnRefreshmentOptions
     .map((option) => {
@@ -12881,17 +13150,17 @@ function renderTavernBarkeeperMenu() {
           ${refreshmentRows}
           <div class="store-row barkeeper-service-row">
             <div>
-              <b>Eat Carried Rations</b>
-              <span>${escapeHtml(`Use ${rationNeed} ration${rationNeed === 1 ? "" : "s"} from the party pack. Available ${travelRationCount()} / ${rationNeed}.`)}</span>
+              <b>Eat Carried Food</b>
+              <span>${escapeHtml(`Use ${rationNeed} food portion${rationNeed === 1 ? "" : "s"} from the party pack. Rations ${rationCount}, ingredients ${foodMaterialCount}.`)}</span>
             </div>
-            <button type="button" data-action="camp-use-rations" ${mealResolved || travelRationCount() < rationNeed ? "disabled" : ""}>Eat</button>
+            <button type="button" data-action="camp-use-rations" ${mealResolved || storedFoodCount < rationNeed ? "disabled" : ""}>Eat</button>
           </div>
           <div class="store-row barkeeper-service-row">
             <div>
               <b>Ask for Supper</b>
-              <span>${escapeHtml(`When coin and rations are gone, ask for mercy. Persuasion DC ${travelInnPersuasionDc()}.`)}</span>
+              <span>${escapeHtml(`When coin and carried food are gone, ask for mercy. Persuasion DC ${travelInnPersuasionDc()}.`)}</span>
             </div>
-            <button type="button" data-action="inn-hungry-fallback" ${mealResolved || moneyToCp(partyPurse()) >= simplePrice || travelRationCount() >= rationNeed ? "disabled" : ""}>Ask</button>
+            <button type="button" data-action="inn-hungry-fallback" ${mealResolved || moneyToCp(partyPurse()) >= simplePrice || storedFoodCount >= rationNeed ? "disabled" : ""}>Ask</button>
           </div>
         </div>
       </section>
@@ -14414,11 +14683,11 @@ const factionFirstContactDefinitions = [
     id: "gravebinders",
     unlockFlag: "flag.village.gravebindersUnlocked",
     title: "The Gravebinders Arrive",
-    welcome: "Odran Vellshade arrives with a black-oak candle ledger and a voice soft enough to make the room listen. The Gravebinders exist to keep restless dead, curses, and grave debts from spilling into living homes.",
+    welcome: "Odran Vellshade arrives with a black-oak candle ledger and a voice soft enough to make the room listen. He says the Gravebinders have noticed a sharp unrest of undead in the area and have come to offer assistance before old graves learn new roads.",
     work: "They offer undead contracts, cursed-remains work, haunt reports, and careful rewards for materials taken from places where the dead refuse boundaries.",
     ranks: "Higher standing marks the party as reliable wardens, unlocking sterner work and deeper trust from the order.",
     gear: "Their equipment favors warding, gravecraft, anti-undead tools, and quiet protection for heroes who walk among tombs.",
-    ask: "Odran hopes the heroes will help the Gravebinders make this village a place where old bones stay properly still.",
+    ask: "Odran hopes the heroes will help the Gravebinders make this village a place where old bones stay properly still, and he offers trained clerics and paladins at reduced contract rates while the unrest lasts.",
   },
   {
     id: "crucible-collegium",
@@ -14511,6 +14780,10 @@ function factionFirstContactCanPresent() {
 }
 
 function factionFirstContactMessage(definition, npc) {
+  return factionFirstContactParagraphs(definition, npc).join("\n\n");
+}
+
+function factionFirstContactParagraphs(definition, npc) {
   const factionLabel = npc?.village?.label ?? factionSymbolDefinitions[definition.id]?.name ?? "the faction";
   const npcName = npc?.name ?? factionLabel;
   const npcTitle = npc?.title ? `${npc.title} ` : "";
@@ -14523,8 +14796,28 @@ function factionFirstContactMessage(definition, npc) {
     definition.gear,
     definition.ask,
   ]
-    .filter(Boolean)
-    .join(" ");
+    .filter(Boolean);
+}
+
+function factionFirstContactMarkup(definition, npc) {
+  const factionLabel = npc?.village?.label ?? factionSymbolDefinitions[definition.id]?.name ?? "Faction";
+  const npcName = npc?.name ?? factionLabel;
+  const subtitle = npc?.title ?? factionLabel;
+  const paragraphs = factionFirstContactParagraphs(definition, npc);
+  return `
+    <div class="faction-intro-dialog">
+      <aside class="faction-intro-speaker">
+        ${npcPortraitMarkup(npc, "faction-intro-portrait", { clickable: false })}
+        <div>
+          <b>${escapeHtml(npcName)}</b>
+          <span>${escapeHtml(subtitle)}</span>
+        </div>
+      </aside>
+      <div class="faction-intro-copy">
+        ${paragraphs.map((paragraph) => `<p>${typeof narrativeHighlightMarkup === "function" ? narrativeHighlightMarkup(paragraph) : escapeHtml(paragraph)}</p>`).join("")}
+      </div>
+    </div>
+  `;
 }
 
 async function presentFactionFirstContacts() {
@@ -14541,6 +14834,8 @@ async function presentFactionFirstContacts() {
       await showChoiceDialog({
         title: definition.title,
         message: factionFirstContactMessage(definition, npc),
+        messageHtml: factionFirstContactMarkup(definition, npc),
+        dialogClass: "wide-dialog faction-intro-panel",
         choices: [
           {
             value: "welcome",
@@ -15780,6 +16075,8 @@ function setAdminCampaignProgress(campaignId, progressValue) {
   const progress = Math.max(0, Math.min(count, Math.floor(Number(progressValue) || 0)));
   state.campaignProgress = { ...(state.campaignProgress ?? {}), [campaignId]: progress };
   addLog(`Admin set ${campaign.name} progress to ${progress}/${count}.`, "important");
+  maybeUnlockNpcProgress();
+  scheduleFactionFirstContacts();
 }
 
 function npcAdminProgressEntries() {
@@ -15912,8 +16209,8 @@ const monsterHunterTurnIns = [
     summary: "Clean points, intact roots, and no campfire scorch marks.",
     requirement: { type: "component", tagsAll: ["beast"], tagsAny: ["fang", "claw"] },
     quantity: 4,
-    rewardCp: 3500,
-    reputation: 8,
+    rewardCp: 1800,
+    reputation: 5,
   },
   {
     id: "good-hides",
@@ -15921,8 +16218,8 @@ const monsterHunterTurnIns = [
     summary: "Usable hide from beasts that were inconsiderate enough to grow armor.",
     requirement: { itemId: "beast-hide" },
     quantity: 3,
-    rewardCp: 4500,
-    reputation: 10,
+    rewardCp: 2400,
+    reputation: 6,
   },
   {
     id: "venom-proof",
@@ -16651,8 +16948,8 @@ const gravebinderTurnIns = [
     summary: "Powdered, cracked, or marked remains for proper cataloging and ward work.",
     requirement: { type: "component", tagsAny: ["bone", "skull"] },
     quantity: 5,
-    rewardCp: 4500,
-    reputation: 10,
+    rewardCp: 1500,
+    reputation: 5,
   },
   {
     id: "grave-wax-candles",
@@ -16660,8 +16957,8 @@ const gravebinderTurnIns = [
     summary: "Cold wax for binding candles. Keep it wrapped unless you want whispers in your pack.",
     requirement: { itemId: "grave-wax" },
     quantity: 3,
-    rewardCp: 6500,
-    reputation: 14,
+    rewardCp: 4500,
+    reputation: 10,
   },
   {
     id: "ectoplasm-vials",
@@ -16682,6 +16979,26 @@ const gravebinderTurnIns = [
     reputation: 22,
   },
 ];
+const gravebinderRecruitClasses = ["cleric", "paladin"];
+const gravebinderRecruitStateKey = "gravebinder-recruits";
+
+function gravebinderHashText(text = "") {
+  let hash = 2166136261;
+  for (const char of String(text)) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function gravebinderSeededRandom(seedText = "") {
+  let value = gravebinderHashText(seedText) || 1;
+  return () => {
+    value = Math.imul(value ^ (value >>> 15), 2246822507);
+    value = Math.imul(value ^ (value >>> 13), 3266489909);
+    return ((value ^= value >>> 16) >>> 0) / 4294967296;
+  };
+}
 
 function gravebinderProgress() {
   state.questFlags = { ...(state.questFlags ?? {}) };
@@ -16691,6 +17008,7 @@ function gravebinderProgress() {
   progress.contracts ??= {};
   progress.completedContracts ??= {};
   progress.turnIns ??= {};
+  progress.recruits = Array.isArray(progress.recruits) ? progress.recruits : [];
   return progress;
 }
 
@@ -16837,6 +17155,166 @@ function gravebinderTurnInsMarkup() {
   `;
 }
 
+function randomGravebinderRecruitIdentity(seed = "") {
+  const random = gravebinderSeededRandom(seed);
+  const entry = window.DepthboundHeroNames?.randomEntry?.(random);
+  if (entry?.name) return { name: entry.name, gender: ["f", "m", "d"].includes(entry.gender) ? entry.gender : "d" };
+  const name = window.DepthboundHeroNames?.random?.(random) ?? `Gravebinder ${Math.floor(random() * 900 + 100)}`;
+  return { name, gender: "d" };
+}
+
+function gravebinderRecruitBaseDefinition(classId = "cleric") {
+  return window.DepthboundTavernGuests?.definition?.(`recruit-class-${classId}`) ?? null;
+}
+
+function gravebinderRecruitTargetCategory(rank = gravebinderRank()) {
+  const partyCategory = typeof partyTargetMonsterCategory === "function" ? partyTargetMonsterCategory(activeHero()) : categoryForHeroLevel(Math.round(averagePartyLevel(activeHero())));
+  if (rank <= 1) return Math.min(2, Math.max(1, partyCategory));
+  if (rank === 2) return Math.min(4, Math.max(1, partyCategory));
+  return Math.max(1, partyCategory);
+}
+
+function gravebinderRecruitTier(def = {}, rank = gravebinderRank()) {
+  const tiers = Array.isArray(def.tiers) ? def.tiers.filter((tier) => tavernRecruitMonsterIsHumanoid(tier.monsterId)) : [];
+  if (!tiers.length) return null;
+  const targetCategory = gravebinderRecruitTargetCategory(rank);
+  return tiers.find((tier) => targetCategory <= Math.max(1, Math.floor(Number(tier.maxCategory) || 1))) ?? tiers[tiers.length - 1];
+}
+
+function gravebinderRecruitOfferClass(slotIndex = 0, serial = 0) {
+  return gravebinderRecruitClasses[(Math.max(0, Math.floor(Number(slotIndex) || 0)) + Math.max(0, Math.floor(Number(serial) || 0))) % gravebinderRecruitClasses.length] ?? "cleric";
+}
+
+function gravebinderRecruitStillGone(offer = {}) {
+  if (!offer) return true;
+  if (offer.state !== "available") return true;
+  if (!offer.recruitedAllyId) return false;
+  const ally = state.fighters?.[offer.recruitedAllyId];
+  return !ally || ally.dead || !ally.alive;
+}
+
+function ensureGravebinderRecruitOffers(progress = gravebinderProgress()) {
+  progress.recruitSerial = Math.max(0, Math.floor(Number(progress.recruitSerial) || 0));
+  let offers = (progress.recruits ?? []).filter((offer) => offer && !gravebinderRecruitStillGone(offer));
+  for (let index = 0; offers.length < 2; index += 1) {
+    progress.recruitSerial += 1;
+    const usedClasses = new Set(offers.map((offer) => offer.classId));
+    const classId = gravebinderRecruitClasses.find((entry) => !usedClasses.has(entry)) ?? gravebinderRecruitOfferClass(offers.length, progress.recruitSerial);
+    const identity = randomGravebinderRecruitIdentity(`${gravebinderRecruitStateKey}:${progress.recruitSerial}:${classId}`);
+    offers.push({
+      id: `${gravebinderRecruitStateKey}-${progress.recruitSerial}`,
+      classId,
+      name: identity.name,
+      gender: identity.gender,
+      state: "available",
+      offeredDay: normalizeWorldDay(state?.worldDay),
+      serial: progress.recruitSerial,
+    });
+  }
+  progress.recruits = offers.slice(0, 2);
+  return progress.recruits;
+}
+
+function gravebinderRecruitOfferDetails(offer, progress = gravebinderProgress()) {
+  const rank = gravebinderRank(progress);
+  const def = gravebinderRecruitBaseDefinition(offer?.classId);
+  const tier = def ? gravebinderRecruitTier(def, rank) : null;
+  const monster = tier?.monsterId ? getMonsterTemplate(tier.monsterId) : null;
+  const cost = Math.max(0, Math.floor(Number(tier?.costCp ?? def?.costCp ?? 0) / 2));
+  const experienced = rank >= 3;
+  return { rank, def, tier, monster, cost, experienced, playerControlled: experienced };
+}
+
+function gravebinderRecruitRowMarkup(offer, progress = gravebinderProgress()) {
+  const details = gravebinderRecruitOfferDetails(offer, progress);
+  const walletCp = moneyToCp(partyPurse());
+  const classLabel = offer?.classId === "paladin" ? "Paladin" : "Cleric";
+  const level = Math.max(1, Math.floor(Number(details.monster?.recruitMockLevel ?? details.tier?.label?.match(/\d+/)?.[0] ?? details.monster?.level ?? 1) || 1));
+  const label = details.tier?.label ?? `${classLabel} Recruit`;
+  const controlText = details.playerControlled ? "Experienced recruit. Joins under your direction and can train as a sidekick." : "Self-directed recruit. Their first 10 days are paid at a reduced Gravebinder rate.";
+  return `
+    <article class="guild-contract-row ${details.playerControlled ? "ready" : ""}">
+      <div>
+        <b>${escapeHtml(offer.name)} - ${escapeHtml(label)}</b>
+        <span>${escapeHtml(`${classLabel} support, level ${level}. ${controlText}`)}</span>
+        <small>${escapeHtml(priceText(details.cost))} per 10 days - Gravebinder rate</small>
+      </div>
+      <button type="button" data-action="hire-gravebinder-recruit" data-recruit="${escapeAttribute(offer.id)}" ${details.tier?.monsterId && walletCp >= details.cost ? "" : "disabled"}>Hire</button>
+    </article>
+  `;
+}
+
+function gravebinderRecruitsMarkup(progress = gravebinderProgress()) {
+  const offers = ensureGravebinderRecruitOffers(progress);
+  return `
+    <section class="guild-section">
+      <h3>Gravebinder Recruits</h3>
+      <p class="empty-note">The order keeps two helpers ready here. Higher standing brings more experienced recruits, and rank 3 or better sends people trusted enough to follow your direction directly.</p>
+      <div class="guild-contract-list">
+        ${offers.map((offer) => gravebinderRecruitRowMarkup(offer, progress)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function hireGravebinderRecruit(recruitId = "") {
+  const progress = gravebinderProgress();
+  const offers = ensureGravebinderRecruitOffers(progress);
+  const offer = offers.find((entry) => entry.id === recruitId);
+  if (!offer) return;
+  const details = gravebinderRecruitOfferDetails(offer, progress);
+  const monsterId = details.tier?.monsterId;
+  if (!monsterId || !tavernRecruitMonsterIsHumanoid(monsterId)) {
+    addLog(`${offer.name} is not ready to join right now.`, "important");
+    renderGravebinderGuild();
+    return;
+  }
+  const cost = Math.max(0, Math.floor(Number(details.cost) || 0));
+  if (!spendMoney(partyPurse(), cost)) return;
+  const leader = activeHero();
+  const playerControlled = Boolean(details.playerControlled);
+  const ally = createFriendlyBeastFromMonster(monsterId, {
+    id: `gravebinder-recruit-${monsterId}-${Date.now()}`,
+    name: offer.name,
+    position: cloneData(leader?.position ?? { x: 5, y: 5 }),
+    kind: playerControlled ? "companion" : "ally",
+    control: playerControlled ? "player" : "ai",
+    className: details.def?.className ?? "Gravebinder Recruit",
+    followHeroId: playerControlled ? null : leader?.id ?? null,
+    level: details.monster?.recruitMockLevel ?? details.monster?.level ?? 1,
+    xp: typeof xpFloorForLevel === "function" ? xpFloorForLevel(details.monster?.recruitMockLevel ?? details.monster?.level ?? 1) : 0,
+    hitDiceRemaining: details.monster?.recruitMockLevel ?? details.monster?.level ?? 1,
+  });
+  if (!ally) return;
+  applyMonsterCategoryScaling(ally, { level: Math.max(1, Math.round(averagePartyLevel(leader))), partySize: partyHeroes().length });
+  ally.hp = ally.maxHp;
+  ally.tavernRecruit = true;
+  ally.gravebinderRecruit = true;
+  ally.tavernRecruitGuestId = offer.id;
+  ally.hireCostCp = cost;
+  ally.hirePeriodDays = 10;
+  ally.hireStartDay = normalizeWorldDay(state.worldDay);
+  ally.hireLastPaidDay = normalizeWorldDay(state.worldDay);
+  ally.hireNextDueDay = normalizeWorldDay(state.worldDay) + 10;
+  ally.hireTierLabel = details.tier?.label ?? "Gravebinder Recruit";
+  ally.sidekickStartingLevel = Math.max(1, Math.floor(Number(details.monster?.recruitMockLevel ?? details.monster?.level) || 1));
+  ally.sidekickEligibleClasses = ["sidekick-warrior", "sidekick-expert", "sidekick-spellcaster"];
+  if (playerControlled) {
+    ally.partyMemberKind = "companion";
+    ally.companionControl = "player";
+    ally.className = `Experienced ${details.def?.className ?? "Gravebinder Recruit"}`;
+  }
+  addRecruitedAllyToParty(ally);
+  offer.state = "recruited";
+  offer.recruitedAllyId = ally.id;
+  const controlText = playerControlled ? "They are experienced enough to follow your direction directly." : "They will act on their own in battle.";
+  addLog(`${ally.name} joins through the Gravebinders. The first 10 days are paid (${priceText(cost)}). ${controlText}`, "important");
+  ensureGravebinderRecruitOffers(progress);
+  render();
+  renderGravebinderGuild();
+  window.DepthboundPlaytest?.syncNow?.();
+}
+
 function gravebinderRankRewardsMarkup() {
   const rank = gravebinderRank();
   return `
@@ -16907,6 +17385,7 @@ function gravebinderBoardActionsMarkup() {
       <button type="button" data-action="show-quest-log">Quest Log</button>
       ${panelButton("contracts", "Rites")}
       ${panelButton("turnins", "Grave Turn-Ins")}
+      ${panelButton("recruits", "Recruits")}
       ${panelButton("shop", "Grave Gear")}
       ${panelButton("catalog", "See Sets")}
       <div>
@@ -16918,13 +17397,14 @@ function gravebinderBoardActionsMarkup() {
 }
 
 function setGravebinderBoardPanel(panel = "contracts") {
-  const allowed = new Set(["contracts", "turnins", "shop", "catalog"]);
+  const allowed = new Set(["contracts", "turnins", "recruits", "shop", "catalog"]);
   gravebinderBoardPanel = allowed.has(panel) ? panel : "contracts";
   renderGravebinderGuild();
 }
 
 function gravebinderMainPanelMarkup(progress) {
   if (gravebinderBoardPanel === "turnins") return gravebinderTurnInsMarkup();
+  if (gravebinderBoardPanel === "recruits") return gravebinderRecruitsMarkup(progress);
   if (gravebinderBoardPanel === "shop") return factionSetShopMarkup(gravebinderGuildId, gravebinderRank(progress), "Grave Gear");
   if (gravebinderBoardPanel === "catalog") return factionSetCatalogMarkup(gravebinderGuildId, gravebinderRank(progress), "Gravebinder Set Catalog");
   return gravebinderContractsMarkup();
@@ -17074,6 +17554,17 @@ function gravebinderQuestLogEntries() {
 window.DungeonNpcBehaviors[gravebinderGuildId] = {
   visit: renderGravebinderGuild,
   returnToVisit: () => renderGravebinderGuild(),
+  maybeUnlockFromProgress() {
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    if (state.questFlags["flag.village.gravebindersUnlocked"]) return false;
+    const barrowProgress = Math.max(0, Math.floor(Number(state?.campaignProgress?.["barrow-crown"]) || 0));
+    if (barrowProgress < 1) return false;
+    state.questFlags["flag.village.gravebindersUnlocked"] = true;
+    gravebinderProgress();
+    addLog("Word of the Barrow Crown reaches the Gravebinders. A Candlewarden is on the way to offer aid against the unrest of the dead.", "important");
+    scheduleFactionFirstContacts();
+    return true;
+  },
   recordMonsterKill: recordGravebinderKill,
   questLogEntries: gravebinderQuestLogEntries,
   cancelQuest: cancelGravebinderContract,
@@ -17192,8 +17683,8 @@ const crucibleTurnIns = [
     summary: "Raw elemental knots. Do not store them beside soup, ink, pets, or opinions.",
     requirement: { itemId: "elemental-mote" },
     quantity: 4,
-    rewardCp: 6500,
-    reputation: 12,
+    rewardCp: 4200,
+    reputation: 9,
   },
   {
     id: "balanced-essences",
@@ -17210,8 +17701,8 @@ const crucibleTurnIns = [
     summary: "Stable housings, cracked focuses, and anything that clicks when no one touched it.",
     requirement: { type: "component", tagsAny: ["pressure", "crystal", "gear", "steam", "arcane-reagent"] },
     quantity: 3,
-    rewardCp: 9000,
-    reputation: 16,
+    rewardCp: 7000,
+    reputation: 14,
   },
   {
     id: "primal-core-study",
@@ -18627,6 +19118,7 @@ function createCompactGuildBoard(config) {
   }
 
   function questLogEntries() {
+    if (config.unlockFlag && !state.questFlags?.[config.unlockFlag]) return [];
     return [
       ...contracts
       .filter((contract) => contractState(contract.id).status === "accepted")
@@ -19102,7 +19594,7 @@ function expeditionMilepostCampaignMarkup() {
             <article class="store-row ${done ? "completed" : ""}">
               <div>
                 <b>${escapeHtml(number)}. ${escapeHtml(name)}</b>
-                <span>${escapeHtml(done ? "The Board has this proof in the ledger." : "A straight road-line delve using the linear generator.")}</span>
+                <span>${escapeHtml(done ? "The Board has this proof in the ledger." : "Follow a dangerous old road marker and return with a sealed field report.")}</span>
               </div>
               <button type="button" data-action="start-expedition-milepost" data-index="${number}" ${unlocked && !done ? "" : "disabled"}>${escapeHtml(done ? "Report Filed" : unlocked ? "Start Mission" : "Locked")}</button>
             </article>
@@ -19219,8 +19711,8 @@ const expeditionBoardApi = createCompactGuildBoard({
       summary: "Wood, cloth, leather, and iron for carts, packs, splints, and excuses.",
       requirement: { type: "component", tagsAny: ["wood", "cloth", "leather", "metal", "crafting"] },
       quantity: 6,
-      rewardCp: 4500,
-      reputation: 12,
+      rewardCp: 1800,
+      reputation: 6,
     },
   ],
   dungeonMatchesContract(context, contract) {
@@ -19326,8 +19818,8 @@ const boomClubApi = createCompactGuildBoard({
       summary: "The dependable foundation of every lecture that ends with everyone stepping back.",
       requirement: { type: "component", tagsAny: ["coal", "brimstone", "sulfur"] },
       quantity: 5,
-      rewardCp: 3500,
-      reputation: 9,
+      rewardCp: 2200,
+      reputation: 6,
     },
     {
       id: "fire-reagents",
@@ -20112,8 +20604,36 @@ function smithMaterialCommissionForNpc(npcId) {
   return commissions[npcId];
 }
 
+function inferredSmithMaterialCommissionRateGp(commission = {}) {
+  const text = [
+    commission.itemId,
+    commission.label,
+    commission.requestText,
+    commission.requirement?.category,
+    ...(commission.requirement?.tagsAny ?? []),
+    ...(commission.requirement?.tagsAll ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (/\b(hellfire|infernal|abyssal|demon|devil)\b/.test(text)) return 16;
+  if (/\b(arcane-gear|arcane|magic-reagent|pressure)\b/.test(text)) return 12;
+  if (/\b(embervein|crystal|spider-silk|venom)\b/.test(text)) return 7;
+  if (/\b(beast-hide|brimstone|sulfur|fire|ember|slag)\b/.test(text)) return 5;
+  if (/\b(healing|herb)\b/.test(text)) return 4;
+  if (/\b(coal|iron|metal|leather|hide|fuel|forge)\b/.test(text)) return 3;
+  if (/\b(cloth|wood|food|cooking)\b/.test(text)) return 2;
+  return smithMaterialCommissionRewardGpPerResource;
+}
+
+function smithMaterialCommissionRateGp(commission = {}) {
+  const explicit = Math.max(0, Math.floor(Number(commission?.rewardGpPerResource) || 0));
+  if (explicit > 0 && explicit !== smithMaterialCommissionRewardGpPerResource) return explicit;
+  return inferredSmithMaterialCommissionRateGp(commission);
+}
+
 function smithMaterialCommissionRewardCp(commission) {
-  return Math.max(0, Math.floor(Number(commission?.quantity) || 0) * Math.floor(Number(commission?.rewardGpPerResource ?? smithMaterialCommissionRewardGpPerResource) || 0) * 100);
+  return Math.max(0, Math.floor(Number(commission?.quantity) || 0) * smithMaterialCommissionRateGp(commission) * 100);
 }
 
 function smithMaterialCommissionRequirement(commission) {
@@ -21378,9 +21898,10 @@ async function trainSidekickCompanion() {
   });
   if (!classId) return;
 
-  companion.level = 1;
-  companion.xp = 0;
-  companion.hitDiceRemaining = 1;
+  const startingLevel = Math.max(1, Math.min(20, Math.floor(Number(companion.sidekickStartingLevel ?? companion.recruitMockLevel ?? companion.level) || 1)));
+  companion.level = startingLevel;
+  companion.xp = Math.max(Math.floor(Number(companion.xp) || 0), typeof xpFloorForLevel === "function" ? xpFloorForLevel(startingLevel) : 0);
+  companion.hitDiceRemaining = Math.max(startingLevel, Math.floor(Number(companion.hitDiceRemaining) || 1));
   companion.baseMaxHp = companion.baseMaxHp ?? companion.maxHp;
   companion.abilityScores = Object.fromEntries(abilities.map((ability) => [ability, baseAbilityScore(companion, ability)]));
   let summary = null;
@@ -21395,11 +21916,11 @@ async function trainSidekickCompanion() {
   companion.spellPointMax = spellPointMaximum(companion);
   companion.spellPoints = companion.spellPointMax;
   companion.role = combatantRoleLabel(companion);
-  const text = `${companion.name} trains as a level 1 ${companion.sidekickClassName ?? companion.className}. ${summary}`;
+  const text = `${companion.name} trains as a level ${companion.level} ${companion.sidekickClassName ?? companion.className}. ${summary}`;
   addLog(text, "important");
   render();
   await showChoiceDialog({
-    title: `Level 1 ${companion.sidekickClassName ?? companion.className}`,
+    title: `Level ${companion.level} ${companion.sidekickClassName ?? companion.className}`,
     message: text,
     choices: [{ value: "ok", label: "Continue" }],
     actor: companion,

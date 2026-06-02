@@ -331,38 +331,38 @@ function consumePartyResource(itemId, quantity = 1) {
 const smithMaterialCommissionRewardGpPerResource = 10;
 const smithMaterialCommissionRequests = {
   "general-merchant": [
-    { label: "Healing Herbs", requestText: "{npc} needs {quantity} Healing Herbs for potion stock.", requirement: { type: "component", tagsAll: ["herb", "healing"] }, quantityRange: [4, 8] },
-    { label: "Food Ingredients", requestText: "{npc} needs {quantity} Food Ingredients for trail rations.", requirement: { type: "component", category: "food ingredient" }, quantityRange: [6, 12] },
-    { itemId: "cloth-scrap", label: "Cloth Scraps", requestText: "{npc} needs {quantity} Cloth Scraps for bandages and supply bundles.", quantityRange: [8, 14] },
-    { itemId: "wood-bundle", label: "Wood Bundles", requestText: "{npc} needs {quantity} Wood Bundles for arrow shafts and crate repairs.", quantityRange: [4, 8] },
-    { label: "Cooking Herbs", requestText: "{npc} needs {quantity} Cooking Herbs for travel meals.", requirement: { type: "component", tagsAll: ["herb", "food"] }, quantityRange: [4, 8] },
+    { label: "Healing Herbs", requestText: "{npc} needs {quantity} Healing Herbs for potion stock.", requirement: { type: "component", tagsAll: ["herb", "healing"] }, quantityRange: [4, 8], rewardGpPerResource: 4 },
+    { label: "Food Ingredients", requestText: "{npc} needs {quantity} Food Ingredients for trail rations.", requirement: { type: "component", category: "food ingredient" }, quantityRange: [6, 12], rewardGpPerResource: 2 },
+    { itemId: "cloth-scrap", label: "Cloth Scraps", requestText: "{npc} needs {quantity} Cloth Scraps for bandages and supply bundles.", quantityRange: [8, 14], rewardGpPerResource: 2 },
+    { itemId: "wood-bundle", label: "Wood Bundles", requestText: "{npc} needs {quantity} Wood Bundles for arrow shafts and crate repairs.", quantityRange: [4, 8], rewardGpPerResource: 2 },
+    { label: "Cooking Herbs", requestText: "{npc} needs {quantity} Cooking Herbs for travel meals.", requirement: { type: "component", tagsAll: ["herb", "food"] }, quantityRange: [4, 8], rewardGpPerResource: 3 },
   ],
   alchemist: [
-    { itemId: "coal-chunk", label: "Coal Chunks", requestText: "{npc} needs {quantity} Coal Chunks for extremely responsible blast tests.", quantityRange: [4, 8] },
-    { itemId: "brimstone-chunk", label: "Brimstone Chunks", requestText: "{npc} needs {quantity} Brimstone Chunks because sulfur is comedy with consequences.", quantityRange: [2, 5] },
-    { itemId: "hellfire-ember", label: "Hellfire Embers", requestText: "{npc} needs {quantity} Hellfire Embers for the exciting shelf.", quantityRange: [1, 3] },
-    { itemId: "slag-glass", label: "Slag Glass", requestText: "{npc} needs {quantity} Slag Glass shards for shrapnel-safe, mostly-safe casings.", quantityRange: [3, 6] },
-    { itemId: "crystal-shard", label: "Crystal Shards", requestText: "{npc} needs {quantity} Crystal Shards for spark focus experiments.", quantityRange: [2, 5] },
-    { label: "Fire Reagents", requestText: "{npc} needs {quantity} Fire Reagents. Fire is a color too.", requirement: { type: "component", tagsAny: ["fire", "sulfur", "brimstone", "ember", "ash", "heat"] }, quantityRange: [3, 7] },
-    { label: "Volatile Alchemical Materials", requestText: "{npc} needs {quantity} Volatile Alchemical Materials for boom research.", requirement: { type: "component", tagsAll: ["alchemy"], tagsAny: ["fire", "acid", "poison", "venom", "infernal", "abyssal", "arcane-reagent", "magic-reagent"] }, quantityRange: [3, 6] },
+    { itemId: "coal-chunk", label: "Coal Chunks", requestText: "{npc} needs {quantity} Coal Chunks for extremely responsible blast tests.", quantityRange: [4, 8], rewardGpPerResource: 3 },
+    { itemId: "brimstone-chunk", label: "Brimstone Chunks", requestText: "{npc} needs {quantity} Brimstone Chunks because sulfur is comedy with consequences.", quantityRange: [2, 5], rewardGpPerResource: 5 },
+    { itemId: "hellfire-ember", label: "Hellfire Embers", requestText: "{npc} needs {quantity} Hellfire Embers for the exciting shelf.", quantityRange: [1, 3], rewardGpPerResource: 18 },
+    { itemId: "slag-glass", label: "Slag Glass", requestText: "{npc} needs {quantity} Slag Glass shards for shrapnel-safe, mostly-safe casings.", quantityRange: [3, 6], rewardGpPerResource: 5 },
+    { itemId: "crystal-shard", label: "Crystal Shards", requestText: "{npc} needs {quantity} Crystal Shards for spark focus experiments.", quantityRange: [2, 5], rewardGpPerResource: 7 },
+    { label: "Fire Reagents", requestText: "{npc} needs {quantity} Fire Reagents. Fire is a color too.", requirement: { type: "component", tagsAny: ["fire", "sulfur", "brimstone", "ember", "ash", "heat"] }, quantityRange: [3, 7], rewardGpPerResource: 6 },
+    { label: "Volatile Alchemical Materials", requestText: "{npc} needs {quantity} Volatile Alchemical Materials for boom research.", requirement: { type: "component", tagsAll: ["alchemy"], tagsAny: ["fire", "acid", "poison", "venom", "infernal", "abyssal", "arcane-reagent", "magic-reagent"] }, quantityRange: [3, 6], rewardGpPerResource: 10 },
   ],
   weaponsmith: [
-    { itemId: "coal-chunk", label: "packs of coal", requestText: "{npc} needs {quantity} packs of coal for his forge.", quantityRange: [4, 7] },
-    { itemId: "iron-scrap", label: "pieces of iron scrap", requestText: "{npc} needs {quantity} pieces of iron scrap for blade fittings.", quantityRange: [8, 14] },
-    { label: "pieces of metal", requestText: "{npc} needs {quantity} pieces of any metal for a rush order.", requirement: { type: "component", category: "metal" }, quantityRange: [8, 14] },
-    { label: "packs of fuel", requestText: "{npc} needs {quantity} packs of fuel for his forge.", requirement: { type: "component", tagsAny: ["fuel", "coal", "forge"] }, quantityRange: [4, 8] },
-    { itemId: "embervein-ore", label: "nuggets of Embervein Ore", requestText: "{npc} needs {quantity} nuggets of Embervein Ore for heat-holding steel.", quantityRange: [3, 6] },
-    { itemId: "infernal-iron-shard", label: "Infernal Iron Shards", requestText: "{npc} needs {quantity} Infernal Iron Shards for warded weapon work.", quantityRange: [2, 4] },
-    { itemId: "arcane-gear", label: "Arcane Gears", requestText: "{npc} needs {quantity} Arcane Gears for a delicate weapon mechanism.", quantityRange: [1, 3] },
+    { itemId: "coal-chunk", label: "packs of coal", requestText: "{npc} needs {quantity} packs of coal for his forge.", quantityRange: [4, 7], rewardGpPerResource: 3 },
+    { itemId: "iron-scrap", label: "pieces of iron scrap", requestText: "{npc} needs {quantity} pieces of iron scrap for blade fittings.", quantityRange: [8, 14], rewardGpPerResource: 3 },
+    { label: "pieces of metal", requestText: "{npc} needs {quantity} pieces of any metal for a rush order.", requirement: { type: "component", category: "metal" }, quantityRange: [8, 14], rewardGpPerResource: 3 },
+    { label: "packs of fuel", requestText: "{npc} needs {quantity} packs of fuel for his forge.", requirement: { type: "component", tagsAny: ["fuel", "coal", "forge"] }, quantityRange: [4, 8], rewardGpPerResource: 3 },
+    { itemId: "embervein-ore", label: "nuggets of Embervein Ore", requestText: "{npc} needs {quantity} nuggets of Embervein Ore for heat-holding steel.", quantityRange: [3, 6], rewardGpPerResource: 7 },
+    { itemId: "infernal-iron-shard", label: "Infernal Iron Shards", requestText: "{npc} needs {quantity} Infernal Iron Shards for warded weapon work.", quantityRange: [2, 4], rewardGpPerResource: 14 },
+    { itemId: "arcane-gear", label: "Arcane Gears", requestText: "{npc} needs {quantity} Arcane Gears for a delicate weapon mechanism.", quantityRange: [1, 3], rewardGpPerResource: 12 },
   ],
   armorsmith: [
-    { itemId: "iron-scrap", label: "pieces of iron scrap", requestText: "{npc} needs {quantity} pieces of iron scrap for rivets and patches.", quantityRange: [8, 14] },
-    { label: "pieces of metal", requestText: "{npc} needs {quantity} pieces of any metal for repairs.", requirement: { type: "component", category: "metal" }, quantityRange: [8, 14] },
-    { label: "pieces of leather or hide", requestText: "{npc} needs {quantity} pieces of leather or hide for straps and padding.", requirement: { type: "component", tagsAny: ["leather", "hide"] }, quantityRange: [6, 10] },
-    { itemId: "leather-scrap", label: "Leather Scraps", requestText: "{npc} needs {quantity} Leather Scraps for harness repairs.", quantityRange: [6, 10] },
-    { itemId: "beast-hide", label: "Beast Hides", requestText: "{npc} needs {quantity} Beast Hides for reinforced armor lining.", quantityRange: [3, 6] },
-    { itemId: "cloth-scrap", label: "Cloth Scraps", requestText: "{npc} needs {quantity} Cloth Scraps for gambeson padding.", quantityRange: [10, 16] },
-    { itemId: "spider-silk", label: "bundles of Spider Silk", requestText: "{npc} needs {quantity} bundles of Spider Silk for light reinforcement.", quantityRange: [3, 6] },
+    { itemId: "iron-scrap", label: "pieces of iron scrap", requestText: "{npc} needs {quantity} pieces of iron scrap for rivets and patches.", quantityRange: [8, 14], rewardGpPerResource: 3 },
+    { label: "pieces of metal", requestText: "{npc} needs {quantity} pieces of any metal for repairs.", requirement: { type: "component", category: "metal" }, quantityRange: [8, 14], rewardGpPerResource: 3 },
+    { label: "pieces of leather or hide", requestText: "{npc} needs {quantity} pieces of leather or hide for straps and padding.", requirement: { type: "component", tagsAny: ["leather", "hide"] }, quantityRange: [6, 10], rewardGpPerResource: 3 },
+    { itemId: "leather-scrap", label: "Leather Scraps", requestText: "{npc} needs {quantity} Leather Scraps for harness repairs.", quantityRange: [6, 10], rewardGpPerResource: 3 },
+    { itemId: "beast-hide", label: "Beast Hides", requestText: "{npc} needs {quantity} Beast Hides for reinforced armor lining.", quantityRange: [3, 6], rewardGpPerResource: 6 },
+    { itemId: "cloth-scrap", label: "Cloth Scraps", requestText: "{npc} needs {quantity} Cloth Scraps for gambeson padding.", quantityRange: [10, 16], rewardGpPerResource: 2 },
+    { itemId: "spider-silk", label: "bundles of Spider Silk", requestText: "{npc} needs {quantity} bundles of Spider Silk for light reinforcement.", quantityRange: [3, 6], rewardGpPerResource: 7 },
   ],
 };
 
@@ -388,7 +388,7 @@ function randomSmithMaterialCommission(npcId) {
     requirement: cloneData(requirement),
     quantity: min + Math.floor(Math.random() * (max - min + 1)),
     quantityRange: request.quantityRange ? [min, max] : undefined,
-    rewardGpPerResource: smithMaterialCommissionRewardGpPerResource,
+    rewardGpPerResource: request.rewardGpPerResource ?? smithMaterialCommissionRewardGpPerResource,
     offeredAt: Date.now(),
   };
 }
@@ -5847,6 +5847,11 @@ function xpForNextLevel(level) {
     19: 355000,
   };
   return thresholds[level] ?? Infinity;
+}
+
+function xpFloorForLevel(level) {
+  const target = Math.max(1, Math.min(20, Math.floor(Number(level) || 1)));
+  return target <= 1 ? 0 : xpForNextLevel(target - 1);
 }
 
 function canLevelUp(hero = state.fighters.hero) {

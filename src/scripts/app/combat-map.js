@@ -4007,7 +4007,7 @@ function customGoalStatus() {
   if (goal.type === "killBoss") {
     return {
       met: !aliveMonsters().some((monster) => monster.customBoss || monster.id?.startsWith("boss-") || monster.tags?.includes("boss")),
-      text: "Defeat the boss monster.",
+      text: "Kill the boss.",
     };
   }
   if (goal.type === "killMonsterType") {

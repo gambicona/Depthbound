@@ -846,11 +846,16 @@ function dialogMessageMarkup(message, actor = null, progress = null) {
   return `${dialogProgressMarkup(progress)}${dialogActorMarkup(actor)}<p>${escapeHtml(message ?? "")}</p>`;
 }
 
-function showChoiceDialog({ title, message, choices, actor = null, progress = null }) {
+function showChoiceDialog({ title, message, messageHtml = null, choices, actor = null, progress = null, dialogClass = "" }) {
   return new Promise((resolve) => {
+    const dialogClasses = String(dialogClass ?? "")
+      .split(/\s+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
     els.gameDialogTitle.textContent = title;
-    els.gameDialogMessage.innerHTML = actor ? dialogMessageMarkup(message, actor, progress) : dialogPlainMessageMarkup(message, progress);
+    els.gameDialogMessage.innerHTML = messageHtml ?? (actor ? dialogMessageMarkup(message, actor, progress) : dialogPlainMessageMarkup(message, progress));
     els.gameDialogField.classList.add("hidden");
+    dialogClasses.forEach((className) => els.gameDialogForm.classList.add(className));
     els.gameDialogActions.innerHTML = choices
       .map(
         (choice) =>
@@ -868,6 +873,7 @@ function showChoiceDialog({ title, message, choices, actor = null, progress = nu
 
     const cleanup = (value) => {
       els.gameDialogActions.removeEventListener("click", handleClick);
+      dialogClasses.forEach((className) => els.gameDialogForm.classList.remove(className));
       els.gameDialog.classList.add("hidden");
       activeDialogCancel = null;
       resolve(value);
@@ -974,12 +980,83 @@ function storyImageMarkup(images = []) {
     .join("");
 }
 
+const narrativeHighlightTerms = [
+  "Goal",
+  "Reward",
+  "Rank",
+  "Renown",
+  "Reputation",
+  "Equipment",
+  "Contracts",
+  "Contract",
+  "Quest",
+  "Quests",
+  "Boons",
+  "Boon",
+  "Recruits",
+  "Recruit",
+  "Clerics",
+  "Cleric",
+  "Paladins",
+  "Paladin",
+  "Dungeon",
+  "Dungeons",
+  "Delve",
+  "Delves",
+  "Boss",
+  "Exit",
+  "Village",
+  "City",
+  "Home Village",
+  "Road",
+  "Roads",
+  "Road Kits",
+  "Milepost",
+  "Teleportation Circle",
+  "Teleportation Circles",
+  "Undead",
+  "Elemental",
+  "Planar",
+  "Shrine",
+  "Shrines",
+  "Mine",
+  "Mines",
+  "Burrow",
+  "Burrows",
+  "Crypt",
+  "Crypts",
+  "Ruin",
+  "Ruins",
+  "Trophy Lodge",
+  "Gravebinders",
+  "Crucible Collegium",
+  "Antiquarian Society",
+  "Expedition Board",
+  "Fighting Pit",
+  "Fizzywick's Fireworks Club",
+  "Barrow Crown",
+  "Thornwood Pact",
+  "First Claim",
+  "Embervein",
+];
+
+function narrativeHighlightMarkup(text = "") {
+  let markup = escapeHtml(text ?? "");
+  const terms = narrativeHighlightTerms
+    .slice()
+    .sort((a, b) => b.length - a.length)
+    .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (!terms.length) return markup;
+  const pattern = new RegExp(`\\b(${terms.join("|")})\\b`, "gi");
+  return markup.replace(pattern, `<mark class="narrative-highlight">$1</mark>`);
+}
+
 function storyTextMarkup(text = "") {
   return String(text)
     .trim()
     .split(/\n\s*\n/)
     .filter(Boolean)
-    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`)
+    .map((paragraph) => `<p>${narrativeHighlightMarkup(paragraph).replace(/\n/g, "<br>")}</p>`)
     .join("");
 }
 
@@ -992,7 +1069,7 @@ function customGoalStatusForTemplate(template) {
     const item = getItemTemplate(goal.itemId);
     return { text: `Collect ${target} ${item?.name ?? goal.itemId ?? "required item"}${target === 1 ? "" : "s"} (0/${target}).` };
   }
-  if (goal.type === "killBoss") return { text: "Defeat the boss monster." };
+  if (goal.type === "killBoss") return { text: "Kill the boss." };
   if (goal.type === "killMonsterType") {
     const target = Math.max(1, Number(goal.count) || 1);
     const monster = getMonsterTemplate(goal.monsterId);
@@ -1004,11 +1081,12 @@ function customGoalStatusForTemplate(template) {
 function showDungeonStoryDialog({ title, text = "", images = [], actionLabel = "Continue", goalText = "" }) {
   return new Promise((resolve) => {
     els.gameDialogTitle.textContent = title;
+    els.gameDialogForm.classList.add("wide-dialog", "story-dialog-panel");
     els.gameDialogMessage.innerHTML = `
       <div class="story-dialog-content">
         ${storyImageMarkup(images)}
         ${text ? storyTextMarkup(text) : ""}
-        ${goalText ? `<p class="story-goal"><b>Goal:</b> ${escapeHtml(goalText)}</p>` : ""}
+        ${goalText ? `<p class="story-goal"><b>Goal:</b> ${narrativeHighlightMarkup(goalText)}</p>` : ""}
       </div>
     `;
     els.gameDialogField.classList.add("hidden");
@@ -1016,6 +1094,7 @@ function showDungeonStoryDialog({ title, text = "", images = [], actionLabel = "
     const button = els.gameDialogActions.querySelector("[data-story-continue]");
     const cleanup = () => {
       button.removeEventListener("click", cleanup);
+      els.gameDialogForm.classList.remove("wide-dialog", "story-dialog-panel");
       els.gameDialog.classList.add("hidden");
       activeDialogCancel = null;
       resolve(true);
@@ -1674,6 +1753,14 @@ function showD20ModeDialog({ allowBack = true } = {}) {
       ...(allowBack ? [{ value: dialogBackValue, label: "Back" }] : []),
     ],
   });
+}
+
+function campaignDescriptionMarkup(description = "") {
+  return `
+    <div class="campaign-description-content">
+      ${storyTextMarkup(description)}
+    </div>
+  `;
 }
 
 function raceSelectOptions(selectedRaceId) {
@@ -3231,7 +3318,7 @@ async function showCampaignMenu(campaignId) {
   return new Promise((resolve) => {
     els.gameDialogForm.classList.add("campaign-dialog");
     els.gameDialogTitle.textContent = campaign.name;
-    els.gameDialogMessage.textContent = campaign.description;
+    els.gameDialogMessage.innerHTML = campaignDescriptionMarkup(campaign.description);
     els.gameDialogMessage.classList.add("campaign-dialog-message");
     els.gameDialogField.classList.add("hidden");
     els.gameDialogActions.classList.add("campaign-dungeon-list");

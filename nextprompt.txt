@@ -1,8 +1,15 @@
+TEST:
+fitting campaing for mileposts
+
+DO:
+revisit all spawnawble structures. do we have any in middletiles that cannot spawn?
+for each: what can happen eventwise when stepping on the structure? full catalogue as file
+
+haunted battlefield dungeon
+demon abyss dungeon
+
 Spell sound effects
 Sidekicks expert and spellcaster availability
-recruitable sidekicks
-ally and companion spawn, configurable
-continous mob spawner
 
 packs to find (Medizin Pack Proviant Pack, etc) that can either be sold to merchants or even factions for points or be opened to gain whatever is inside
 
@@ -13,18 +20,9 @@ soak tiles in water, oil, acid etc temporary
 
 underwater
 
-village quest board:
-5 random quests sending you into five different random dungeons (size medium each), refreshing if not locked/accepted.
-you can accept multiple quests and then go into one of the dungeons to complete the corresponding quest. small rewards.
-Forest dungeon quest is available here always until Mara is open.
-Also always the quest Venture freely (enabling the own random dungeon choice).
-
 Quests:
 stealthing
 find secret rooms
-
-main story with different paths according to faction
-
 
 Village NPCs and their unlock quests (Alchemist, Arcanist, rune smith, monsterguild, other guilds)
 more village NPCs (armor leather ork with shamanism, Jewelry elven)
@@ -37,16 +35,8 @@ add teleport circles for fast travel, add teleportation circle and teleport as s
 goblin pack
 
 add relique items for antiquarian society
-building roads and their effect
 
-Expedition board quest: built roads to nearest city and villages
-Contracts:
-- OK - Prove the Road: progresses on any completed dungeon via `handleNpcDungeonComplete`.
-- OK - Campaign Mileposts: progresses on completed dungeons with `campaignId` in the completion context.
-- OK - Long-Haul Ledger: progresses on any completed dungeon; higher count only.
-Notes: All Expedition Board missions are completable. Campaign Mileposts specifically requires campaign dungeon runs, not random dungeons.
-Add SPECIFIC themes to complete for road (forest, desert, add grassland, mountain etc, road dungeons)
-implement fitting campaing for mileposts
+
 
 remove abandon dungeon penalty?
 

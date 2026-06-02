@@ -1988,7 +1988,7 @@ function placeMiscStructures(lakeCells, settlementCells = []) {
   const landCells = cells.filter((cell) => isGeneratedLandCell(cell, lakeCells));
   const shorelineCells = landCells.filter((cell) => isNextToGeneratedWater(cell, lakeCells));
   const waterCells = cells.filter((cell) => isGeneratedWaterCell(cell, lakeCells));
-  const budget = clamp(Math.round(state.width * state.height / 30), 4, 14);
+  const budget = clamp(Math.round(state.width * state.height / 24), 6, 18);
   let placed = 0;
   for (const rule of shuffledStructureRules()) {
     if (placed >= budget || Math.random() > rule.chance) {
@@ -2000,7 +2000,8 @@ function placeMiscStructures(lakeCells, settlementCells = []) {
       shoreline: rule.shoreline,
       allowNonLand: rule.allowNonLand,
       nearCells: rule.nearSettlement ? settlementCells : null,
-      maxNearDistance: 2
+      minNearDistance: rule.minNearDistance,
+      maxNearDistance: rule.maxNearDistance || 2
     });
     if (object) {
       placed += 1;
@@ -2029,9 +2030,9 @@ function shuffledStructureRules() {
     structureRule("camp_nomad", 0.22, ["desert", "savanna", "badlands"], { nearSettlement: true, scale: 0.55 }),
     structureRule("camp_border", 0.2, ["highlands", "hills", "grassland"], { nearSettlement: true, scale: 0.55 }),
     structureRule("camp_pallisade", 0.18, ["forest", "grassland", "hills"], { nearSettlement: true, scale: 0.56 }),
-    structureRule("banditcamp", 0.22, ["forest", "hills", "badlands", "wasteland"], { nearSettlement: true, scale: 0.58 }),
-    structureRule("bandit hideout", 0.18, ["forest", "hills", "badlands", "wasteland"], { nearSettlement: true, scale: 0.56 }),
-    structureRule("camp_goblin", 0.2, ["forest", "hills", "wasteland"], { nearSettlement: true, scale: 0.54 }),
+    structureRule("banditcamp", 0.42, ["forest", "hills", "badlands", "wasteland", "grassland"], { nearSettlement: true, minNearDistance: 1, maxNearDistance: 3, scale: 0.58 }),
+    structureRule("bandit hideout", 0.34, ["forest", "hills", "badlands", "wasteland", "grassland"], { nearSettlement: true, minNearDistance: 1, maxNearDistance: 3, scale: 0.56 }),
+    structureRule("camp_goblin", 0.38, ["forest", "hills", "wasteland", "grassland"], { nearSettlement: true, minNearDistance: 1, maxNearDistance: 3, scale: 0.54 }),
     structureRule("watchtower", 0.4, ["hills", "highlands", "forest", "grassland"], { scale: 0.54 }),
     structureRule("tower_broken", 0.2, ["hills", "highlands", "wasteland", "forest"], { scale: 0.54 }),
     structureRule("wizardtower", 0.2, ["highlands", "forest", "crystalfield", "mountain"], { scale: 0.58 }),
@@ -2039,16 +2040,16 @@ function shuffledStructureRules() {
     structureRule("abyssalrift", 0.08, ["wasteland", "cave", "crystalfield"], { scale: 0.58 }),
     structureRule("hellsportal", 0.08, ["volcano", "ashland", "wasteland"], { allowNonLand: true, scale: 0.56 }),
     structureRule(randomItem(["demon scar", "demonscar"]), 0.1, ["volcano", "ashland", "wasteland"], { allowNonLand: true, scale: 0.56 }),
-    structureRule("burrow_dragon", 0.12, ["mountain", "highlands", "volcano"], { allowNonLand: true, scale: 0.56 }),
-    structureRule("burrow_wyvernpeak", 0.12, ["mountain", "highlands"], { scale: 0.56 }),
-    structureRule("burrow_manticorecliffs", 0.1, ["mountain", "badlands", "highlands"], { scale: 0.56 }),
-    structureRule("burrow_giantnest", 0.1, ["mountain", "highlands", "hills"], { scale: 0.56 }),
-    structureRule("burrow_chimeranest", 0.08, ["wasteland", "badlands", "mountain"], { scale: 0.56 }),
-    structureRule("burrow_beastden", 0.18, ["forest", "hills", "grassland"], { scale: 0.54 }),
-    structureRule("burrow_forest", 0.18, ["forest", "jungle"], { scale: 0.54 }),
-    structureRule("burrow_hydraswamp", 0.1, ["swamp"], { allowNonLand: true, scale: 0.56 }),
-    structureRule("burrow_trollbridge", 0.1, ["swamp", "forest", "hills"], { allowNonLand: true, scale: 0.55 }),
-    structureRule("burrow_spiders", 0.14, ["forest", "swamp", "wasteland"], { allowNonLand: true, scale: 0.54 }),
+    structureRule("burrow_dragon", 0.18, ["mountain", "highlands", "volcano"], { allowNonLand: true, scale: 0.56 }),
+    structureRule("burrow_wyvernpeak", 0.2, ["mountain", "highlands"], { scale: 0.56 }),
+    structureRule("burrow_manticorecliffs", 0.18, ["mountain", "badlands", "highlands"], { scale: 0.56 }),
+    structureRule("burrow_giantnest", 0.18, ["mountain", "highlands", "hills"], { scale: 0.56 }),
+    structureRule("burrow_chimeranest", 0.15, ["wasteland", "badlands", "mountain"], { scale: 0.56 }),
+    structureRule("burrow_beastden", 0.32, ["forest", "hills", "grassland"], { scale: 0.54 }),
+    structureRule("burrow_forest", 0.32, ["forest", "jungle"], { scale: 0.54 }),
+    structureRule("burrow_hydraswamp", 0.2, ["swamp"], { allowNonLand: true, scale: 0.56 }),
+    structureRule("burrow_trollbridge", 0.18, ["swamp", "forest", "hills"], { allowNonLand: true, scale: 0.55 }),
+    structureRule("burrow_spiders", 0.24, ["forest", "swamp", "wasteland"], { allowNonLand: true, scale: 0.54 }),
     structureRule("entrance_cave", 0.34, ["mountain", "hills", "highlands", "cave"], { scale: 0.55 }),
     structureRule("entrance_crypt", 0.22, ["wasteland", "swamp", "grassland"], { allowNonLand: true, scale: 0.54 }),
     structureRule("entrance_deserttemple", 0.2, ["desert"], { scale: 0.58 }),
@@ -2100,7 +2101,7 @@ function placeStructureNear(tile, candidates, scale, predicate, options = {}) {
     predicate(cell) &&
     (waterAllowed || options.allowNonLand || isGeneratedLandCell(cell, lakeCells)) &&
     (!options.shoreline || isNextToGeneratedWater(cell, lakeCells)) &&
-    (!options.nearCells || isNearAnyCell(cell, options.nearCells, options.maxNearDistance || 2)) &&
+    (!options.nearCells || isNearAnyCell(cell, options.nearCells, options.maxNearDistance || 2, options.minNearDistance || 0)) &&
     !state.middleObjects.some((object) => object.layer === "structures" && distance(object, cellCenter(cell.row, cell.col)) < HEX_WIDTH * 1.25)
   );
   if (!usable.length) {
@@ -2115,8 +2116,11 @@ function placeStructureNear(tile, candidates, scale, predicate, options = {}) {
   return object;
 }
 
-function isNearAnyCell(cell, cells, maxDistance) {
-  return Array.isArray(cells) && cells.some((candidate) => hexDistance(cell, candidate) <= maxDistance);
+function isNearAnyCell(cell, cells, maxDistance, minDistance = 0) {
+  return Array.isArray(cells) && cells.some((candidate) => {
+    const distance = hexDistance(cell, candidate);
+    return distance >= minDistance && distance <= maxDistance;
+  });
 }
 
 function bestVillageForCell(cell, nextToWater = false) {

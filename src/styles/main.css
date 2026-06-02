@@ -3093,6 +3093,11 @@ button[data-ui-icon]::before,
   width: min(100%, 920px);
 }
 
+#fighter-info:has(.home-storage-panel) .fighter-info-panel {
+  max-width: 760px;
+  width: min(100%, 760px);
+}
+
 #abilities-menu .fighter-info-panel {
   max-width: 860px;
   width: min(100%, 860px);
@@ -3132,6 +3137,24 @@ button[data-ui-icon]::before,
   max-width: 760px;
   overflow: hidden;
   width: min(100%, 760px);
+}
+
+.dialog-panel.faction-intro-panel {
+  max-width: 920px;
+  width: min(calc(100vw - 28px), 920px);
+}
+
+.dialog-panel.story-dialog-panel {
+  max-width: 900px;
+  width: min(calc(100vw - 28px), 900px);
+}
+
+.faction-intro-panel .fighter-info-body {
+  padding: 18px;
+}
+
+.story-dialog-panel .fighter-info-body {
+  padding: 18px;
 }
 
 .wide-dialog .dialog-field {
@@ -3592,6 +3615,93 @@ button[data-ui-icon]::before,
   margin: 0;
 }
 
+.faction-intro-dialog {
+  align-items: start;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(148px, 190px) minmax(0, 1fr);
+}
+
+.faction-intro-speaker {
+  background: rgba(214, 180, 102, 0.055);
+  border: 1px solid rgba(214, 180, 102, 0.24);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.faction-intro-speaker b,
+.faction-intro-speaker span {
+  display: block;
+}
+
+.faction-intro-speaker b {
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.faction-intro-speaker span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.faction-intro-portrait {
+  align-items: center;
+  aspect-ratio: 3 / 4;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(215, 168, 79, 0.12), transparent 64%),
+    rgba(6, 12, 13, 0.5);
+  border: 1px solid rgba(215, 168, 79, 0.36);
+  border-radius: 8px;
+  display: inline-flex;
+  justify-content: center;
+  overflow: hidden;
+  width: 100%;
+}
+
+.faction-intro-portrait img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.faction-intro-portrait.empty span {
+  color: var(--gold);
+  font-size: 1.7rem;
+  font-weight: 900;
+}
+
+.faction-intro-copy {
+  background: rgba(13, 11, 12, 0.24);
+  border-left: 2px solid rgba(115, 218, 205, 0.34);
+  border-radius: 8px;
+  color: #e9ddc9;
+  display: grid;
+  gap: 12px;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.96rem;
+  font-weight: 650;
+  line-height: 1.6;
+  padding: 12px 14px;
+}
+
+.faction-intro-copy p {
+  margin: 0;
+}
+
+.narrative-highlight {
+  background: linear-gradient(180deg, rgba(215, 168, 79, 0.18), rgba(215, 168, 79, 0.08));
+  border: 1px solid rgba(215, 168, 79, 0.22);
+  border-radius: 5px;
+  color: #f8d985;
+  font-weight: 900;
+  padding: 0 3px;
+}
+
 .dialog-progress {
   align-items: center;
   background: rgba(115, 218, 205, 0.08);
@@ -3626,7 +3736,9 @@ button[data-ui-icon]::before,
   display: flex;
   flex-direction: column;
   max-height: min(760px, 88vh);
+  max-width: 900px;
   overflow: hidden;
+  width: min(calc(100vw - 28px), 900px);
 }
 
 .campaign-dialog .fighter-info-body {
@@ -3637,14 +3749,29 @@ button[data-ui-icon]::before,
 }
 
 .campaign-dialog-message {
-  color: #f1e4d2;
+  margin: 0;
+}
+
+.campaign-description-content {
+  display: grid;
+  gap: 12px;
+  max-height: min(420px, 48vh);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.campaign-description-content p {
+  background: rgba(13, 11, 12, 0.22);
+  border-left: 2px solid rgba(115, 218, 205, 0.28);
+  border-radius: 8px;
+  color: #eadfcd;
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 1rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  line-height: 1.55;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.62;
   margin: 0;
-  white-space: pre-line;
+  padding: 11px 13px;
 }
 
 .campaign-dungeon-list {
@@ -6015,6 +6142,10 @@ button[data-ui-icon]::before,
   width: 28px;
 }
 
+.inspect-admin-toggle {
+  display: none;
+}
+
 .monster-art-preview {
   align-items: center;
   background: rgba(8, 6, 7, 0.78);
@@ -8010,6 +8141,18 @@ button[data-ui-icon]::before,
     min-height: 54px;
   }
 
+  .faction-intro-dialog {
+    grid-template-columns: 1fr;
+  }
+
+  .faction-intro-speaker {
+    grid-template-columns: 86px minmax(0, 1fr);
+  }
+
+  .faction-intro-portrait {
+    width: 86px;
+  }
+
   .topbar {
     align-items: stretch;
     flex-direction: column;
@@ -8247,34 +8390,40 @@ button[data-ui-icon]::before,
 
 .story-dialog-content {
   display: grid;
-  gap: 12px;
-  max-height: min(420px, 52vh);
+  gap: 14px;
+  max-height: min(560px, 62vh);
   overflow-y: auto;
   padding-right: 4px;
 }
 
 .story-dialog-content p {
-  color: #f1e4d2;
+  background: rgba(13, 11, 12, 0.22);
+  border-left: 2px solid rgba(115, 218, 205, 0.28);
+  border-radius: 8px;
+  color: #eadfcd;
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 1rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  line-height: 1.55;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.62;
   margin: 0;
+  padding: 11px 13px;
 }
 
 .story-image {
   border: 1px solid var(--line);
   border-radius: 8px;
   display: block;
-  max-height: 120px;
-  max-width: 220px;
+  max-height: 220px;
+  max-width: 100%;
   object-fit: contain;
   width: 100%;
 }
 
 .story-goal {
-  color: var(--accent);
+  background: rgba(115, 218, 205, 0.08) !important;
+  border-color: rgba(115, 218, 205, 0.42) !important;
+  color: #f6ead6 !important;
 }
 
 .token.monster-token {

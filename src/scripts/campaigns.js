@@ -197,7 +197,7 @@ These are placeholder campaign slots using the same 8-dungeon template lineup as
       completedTitle: "The Ledger Holds",
       completedDescription: "The Expedition Board has enough proof to mark the first real mileposts.",
     },
-    description: "Special Expedition Board missions built as straight road-line delves.",
+    description: "Special Expedition Board missions along dangerous old road markers.",
     count: expeditionMilepostMissions.length,
     folder: "campaigns/the-milepost-ledger",
     generator: expeditionMilepostTemplate,

@@ -1047,6 +1047,9 @@ els.villageMenu?.addEventListener("click", (event) => {
     if (button.dataset.npc === "expedition-board") completeExpeditionTurnIn(button.dataset.turnIn);
     if (button.dataset.npc === "boom-club") completeBoomClubTurnIn(button.dataset.turnIn);
   }
+  if (button?.dataset.action === "hire-gravebinder-recruit") {
+    hireGravebinderRecruit(button.dataset.recruit);
+  }
   if (button?.dataset.action === "accept-road-project") {
     acceptExpeditionRoadProject(button.dataset.project);
   }

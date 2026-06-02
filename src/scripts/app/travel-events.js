@@ -565,6 +565,7 @@
       id: "mine-black-air",
       title: "Black Air Shaft",
       kinds: ["mine"],
+      always: true,
       weight: 10,
       text: "Cold air breathes from the mine mouth. The old warning bell beside the track is split down the middle.",
       choices: [
@@ -584,6 +585,7 @@
       id: "crystal-mine-hum",
       title: "Crystal Harmonics",
       tiles: ["entrance_crystalmine"],
+      always: true,
       weight: 12,
       text: "The mine mouth hums in several notes at once. Every metal buckle on the party's gear vibrates toward the dark.",
       choices: [
@@ -599,9 +601,115 @@
       ],
     },
     {
+      id: "abyssal-rift-entry",
+      title: "Abyssal Rift",
+      tiles: ["abyssalrift"],
+      always: true,
+      weight: 18,
+      text: "A purple-black tear hangs above the ground. It breathes warm rot and distant screaming, then widens as the party draws near.",
+      choices: [
+        { id: "enter", label: "Enter The Rift", description: "Step through and face what waits in the Abyss.", outcome: { text: "The party steps through the rift and the world peels open into clawed dark.", dungeon: { size: "medium", themeId: "depthsOfHells" } } },
+        { id: "ward", label: "Mark The Rift", description: "Leave warning marks and camp well away from the tear.", outcome: { text: "The party marks stones around the rift and keeps the camp outside its breathing." } },
+      ],
+    },
+    {
+      id: "hells-portal-entry",
+      title: "Hells Portal",
+      tiles: ["hellsportal"],
+      always: true,
+      weight: 18,
+      text: "A red gate stands without a wall. Chains twitch across its frame, and the air smells of hot iron and old bargains.",
+      choices: [
+        { id: "enter", label: "Enter The Gate", description: "Cross into infernal halls.", outcome: { text: "The party crosses the red gate, and iron doors close somewhere behind them.", dungeon: { size: "medium", themeId: "depthsOfHells" } } },
+        { id: "refuse", label: "Refuse The Gate", description: "Do not give the portal a name to remember.", outcome: { text: "The portal burns a little brighter as the party refuses it." } },
+      ],
+    },
+    {
+      id: "elemental-rift-entry",
+      title: "Elemental Rift",
+      tiles: ["elementalrift"],
+      always: true,
+      weight: 16,
+      text: "Four colors of weather circle the rift: flame, stone-dust, bright spray, and thundercloud. One of them reaches for the party.",
+      choices: [
+        { id: "storm", label: "Enter Storm", description: "Step into thunder-lit halls.", outcome: { text: "The rift catches the party in a rush of thunder and bright wind.", dungeon: { size: "small", themeId: "crucibleOfStorms" } } },
+        { id: "stone", label: "Enter Stone", description: "Step into the deep stone trial.", outcome: { text: "The rift folds into a stone stair under the earth.", dungeon: { size: "small", themeId: "crucibleOfStone" } } },
+        { id: "flame", label: "Enter Flame", description: "Step into the furnace-bright trial.", outcome: { text: "The rift opens into heat shimmer and furnace light.", dungeon: { size: "small", themeId: "crucibleOfFlame" } } },
+        { id: "tides", label: "Enter Tides", description: "Step into the drowned trial.", outcome: { text: "The rift becomes a wall of water and pulls the party through.", dungeon: { size: "small", themeId: "crucibleOfTides" } } },
+        { id: "ground", label: "Anchor The Camp", description: "Hammer stakes into the ground and wait for the rift to quiet.", outcome: { text: "The storm of elements circles the camp but does not cross the marked line." } },
+      ],
+    },
+    {
+      id: "alchemist-road-lab",
+      title: "Roadside Alchemist",
+      tiles: ["alchemist"],
+      always: true,
+      weight: 14,
+      text: "A canvas awning shades crates of glassware, bitter herbs, and bottles labeled in three different hands. The alchemist waves the party closer and taps a sign: treatment, tonics, and no refunds.",
+      choices: [
+        { id: "buy-healing", label: "Buy Healing Potion", description: "Pay 10 gp for a Potion of Healing.", outcome: { text: "The alchemist sells a corked red vial and insists it only smokes when it is working.", cost: { gp: 10 }, rewards: { items: { "potion-healing": 1 } } } },
+        { id: "buy-tonic", label: "Buy Stronger Tonic", description: "Pay 40 gp for a Greater Healing Potion.", outcome: { text: "The alchemist unlocks a padded case and hands over a stronger tonic.", cost: { gp: 40 }, rewards: { items: { "potion-greater-healing": 1 } } } },
+        { id: "treat-disease", label: "Treat Disease", description: "Pay 25 gp. The alchemist treats the first diseased hero who needs care.", outcome: { text: "The alchemist opens a lacquered case of bitter tinctures and clean needles.", service: { type: "cureDisease", costCp: 2500 } } },
+        { id: "treat-exhaustion", label: "Treat Exhaustion", description: "Pay 10 gp. The alchemist treats the first hero suffering hunger exhaustion.", outcome: { text: "The alchemist mixes salts, broth, and a fierce green tonic.", service: { type: "treatHungerExhaustion", costCp: 1000 } } },
+        { id: "move", label: "Move On", description: "Leave the glassware undisturbed.", outcome: { text: "The party leaves before anything bubbles over." } },
+      ],
+    },
+    {
+      id: "cave-entrance-depths",
+      title: "Cave Mouth",
+      tiles: ["entrance_cave"],
+      kinds: ["cave"],
+      always: true,
+      weight: 14,
+      text: "The cave mouth exhales cold air and the mineral smell of deep stone. Scratches mark the walls just inside.",
+      choices: [
+        { id: "enter", label: "Enter The Cave", description: "Follow the passage underground.", outcome: { text: "The party lights the way and follows the cave passage down.", dungeon: { size: "medium", themeId: "underdarkDepths" } } },
+        { id: "listen", label: "Listen First", description: "Perception DC 13. Success finds a safer entry; failure draws cave scavengers.", check: { ability: "wis", skill: "perception", dc: 13 }, success: { text: "A faint draft reveals a safer side passage into the depths.", dungeon: { size: "small", themeId: "underdarkDepths" } }, failure: { text: "Loose stones clatter inward, and cave scavengers answer the sound.", fight: { monsterTags: ["beast", "cave"], count: "party", size: "skirmish", themeId: "underdarkDepths" } } },
+        { id: "camp", label: "Camp Outside", description: "Leave the cave for another day.", outcome: { text: "The party camps where the cave wind cannot reach the fire." } },
+      ],
+    },
+    {
+      id: "crypt-entrance-guardroom",
+      title: "Sealed Crypt",
+      tiles: ["entrance_crypt", "crypt", "undead graveyard"],
+      kinds: ["crypt", "graveyard"],
+      always: true,
+      weight: 14,
+      text: "A stone door sits half-open below old grave marks. The air beyond smells of dust, rust, and extinguished candles.",
+      choices: [
+        { id: "enter", label: "Enter The Crypt", description: "Descend into the guarded dead halls.", outcome: { text: "The party passes the stone door and descends into the dead halls.", dungeon: { size: "medium", themeId: "oldGuardroom" } } },
+        { id: "rites", label: "Speak The Rites", description: "Religion DC 13. Success quiets the threshold; failure calls the watch.", check: { ability: "int", skill: "religion", dc: 13 }, success: { text: "The threshold grows still, and old grave wax flakes from the stone.", rewards: { items: { "grave-wax": 1 } } }, failure: { text: "The door groans wider. The old watch comes up armed.", fight: { monsterTags: ["undead"], count: "party", size: "skirmish", themeId: "oldGuardroom" } } },
+      ],
+    },
+    {
+      id: "giant-skeleton-harvest",
+      title: "Giant Skeleton",
+      tiles: ["giantskeleton", "monsterbones"],
+      always: true,
+      weight: 12,
+      text: "Enormous bones lie sunken into the earth. The ribs are weathered white, but useful shards remain where the marrow once was.",
+      choices: [
+        { id: "harvest", label: "Harvest Bone", description: "Medicine DC 12. Success gathers useful bone material.", check: { ability: "wis", skill: "medicine", dc: 12 }, success: { text: "The party cuts loose clean fragments without cracking the useful pieces.", rewards: { items: { "bone-dust": 2, "cracked-rib-bone": 1 } } }, failure: { text: "The best pieces splinter under bad leverage, leaving only dust.", rewards: { items: { "bone-dust": 1 } } } },
+        { id: "study", label: "Study The Remains", description: "History DC 13. Success finds an old mark among the bones.", check: { ability: "int", skill: "history", dc: 13 }, success: { text: "A carved tooth records an old battle road and a warning about giants nearby.", rewards: { money: { sp: 8 } } }, failure: { text: "The bones keep their old story." } },
+      ],
+    },
+    {
+      id: "wild-herb-garden",
+      title: "Wild Herb Garden",
+      tiles: ["herbgarden"],
+      always: true,
+      weight: 12,
+      text: "A sheltered patch of herbs grows in careful rows despite no visible gardener. Bees move lazily between blue flowers and silver-green leaves.",
+      choices: [
+        { id: "harvest", label: "Harvest Herbs", description: "Nature DC 11. Success gathers useful herbs. The garden should be left to regrow before heavy picking.", check: { ability: "int", skill: "nature", dc: 11 }, success: { text: "The party gathers clean herbs and leaves the roots whole for regrowth.", cooldownDays: 7, rewards: { items: { "medicinal-herb": 2, "green-vines": 1 } } }, failure: { text: "The party gathers a few bruised leaves but leaves most of the garden untouched.", cooldownDays: 7, rewards: { items: { "medicinal-herb": 1 } } } },
+        { id: "respect", label: "Leave It Growing", description: "Mark the garden and leave the plants untouched.", outcome: { text: "The party marks the garden on the map and lets the bees keep working." } },
+      ],
+    },
+    {
       id: "ruin-open-threshold",
       title: "Open Threshold",
       kinds: ["ruin"],
+      always: true,
       weight: 10,
       text: "The ruin still has one clean doorway. No dust lies across its threshold, though the stones around it are centuries old.",
       choices: [
@@ -620,7 +728,8 @@
     {
       id: "buried-city-avenue",
       title: "Buried Avenue",
-      tiles: ["ruins_buriedcity", "ruins_desert", "entrance_deserttemple", "temple_desert"],
+      tiles: ["ruins_buriedcity", "ruins_desert"],
+      always: true,
       weight: 12,
       text: "Sand pours away from a paved avenue lined with broken statues. Far below, a buried city catches the last light.",
       choices: [
@@ -636,81 +745,70 @@
       ],
     },
     {
+      id: "desert-temple-entrance",
+      title: "Desert Temple",
+      tiles: ["entrance_deserttemple", "temple_desert"],
+      always: true,
+      weight: 16,
+      text: "A sand-choked temple stair descends between sun-cracked pillars. Heat gathers on the carved threshold like a waiting hand.",
+      choices: [
+        { id: "enter", label: "Enter The Temple", description: "Descend into the desert ruins below.", outcome: { text: "The party descends beneath the hot stone threshold into buried desert halls.", dungeon: { size: "medium", themeId: "desertRuins" } } },
+        { id: "leave", label: "Return Later", description: "Leave the temple sealed for now.", outcome: { text: "The temple keeps its heat and waits under the sand." } },
+      ],
+    },
+    {
       id: "shrine-air-crucible",
       title: "Air Shrine",
       tiles: ["shrine_air"],
+      always: true,
       weight: 12,
       text: "Prayer flags snap in wind that never touches the ground. A stair of cloud forms above the altar.",
       choices: [
-        { id: "ascend", label: "Ascend", description: "Climb the cloud stair into thunder-lit halls.", outcome: { text: "The party climbs the cloud stair into thunder-lit halls.", dungeon: { size: "small", themeId: "crucibleOfStorms" } } },
-        {
-          id: "listen",
-          label: "Listen To The Wind",
-          description: "Religion DC 13. Success receives guidance; failure calls air spirits.",
-          check: { ability: "int", skill: "religion", dc: 13 },
-          success: { text: "The wind names a safe campsite and blows fresh water from a hidden spring.", rewards: { rations: 1 } },
-          failure: { text: "The wind takes offense and condenses into cutting shapes.", fight: { monsterTags: ["elemental", "air"], count: "small", size: "skirmish", themeId: "crucibleOfStorms" } },
-        },
+        { id: "ascend", label: "Enter Air Crucible", description: "Climb the cloud stair into thunder-lit halls.", outcome: { text: "The party climbs the cloud stair into thunder-lit halls.", dungeon: { size: "small", themeId: "crucibleOfStorms" } } },
+        { id: "leave", label: "Return Later", description: "Leave the shrine quiet for now.", outcome: { text: "The cloud stair unravels into harmless mist." } },
       ],
     },
     {
       id: "shrine-earth-crucible",
       title: "Earth Shrine",
       tiles: ["shrine_earth", "shrine_standingstones"],
+      always: true,
       weight: 12,
       text: "The shrine stones are warm, and a deep drumbeat pulses beneath the soil.",
       choices: [
-        { id: "enter", label: "Touch The Stone", description: "Open the stair into the earth.", outcome: { text: "The stones sink in sequence, revealing a stair into the earth.", dungeon: { size: "small", themeId: "crucibleOfStone" } } },
-        {
-          id: "offer",
-          label: "Make An Offering",
-          description: "Nature DC 13. Success earns a safe camp; failure rouses stone guardians.",
-          check: { ability: "int", skill: "nature", dc: 13 },
-          success: { text: "The drumbeat slows, and the ground shelters the camp from wind and rain." },
-          failure: { text: "The soil buckles. Stones drag themselves upright.", fight: { monsterTags: ["elemental", "earth"], count: "small", size: "skirmish", themeId: "crucibleOfStone" } },
-        },
+        { id: "enter", label: "Enter Earth Crucible", description: "Open the stair into the earth.", outcome: { text: "The stones sink in sequence, revealing a stair into the earth.", dungeon: { size: "small", themeId: "crucibleOfStone" } } },
+        { id: "leave", label: "Return Later", description: "Leave the shrine quiet for now.", outcome: { text: "The drumbeat fades back under the soil." } },
       ],
     },
     {
       id: "shrine-fire-crucible",
       title: "Fire Shrine",
       tiles: ["shrine_fire"],
+      always: true,
       weight: 12,
       text: "A smokeless flame burns in a cracked bowl. Its light shows doors in the air where there are none.",
       choices: [
-        { id: "step", label: "Step Through", description: "Step through the heat shimmer.", outcome: { text: "The party steps through the heat shimmer into a furnace-bright passage.", dungeon: { size: "small", themeId: "crucibleOfFlame" } } },
-        {
-          id: "bank",
-          label: "Bank The Flame",
-          description: "Arcana DC 13. Success cooks a perfect meal; failure spills fire.",
-          check: { ability: "int", skill: "arcana", dc: 13 },
-          success: { text: "The flame softens and leaves warm coals for camp cooking.", rewards: { rations: 1 } },
-          failure: { text: "The bowl cracks, and fire crawls out with hands.", fight: { monsterTags: ["elemental", "fire"], count: "small", size: "skirmish", themeId: "crucibleOfFlame" } },
-        },
+        { id: "step", label: "Enter Fire Crucible", description: "Step through the heat shimmer.", outcome: { text: "The party steps through the heat shimmer into a furnace-bright passage.", dungeon: { size: "small", themeId: "crucibleOfFlame" } } },
+        { id: "leave", label: "Return Later", description: "Leave the shrine quiet for now.", outcome: { text: "The smokeless flame bends low and waits." } },
       ],
     },
     {
       id: "shrine-water-crucible",
       title: "Water Shrine",
       tiles: ["shrine_water"],
+      always: true,
       weight: 12,
       text: "A shallow font reflects the party from below, as if they are standing on the ceiling of a flooded hall.",
       choices: [
-        { id: "dive", label: "Step Into The Font", description: "Let the font carry the party into the drowned corridor.", outcome: { text: "The water closes over the party, then opens into a drowned corridor.", dungeon: { size: "small", themeId: "crucibleOfTides" } } },
-        {
-          id: "purify",
-          label: "Purify Waterskins",
-          description: "Medicine DC 12. Success preserves supplies; failure draws water spirits.",
-          check: { ability: "wis", skill: "medicine", dc: 12 },
-          success: { text: "The shrine water clears the party's stores and makes the evening meal stretch further.", rewards: { rations: 1 } },
-          failure: { text: "The reflections climb out first.", fight: { monsterTags: ["elemental", "water"], count: "small", size: "skirmish", themeId: "crucibleOfTides" } },
-        },
+        { id: "dive", label: "Enter Water Crucible", description: "Let the font carry the party into the drowned corridor.", outcome: { text: "The water closes over the party, then opens into a drowned corridor.", dungeon: { size: "small", themeId: "crucibleOfTides" } } },
+        { id: "leave", label: "Return Later", description: "Leave the shrine quiet for now.", outcome: { text: "The font clears and reflects only the sky." } },
       ],
     },
     {
       id: "necro-shrine",
       title: "Necromantic Shrine",
       tiles: ["shrine_necro", "temple_shattered"],
+      always: true,
       weight: 12,
       text: "Black candles burn without wicks. Names scratched into the altar rearrange themselves while nobody blinks.",
       choices: [
@@ -835,8 +933,10 @@
       title: "Sour Vintage",
       kinds: ["vineyard", "farm"],
       weight: 9,
+      always: true,
       text: "Rows of crops stand too still. A broken cart carries bottles sealed with black wax and a warning scratched into the wood.",
       choices: [
+        { id: "buy-rations", label: "Buy Farm Rations", description: "Pay 1 gp for 3 rations.", outcome: { text: "The farmers trade sacks of hard bread, dried fruit, and salted roots for the road.", cost: { gp: 1 }, rewards: { rations: 3 } } },
         {
           id: "sample",
           label: "Inspect The Stores",
@@ -922,21 +1022,40 @@
       ],
     },
     {
+      id: "hunting-camp-supplies",
+      title: "Hunting Camp",
+      tiles: ["camp_hunting"],
+      always: true,
+      weight: 12,
+      text: "Dry hides hang beside a low fire. The hunters have spare trail goods and enough road caution to count arrows before greeting strangers.",
+      choices: [
+        { id: "buy-rations", label: "Buy Trail Food", description: "Pay 1 gp for 2 rations.", outcome: { text: "The hunters trade smoked meat, hard bread, and a little salt.", cost: { gp: 1 }, rewards: { rations: 2 } } },
+        { id: "buy-lights", label: "Buy Torches", description: "Pay 5 sp for 3 torches.", outcome: { text: "The hunters bundle dry torches in oilcloth.", cost: { sp: 5 }, rewards: { items: { torch: 3 } } } },
+        { id: "share-tracks", label: "Share Tracks", description: "Survival DC 12. Success earns a free meal.", check: { ability: "wis", skill: "survival", dc: 12, autoSuccessClasses: ["ranger"] }, success: { text: "The party reads the local tracks well enough to earn a hunter's nod and a hot meal.", rewards: { rations: 1 } }, failure: { text: "The tracks are older than they looked, but the hunters appreciate the attempt." } },
+      ],
+    },
+    {
+      id: "peaceful-camp-work",
+      title: "Working Camp",
+      tiles: ["camp_lumber", "camp_fishing", "camp_market", "camp_caravan", "camp_nomad", "camp_quarry"],
+      always: true,
+      weight: 10,
+      text: "The camp is busy rather than hostile. Workers, traders, and travelers make room by the fire without taking hands far from their tools.",
+      choices: [
+        { id: "trade-news", label: "Trade News", description: "Persuasion DC 11. Success earns food or road help.", check: { ability: "cha", skill: "persuasion", dc: 11 }, success: { text: "Good news travels both ways. The camp shares food and a safer place to sleep.", rewards: { rations: 1 } }, failure: { text: "The camp is polite, tired, and too busy to spare much." } },
+        { id: "lend-hand", label: "Lend A Hand", description: "Athletics DC 12. Success earns a small wage.", check: { ability: "str", skill: "athletics", dc: 12 }, success: { text: "A few hours of lifting, hauling, or mending earns honest road coin.", rewards: { money: { sp: 8 } } }, failure: { text: "The work is harder than it looked, and the camp mostly gains a story." } },
+        { id: "rest", label: "Rest By The Fire", description: "Keep the evening peaceful.", outcome: { text: "The party rests by the campfire while ordinary work carries on around them." } },
+      ],
+    },
+    {
       id: "goblin-camp",
       title: "Goblin Hideout",
       tiles: ["camp_goblin"],
+      always: true,
       weight: 15,
       text: "The camp is smaller than it first looked because half of it is underground. Smoke leaks from holes between stacked shields and stolen canvas.",
       choices: [
-        { id: "crawl", label: "Enter The Hideout", description: "Follow the smoke holes into the goblin den.", outcome: { text: "The party squeezes into the low dark, where voices hiss and metal scrapes.", dungeon: { size: "small", themeId: "goblinWarren" } } },
-        {
-          id: "lure",
-          label: "Draw Them Out",
-          description: "Deception DC 13. Success scatters the watch; failure starts a messy fight.",
-          check: { ability: "cha", skill: "deception", dc: 13 },
-          success: { text: "A thrown voice and a clattering pot send the lookouts chasing shadows. The party steals food before the shouting settles.", rewards: { rations: 2 } },
-          failure: { text: "The trick almost works, then a horn squeals from below.", fight: { monsterTags: ["humanoid", "goblin"], count: "party", size: "skirmish", themeId: "goblinWarren" } },
-        },
+        { id: "crawl", label: "Enter The Hideout", description: "Follow the smoke holes into the goblin den and defeat its boss.", outcome: { text: "The party squeezes into the low dark, where voices hiss and metal scrapes.", dungeon: { size: "small", themeId: "goblinWarren", goal: { type: "killBoss" } } } },
         { id: "avoid", label: "Avoid The Holes", description: "Do not test the den today.", outcome: { text: "The party leaves the smoking holes alone and makes camp out of earshot." } },
       ],
     },
@@ -944,19 +1063,11 @@
       id: "bandit-camp",
       title: "Bandit Camp",
       tiles: ["banditcamp", "bandit hideout", "camp_siege", "camp_pallisade", "camp_palisade", "camp_border"],
+      always: true,
       weight: 12,
       text: "Fresh tracks circle the camp, and the firepit is still warm. Supplies are stacked where guards can see them.",
       choices: [
-        { id: "raid", label: "Raid The Camp", description: "Rush the camp before the lookouts can shout.", outcome: { text: "The party rushes the camp before the lookouts can shout.", fight: { monsterTags: ["humanoid", "criminal"], count: "party", size: "skirmish", themeId: "outlawCamp" } } },
-        { id: "break", label: "Break The Hideout", description: "Push through the camp and clear the inner stockade.", outcome: { text: "The party pushes past the outer fires and into the guarded heart of the camp.", dungeon: { size: "small", themeId: "outlawCamp" } } },
-        {
-          id: "sneak",
-          label: "Steal Supplies",
-          description: "Stealth DC 13. Success gains rations; failure starts the raid anyway.",
-          check: { ability: "dex", skill: "stealth", dc: 13 },
-          success: { text: "The party slips away with food bundles and nobody the wiser.", rewards: { rations: 3 } },
-          failure: { text: "A guard turns at the wrong moment.", fight: { monsterTags: ["humanoid", "criminal"], count: "party", size: "skirmish", themeId: "outlawCamp" } },
-        },
+        { id: "break", label: "Break The Hideout", description: "Push through the camp and defeat its boss.", outcome: { text: "The party pushes past the outer fires and into the guarded heart of the camp.", dungeon: { size: "small", themeId: "outlawCamp", goal: { type: "killBoss" } } } },
         { id: "watch", label: "Watch From Afar", description: "Avoid the camp.", outcome: { text: "The party camps far enough away to see the fire but not smell the smoke." } },
       ],
     },
@@ -1071,7 +1182,9 @@
     const random = rngFromSeed(seed);
     const matchingEvents = travelStructureEvents.filter((event) => eventMatchesStructure(event, context));
     const specialEvents = matchingEvents.filter((event) => event.specialSites?.length);
-    const pool = recentlyFiltered(specialEvents.length ? specialEvents : matchingEvents, context.recentEventIds);
+    const alwaysEvents = matchingEvents.filter((event) => event.always);
+    const pool = recentlyFiltered(specialEvents.length ? specialEvents : alwaysEvents.length ? alwaysEvents : matchingEvents, context.recentEventIds);
+    if (alwaysEvents.length && !specialEvents.length) return clone(weightedPick(pool, random));
     const weights = Number(context.visitCount ?? 1) > 1 ? EVENT_CATEGORY_WEIGHTS.structureRevisit : EVENT_CATEGORY_WEIGHTS.structure;
     const category = weightedCategory(weights, random);
     if (category === "quiet") return null;
