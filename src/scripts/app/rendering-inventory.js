@@ -11664,6 +11664,36 @@ function travelFallbackEventChoice(event = {}) {
   return (event.choices ?? []).find((choice) => ["ignore", "avoid", "leave", "camp", "pass", "wait", "mark", "respect", "detour", "skip"].includes(choice.id)) ?? event.choices?.[0] ?? null;
 }
 
+const expeditionBiomeDungeonThemeIds = new Set(["arctic", "desertRuins", "forestOfTheBeasts", "grasslands", "jungle", "mountain", "swamp", "underwater", "crucibleOfFlame"]);
+const expeditionNonBiomeDungeonThemeIds = new Set(["emberveinDeepworks", "oldGuardroom", "goblinWarren", "outlawCamp", "castleKeep", "urban", "wizardTower", "underdarkDepths", "crucibleOfStorms", "crucibleOfStone", "crucibleOfTides"]);
+
+function expeditionProveRoadContractActive() {
+  const contract = expeditionBoardApi?.progress?.().contracts?.["prove-the-road"];
+  const progress = Math.max(0, Math.floor(Number(contract?.progress) || 0));
+  return contract?.status === "accepted" && progress < 2;
+}
+
+function travelEventHasBiomeDungeonOutcome(event = null) {
+  return (event?.choices ?? []).some((choice) => [choice.outcome, choice.success, choice.failure].filter(Boolean).some((outcome) => {
+    const themeId = String(outcome?.dungeon?.themeId ?? "");
+    return outcome?.dungeon && (!themeId || expeditionBiomeDungeonThemeIds.has(themeId));
+  }));
+}
+
+function travelPickProveRoadBiomeEvent(context = {}, biomeGroup = "") {
+  if (!expeditionProveRoadContractActive() || (!context.forceWilderness && travelHexIsSaferRoute(context.to))) return null;
+  const seed = `${state.world?.seed ?? ""}:${context.departureDay ?? 0}:${travelHexKeyForHex(context.to)}:prove-road-delve`;
+  const random = settlementBoardRandom(settlementBoardHash(seed));
+  if (random() > 0.45) return null;
+  const events = (window.DepthboundTravelEvents?.emptyHexEvents ?? [])
+    .filter((event) => travelEventHasBiomeDungeonOutcome(event))
+    .filter((event) => !event.biomes?.length || event.biomes.includes(String(biomeGroup || "").toLowerCase()));
+  if (!events.length) return null;
+  const recent = new Set(travelRecentEventIds());
+  const filtered = events.filter((event) => !recent.has(event.id));
+  return cloneData((filtered.length ? filtered : events)[Math.floor(random() * (filtered.length ? filtered.length : events.length))]);
+}
+
 async function travelResolveEmptyHexEvent(context = {}) {
   if (travelFeatureForHex(context.to) && !context.forceWilderness) return "none";
   const tile = travelBiomeForHex(context.to);
@@ -11685,7 +11715,7 @@ async function travelResolveEmptyHexEvent(context = {}) {
       return travelResolveEventOutcome(event, choice, { ...context, tile, biomeGroup, boardQuest });
     }
   }
-  const event = window.DepthboundTravelEvents?.pickEmptyHexEvent?.({
+  const event = travelPickProveRoadBiomeEvent(context, biomeGroup) ?? window.DepthboundTravelEvents?.pickEmptyHexEvent?.({
     seed: state.world?.seed,
     day: context.departureDay,
     hex: context.to,
@@ -15165,6 +15195,9 @@ function tavernGuestBodyMarkup(context) {
   const skillLabel = def.skill ? skillName(def.skill) : "";
   const roleLabel = tavernGuestRoleLabel(def.role);
   const walletCp = moneyToCp(partyPurse());
+  guest.stockCounts = def.role === "vendor" && (!guest.stockCounts || typeof guest.stockCounts !== "object")
+    ? Object.fromEntries((def.stock ?? []).map((itemId) => [itemId, 1]))
+    : guest.stockCounts;
   const stock = (def.stock ?? []).map((itemId) => getItemTemplate(itemId)).filter(Boolean);
   const daysLeft = Math.max(0, Math.floor(Number(guest.departureDay) || 0) - normalizeWorldDay(state.worldDay));
   const recruitTier = def.role === "recruit" ? tavernRecruitTier(def) : null;
@@ -15228,13 +15261,14 @@ function tavernGuestBodyMarkup(context) {
                 ${stock
                   .map((stockItem) => {
                     const price = Math.max(1, Math.ceil(storeItemBuyValueCp(stockItem, { shop: { buyPriceMultiplier: def.priceMultiplier ?? 1.25 } })));
+                    const remaining = Math.max(0, Math.floor(Number(guest.stockCounts?.[stockItem.id]) || 0));
                     return `
                       <div class="store-row">
                         <div>
                           <b>${escapeHtml(stockItem.name)}</b>
-                          <span>${escapeHtml(itemDetails(stockItem))} - ${escapeHtml(priceText(price))}</span>
+                          <span>${escapeHtml(itemDetails(stockItem))} - ${escapeHtml(priceText(price))} - ${escapeHtml(remaining)} left</span>
                         </div>
-                        <button type="button" data-action="tavern-buy-guest-item" data-guest="${escapeAttribute(guest.id)}" data-item="${escapeAttribute(stockItem.id)}" ${walletCp >= price ? "" : "disabled"}>Buy</button>
+                        <button type="button" data-action="tavern-buy-guest-item" data-guest="${escapeAttribute(guest.id)}" data-item="${escapeAttribute(stockItem.id)}" ${remaining > 0 && walletCp >= price ? "" : "disabled"}>${remaining > 0 ? "Buy" : "Sold Out"}</button>
                       </div>
                     `;
                   })
@@ -15271,7 +15305,7 @@ function tavernGuestBodyMarkup(context) {
                   <b>Ask For A Rumor</b>
                   <span>${escapeHtml(guest.rumorVisitId === tavernVisitId(context.profile) ? guest.lastResult ?? "They have said their piece for now." : "Ask what they have heard about the roads, shops, and trouble nearby.")}</span>
                 </div>
-                <button type="button" data-action="tavern-ask-rumor" data-guest="${escapeAttribute(guest.id)}" ${guest.rumorVisitId === tavernVisitId(context.profile) ? "disabled" : ""}>Ask</button>
+                <button type="button" data-action="tavern-ask-rumor" data-guest="${escapeAttribute(guest.id)}" onclick="window.tavernAskRumorFromButton(this); return false;" ${guest.rumorVisitId === tavernVisitId(context.profile) ? "disabled" : ""}>Ask</button>
               </article>`
             : ""
         }
@@ -15478,13 +15512,17 @@ function tavernFactionCheck(guestId = "") {
 function tavernBuyGuestItem(guestId = "", itemId = "") {
   const context = currentTavernGuest(guestId);
   if (!context?.def || context.def.role !== "vendor" || !context.def.stock?.includes(itemId)) return;
+  context.guest.stockCounts = context.guest.stockCounts && typeof context.guest.stockCounts === "object" ? context.guest.stockCounts : {};
+  const remaining = Math.max(0, Math.floor(Number(context.guest.stockCounts[itemId]) || 0));
+  if (remaining <= 0) return;
   const template = getItemTemplate(itemId);
   if (!template) return;
   const price = Math.max(1, Math.ceil(storeItemBuyValueCp(template, { shop: { buyPriceMultiplier: context.def.priceMultiplier ?? 1.25 } })));
   if (!spendMoney(partyPurse(), price)) return;
+  context.guest.stockCounts[itemId] = remaining - 1;
   const item = createItemInstance(itemId, "tavern-guest");
   addItemToPartyInventory(item, "tavern-guest");
-  addLog(`The party buys ${template.name} from ${context.guest.name}. It goes into the party inventory.`, "important");
+  addLog(`The party buys ${template.name} from ${context.guest.name}. ${context.guest.stockCounts[itemId]} left. It goes into the party inventory.`, "important");
   visitTavernGuest(guestId);
   window.DepthboundPlaytest?.syncNow?.();
 }
@@ -15685,8 +15723,15 @@ function tavernAskRumor(guestId = "") {
   window.DepthboundPlaytest?.syncNow?.();
 }
 
+function tavernAskRumorFromButton(button) {
+  const guestId = button?.dataset?.guest ?? "";
+  tavernAskRumor(guestId);
+  return false;
+}
+
 window.tavernChooseGuestChatOption = tavernChooseGuestChatOption;
 window.tavernAskRumor = tavernAskRumor;
+window.tavernAskRumorFromButton = tavernAskRumorFromButton;
 window.tavernShowChatResponseFromButton = tavernShowChatResponseFromButton;
 window.tavernFinishGuestChatFromButton = tavernFinishGuestChatFromButton;
 window.tavernReturnToGuestChatFromButton = tavernReturnToGuestChatFromButton;
@@ -19180,8 +19225,14 @@ const expeditionBoardApi = createCompactGuildBoard({
   ],
   dungeonMatchesContract(context, contract) {
     const objective = contract?.objective ?? {};
-    const biomeDungeonThemes = new Set(["arctic", "desertRuins", "forestOfTheBeasts", "grasslands", "jungle", "mountain", "swamp", "underwater", "crucibleOfFlame"]);
-    if (objective.type === "biomeDungeonComplete") return biomeDungeonThemes.has(String(context?.themeId ?? ""));
+    if (objective.type === "biomeDungeonComplete") {
+      const themeId = String(context?.themeId ?? "");
+      if (expeditionNonBiomeDungeonThemeIds.has(themeId)) return false;
+      if (expeditionBiomeDungeonThemeIds.has(themeId)) return true;
+      const eventText = `${context?.travelEventId ?? ""} ${context?.travelEventTitle ?? ""} ${context?.dungeonName ?? ""}`.toLowerCase();
+      if (/(forest|jungle|mountain|swamp|desert|grassland|arctic|underwater|crevasse|goat path|standing stones|ember rain|split-root|idol|sink-lights)/i.test(eventText)) return true;
+      return false;
+    }
     if (objective.type === "dungeonComplete") return true;
     if (objective.type === "campaignDungeon") return context?.campaignId === "expedition-mileposts";
     return false;
@@ -20865,6 +20916,9 @@ function renderStoreMenu(options = {}) {
   const npc = storeNpcDefinition();
   const preserveScroll = Boolean(options.preserveScroll);
   const previousScrollTop = preserveScroll ? els.storeBody?.scrollTop ?? 0 : 0;
+  const previousListScrolls = preserveScroll && els.storeBody
+    ? Array.from(els.storeBody.querySelectorAll(".store-list")).map((list) => list.scrollTop)
+    : [];
   document.querySelector("#store-title").textContent = npc.title ?? "Store";
   const equippedIds = new Set(Object.values(hero.equipment).filter(Boolean));
   const query = storeSearch.trim().toLowerCase();
@@ -20929,7 +20983,18 @@ function renderStoreMenu(options = {}) {
           </section>`
     }
   `;
-  if (preserveScroll && els.storeBody) els.storeBody.scrollTop = previousScrollTop;
+  if (preserveScroll && els.storeBody) {
+    els.storeBody.scrollTop = previousScrollTop;
+    Array.from(els.storeBody.querySelectorAll(".store-list")).forEach((list, index) => {
+      if (previousListScrolls[index] !== undefined) list.scrollTop = previousListScrolls[index];
+    });
+    requestAnimationFrame(() => {
+      els.storeBody.scrollTop = previousScrollTop;
+      Array.from(els.storeBody.querySelectorAll(".store-list")).forEach((list, index) => {
+        if (previousListScrolls[index] !== undefined) list.scrollTop = previousListScrolls[index];
+      });
+    });
+  }
 }
 
 function showStoreMenu(npcId = "general-merchant") {

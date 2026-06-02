@@ -4062,6 +4062,11 @@ function checkDungeonCompletion(hero = activeHero()) {
       themeId: state.themeId,
       campaignId: state.campaignId,
       campaignIndex: state.campaignIndex,
+      travelReturnCamp,
+      travelEventId: travelReturnCamp?.eventId ?? "",
+      travelEventTitle: travelReturnCamp?.eventTitle ?? "",
+      boardQuestId: travelReturnCamp?.boardQuestId ?? state.customDungeon?.settlementBoardQuestId ?? "",
+      dungeonName: state.customDungeon?.name ?? state.dungeon?.name ?? "",
     };
     handleNpcDungeonComplete(completedContext);
     const completedCampaign = state.campaignId && state.campaignIndex ? { ...state.campaignProgress } : state.campaignProgress;

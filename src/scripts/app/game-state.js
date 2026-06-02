@@ -3775,6 +3775,7 @@ function soundPathForMusic(key) {
     "village:expedition-board": [`${soundAssetRoot}/music/village-expedition-board.mp3`, `${soundAssetRoot}/music/village-expedition-board-2.mp3`],
     "village:boom-club": [`${soundAssetRoot}/music/village-boom-club.mp3`, `${soundAssetRoot}/music/village-boom-club-2.mp3`],
     "village:fighting-pit": [`${soundAssetRoot}/music/village-fighting-pit.mp3`, `${soundAssetRoot}/music/village-fighting-pit-2.mp3`],
+    "inn": [`${soundAssetRoot}/music/inn.mp3`, `${soundAssetRoot}/music/inn-2.mp3`],
     "fighting-pit-arena": `${soundAssetRoot}/music/fighting-pit-arena.mp3`,
   };
   const fixedPath = fixedMusicPaths[key];
@@ -3807,6 +3808,7 @@ function desiredMusicKey() {
   if (!state) return "";
   if (state?.questFlags?.fightingPitRun?.active && state.mode !== "home") return "fighting-pit-arena";
   if (activeVillageMusicKey && !els.villageMenu?.classList.contains("hidden")) return activeVillageMusicKey;
+  if (state.mode === "camp" && typeof travelCampIsInn === "function" && travelCampIsInn()) return "inn";
   if (state.mode === "home") return "home";
   if (state.mode === "combat") {
     return combatMonsters().some((monster) => monster.id?.startsWith("boss-")) ? "boss-combat" : "combat";

@@ -279,6 +279,7 @@
       title: "Shady Charm Seller",
       opener: "They unfold a velvet cloth under the table and smile like the room owes them money.",
       stock: ["potion-healing", "torch", "alchemists-fire"],
+      stockQuantityRange: [1, 2],
       priceMultiplier: 1.35,
       weight: 0.7,
     },
@@ -288,6 +289,7 @@
       title: "Road Peddler",
       opener: "Their pack has rope, rations, chalk, and the smell of three weather systems.",
       stock: ["trail-ration", "torch", "potion-healing"],
+      stockQuantityRange: [1, 4],
       priceMultiplier: 1.15,
       weight: 0.8,
     },
@@ -297,6 +299,7 @@
       title: "Bottle-Witch Broker",
       opener: "Every bottle in their satchel has a string tag, a wax seal, and a warning written too small.",
       stock: ["potion-healing", "potion-greater-healing", "alchemists-fire"],
+      stockQuantityRange: [1, 2],
       priceMultiplier: 1.45,
       cityOnly: true,
       weight: 0.55,
@@ -307,6 +310,7 @@
       title: "Contraband Wand Runner",
       opener: "They keep tapping a narrow case and pretending the sparks are someone else's problem.",
       stock: ["potion-fire-breath", "potion-heroism", "alchemists-fire"],
+      stockQuantityRange: [1, 1],
       priceMultiplier: 1.65,
       cityOnly: true,
       weight: 0.25,
@@ -317,6 +321,7 @@
       title: "Lantern Monger",
       opener: "Their coat smells of oil, smoke, and the firm belief that darkness is a solvable problem.",
       stock: ["torch", "hooded-lantern", "lantern-oil", "trail-ration"],
+      stockQuantityRange: [2, 5],
       priceMultiplier: 1.1,
       weight: 0.55,
     },
@@ -326,6 +331,7 @@
       title: "Performer Selling Spare Instruments",
       opener: "Their instrument case is patched, polished, and guarded like a sleeping child.",
       stock: ["instrument-flute", "instrument-drum", "instrument-lute"],
+      stockQuantityRange: [1, 1],
       priceMultiplier: 1.2,
       weight: 0.22,
     },
@@ -551,8 +557,20 @@
     return departureDay > 0 && currentDay >= departureDay;
   }
 
+  function createVendorStockCounts(definition, random) {
+    if (definition?.role !== "vendor") return {};
+    const [minRaw, maxRaw] = Array.isArray(definition.stockQuantityRange) ? definition.stockQuantityRange : [1, 2];
+    const min = Math.max(0, Math.floor(Number(minRaw) || 0));
+    const max = Math.max(min, Math.floor(Number(maxRaw) || min));
+    return Object.fromEntries((definition.stock ?? []).map((itemId) => {
+      const quantity = min + Math.floor(random() * (max - min + 1));
+      return [itemId, quantity];
+    }));
+  }
+
   function normalizeExistingGuest(guest, profile, currentDay) {
     if (!guest?.defId) return null;
+    const definition = byId[guest.defId] ?? null;
     const seedText = `${profile.id ?? profile.name}:${guest.id ?? guest.defId}:${guest.spawnedDay ?? currentDay}:duration`;
     const random = seeded(hashText(seedText));
     const identity = guest.name && guest.gender
@@ -572,6 +590,9 @@
       state: guest.state ?? "available",
       completed: Boolean(guest.completed),
       failedToday: Boolean(guest.failedToday),
+      stockCounts: definition?.role === "vendor"
+        ? { ...createVendorStockCounts(definition, random), ...(guest.stockCounts && typeof guest.stockCounts === "object" ? guest.stockCounts : {}) }
+        : guest.stockCounts,
     };
   }
 
@@ -600,6 +621,7 @@
       departureDay: currentDay + durationDays,
       completed: false,
       failedToday: false,
+      stockCounts: createVendorStockCounts(definition, random),
     };
   }
 

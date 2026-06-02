@@ -38,7 +38,7 @@
   }
 
   const EVENT_CATEGORY_WEIGHTS = {
-    empty: { none: 45, text: 35, fight: 12, dungeon: 8 },
+    empty: { none: 38, text: 34, fight: 12, dungeon: 16 },
     emptyRoad: { none: 60, text: 30, fight: 6, dungeon: 4 },
     structure: { quiet: 15, text: 45, dungeon: 25, fight: 15 },
     structureRevisit: { quiet: 30, text: 42, dungeon: 18, fight: 10 },
