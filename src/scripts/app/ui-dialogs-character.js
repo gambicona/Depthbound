@@ -1079,6 +1079,7 @@ function customGoalStatusForTemplate(template) {
     const monster = getMonsterTemplate(goal.monsterId);
     return { text: `Defeat ${target} ${monster?.name ?? goal.monsterId ?? "chosen monster"}${target === 1 ? "" : "s"} (0/${target}).` };
   }
+  if (goal.type === "interactObject") return { text: goal.text ?? "Use the marked object before leaving." };
   return { text: "Complete the dungeon goal." };
 }
 

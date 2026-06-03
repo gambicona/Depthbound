@@ -6140,7 +6140,8 @@
         "description": "A pale sigil seals the latch with stored winter. It deals 2d6 cold damage unless unraveled or dispelled."
       },
       "items": [
-        "magic-bracers-archery"
+        "magic-bracers-archery",
+        "magic-undead-barrowcrown-shield-drowned-legion"
       ]
     },
     {

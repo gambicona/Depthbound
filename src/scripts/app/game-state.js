@@ -621,6 +621,8 @@ function createCustomDungeonObject(templateObject, index) {
     ...(typeof locked === "boolean" ? { locked } : {}),
     ...(templateObject.spawner ? { spawner: cloneData(templateObject.spawner) } : {}),
     ...(templateObject.recruit ? { recruit: cloneData(templateObject.recruit) } : {}),
+    ...(Array.isArray(templateObject.components) ? { components: cloneData(templateObject.components) } : {}),
+    ...(templateObject.description ? { description: templateObject.description } : {}),
     items: itemInstancesFromIds(templateObject.items ?? [], "object"),
   };
 }
@@ -649,6 +651,10 @@ function createCustomDungeonMonsters(template, dungeon, hero) {
     if (entry.isBoss) {
       monster.customBoss = true;
       monster.tags = Array.from(new Set([...(monster.tags ?? []), "boss"]));
+    }
+    if (entry.wave) {
+      monster.customDungeonWave = Math.max(1, Math.floor(Number(entry.wave)) || 1);
+      monster.customDungeonWaveMonster = true;
     }
     applyMonsterCategoryScaling(monster, hero);
     monster.position = { ...(entry.position ?? dungeon.startPosition) };
@@ -731,6 +737,7 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
       outro: template.outro ?? { text: "", images: [] },
       storyTriggers: Array.isArray(template.storyTriggers) ? cloneData(template.storyTriggers) : [],
       storyTriggerHistory: {},
+      waveEncounter: template.waveEncounter ? cloneData(template.waveEncounter) : null,
     },
     combatStarted: false,
     mode: "exploration",
@@ -1308,6 +1315,19 @@ function prepareTimedEffect(effect) {
   const prepared = { ...effect, startsOnNextEncounter: false, durationSeconds };
   prepared.expiresAtDungeonTimeSeconds = dungeonElapsedSeconds({ sync: false }) + durationSeconds;
   return prepared;
+}
+
+function statusEffectIsInvisibilityLike(effect) {
+  return Boolean(effect && (effect.id === "invisible" || effect.id === "greater-invisibility" || effect.invisible));
+}
+
+function fighterHasInvisibilitySuppressed(fighter) {
+  return Boolean((fighter?.statusEffects ?? []).some((effect) => effect.invisibleSuppressed));
+}
+
+function effectiveStatusEffectsForStats(fighter) {
+  const effects = fighter?.statusEffects ?? [];
+  return fighterHasInvisibilitySuppressed(fighter) ? effects.filter((effect) => !statusEffectIsInvisibilityLike(effect)) : effects;
 }
 
 function conditionDefinitions() {
@@ -4270,7 +4290,8 @@ function objectComponents(objectOrType) {
     typeof objectOrType === "string"
       ? objectTemplate(objectOrType)
       : objectTemplate(objectOrType?.type);
-  return (template?.components ?? []).map(normalizeObjectComponent).filter(Boolean);
+  const localComponents = typeof objectOrType === "string" ? [] : (objectOrType?.components ?? []);
+  return [...localComponents, ...(template?.components ?? [])].map(normalizeObjectComponent).filter(Boolean);
 }
 
 function objectComponent(objectOrType, type) {
@@ -6334,13 +6355,14 @@ function attackWeaponChoicesForFighter(fighter) {
 
 function armorClass(fighter) {
   const sidekickDefenseBonus = isSidekickWarrior(fighter) && (fighter.level ?? 1) >= 10 ? 1 : 0;
+  const statusEffects = effectiveStatusEffectsForStats(fighter);
   if (isWildShaped(fighter)) {
-    const statusAc = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.acBonus ?? 0), 0);
+    const statusAc = statusEffects.reduce((sum, effect) => sum + (effect.acBonus ?? 0), 0);
     return (fighter.baseAc ?? fighter.ac ?? 10) + statusAc + sidekickDefenseBonus;
   }
   if (isRangerBeastCompanion(fighter)) {
     const magicAc = magicEffects(fighter).acBonus;
-    const statusAc = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.acBonus ?? 0), 0);
+    const statusAc = statusEffects.reduce((sum, effect) => sum + (effect.acBonus ?? 0), 0);
     return (fighter.baseAc ?? fighter.ac ?? 10) + rangerCompanionProficiencyBonus(fighter) + magicAc + statusAc + sidekickDefenseBonus;
   }
   const torso = equippedItem(fighter, "torso");
@@ -6348,7 +6370,7 @@ function armorClass(fighter) {
   const shield = equippedItem(fighter, "offHand");
   const shieldBonus = heroHasArmorProficiency(fighter, shield) ? activeArmorData(fighter, shield)?.bonus ?? 0 : 0;
   const magicAc = magicEffects(fighter).acBonus;
-  const statusAc = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.acBonus ?? 0), 0);
+  const statusAc = statusEffects.reduce((sum, effect) => sum + (effect.acBonus ?? 0), 0);
   const styleAc = fighterHasStyle(fighter, "defense") && Boolean(torso?.armor?.base) ? 1 : 0;
   const dualWielderAc =
     fighterHasFeat(fighter, "dual-wielder") &&
@@ -6441,15 +6463,16 @@ function refreshDerivedStats(fighter) {
   normalizeAttunementState(fighter);
   syncRangerBeastCompanionStats(fighter);
   const effects = magicEffects(fighter);
-  const statusSpeedBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.speedBonusFeet ?? 0), 0);
-  const statusSpeedOverride = (fighter.statusEffects ?? []).reduce((speed, effect) => Math.max(speed, effect.speedOverrideFeet ?? 0), 0);
-  const statusSpeedMultiplier = (fighter.statusEffects ?? []).reduce((multiplier, effect) => {
+  const statusEffects = effectiveStatusEffectsForStats(fighter);
+  const statusSpeedBonus = statusEffects.reduce((sum, effect) => sum + (effect.speedBonusFeet ?? 0), 0);
+  const statusSpeedOverride = statusEffects.reduce((speed, effect) => Math.max(speed, effect.speedOverrideFeet ?? 0), 0);
+  const statusSpeedMultiplier = statusEffects.reduce((multiplier, effect) => {
     if (effect.speedMultiplier != null) return multiplier * Math.max(0, Number(effect.speedMultiplier) || 0);
     if (effect.speedPenaltyPercent != null) return multiplier * Math.max(0, 1 - (Number(effect.speedPenaltyPercent) || 0) / 100);
     return multiplier;
   }, 1);
-  const statusMaxHpBonus = (fighter.statusEffects ?? []).reduce((sum, effect) => sum + (effect.maxHpBonus ?? 0), 0);
-  const statusMaxHpMultiplier = (fighter.statusEffects ?? []).reduce((multiplier, effect) => {
+  const statusMaxHpBonus = statusEffects.reduce((sum, effect) => sum + (effect.maxHpBonus ?? 0), 0);
+  const statusMaxHpMultiplier = statusEffects.reduce((multiplier, effect) => {
     if (effect.maxHpMultiplier != null) return multiplier * Math.max(0, Number(effect.maxHpMultiplier) || 0);
     if (effect.maxHpPenaltyPercent != null) return multiplier * Math.max(0, 1 - (Number(effect.maxHpPenaltyPercent) || 0) / 100);
     return multiplier;

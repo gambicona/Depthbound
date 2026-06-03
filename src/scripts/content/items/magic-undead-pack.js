@@ -565,7 +565,6 @@ registerMagicArmor("magic-undead-graveplate-chain-mail", "chain-mail", "Gravepla
   "description": "Blackened chain mail that muffles the heartbeat."
 });
 
-// IMPLEMENTATION NOTE: Later hook: bonus to stealth/investigation checks inside tombs or against undead.
 registerMagicArmor("magic-undead-shroud-leather", "leather", "Shroud Leather", "uncommon", 900, {
   "enhancementBonus": 1,
   "tags": [
@@ -576,7 +575,7 @@ registerMagicArmor("magic-undead-shroud-leather", "leather", "Shroud Leather", "
     "stealth"
   ],
   "description": "Pale leather stitched under burial shroud linen.",
-  "implementation": "Stealth bonus against undead needs skill-check modifier hooks."
+  "implementation": "The +1 armor bonus is active through armor magic data."
 });
 
 registerMagicArmor("magic-undead-deathknell-plate", "plate", "Deathknell Plate", "very rare", 32000, {
@@ -622,7 +621,6 @@ registerMagicAccessory("magic-undead-ring-last-breath", "Ring of the Last Breath
   "description": "Grants necrotic resistance."
 });
 
-// IMPLEMENTATION NOTE: Needs accessory extra-damage hook.
 registerMagicAccessory("magic-undead-reliquary-gravesun", "Reliquary of the Gravesun", "amulet", "rare", 7000, {
   "requiresAttunement": true,
   "effects": {
@@ -645,7 +643,7 @@ registerMagicAccessory("magic-undead-reliquary-gravesun", "Reliquary of the Grav
     "radiant"
   ],
   "description": "Grants necrotic resistance and marks attacks with faint radiant force.",
-  "implementation": "Accessory extra damage needs a hook that adds equipped accessory damage to weapon/spell attacks."
+  "implementation": "Necrotic resistance and accessory extra radiant damage are active through magic effects."
 });
 
 registerMagicAccessory("magic-undead-boots-tombstep", "Boots of Tombstep", "boots", "uncommon", 1300, {
@@ -677,7 +675,6 @@ registerMagicAccessory("magic-undead-bracers-pallbearer", "Bracers of the Pallbe
   "description": "Grants +12 max HP."
 });
 
-// IMPLEMENTATION NOTE: Later hook: undead are less likely to target the wearer until attacked.
 registerMagicAccessory("magic-undead-cloak-quiet-grave", "Cloak of the Quiet Grave", "cloak", "rare", 5800, {
   "requiresAttunement": true,
   "effects": {
@@ -690,7 +687,7 @@ registerMagicAccessory("magic-undead-cloak-quiet-grave", "Cloak of the Quiet Gra
     "cloak"
   ],
   "description": "Grants +1 AC.",
-  "implementation": "Undead ignore/aggro reduction needs monster targeting AI tags."
+  "implementation": "The +1 AC bonus is active through magic effects."
 });
 
 registerMagicAccessory("magic-undead-crown-hollow-mourning", "Crown of Hollow Mourning", "head", "very rare", 21000, {
@@ -716,7 +713,6 @@ registerMagicAccessory("magic-undead-crown-hollow-mourning", "Crown of Hollow Mo
   "description": "Grants +2 CHA and necrotic resistance, but radiant vulnerability."
 });
 
-// IMPLEMENTATION NOTE: Needs temporary buff handling; intended necrotic resistance for current dungeon.
 registerMagicConsumable("magic-undead-necrotic-ward-draught", "Necrotic Ward Draught", "potion", "uncommon", 500, {
   "effects": {
     "resistances": [
@@ -743,7 +739,7 @@ registerMagicConsumable("magic-undead-necrotic-ward-draught", "Necrotic Ward Dra
     },
     "description": "Gain necrotic resistance for the current dungeon."
   },
-  "implementation": "Needs temporary resistance buff support."
+  "implementation": "The consumable buff is handled through generic item-use status effects."
 });
 
 registerMagicWondrous("magic-undead-barrowcrown-gravebreakers-lantern", "Gravebreaker's Lantern", [
@@ -760,11 +756,10 @@ registerMagicWondrous("magic-undead-barrowcrown-gravebreakers-lantern", "Gravebr
     "light",
     "barrowcrown"
   ],
-  "description": "A dented grave-robber's lantern whose flame burns pale blue near the restless dead. While holding this lantern, you can use a bonus action to cast its light onto one creature you can see within 30 feet. Until the start of your next turn, that creature cannot benefit from being invisible, and if it is undead, it also cannot regain hit points. Grave-Flare: once per long rest when an undead creature starts its turn within 20 feet of you, you can cause the lantern to flare. The creature must make a DC 13 Wisdom saving throw or be frightened of you until the end of its next turn. Curse-Scent: the lantern glows faintly when within 30 feet of a cursed object, hidden burial chamber, or active necromantic magic.",
+  "description": "A dented grave-robber's lantern whose flame burns pale blue near the restless dead. While holding this lantern, you can use a bonus action to cast its light onto one creature you can see within 30 feet. Until the start of your next turn, that creature cannot benefit from being invisible, and if it is undead, it also cannot regain hit points. Grave-Flare: once per long rest when an undead creature starts its turn within 20 feet of you, the lantern can flare. The creature must make a DC 13 Wisdom saving throw or be frightened of you until the end of its turn.",
   "properties": [
     "Bonus action: reveal one creature within 30 ft until your next turn and block undead healing.",
-    "Once per long rest: DC 13 WIS save or one nearby undead is frightened until end of its next turn.",
-    "Glows near cursed objects, hidden burial chambers, or active necromantic magic."
+    "Once per long rest: DC 13 WIS save or one nearby undead is frightened until the end of its turn."
   ],
   "use": {
     "kind": "special",
@@ -773,7 +768,7 @@ registerMagicWondrous("magic-undead-barrowcrown-gravebreakers-lantern", "Gravebr
     "target": "one creature within 30 ft",
     "description": "Cast pale lantern-light onto one visible creature within 30 feet. Until your next turn, it cannot benefit from being invisible, and undead targets cannot regain hit points."
   },
-  "implementation": "The reveal, undead healing lockout, Grave-Flare fear save, and Curse-Scent detection need bespoke dungeon/combat hooks."
+  "implementation": "Reveal, invisibility suppression, undead healing lockout, and Grave-Flare fear save are hooked."
 });
 
 registerMagicArmor("magic-undead-barrowcrown-shield-drowned-legion", "shield", "Shield of the Drowned Legion", "rare", 7200, {
@@ -786,13 +781,13 @@ registerMagicArmor("magic-undead-barrowcrown-shield-drowned-legion", "shield", "
     "shield",
     "barrowcrown"
   ],
-  "description": "This shield is made from dark iron and decorated with hundreds of tiny bone-white faces. You gain a +1 bonus to AC while wielding this shield. Legion Wall: when a creature you can see hits you with a melee attack, you can use your reaction to reduce the damage by 1d8 + your proficiency bonus, as spectral soldiers rise around you. Drowned Advance: once per short rest, when you take the Dodge action, you may move up to 10 feet without provoking opportunity attacks. Bone-Bound: you have advantage on saving throws against being knocked prone or moved against your will.",
+  "description": "This shield is made from dark iron and decorated with hundreds of tiny bone-white faces. You gain a +1 bonus to AC while wielding this shield. Legion Wall: when a creature you can see hits you with a melee attack, you can use your reaction to reduce the damage by 1d8 + your proficiency bonus, as spectral soldiers rise around you. Drowned Advance: once per short rest, when you take the Dodge action, you may move up to 10 feet without provoking opportunity attacks. Bone-Bound: when you would be knocked prone or moved against your will, roll a d20 with advantage and add your proficiency bonus; on a success against the effect DC, or DC 13 if no DC is provided, the shield anchors you in place.",
   "properties": [
     "Reaction: reduce melee damage by 1d8 + proficiency bonus.",
     "Once per short rest: move up to 10 ft after Dodging without provoking opportunity attacks.",
-    "Advantage on saves against being knocked prone or moved against your will."
+    "Advantaged d20 + proficiency check against being knocked prone or moved against your will."
   ],
-  "implementation": "The +1 shield AC is active through the armor data. Legion Wall, Drowned Advance, and Bone-Bound need reaction, Dodge, and forced-movement hooks."
+  "implementation": "The +1 shield AC, Legion Wall reaction, optional Drowned Advance on Dodge, and Bone-Bound prone/forced-movement checks are hooked."
 });
 
 registerMagicWondrous("magic-undead-barrowcrown-black-market-coin", "Black Market Coin", [
@@ -822,7 +817,7 @@ registerMagicWondrous("magic-undead-barrowcrown-black-market-coin", "Black Marke
     "name": "Paid in Blood",
     "description": "The coin's strongest bargain always demands blood, exhaustion, or worse."
   },
-  "implementation": "Paid in Blood and Unfair Bargain need attack-roll choice prompts, once-per-turn tracking, long-rest tracking, and exhaustion/damage payment hooks."
+  "implementation": "Paid in Blood and Unfair Bargain are hooked for normal and opportunity attack rolls with turn/long-rest tracking and payment prompts."
 });
 
 registerMagicWeapon("magic-undead-barrowcrown-bell-ringers-maul", "maul", "Bell-Ringer's Maul", "rare", 7800, {
@@ -841,7 +836,7 @@ registerMagicWeapon("magic-undead-barrowcrown-bell-ringers-maul", "maul", "Bell-
     "Once per turn on hit: another creature within 10 ft of the target takes thunder damage equal to your proficiency bonus.",
     "Deals double damage to unattended objects and structures made of stone, bone, or brittle metal."
   ],
-  "implementation": "The +1 attack and damage bonus is active through weapon magic data. Funeral Toll and Resonant Strike need conditional rider/object-damage hooks."
+  "implementation": "The +1 attack/damage bonus, Funeral Toll rider, and Resonant Strike object-damage bonus are hooked."
 });
 
 registerMagicWeapon("magic-undead-barrowcrown-bell-ringers-warhammer", "warhammer", "Bell-Ringer's Warhammer", "rare", 7600, {
@@ -860,7 +855,7 @@ registerMagicWeapon("magic-undead-barrowcrown-bell-ringers-warhammer", "warhamme
     "Once per turn on hit: another creature within 10 ft of the target takes thunder damage equal to your proficiency bonus.",
     "Deals double damage to unattended objects and structures made of stone, bone, or brittle metal."
   ],
-  "implementation": "The +1 attack and damage bonus is active through weapon magic data. Funeral Toll and Resonant Strike need conditional rider/object-damage hooks."
+  "implementation": "The +1 attack/damage bonus, Funeral Toll rider, and Resonant Strike object-damage bonus are hooked."
 });
 
 registerMagicAccessory("magic-undead-barrowcrown-ring-last-heir", "Ring of the Last Heir", [
@@ -876,7 +871,7 @@ registerMagicAccessory("magic-undead-barrowcrown-ring-last-heir", "Ring of the L
     "royal",
     "barrowcrown"
   ],
-  "description": "A gold signet ring bearing the crest of the buried dynasty. It grows warm when worn by someone standing before a throne, altar, or battlefield. Royal Command: once per short rest, when you hit a creature with a weapon attack, you can command it to kneel. The target must make a DC 14 Wisdom saving throw. On a failure, it falls prone and its speed becomes 0 until the start of your next turn. Creatures immune to being charmed have advantage on this save. Blood Remembers: when you are reduced to 0 hit points but not killed outright, you can use your reaction to drop to 1 hit point instead. Once this property is used, it cannot be used again until the next dawn.",
+  "description": "A gold signet ring bearing the crest of the buried dynasty. It grows warm when worn by someone standing before a throne, altar, or battlefield. Royal Command: once per short rest, when you hit a creature with a weapon attack, you can command it to kneel. The target must make a DC 14 Wisdom saving throw. On a failure, it falls prone and its speed becomes 0 until the start of your next turn. Creatures immune to being charmed have advantage on this save. Blood Remembers: when you are reduced to 0 hit points but not killed outright, you can use your reaction to drop to 1 hit point instead. Once this property is used, it cannot be used again until you finish a long rest.",
   "properties": [
     "Once per short rest on weapon hit: DC 14 WIS save or the target falls prone and speed becomes 0 until your next turn.",
     "Charm-immune creatures have advantage on the Royal Command save.",
@@ -888,11 +883,11 @@ registerMagicAccessory("magic-undead-barrowcrown-ring-last-heir", "Ring of the L
     "consume": false,
     "charges": {
       "max": 1,
-      "refresh": "newDungeon"
+      "refresh": "longRest"
     },
     "description": "Blood Remembers: when reduced to 0 hit points but not killed outright, drop to 1 hit point instead."
   },
-  "implementation": "Royal Command needs an on-hit short-rest rider with DC 14 WIS prone/speed lock. Blood Remembers needs a death-prevention reaction hook; the use data marks it as one charge until a dawn/rest-equivalent refresh exists."
+  "implementation": "Royal Command and Blood Remembers are hooked with short-rest/long-rest tracking, save handling, prone/speed lock, and death-prevention reaction."
 });
 
 registerMagicWeapon("magic-undead-barrowcrown-crownshard-shortsword", "shortsword", "Crownshard Shortsword", "very rare", 32000, {
@@ -916,13 +911,13 @@ registerMagicWeapon("magic-undead-barrowcrown-crownshard-shortsword", "shortswor
     "name": "Burden",
     "description": "While attuned to this weapon, you occasionally hear the whispers of dead rulers. Your Wisdom score has a -4 penalty."
   },
-  "description": "This weapon contains a broken shard of the Barrow Crown set into its guard. Black iron veins run through the blade like cracks in old stone. You gain a +2 bonus to attack and damage rolls made with this weapon. No King Above Me: when you hit a creature that is charmed, frightened, possessed, magically commanded, or undead, the attack deals an extra 1d8 radiant or necrotic damage; choose the damage type when you hit. Sever Command: once per short rest, when you hit an undead creature with this weapon, you may attempt to command or dominate it. The target must make a DC 16 Charisma saving throw. On a failure, the undead fights beside you for the duration of this combat; after combat it turns to dust and leaves nothing behind. Crownbreaker: once per long rest, when you score a critical hit, you may force all hostile creatures of your choice within 15 feet to make a DC 16 Wisdom saving throw. On a failure, a creature is frightened of you until the end of your next turn. Burden: while attuned to this weapon, your Wisdom score has a -4 penalty.",
+  "description": "This weapon contains a broken shard of the Barrow Crown set into its guard. Black iron veins run through the blade like cracks in old stone. You gain a +2 bonus to attack and damage rolls made with this weapon. No King Above Me: when you hit a creature that is charmed, frightened, possessed, magically commanded, or undead, the attack deals an extra 1d8 radiant or necrotic damage; choose the damage type when you hit. Sever Command: once per short rest, when you hit an undead creature with this weapon, you may attempt to command or dominate it. The target must make a DC 16 Charisma saving throw. On a failure, the undead fights beside you for the duration of this combat; after combat it turns to dust and leaves nothing behind. Crownbreaker: once per long rest, when you score a critical hit, you may force hostile creatures within 15 feet to make a DC 16 Wisdom saving throw. On a failure, a creature is frightened of you until the end of your next turn. Burden: while attuned to this weapon, your Wisdom score has a -4 penalty.",
   "properties": [
     "Conditional hit: +1d8 radiant or necrotic damage against charmed, frightened, possessed, magically commanded, or undead targets.",
     "Once per short rest on undead hit: DC 16 CHA save or the undead fights beside you for this combat, then turns to dust.",
-    "Once per long rest on critical hit: chosen hostile creatures within 15 ft make DC 16 WIS save or become frightened until end of your next turn."
+    "Once per long rest on critical hit: hostile creatures within 15 ft make DC 16 WIS save or become frightened until end of your next turn."
   ],
-  "implementation": "The +2 attack/damage bonus and -4 WIS curse are active through magic data. No King Above Me, Sever Command, Crownbreaker, and post-combat dusting need conditional rider and AI allegiance hooks."
+  "implementation": "The +2 attack/damage bonus, -4 WIS curse, No King Above Me, Sever Command, Crownbreaker, and post-combat dusting are hooked."
 });
 
 registerMagicWeapon("magic-undead-barrowcrown-crownshard-longsword", "longsword", "Crownshard Longsword", "very rare", 34000, {
@@ -946,13 +941,13 @@ registerMagicWeapon("magic-undead-barrowcrown-crownshard-longsword", "longsword"
     "name": "Burden",
     "description": "While attuned to this weapon, you occasionally hear the whispers of dead rulers. Your Wisdom score has a -4 penalty."
   },
-  "description": "This weapon contains a broken shard of the Barrow Crown set into its guard. Black iron veins run through the blade like cracks in old stone. You gain a +2 bonus to attack and damage rolls made with this weapon. No King Above Me: when you hit a creature that is charmed, frightened, possessed, magically commanded, or undead, the attack deals an extra 1d8 radiant or necrotic damage; choose the damage type when you hit. Sever Command: once per short rest, when you hit an undead creature with this weapon, you may attempt to command or dominate it. The target must make a DC 16 Charisma saving throw. On a failure, the undead fights beside you for the duration of this combat; after combat it turns to dust and leaves nothing behind. Crownbreaker: once per long rest, when you score a critical hit, you may force all hostile creatures of your choice within 15 feet to make a DC 16 Wisdom saving throw. On a failure, a creature is frightened of you until the end of your next turn. Burden: while attuned to this weapon, your Wisdom score has a -4 penalty.",
+  "description": "This weapon contains a broken shard of the Barrow Crown set into its guard. Black iron veins run through the blade like cracks in old stone. You gain a +2 bonus to attack and damage rolls made with this weapon. No King Above Me: when you hit a creature that is charmed, frightened, possessed, magically commanded, or undead, the attack deals an extra 1d8 radiant or necrotic damage; choose the damage type when you hit. Sever Command: once per short rest, when you hit an undead creature with this weapon, you may attempt to command or dominate it. The target must make a DC 16 Charisma saving throw. On a failure, the undead fights beside you for the duration of this combat; after combat it turns to dust and leaves nothing behind. Crownbreaker: once per long rest, when you score a critical hit, you may force hostile creatures within 15 feet to make a DC 16 Wisdom saving throw. On a failure, a creature is frightened of you until the end of your next turn. Burden: while attuned to this weapon, your Wisdom score has a -4 penalty.",
   "properties": [
     "Conditional hit: +1d8 radiant or necrotic damage against charmed, frightened, possessed, magically commanded, or undead targets.",
     "Once per short rest on undead hit: DC 16 CHA save or the undead fights beside you for this combat, then turns to dust.",
-    "Once per long rest on critical hit: chosen hostile creatures within 15 ft make DC 16 WIS save or become frightened until end of your next turn."
+    "Once per long rest on critical hit: hostile creatures within 15 ft make DC 16 WIS save or become frightened until end of your next turn."
   ],
-  "implementation": "The +2 attack/damage bonus and -4 WIS curse are active through magic data. No King Above Me, Sever Command, Crownbreaker, and post-combat dusting need conditional rider and AI allegiance hooks."
+  "implementation": "The +2 attack/damage bonus, -4 WIS curse, No King Above Me, Sever Command, Crownbreaker, and post-combat dusting are hooked."
 });
 
 registerMagicWeapon("magic-undead-barrowcrown-crownshard-greatsword", "greatsword", "Crownshard Greatsword", "very rare", 36000, {
@@ -976,13 +971,54 @@ registerMagicWeapon("magic-undead-barrowcrown-crownshard-greatsword", "greatswor
     "name": "Burden",
     "description": "While attuned to this weapon, you occasionally hear the whispers of dead rulers. Your Wisdom score has a -4 penalty."
   },
-  "description": "This weapon contains a broken shard of the Barrow Crown set into its guard. Black iron veins run through the blade like cracks in old stone. You gain a +2 bonus to attack and damage rolls made with this weapon. No King Above Me: when you hit a creature that is charmed, frightened, possessed, magically commanded, or undead, the attack deals an extra 1d8 radiant or necrotic damage; choose the damage type when you hit. Sever Command: once per short rest, when you hit an undead creature with this weapon, you may attempt to command or dominate it. The target must make a DC 16 Charisma saving throw. On a failure, the undead fights beside you for the duration of this combat; after combat it turns to dust and leaves nothing behind. Crownbreaker: once per long rest, when you score a critical hit, you may force all hostile creatures of your choice within 15 feet to make a DC 16 Wisdom saving throw. On a failure, a creature is frightened of you until the end of your next turn. Burden: while attuned to this weapon, your Wisdom score has a -4 penalty.",
+  "description": "This weapon contains a broken shard of the Barrow Crown set into its guard. Black iron veins run through the blade like cracks in old stone. You gain a +2 bonus to attack and damage rolls made with this weapon. No King Above Me: when you hit a creature that is charmed, frightened, possessed, magically commanded, or undead, the attack deals an extra 1d8 radiant or necrotic damage; choose the damage type when you hit. Sever Command: once per short rest, when you hit an undead creature with this weapon, you may attempt to command or dominate it. The target must make a DC 16 Charisma saving throw. On a failure, the undead fights beside you for the duration of this combat; after combat it turns to dust and leaves nothing behind. Crownbreaker: once per long rest, when you score a critical hit, you may force hostile creatures within 15 feet to make a DC 16 Wisdom saving throw. On a failure, a creature is frightened of you until the end of your next turn. Burden: while attuned to this weapon, your Wisdom score has a -4 penalty.",
   "properties": [
     "Conditional hit: +1d8 radiant or necrotic damage against charmed, frightened, possessed, magically commanded, or undead targets.",
     "Once per short rest on undead hit: DC 16 CHA save or the undead fights beside you for this combat, then turns to dust.",
-    "Once per long rest on critical hit: chosen hostile creatures within 15 ft make DC 16 WIS save or become frightened until end of your next turn."
+    "Once per long rest on critical hit: hostile creatures within 15 ft make DC 16 WIS save or become frightened until end of your next turn."
   ],
-  "implementation": "The +2 attack/damage bonus and -4 WIS curse are active through magic data. No King Above Me, Sever Command, Crownbreaker, and post-combat dusting need conditional rider and AI allegiance hooks."
+  "implementation": "The +2 attack/damage bonus, -4 WIS curse, No King Above Me, Sever Command, Crownbreaker, and post-combat dusting are hooked."
+});
+
+registerMagicWondrous("magic-undead-barrowcrown-barrow-crown", "Barrow Crown", "head", "artifact", 250000, {
+  "requiresAttunement": true,
+  "unique": true,
+  "weightLb": 2,
+  "effects": {
+    "acBonus": 2,
+    "resistances": ["necrotic"],
+    "vulnerabilities": ["radiant", "thunder"],
+    "abilityScorePenalties": {
+      "wis": -6
+    }
+  },
+  "tags": [
+    "undead",
+    "necrotic",
+    "radiant",
+    "grave",
+    "crown",
+    "royal",
+    "artifact",
+    "cursed",
+    "barrowcrown"
+  ],
+  "description": "A crown of black iron and old gold, set with a broken shard of the first king's burial throne. It grants the power to rule the dead - but it does not accept a weak wearer. While attuned, you gain +2 AC, resistance to necrotic damage, and your weapon attacks and spell attacks deal an extra 1d8 necrotic damage, or radiant damage against undead. Royal Decree: as a bonus action, choose one creature you can see within 60 feet. It must make a DC 17 Wisdom saving throw. On a failure, choose for it to fall prone, become frightened of you until the end of your next turn, or use its reaction to make one weapon attack against a creature of your choice within reach. Uses equal to your proficiency bonus per long rest. Bend the Knee: once per short rest, when you hit an undead creature, force a DC 17 Charisma saving throw. On a failure, the undead becomes allied for the rest of combat, then turns to dust. The King Does Not Fall: once per long rest, when reduced to 0 hit points, drop to 1 hit point instead; hostile creatures within 15 feet make a DC 17 Wisdom saving throw or become frightened until the end of your next turn. Curse: once attuned, you cannot willingly unattune unless the curse is broken by powerful magic, a divine rite, or the crown's destruction. Your Wisdom score is reduced by 6, healing magic and potions have a 40% chance to fail, and you have vulnerability to radiant and thunder damage. Death Curse: if you die while attuned, your soul cannot pass on and you can never be revived.",
+  "properties": [
+    "+2 AC while attuned.",
+    "Resistance to necrotic damage.",
+    "Weapon and spell attacks deal +1d8 necrotic damage, or radiant damage against undead.",
+    "Royal Decree: bonus action, proficiency bonus uses per long rest, DC 17 WIS save for prone, frightened, or forced reaction attack.",
+    "Bend the Knee: once per short rest on undead hit, DC 17 CHA save or allied for this combat, then dust.",
+    "The King Does Not Fall: once per long rest, drop to 1 HP instead of 0 and frighten nearby hostile creatures on failed DC 17 WIS saves.",
+    "Curse: WIS -6, 40% healing failure, vulnerability to radiant and thunder, cannot willingly unattune.",
+    "Death Curse: if you die while attuned, you can never be revived."
+  ],
+  "curse": {
+    "name": "The Crown Must Rule",
+    "description": "Once attuned, you cannot willingly unattune unless the curse is broken by powerful magic, a divine rite, or the crown's destruction. Your Wisdom score is reduced by 6, healing magic and potions have a 40% chance to fail, you have vulnerability to radiant and thunder damage, and death while attuned prevents revival."
+  },
+  "implementation": "Passive AC, necrotic resistance, Wisdom penalty, radiant/thunder vulnerability, attack extra damage, Royal Decree, Bend the Knee, The King Does Not Fall, healing failure, curse binding, and death curse are hooked."
 });
 
 window.DungeonContent.register("lootTables", "magicUndeadItems", {

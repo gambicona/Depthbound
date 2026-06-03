@@ -271,6 +271,74 @@ function hasOverride(campaignId, index) {
   return Boolean(loadOverrides()[overrideKey(campaignId, index)]);
 }
 
+function barrowCrownFinaleBranch(template, gameState = window.state) {
+  if (!template) return null;
+  const fate = gameState?.questFlags?.barrowCrownDecision;
+  if (fate !== "destroy" && fate !== "claim") return template;
+  const next = clone(template);
+  next.barrowCrownDecision = fate;
+  if (fate === "destroy") {
+    return next;
+  } else {
+    next.name = "The Ashen Herald's Challenge";
+    next.intro = {
+      ...(next.intro ?? {}),
+      text: "The final stair leads below the graves, below the ossuaries, below even the oldest roots of the hills.\nThere, beneath the world of the living, waits a kingdom that was never allowed to die.\nYou see stone roads lined with dead soldiers. Empty houses carved into cavern walls. Banners hang without wind. At the center of it all rises a palace of burial stone, its towers pressing against the underside of the earth.\n\nThe Barrow Crown is not on your head yet. It hangs in the air before you, black iron and old gold, cold as judgment.\n\nAt the palace gates, the Ashen Herald waits alone.\n\"You would claim what even kings failed to carry,\" it says. \"Then I must know whether you are strong enough to withstand its power, and wise enough to survive its corruption.\"\n\nBehind the Herald, in the throne hall beyond, sits the corpse of the King Beneath, wrapped in royal burial cloth and ancient armor. The Herald reaches out one ashen hand.\n\nThe corpse of the first king crumbles into dust.\n\nThe dead army rises under the Herald's command.\n\"Stand,\" the Herald says. \"Test them.\"",
+    };
+    next.outro = {
+      ...(next.outro ?? {}),
+      text: "The Ashen Herald falls to one knee, its burning wings guttering into gray ash. Around the throne hall, the dead army lowers its weapons. Not in mercy. In recognition.\n\nThe Barrow Crown drifts down from the air and waits before you, heavier than iron, colder than the grave, alive with the need to command.\n\nThe Herald looks up one last time.\n\"Then rule,\" it says. \"And pray you remain yourself long enough to understand what you have taken.\"\n\nThe crown accepts your claim.",
+    };
+    if (next.waveEncounter) {
+      next.waveEncounter.completeLog = "The Ashen Herald is defeated. The Barrow Crown accepts its new claimant, and the exit is ready.";
+      next.waveEncounter.goalText = "Survive all five waves and defeat the Ashen Herald.";
+      next.waveEncounter.preWaveStories = {
+        ...(next.waveEncounter.preWaveStories ?? {}),
+        5: {
+          title: "The Herald's Judgment",
+          text: "The throne hall goes still. The army of the dead parts around the empty throne, and the Ashen Herald steps through them with ash falling from its wings.\n\n\"Enough,\" it says. \"The crown does not belong to the merely victorious. It belongs to the one who can carry command without being hollowed by it.\"\n\nA pale fire gathers in the Herald's hands. Behind it, the dust of the King Beneath scatters across the dais.\n\n\"Face me. Claim it, if you can.\"",
+          actionLabel: "Face the Herald",
+        },
+      };
+      const finalWave = next.waveEncounter.waves?.find((wave) => Math.max(1, Math.floor(Number(wave.wave) || 1)) === 5);
+      if (finalWave) {
+        finalWave.label = "Wave 5 - The Ashen Herald's Judgment";
+        finalWave.monsters = [
+          {
+            id: "boss-ashen-herald",
+            monsterId: "mourningDukeEidolon",
+            name: "The Ashen Herald",
+            isBoss: true,
+            position: { x: 15, y: 5 },
+            extraLoot: ["magic-undead-barrowcrown-barrow-crown"],
+            overrides: {
+              role: "Corrupted celestial herald of the buried dynasty",
+              tags: ["celestial", "corrupted", "undead", "herald", "boss", "flying"],
+              category: 3,
+              maxHp: 145,
+              ac: 18,
+              attackBonus: 9,
+              multiattack: { attacks: 2 },
+              damage: { count: 3, sides: 8, bonus: 5, type: "radiant", attackType: "spell", label: "3d8 + 5 radiant", range: { kind: "melee", feet: 10 } },
+              damageResistances: ["necrotic", "radiant", "fire"],
+              damageVulnerabilities: ["thunder"],
+              damageImmunities: ["poison"],
+              conditionImmunities: ["poisoned", "charmed", "frightened"],
+              specialAbility: ["Command the Dead", "SelfHeal", "Royal Wail"],
+              xp: 1800,
+              speedFeet: 40,
+              token: "H",
+            },
+          },
+          { monsterId: "graveMistBanshee", name: "Choir of the Herald", position: { x: 8, y: 8 } },
+          { monsterId: "corpseStitchedGoliath", name: "Crown-Oath Corpse Guard", position: { x: 22, y: 8 } },
+        ];
+      }
+    }
+  }
+  return next;
+}
+
 function isUnlocked(campaignId, gameState = window.state) {
   const campaign = campaigns.find((entry) => entry.id === campaignId);
   if (!campaign) return false;
@@ -314,7 +382,10 @@ async function dungeon(campaignId, index) {
       );
     }
   }
-  return cache.get(key);
+  return cache.get(key).then((template) => {
+    if (campaignId === "barrow-crown" && index === 7) return barrowCrownFinaleBranch(template);
+    return template;
+  });
 }
 
 async function originalDungeon(campaignId, index) {

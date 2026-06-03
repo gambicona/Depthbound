@@ -62,6 +62,10 @@ function killHero(hero) {
   hero.dead = true;
   hero.stableAtZero = false;
   hero.deathSaves = { successes: 0, failures: 3 };
+  if (activeMagicItemByTemplate(hero, barrowCrownItemIds.barrowCrown)) {
+    hero.barrowCrownDeathCurse = true;
+    addLog(`${hero.name}'s soul is trapped by the Barrow Crown and cannot pass on.`, "important");
+  }
   ensureHeroCorpseState(hero, { location: "dungeon" });
   dropLootForHero(hero);
   state.party.heroIds = livingPartyHeroIds();
@@ -163,6 +167,25 @@ function applyDamageToFighter(defender, damage) {
     clearStableAtZero(defender);
     resetDeathSaveCounters(defender);
     addLog(`${defender.name}'s Ring of the Last Heir remembers the bloodline and leaves them at 1 HP.`, "important");
+    return;
+  }
+  if (
+    previousHp > 0 &&
+    activeMagicItemByTemplate(defender, barrowCrownItemIds.barrowCrown) &&
+    canUseItemPower(defender, itemPowerKey(barrowCrownItemIds.barrowCrown, "kingDoesNotFall"))
+  ) {
+    spendItemPower(defender, itemPowerKey(barrowCrownItemIds.barrowCrown, "kingDoesNotFall"), "longRest");
+    defender.hp = 1;
+    defender.alive = true;
+    clearStableAtZero(defender);
+    resetDeathSaveCounters(defender);
+    addLog(`${defender.name}'s Barrow Crown refuses the fall and leaves them at 1 HP.`, "important");
+    const targets = aliveMonsters().filter((monster) => hostileTo(defender, monster) && fightersWithinSquares(defender, monster, 3));
+    for (const target of targets) {
+      const save = savingThrow(target, "wis", 17, { source: defender, label: "The King Does Not Fall" });
+      addLog(`${target.name} rolls WIS ${save.total} vs DC 17 against The King Does Not Fall.`, "important");
+      if (!save.success) applyStatusEffect(target, { id: "frightened", label: "Frightened", attackBonus: -2, durationRounds: 1, sourceId: defender.id });
+    }
     return;
   }
   if (defender.classId === "barbarian" && (defender.statusEffects ?? []).some((effect) => effect.id === "rage")) {
@@ -437,7 +460,11 @@ function fighterIsStealthing(fighter) {
 }
 
 function fighterInvisibleEffects(fighter) {
-  return (fighter?.statusEffects ?? []).filter((effect) => effect.id === "invisible" || effect.id === "greater-invisibility" || effect.invisible);
+  if (typeof fighterHasInvisibilitySuppressed === "function" && fighterHasInvisibilitySuppressed(fighter)) return [];
+  const isInvisibleEffect = typeof statusEffectIsInvisibilityLike === "function"
+    ? statusEffectIsInvisibilityLike
+    : (effect) => effect?.id === "invisible" || effect?.id === "greater-invisibility" || effect?.invisible;
+  return (fighter?.statusEffects ?? []).filter(isInvisibleEffect);
 }
 
 function fighterCanSeeInvisible(observer, target = null) {
@@ -452,10 +479,14 @@ function fighterCanSeeInvisible(observer, target = null) {
 }
 
 function fighterIsInvisibleToMonsters(fighter, observer = null) {
+  const isInvisibleEffect = typeof statusEffectIsInvisibilityLike === "function"
+    ? statusEffectIsInvisibilityLike
+    : (effect) => effect?.id === "invisible" || effect?.id === "greater-invisibility" || effect?.invisible;
+  const suppressInvisibility = typeof fighterHasInvisibilitySuppressed === "function" && fighterHasInvisibilitySuppressed(fighter);
   if (observer && fighterInvisibleEffects(fighter).length && fighterCanSeeInvisible(observer, fighter)) {
-    return (fighter?.statusEffects ?? []).some((effect) => effect.ignoredByMonsters && !fighterInvisibleEffects(fighter).includes(effect));
+    return (fighter?.statusEffects ?? []).some((effect) => effect.ignoredByMonsters && !isInvisibleEffect(effect));
   }
-  return Boolean((fighter?.statusEffects ?? []).some((effect) => effect.ignoredByMonsters || effect.id === "invisible"));
+  return Boolean((fighter?.statusEffects ?? []).some((effect) => (effect.ignoredByMonsters || effect.id === "invisible") && !(suppressInvisibility && isInvisibleEffect(effect))));
 }
 
 function monsterCanTargetHero(monster, hero) {
@@ -761,7 +792,17 @@ function addTurnStartLog(fighter) {
   addLog(`${fighter.name}'s turn starts.`, `turn-start turn-${side}`);
 }
 
+function expireEffectsAtSourceTurnStart(source) {
+  if (!source?.id || !state?.fighters) return;
+  for (const fighter of Object.values(state.fighters)) {
+    const before = fighter.statusEffects?.length ?? 0;
+    fighter.statusEffects = (fighter.statusEffects ?? []).filter((effect) => effect.expiresAtStartOfTurnSourceId !== source.id);
+    if ((fighter.statusEffects?.length ?? 0) !== before) refreshDerivedStats(fighter);
+  }
+}
+
 function resetTurnResources(fighter) {
+  expireEffectsAtSourceTurnStart(fighter);
   agePersistentSpellAreasForCaster(fighter);
   tickStatusDurations(fighter);
   fighter.statusEffects = (fighter.statusEffects ?? []).filter((effect) => !effect.expiresAtStartOfTurn);
@@ -828,6 +869,7 @@ const barrowCrownItemIds = {
   bellRingersMaul: "magic-undead-barrowcrown-bell-ringers-maul",
   bellRingersWarhammer: "magic-undead-barrowcrown-bell-ringers-warhammer",
   lastHeirRing: "magic-undead-barrowcrown-ring-last-heir",
+  barrowCrown: "magic-undead-barrowcrown-barrow-crown",
   crownshardShortsword: "magic-undead-barrowcrown-crownshard-shortsword",
   crownshardLongsword: "magic-undead-barrowcrown-crownshard-longsword",
   crownshardGreatsword: "magic-undead-barrowcrown-crownshard-greatsword",
@@ -3709,6 +3751,128 @@ async function shouldTakeOpportunityAttack(attacker, defender) {
   });
 }
 
+function customDungeonWaveEncounter() {
+  const encounter = state.customDungeon?.waveEncounter;
+  if (!encounter || !Array.isArray(encounter.waves) || encounter.waves.length === 0) return null;
+  encounter.currentWave = Math.max(1, Math.floor(Number(encounter.currentWave) || 1));
+  encounter.totalWaves = Math.max(encounter.currentWave, Math.floor(Number(encounter.totalWaves) || encounter.waves.length));
+  return encounter;
+}
+
+function customDungeonWaveLabel(waveNumber) {
+  const encounter = customDungeonWaveEncounter();
+  const wave = encounter?.waves?.find((entry) => Math.max(1, Math.floor(Number(entry.wave) || 1)) === waveNumber);
+  return wave?.label ?? `Wave ${waveNumber}`;
+}
+
+function customDungeonWaveStillAlive(waveNumber) {
+  return aliveMonsters().some((monster) => monster.customDungeonWaveMonster && Math.max(1, Math.floor(Number(monster.customDungeonWave) || 1)) === waveNumber);
+}
+
+function customDungeonWaveSpawnPosition(entry, room, occupiedKeys) {
+  const candidates = [
+    entry.position,
+    ...(entry.positions ?? []),
+    ...(customDungeonWaveEncounter()?.spawnPositions ?? []),
+    ...(room?.cells ?? []),
+    ...(state.dungeon?.walkable ?? []),
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    const position = { x: candidate.x, y: candidate.y };
+    const key = positionKey(position);
+    if (occupiedKeys.has(key)) continue;
+    if (!(state.dungeon?.walkable ?? []).some((cell) => positionKey(cell) === key)) continue;
+    occupiedKeys.add(key);
+    return position;
+  }
+  return room?.cells?.[0] ? { ...room.cells[0] } : { ...(state.dungeon?.startPosition ?? { x: 0, y: 0 }) };
+}
+
+async function spawnCustomDungeonWave(waveNumber) {
+  const encounter = customDungeonWaveEncounter();
+  if (!encounter || state.completed) return false;
+  const wave = encounter.waves.find((entry) => Math.max(1, Math.floor(Number(entry.wave) || 1)) === waveNumber);
+  if (!wave || !Array.isArray(wave.monsters) || wave.monsters.length === 0) return false;
+  const story = encounter.preWaveStories?.[waveNumber] ?? encounter.preWaveStories?.[String(waveNumber)];
+  if (story?.text) {
+    await showDungeonStoryDialog({
+      title: story.title ?? customDungeonWaveLabel(waveNumber),
+      text: story.text,
+      images: story.images ?? [],
+      actionLabel: story.actionLabel ?? "Continue",
+    });
+  }
+  const room = state.dungeon?.rooms?.find((entry) => entry.id === (wave.roomId ?? encounter.roomId)) ?? state.dungeon?.rooms?.[0];
+  const occupiedKeys = new Set(
+    Object.values(state.fighters ?? {})
+      .filter((fighter) => fighter?.alive && !fighter.dead)
+      .flatMap((fighter) => window.DungeonGrid.fighterCells(fighter))
+      .map(positionKey),
+  );
+  const hero = {
+    ...(activeHero() ?? {}),
+    level: averagePartyLevel(activeHero() ?? { level: 1 }),
+    partySize: partyHeroes().length,
+    partyAverageLevel: averagePartyLevel(activeHero() ?? { level: 1 }),
+  };
+  let spawned = 0;
+  for (const [index, entry] of wave.monsters.entries()) {
+    const template = getMonsterTemplate(entry.monsterId);
+    if (!template) continue;
+    const id = entry.id ?? `custom-wave-${waveNumber}-${index + 1}`;
+    const monster = createCombatant({
+      ...template,
+      ...(entry.overrides ?? {}),
+      id,
+      name: entry.name || template.name,
+      extraLoot: (entry.extraLoot ?? []).map((itemId) => ({ kind: "item", itemId })),
+    });
+    monster.baseMonsterId = entry.monsterId;
+    monster.templateId = entry.monsterId;
+    monster.customDungeonWave = waveNumber;
+    monster.customDungeonWaveMonster = true;
+    if (entry.isBoss) {
+      monster.customBoss = true;
+      monster.tags = Array.from(new Set([...(monster.tags ?? []), "boss"]));
+    }
+    applyMonsterCategoryScaling(monster, hero);
+    monster.position = customDungeonWaveSpawnPosition(entry, room, occupiedKeys);
+    monster.roomId = entry.roomId ?? wave.roomId ?? encounter.roomId ?? room?.id;
+    state.fighters[monster.id] = monster;
+    spawned += 1;
+  }
+  encounter.currentWave = waveNumber;
+  encounter.currentWaveSpawned = spawned;
+  addLog(`${customDungeonWaveLabel(waveNumber)} begins.`, "important");
+  render();
+  if (spawned > 0 && typeof rollInitiative === "function") await rollInitiative();
+  return spawned > 0;
+}
+
+async function handleCustomDungeonWaveClear() {
+  const encounter = customDungeonWaveEncounter();
+  if (!encounter || encounter.completed || state.completed || state.mode === "home") return false;
+  const currentWave = Math.max(1, Math.floor(Number(encounter.currentWave) || 1));
+  if (customDungeonWaveStillAlive(currentWave)) return false;
+  encounter.clearedWaves = Math.max(Math.floor(Number(encounter.clearedWaves) || 0), currentWave);
+  if (currentWave >= encounter.totalWaves) {
+    encounter.completed = true;
+    addLog(encounter.completeLog ?? "The final wave is broken. The way out is open.", "important");
+    render();
+    return true;
+  }
+  const nextWave = currentWave + 1;
+  addLog(`${customDungeonWaveLabel(currentWave)} is defeated. The party may take a short rest before ${customDungeonWaveLabel(nextWave)}, or press on.`, "important");
+  if (typeof showShortRestMenu === "function") {
+    const rested = await showShortRestMenu(false);
+    if (!rested) addLog("The party refuses the pause and presses deeper into the judgment.", "important");
+  }
+  encounter.currentWave = nextWave;
+  await spawnCustomDungeonWave(nextWave);
+  render();
+  return true;
+}
+
 async function finishEncounterAfterLastMonsterFalls() {
   if (combatMonsters().length > 0) return false;
 
@@ -3734,6 +3898,7 @@ async function finishEncounterAfterLastMonsterFalls() {
     endCurrentEncounter();
     addLog("The room falls quiet. Exploration resumes.", "important");
     if (typeof handleFightingPitWaveClear === "function" && typeof fightingPitCurrentRun === "function" && fightingPitCurrentRun()) await handleFightingPitWaveClear();
+    await handleCustomDungeonWaveClear();
   }
   return true;
 }
@@ -3786,7 +3951,7 @@ async function opportunityAttack(attacker, defender) {
   totalAttack = hitReaction.totalAttack;
   defenderAc += hitReaction.acBonus ?? 0;
   const shieldBlocked = !hitReaction.blocked && attackRoll !== 1 && totalAttack >= defenderAc ? await maybeUseShieldReaction(defender, attacker, totalAttack, defenderAc) : false;
-  const unfairBargainHit = !hitReaction.blocked && !shieldBlocked && attackRoll !== 1 && totalAttack < defenderAc ? await maybeUseUnfairBargain(attacker, totalAttack, defenderAc) : false;
+  const unfairBargainHit = !hitReaction.blocked && !shieldBlocked && attackRoll !== 1 && !criticalResult.forcedHit && totalAttack < defenderAc ? await maybeUseUnfairBargain(attacker, totalAttack, defenderAc) : false;
   const isMiss = attackRoll === 1 || hitReaction.blocked || (!criticalResult.forcedHit && !unfairBargainHit && totalAttack < defenderAc) || shieldBlocked;
   const attackRollText = attackRolls.length > 1 ? `${attackRolls.join(" / ")} -> ${attackRoll}` : attackRoll;
 
@@ -3823,6 +3988,7 @@ async function opportunityAttack(attacker, defender) {
       label: `${extraRoll.rolls.join(" + ")}${extra.bonus ? ` ${abilityLabel(extra.bonus)}` : ""} ${extra.type}`,
     });
   }
+  await maybeApplyBarrowCrownOnHit(attacker, defender, profile.weapon, packets, isCritical);
   if (isPartyHeroId(defender.id) && adminEnabled() && adminGodMode) {
     addLog(`God mode prevents ${attacker.name}'s opportunity damage to ${defender.name}.`, "important");
     return;
@@ -4005,6 +4171,13 @@ function customGoalStatus() {
     };
   }
   if (goal.type === "killBoss") {
+    const waveEncounter = customDungeonWaveEncounter();
+    if (waveEncounter && !waveEncounter.completed) {
+      return {
+        met: false,
+        text: waveEncounter.goalText ?? `Defeat all ${waveEncounter.totalWaves ?? waveEncounter.waves?.length ?? 5} waves and kill the King Beneath.`,
+      };
+    }
     return {
       met: !aliveMonsters().some((monster) => monster.customBoss || monster.id?.startsWith("boss-") || monster.tags?.includes("boss")),
       text: "Kill the boss.",
@@ -4020,6 +4193,13 @@ function customGoalStatus() {
     return {
       met: killed >= target,
       text: `Defeat ${target} ${monsterName}${target === 1 ? "" : "s"} (${killed}/${target}).`,
+    };
+  }
+  if (goal.type === "interactObject") {
+    const object = dungeonObjectForId(goal.objectId);
+    return {
+      met: Boolean(object?.uniqueInteractionClaimed || object?.spent),
+      text: goal.text ?? "Use the marked object before leaving.",
     };
   }
   if (goal.type === "escortNpc") {
@@ -4827,6 +5007,7 @@ function handleFighterDefeatedByTerrain(fighter) {
   triggerMonsterDeathStory(fighter);
   awardMonsterXp(fighter);
   dropLootForMonster(fighter);
+  if (state.combatStarted) void finishEncounterAfterLastMonsterFalls();
 }
 
 function triggerFloorTrap(fighter, trap) {
@@ -5466,6 +5647,25 @@ function destroyDungeonObject(object, source = activeFighter()) {
   addLog(`${name} is destroyed.`, "important");
 }
 
+function bellRingerResonatesWithObject(object) {
+  const template = objectTemplate(object?.type) ?? {};
+  const tokens = [
+    object?.type,
+    object?.name,
+    object?.material,
+    template.id,
+    template.name,
+    template.material,
+    template.description,
+    ...(object?.tags ?? []),
+    ...(template.tags ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return /stone|rock|sarcophagus|statue|idol|altar|bone|ossuary|skeleton|skull|rib|metal|iron|steel|bronze|brass|copper|ore|chain|anvil|bell|crystal|glass/.test(tokens);
+}
+
 async function attackDestructibleObject(attacker, object, options = {}) {
   if (!attacker || !objectIsDestructible(object)) return;
   ensureDestructibleObjectState(object);
@@ -5504,7 +5704,8 @@ async function attackDestructibleObject(attacker, object, options = {}) {
   const rangedAttack = !thrownAsMelee && (weaponIsRanged(weapon) || ["ranged", "thrown"].includes(attackDamage.range?.kind));
   playSoundEffect(rangedAttack ? "rangedAttack" : "meleeAttack");
 
-  const attackAdvantage = (attacker.statusEffects ?? []).some((effect) => effect.attackAdvantage);
+  const attackerStatusEffects = typeof effectiveStatusEffectsForStats === "function" ? effectiveStatusEffectsForStats(attacker) : attacker.statusEffects ?? [];
+  const attackAdvantage = attackerStatusEffects.some((effect) => effect.attackAdvantage);
   const attackRollResult = rollD20ForFighter(attacker, { advantage: attackAdvantage });
   const attackRoll = attackRollResult.roll;
   const attackRolls = attackRollResult.rolls;
@@ -5533,7 +5734,7 @@ async function attackDestructibleObject(attacker, object, options = {}) {
     const extraRoll = rollDice((extra.count ?? 1) * (isCritical ? 2 : 1), extra.sides ?? 4);
     totalDamage += Math.max(1, extraRoll.total + (extra.bonus ?? 0));
   }
-  if (activeWeaponMatchesTemplate(attacker, weapon, [barrowCrownItemIds.bellRingersMaul, barrowCrownItemIds.bellRingersWarhammer])) {
+  if (activeWeaponMatchesTemplate(attacker, weapon, [barrowCrownItemIds.bellRingersMaul, barrowCrownItemIds.bellRingersWarhammer]) && bellRingerResonatesWithObject(object)) {
     totalDamage *= 2;
     addLog(`${attacker.name}'s Bell-Ringer weapon resonates through ${targetName}, doubling the damage.`, "important");
   }
@@ -5627,7 +5828,7 @@ async function maybeApplyRingOfLastHeir(attacker, defender) {
   const save = savingThrow(defender, "wis", 14, { source: attacker, label: "Royal Command", advantage: charmImmune });
   addLog(`${attacker.name}'s Ring of the Last Heir commands ${defender.name} to kneel: WIS ${save.total} vs DC 14${charmImmune ? " with advantage" : ""}.`, "important");
   if (!save.success) {
-    applyStatusEffect(defender, { id: "royal-command", label: "Commanded to Kneel", prone: true, speedLocked: true, expiresAtStartOfTurn: true });
+    applyStatusEffect(defender, { id: "royal-command", label: "Commanded to Kneel", prone: true, speedLocked: true, durationRounds: 1, sourceId: attacker.id });
     addLog(`${defender.name} falls prone and cannot move until ${attacker.name}'s next turn begins.`, "important");
   }
 }
@@ -5675,16 +5876,64 @@ async function maybeApplyCrownshardCrownbreaker(attacker, defender, weapon, isCr
   for (const target of targets) {
     const save = savingThrow(target, "wis", 16, { source: attacker, label: "Crownbreaker" });
     addLog(`${target.name} rolls WIS ${save.total} vs DC 16 against Crownbreaker.`, "important");
-    if (!save.success) applyStatusEffect(target, { id: "frightened", label: "Frightened", attackBonus: -2, expiresAtEndOfTurn: true });
+    if (!save.success) applyStatusEffect(target, { id: "frightened", label: "Frightened", attackBonus: -2, durationRounds: 1, sourceId: attacker.id });
+  }
+}
+
+function barrowCrownExtraDamagePacket(attacker, defender, critical = false) {
+  if (!isPartyHeroId(attacker?.id) || !activeMagicItemByTemplate(attacker, barrowCrownItemIds.barrowCrown)) return null;
+  const roll = rollDice(critical ? 2 : 1, 8);
+  const type = monsterIsUndead(defender) ? "radiant" : "necrotic";
+  return {
+    raw: Math.max(1, roll.total),
+    type,
+    label: `Barrow Crown ${roll.rolls.join(" + ")} ${type}`,
+  };
+}
+
+async function maybeApplyBarrowCrownBendTheKnee(attacker, defender) {
+  if (!isPartyHeroId(attacker?.id) || !monsterIsUndead(defender) || !activeMagicItemByTemplate(attacker, barrowCrownItemIds.barrowCrown)) return;
+  const key = itemPowerKey(barrowCrownItemIds.barrowCrown, "bendTheKnee");
+  if (!canUseItemPower(attacker, key)) return;
+  const useCommand = await showReactionPrompt({
+    actor: attacker,
+    title: "Bend the Knee",
+    message: `Command ${defender.name}? DC 17 Charisma save. On failure it fights beside the party for this combat, then turns to dust.`,
+    acceptLabel: "Bend the Knee",
+    declineLabel: "Save It",
+  });
+  if (!useCommand) return;
+  spendItemPower(attacker, key, "shortRest");
+  const save = savingThrow(defender, "cha", 17, { source: attacker, label: "Bend the Knee" });
+  addLog(`${attacker.name}'s Barrow Crown commands ${defender.name}: CHA ${save.total} vs DC 17.`, "important");
+  if (!save.success) {
+    defender.team = "heroes";
+    defender.friendly = true;
+    defender.aiControlled = true;
+    defender.barrowCrownDustAfterCombat = true;
+    applyStatusEffect(defender, { id: "bend-the-knee", label: "Bent the Knee", durationRounds: 99 });
+    addLog(`${defender.name} kneels to the Barrow Crown and fights beside the party until combat ends.`, "important");
   }
 }
 
 async function maybeApplyBarrowCrownOnHit(attacker, defender, weapon, packets, isCritical) {
   await maybeApplyBlackMarketCoin(attacker, packets);
   await maybeApplyRingOfLastHeir(attacker, defender);
+  const crownDamage = barrowCrownExtraDamagePacket(attacker, defender, isCritical);
+  if (crownDamage) packets.push(crownDamage);
+  await maybeApplyBarrowCrownBendTheKnee(attacker, defender);
   if (activeWeaponMatchesTemplate(attacker, weapon, [barrowCrownItemIds.bellRingersMaul, barrowCrownItemIds.bellRingersWarhammer])) {
     const key = itemPowerKey(weapon.baseItemId ?? weapon.itemId ?? weapon.id, `funeralToll:${state.round ?? 0}:${attacker.id}`);
-    const splash = visibleMonsters().find((monster) => monster.id !== defender.id && monster.alive && fightersWithinSquares(monster, defender, 2));
+    const splashTargets = visibleMonsters().filter((monster) => monster.id !== defender.id && monster.alive && fightersWithinSquares(monster, defender, 2));
+    const splashId = canUseItemPower(attacker, key) && splashTargets.length <= 1
+      ? splashTargets[0]?.id
+      : canUseItemPower(attacker, key) ? await showChoiceDialog({
+          title: "Funeral Toll",
+          message: "Choose one different creature within 10 feet to take thunder damage.",
+          actor: attacker,
+          choices: splashTargets.map((monster) => ({ value: monster.id, label: monster.name })),
+        }) : null;
+    const splash = splashTargets.find((monster) => monster.id === splashId);
     if (splash && canUseItemPower(attacker, key)) {
       spendItemPower(attacker, key, "turn");
       applySpecialDamage(attacker, splash, Math.max(1, proficiencyBonus(attacker)), "thunder", "Funeral Toll");
@@ -5692,8 +5941,17 @@ async function maybeApplyBarrowCrownOnHit(attacker, defender, weapon, packets, i
   }
   if (activeWeaponMatchesTemplate(attacker, weapon, [barrowCrownItemIds.crownshardShortsword, barrowCrownItemIds.crownshardLongsword, barrowCrownItemIds.crownshardGreatsword])) {
     if (targetHasCommandBreakingCondition(defender)) {
-      const roll = rollDice(1, 8);
-      packets.push({ raw: Math.max(1, roll.total), type: monsterIsUndead(defender) ? "radiant" : "necrotic", label: `No King Above Me ${roll.rolls[0]} ${monsterIsUndead(defender) ? "radiant" : "necrotic"}` });
+      const damageType = await showChoiceDialog({
+        title: "No King Above Me",
+        message: `${defender.name} is undead or bound by command. Choose the Crownshard's extra damage type.`,
+        actor: attacker,
+        choices: [
+          { value: "radiant", label: "Radiant" },
+          { value: "necrotic", label: "Necrotic" },
+        ],
+      }) || "radiant";
+      const roll = rollDice(isCritical ? 2 : 1, 8);
+      packets.push({ raw: Math.max(1, roll.total), type: damageType, label: `No King Above Me ${roll.rolls.join(" + ")} ${damageType}` });
     }
     await maybeApplyCrownshardSeverCommand(attacker, defender, weapon);
     await maybeApplyCrownshardCrownbreaker(attacker, defender, weapon, isCritical);
@@ -5758,7 +6016,7 @@ async function makeAttack(attacker, defender, options = {}) {
   const targetReckless = defenderGrantsAttackAdvantage(defender);
   const attackAdvantage =
     targetReckless ||
-    (attacker.statusEffects ?? []).some((effect) => effect.attackAdvantage) ||
+    (typeof effectiveStatusEffectsForStats === "function" ? effectiveStatusEffectsForStats(attacker) : attacker.statusEffects ?? []).some((effect) => effect.attackAdvantage) ||
     (fighterHasFeat(attacker, "grappler") && fighterStatusEffect(defender, "grappled")?.grappledBy === attacker.id) ||
     (warlockKnowsInvocation(attacker, "devilsSight") && targetIsInMagicalDarkness(defender)) ||
     (warlockKnowsInvocation(attacker, "witchSight") && targetIsCursedOrObscured(defender));
@@ -5782,7 +6040,8 @@ async function makeAttack(attacker, defender, options = {}) {
   totalAttack = hitReaction.totalAttack;
   defenderAc += hitReaction.acBonus ?? 0;
   const shieldBlocked = !hitReaction.blocked && attackRoll !== 1 && totalAttack >= defenderAc ? await maybeUseShieldReaction(defender, attacker, totalAttack, defenderAc) : false;
-  const isMiss = attackRoll === 1 || hitReaction.blocked || (!criticalResult.forcedHit && totalAttack < defenderAc) || shieldBlocked;
+  const unfairBargainHit = !hitReaction.blocked && !shieldBlocked && attackRoll !== 1 && !criticalResult.forcedHit && totalAttack < defenderAc ? await maybeUseUnfairBargain(attacker, totalAttack, defenderAc) : false;
+  const isMiss = attackRoll === 1 || hitReaction.blocked || (!criticalResult.forcedHit && !unfairBargainHit && totalAttack < defenderAc) || shieldBlocked;
 
   addLog(
     `${attacker.name} ${options.actionLabel ?? "attacks"}${attackAdvantage && !hasDisadvantage ? targetReckless ? " with advantage because the target attacked recklessly" : " with advantage" : ""}${rangedDisadvantage && !attackAdvantage ? " with disadvantage" : ""}${defenderDodge && !attackAdvantage ? " because the target is dodging" : ""}${defendedBySidekick && !attackAdvantage ? " because of Defender" : ""}${lightContext.disadvantage && !attackAdvantage ? attackLightDisadvantageText(lightContext) : ""}: d20 ${
@@ -7912,12 +8171,12 @@ function applySpellHealing(caster, target, spell) {
   let bonus = spell.effect?.abilityBonus === "spellcasting" ? abilityMod(caster, spell?.saveDcAbility ?? spellcastingAbility(caster)) : spell.effect?.bonus ?? 0;
   if (isSidekickSpellcaster(caster) && spellBaseLevel(spell) > 0 && (caster.level ?? 1) >= 14 && caster.empoweredSpellSchool === spell.school) bonus += Math.max(0, abilityMod(caster, spellcastingAbility(caster)));
   const discipleBonus = caster?.subclassId === "life-domain" && (caster.level ?? 1) >= 3 && spellBaseLevel(spell) > 0 ? 2 + spellCastLevel(spell) : 0;
-  const healed = applyHealingToHero(target, Math.max(0, roll.total + bonus + discipleBonus));
+  const healed = applyHealingToHero(target, Math.max(0, roll.total + bonus + discipleBonus), { sourceKind: "spell", spellId: spell.id });
   const discipleText = discipleBonus > 0 ? ` + Disciple of Life ${discipleBonus}` : "";
   addLog(`${caster.name}'s ${spell.name} heals ${target.name} for ${healed} HP (${roll.rolls.join(" + ")} ${abilityLabel(bonus)}${discipleText}).`, "heal");
   if (caster?.subclassId === "life-domain" && (caster.level ?? 1) >= 10 && target?.id !== caster.id && spellBaseLevel(spell) > 0) {
     const selfHeal = Math.max(1, 2 + spellCastLevel(spell));
-    const restored = applyHealingToHero(caster, selfHeal);
+    const restored = applyHealingToHero(caster, selfHeal, { sourceKind: "spell", spellId: spell.id });
     if (restored > 0) addLog(`${caster.name}'s Blessed Healer restores ${restored} HP to themself.`, "heal");
   }
   void maybeFinishEncounterAfterHeroRecovery();
@@ -7965,7 +8224,7 @@ function applySpellRestoration(caster, target, spell) {
   }
   if (spell.effect?.healDice) {
     const roll = rollDice(spell.effect.healDice.count, spell.effect.healDice.sides);
-    const healed = applyHealingToHero(target, roll.total + (spell.effect.healBonus ?? 0));
+    const healed = applyHealingToHero(target, roll.total + (spell.effect.healBonus ?? 0), { sourceKind: "spell", spellId: spell.id });
     if (healed > 0) addLog(`${caster.name}'s ${spell.name} restores ${healed} HP to ${target.name}.`, "heal");
   } else {
     refreshDerivedStats(target);
@@ -7982,6 +8241,7 @@ function spellRevivalWindowSeconds(spell) {
 
 function canSpellReviveCorpse(caster, spell, corpseHero) {
   if (!caster || !spell || !corpseHero?.dead) return false;
+  if (corpseHero.barrowCrownDeathCurse) return false;
   if (!heroCanAct(caster)) return false;
   if (spell.effect?.kind !== "revive") return false;
   if (!canPaySpellCost(caster, spell)) return false;
@@ -8325,6 +8585,9 @@ async function applySpellAttack(caster, target, spell) {
     addLog(`${caster.name}'s Blessed Strike adds ${blessed.total} radiant force.`, "important");
   }
   applySpecialDamage(caster, target, totalDamage, spell.effect?.type ?? "force", spell.name);
+  const crownPacket = barrowCrownExtraDamagePacket(caster, target, criticalResult.isCritical);
+  if (crownPacket && target.alive) applySpecialDamage(caster, target, crownPacket.raw, crownPacket.type, "Barrow Crown");
+  if (target.alive) await maybeApplyBarrowCrownBendTheKnee(caster, target);
   if (spell.effect?.status) await applySpellStatus(caster, target, spell);
   else applySpellForcedMovement(caster, target, spell, null, { origin: caster.position });
 }
@@ -8407,6 +8670,9 @@ async function resolveEldritchBlastBeam(caster, target, beamIndex, beamCount) {
   const damage = Math.max(1, damageRoll.total + agonizingBonus + hexingBonus);
   addAdminLog(`${caster.name}'s Eldritch Blast damage roll: ${damageRoll.rolls.join(" + ")}${agonizingBonus ? ` + Agonizing Blast ${agonizingBonus}` : ""}${hexingBonus ? ` + Hexing Blast ${hexingBonus}` : ""} = ${damage} force.`);
   applySpecialDamage(caster, target, damage, "force", "Eldritch Blast");
+  const crownPacket = barrowCrownExtraDamagePacket(caster, target, criticalResult.isCritical);
+  if (crownPacket && target.alive) applySpecialDamage(caster, target, crownPacket.raw, crownPacket.type, "Barrow Crown");
+  if (target.alive) await maybeApplyBarrowCrownBendTheKnee(caster, target);
   if (criticalResult.isCritical && warlockKnowsInvocation(caster, "eldritchDoom") && target.alive) {
     applyStatusEffect(target, { id: `eldritch-doom-${caster.id}`, label: "Eldritch Doom", speedLocked: true, actionLocked: true, durationRounds: 1 });
     addLog(`${caster.name}'s Eldritch Doom stuns ${target.name}.`, "important");

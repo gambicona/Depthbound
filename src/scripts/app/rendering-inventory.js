@@ -5634,7 +5634,61 @@ function resolveObjectInteractionFailure(hero, object, component) {
   return component.failureText ?? `${hero.name} mishandles ${objectTemplate(object.type)?.name ?? "the feature"}.`;
 }
 
-function useObjectInteraction(objectId) {
+const barrowCrownDecisionOutros = {
+  destroy: `The Barrow Crown is colder than iron should be. As it leaves the altar, every dead monarch in the vault turns to watch.
+None attack.
+Not yet.
+A path opens behind the altar, leading deeper into the earth.
+The Ashen Herald waits there, head bowed.
+"Then you choose rebellion," it says. "The King Beneath will hear your argument in person."
+The passage yawns open like a throat.`,
+  claim: `The Barrow Crown is colder than iron should be. As it leaves the altar, every dead monarch in the vault turns to watch.
+None bow.
+Not yet.
+A path opens behind the altar, leading deeper into the earth.
+The Ashen Herald waits there with its black blade lowered across the way.
+"Then you choose dominion," it says. "No hand claims the crown without answering the dead who guarded it."
+The passage opens behind it, bright with ash-gray fire. To take the crown onward, the party must defeat the Herald and prove the right to bear what should have stayed buried.`,
+};
+
+async function resolveBarrowCrownDecision(hero, object, template, component) {
+  const choice = await showChoiceDialog({
+    title: "The Barrow Crown",
+    message: component.prompt ?? "The Barrow Crown waits on the black altar. What will the party do?",
+    choices: [
+      {
+        value: "destroy",
+        label: "Destroy the Barrow Crown",
+        description: "Reject the dynasty and carry the crown toward the King Beneath as an enemy.",
+      },
+      {
+        value: "claim",
+        label: "Claim the Barrow Crown",
+        description: "Take the crown and face the Ashen Herald for the right to bear it.",
+      },
+    ],
+  });
+  if (!choice) return;
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags.barrowCrownDecision = choice;
+  state.questFlags["flag.barrowCrown.destroyCrown"] = choice === "destroy";
+  state.questFlags["flag.barrowCrown.claimCrown"] = choice === "claim";
+  object.uniqueInteractionClaimed = true;
+  object.spent = true;
+  object.lastResult = choice === "destroy" ? "The party chooses to destroy the Barrow Crown." : "The party chooses to claim the Barrow Crown.";
+  if (state.customDungeon) {
+    state.customDungeon.outro = {
+      text: barrowCrownDecisionOutros[choice],
+      images: state.customDungeon.outro?.images ?? [],
+    };
+  }
+  addLog(`${hero.name} touches ${template.name}. ${object.lastResult}`, "important");
+  advanceDungeonTime(component.timeSeconds ?? 60, `${hero.name} choosing the Barrow Crown's fate`, { force: true });
+  render();
+  showDungeonObjectInfo(object);
+}
+
+async function useObjectInteraction(objectId) {
   const object = dungeonObjectForId(objectId);
   const hero = activeHero();
   const template = object ? objectTemplate(object.type) : null;
@@ -5646,6 +5700,10 @@ function useObjectInteraction(objectId) {
     return;
   }
   if (!activeStealthCheckInMonsterRoom(hero, `uses ${template.name}`)) return;
+  if (component.effect === "barrowCrownDecision") {
+    await resolveBarrowCrownDecision(hero, object, template, component);
+    return;
+  }
 
   const option = bestUniqueInteractionOption(hero, component);
   const interactionPosition = objectCells(object)[0] ?? object.position ?? hero.position;
@@ -7798,6 +7856,106 @@ function combatActionButtonMarkup(actionId, label, disabled = false, targetId = 
   }>${escapeHtml(label)}</button>`;
 }
 
+const barrowCrownTemplateId = "magic-undead-barrowcrown-barrow-crown";
+
+function activeBarrowCrownForFighter(fighter) {
+  return typeof activeMagicItemByTemplate === "function" ? activeMagicItemByTemplate(fighter, barrowCrownTemplateId) : null;
+}
+
+function royalDecreePowerKey() {
+  return typeof itemPowerKey === "function" ? itemPowerKey(barrowCrownTemplateId, "royalDecree") : `${barrowCrownTemplateId}:royalDecree`;
+}
+
+function royalDecreeUsedCount(fighter) {
+  const key = royalDecreePowerKey();
+  if (typeof itemPowerUseCount === "function") return itemPowerUseCount(fighter, key);
+  return Number(fighter?.itemPowerUses?.[key]?.count ?? 0) || 0;
+}
+
+function royalDecreeTargets(fighter) {
+  if (!fighter?.position || typeof visibleMonsters !== "function") return [];
+  return visibleMonsters().filter(
+    (target) =>
+      target.alive &&
+      fightersWithinSquares(fighter, target, 12) &&
+      (typeof hasClearLineOfSightBetweenFighters !== "function" || hasClearLineOfSightBetweenFighters(fighter, target)),
+  );
+}
+
+function canUseRoyalDecree(fighter) {
+  if (!activeBarrowCrownForFighter(fighter) || !fighter?.hasBonusAction || !heroCanAct(fighter)) return false;
+  const key = royalDecreePowerKey();
+  if (typeof canUseItemPower === "function" && !canUseItemPower(fighter, key, proficiencyBonus(fighter))) return false;
+  return royalDecreeTargets(fighter).length > 0;
+}
+
+async function useRoyalDecree(fighter) {
+  if (!canUseRoyalDecree(fighter)) {
+    addLog(`${fighter?.name ?? "The wearer"} needs a bonus action and a visible creature within 60 feet for Royal Decree.`, "important");
+    return;
+  }
+  const key = royalDecreePowerKey();
+  const targets = royalDecreeTargets(fighter);
+  const targetId = targets.length === 1
+    ? targets[0].id
+    : await showChoiceDialog({
+        title: "Royal Decree",
+        message: "Choose one creature within 60 feet to command.",
+        actor: fighter,
+        choices: targets.map((target) => ({ value: target.id, label: `${target.name} (${attackGridDistanceBetweenFighters(fighter, target) * feetPerSquare} ft)` })),
+      });
+  const target = targets.find((entry) => entry.id === targetId);
+  if (!target) return;
+  fighter.hasBonusAction = false;
+  if (typeof spendItemPower === "function") spendItemPower(fighter, key, "longRest");
+  const save = savingThrow(target, "wis", 17, { source: fighter, label: "Royal Decree" });
+  addLog(`${fighter.name}'s Barrow Crown issues a Royal Decree to ${target.name}: WIS ${save.total} vs DC 17.`, "important");
+  if (save.success) {
+    addLog(`${target.name} resists the crown's command.`);
+    return;
+  }
+  const attackTargets = Object.values(state.fighters ?? {}).filter((candidate) => candidate?.alive && candidate.id !== target.id && hasMeleeAccess(target, candidate));
+  const effectChoices = [
+    { value: "prone", label: "Fall Prone" },
+    { value: "frightened", label: "Be Frightened" },
+  ];
+  if (target.hasReaction && attackTargets.length) effectChoices.push({ value: "attack", label: "Make Reaction Attack" });
+  const effect = await showChoiceDialog({
+    title: "Royal Decree",
+    message: `${target.name} failed. Choose the decree.`,
+    actor: fighter,
+    choices: effectChoices,
+  }) || "prone";
+  if (effect === "prone") {
+    applyStatusEffect(target, { id: "royal-decree-prone", label: "Decreed Prone", prone: true, speedBonusFeet: -10, durationRounds: 1, sourceId: fighter.id });
+    addLog(`${target.name} is forced to the ground by royal command.`, "important");
+    return;
+  }
+  if (effect === "frightened") {
+    applyStatusEffect(target, { id: "frightened", label: "Frightened", attackBonus: -2, durationRounds: 1, sourceId: fighter.id });
+    addLog(`${target.name} is frightened of ${fighter.name} until ${fighter.name}'s next turn.`, "important");
+    return;
+  }
+  if (effect === "attack") {
+    const victimId = attackTargets.length === 1
+      ? attackTargets[0].id
+      : await showChoiceDialog({
+          title: "Royal Decree",
+          message: `Choose who ${target.name} must attack.`,
+          actor: fighter,
+          choices: attackTargets.map((candidate) => ({ value: candidate.id, label: candidate.name })),
+        });
+    const victim = attackTargets.find((candidate) => candidate.id === victimId) ?? attackTargets[0];
+    if (!victim || !consumeReaction(target, "Royal Decree")) {
+      applyStatusEffect(target, { id: "royal-decree-prone", label: "Decreed Prone", prone: true, speedBonusFeet: -10, durationRounds: 1, sourceId: fighter.id });
+      addLog(`${target.name} is forced to the ground by royal command.`, "important");
+      return;
+    }
+    addLog(`${fighter.name} orders ${target.name} to strike ${victim.name}.`, "important");
+    await makeAttack(target, victim, { freeAttack: true, actionLabel: "is forced to attack" });
+  }
+}
+
 function combatTacticDefinitions(fighter) {
   const canUseAttackAction = Boolean(fighter?.hasAction);
   const maneuverTarget = combatManeuverTarget(fighter);
@@ -7839,6 +7997,20 @@ function combatTacticDefinitions(fighter) {
       controls: combatActionButtonMarkup("getBehind", "Get Behind", !fighter?.hasBonusAction),
       description: "DEX DC 12. On success, use your Bonus action to move through monsters this turn.",
     },
+    ...(activeBarrowCrownForFighter(fighter)
+      ? [
+          {
+            id: "royalDecree",
+            section: "Bonus actions",
+            controls: combatActionButtonMarkup(
+              "royalDecree",
+              `Royal Decree (${Math.max(0, proficiencyBonus(fighter) - royalDecreeUsedCount(fighter))})`,
+              !canUseRoyalDecree(fighter),
+            ),
+            description: "Barrow Crown. Bonus action, DC 17 WIS. Command a visible creature within 60 ft.",
+          },
+        ]
+      : []),
     {
       id: "grapple",
       section: "Maneuvers",
@@ -7982,6 +8154,13 @@ async function useCombatAction(action, targetId = null) {
     return;
   }
 
+  if (action === "royalDecree") {
+    hideActionMenu();
+    await useRoyalDecree(fighter);
+    render();
+    return;
+  }
+
   if (!fighter.hasAction) return;
 
   if (action === "grapple" || action === "shovePush" || action === "shoveProne") {
@@ -8030,10 +8209,21 @@ async function useCombatAction(action, targetId = null) {
     const drownedShield = typeof activeMagicItemByTemplate === "function" ? activeMagicItemByTemplate(fighter, drownedShieldId) : null;
     const advanceKey = typeof itemPowerKey === "function" ? itemPowerKey(drownedShieldId, "drownedAdvance") : `${drownedShieldId}:drownedAdvance`;
     if (drownedShield && typeof canUseItemPower === "function" && typeof spendItemPower === "function" && canUseItemPower(fighter, advanceKey)) {
-      fighter.movementLeft = (fighter.movementLeft ?? 0) + 2;
-      fighter.disengaged = true;
-      spendItemPower(fighter, advanceKey, "shortRest");
-      addLog(`${fighter.name}'s Shield of the Drowned Legion grants Drowned Advance: +10 ft movement and no opportunity attacks this turn.`, "important");
+      const useAdvance = typeof showReactionPrompt === "function"
+        ? await showReactionPrompt({
+            actor: fighter,
+            title: "Drowned Advance",
+            message: "Use Shield of the Drowned Legion to move 10 feet without provoking opportunity attacks?",
+            acceptLabel: "Advance",
+            declineLabel: "Save It",
+          })
+        : true;
+      if (useAdvance) {
+        fighter.movementLeft = (fighter.movementLeft ?? 0) + 2;
+        fighter.disengaged = true;
+        spendItemPower(fighter, advanceKey, "shortRest");
+        addLog(`${fighter.name}'s Shield of the Drowned Legion grants Drowned Advance: +10 ft movement and no opportunity attacks this turn.`, "important");
+      }
     }
     addLog(`${fighter.name} uses Dodge. Attacks against them have disadvantage until their next turn.`, "important");
   }
@@ -23463,7 +23653,20 @@ function consumeEquippedItem(itemId) {
   consumeInventoryItemQuantity(hero, itemId, 1);
 }
 
-function applyHealingToHero(target, healing) {
+function applyHealingToHero(target, healing, options = {}) {
+  const barrowCrownCanRejectHealing = Boolean(options.magic || options.magical || options.potion || ["magic", "spell", "potion"].includes(options.sourceKind));
+  if (
+    barrowCrownCanRejectHealing &&
+    target &&
+    healing > 0 &&
+    typeof activeMagicItemByTemplate === "function" &&
+    typeof barrowCrownItemIds !== "undefined" &&
+    activeMagicItemByTemplate(target, barrowCrownItemIds.barrowCrown) &&
+    Math.random() < 0.4
+  ) {
+    addLog(`${target.name}'s Barrow Crown rejects the healing.`, "important");
+    return 0;
+  }
   const multiplier = (target.statusEffects ?? []).reduce((value, effect) => Math.min(value, effect.healingReceivedMultiplier ?? 1), 1);
   healing = Math.floor(Math.max(0, healing) * multiplier);
   const before = target.hp;
@@ -23586,7 +23789,7 @@ async function useUsableInventoryItem(itemId, targetId = null, options = {}) {
     if (!spendItemCharge(item)) return;
     const healingRoll = rollDice(item.use.dice.count, item.use.dice.sides);
     const healing = healingRoll.total + (item.use.bonus ?? 0);
-    const healed = applyHealingToHero(target, healing);
+    const healed = applyHealingToHero(target, healing, { sourceKind: "potion", itemId: item.id });
     playSoundEffect("potionDrink");
     const targetText = target.id === hero.id ? "" : ` on ${target.name}`;
     addLog(`${hero.name} uses ${item.name}${targetText} and heals ${healed} HP (${healingRoll.rolls.join(" + ")} + ${item.use.bonus ?? 0}).`, "heal");
@@ -23599,7 +23802,7 @@ async function useUsableInventoryItem(itemId, targetId = null, options = {}) {
     void maybeFinishEncounterAfterHeroRecovery();
   } else if (item.use?.kind === "fullHealing") {
     if (!spendItemCharge(item)) return;
-    const healed = applyHealingToHero(target, Math.max(0, (target.maxHp ?? 0) - (target.hp ?? 0)));
+    const healed = applyHealingToHero(target, Math.max(0, (target.maxHp ?? 0) - (target.hp ?? 0)), { sourceKind: "potion", itemId: item.id });
     playSoundEffect("potionDrink");
     const targetText = target.id === hero.id ? "" : ` on ${target.name}`;
     addLog(`${hero.name} uses ${item.name}${targetText} and heals ${healed} HP to full.`, "heal");
@@ -23696,7 +23899,7 @@ async function useUsableInventoryItem(itemId, targetId = null, options = {}) {
       label: "Grave-Lit",
       invisibleSuppressed: true,
       healingReceivedMultiplier: monsterIsUndead(target) ? 0 : 1,
-      expiresAtStartOfTurn: true,
+      expiresAtStartOfTurnSourceId: hero.id,
     };
     applyStatusEffect(target, status);
     addLog(`${hero.name} casts Gravebreaker's Lantern onto ${target.name}. ${target.name} cannot benefit from invisibility${monsterIsUndead(target) ? " or regain HP" : ""} until ${hero.name}'s next turn.`, "important");
