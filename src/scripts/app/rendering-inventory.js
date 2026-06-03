@@ -12516,7 +12516,7 @@ async function travelStayHereOneDay(options = {}) {
 async function showTravelMapMenu() {
   if (!els.travelMapMenu) return;
   state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state.world;
-  if (!state.world && typeof ensureWorldForLoadedSave === "function") {
+  if ((!state.world || window.DepthboundWorldTravel?.worldNeedsRegeneration?.(state.world)) && typeof ensureWorldForLoadedSave === "function") {
     await ensureWorldForLoadedSave(state.saveSlotId ?? activeSaveSlot).catch((error) => {
       console.warn("Could not generate a world map for this save.", error);
       addLog("The world map could not be generated yet. Try opening Travel again in a moment.", "warning");

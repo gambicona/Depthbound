@@ -3577,18 +3577,27 @@ async function loadAdventure(slotId) {
 }
 
 async function ensureWorldForLoadedSave(slotId = activeSaveSlot) {
-  if (state?.world || !window.DepthboundWorldTravel?.createInitialWorldState) return false;
+  const worldTools = window.DepthboundWorldTravel;
+  if (!worldTools?.createInitialWorldState) return false;
+  const needsWorld = !state?.world || worldTools.worldNeedsRegeneration?.(state.world);
+  if (!needsWorld) return false;
   const active = state?.fighters?.[state?.party?.activeHeroId] ?? state?.fighters?.hero;
   const heroName = String(active?.name ?? "hero").trim() || "hero";
-  const initialWorld = await window.DepthboundWorldTravel.createInitialWorldState({
-    seed: `save-upgrade:${slotId || "slot"}:${heroName}:${Date.now()}`,
+  const replacingFallbackWorld = Boolean(state?.world);
+  const initialWorld = await worldTools.createInitialWorldState({
+    seed: state?.world?.seed || `save-upgrade:${slotId || "slot"}:${heroName}:${Date.now()}`,
     chunkWidth: 10,
     chunkHeight: 10,
   });
-  state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(initialWorld) ?? initialWorld;
+  state.world = worldTools.normalizeWorldState?.(initialWorld) ?? initialWorld;
   if (typeof travelEnsureHomeVillageState === "function") travelEnsureHomeVillageState(state.world);
   state.worldDay = normalizeWorldDay(state.worldDay);
-  addLog("This older save has been upgraded with a world map, home village, and local quest-board territory.", "important");
+  if (replacingFallbackWorld) {
+    if (state.questFlags?.settlementBoards) delete state.questFlags.settlementBoards;
+    addLog("The placeholder grassland world on this save has been replaced with a generated world map.", "important");
+  } else {
+    addLog("This older save has been upgraded with a world map, home village, and local quest-board territory.", "important");
+  }
   return true;
 }
 

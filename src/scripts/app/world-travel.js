@@ -283,7 +283,7 @@
 
   async function generateChunk(chunkX = 0, chunkY = 0, options = {}) {
     const api = await builderFrame();
-    const result = api.generateBigWorldChunkForGame({
+    const result = await api.generateBigWorldChunkForGame({
       seed: options.seed,
       project: options.project,
       chunkX,
@@ -291,6 +291,7 @@
       chunkWidth: options.chunkWidth ?? options.width ?? defaultChunkWidth,
       chunkHeight: options.chunkHeight ?? options.height ?? defaultChunkHeight
     });
+    if (!result?.chunk?.tiles) throw new Error("Hexagonal world builder returned no chunk tiles.");
     return {
       project: cloneData(result.project),
       chunk: ensureStarterChunkRequirements(normalizeChunk(result.chunk, chunkX, chunkY), chunkX, chunkY)
@@ -388,6 +389,26 @@
     return normalized;
   }
 
+  function worldNeedsRegeneration(world = null) {
+    const normalized = normalizeWorldState(world);
+    if (!normalized) return true;
+    const chunk = normalized.chunks?.[originKey];
+    if (!chunk) return true;
+    const tiles = chunk.tiles.flat().filter(Boolean);
+    const uniqueTiles = new Set(tiles);
+    const hasProject = Boolean(normalized.worldProject && Object.keys(normalized.worldProject).length);
+    const structures = (chunk.middleObjects ?? []).filter((object) => object?.layer === "structures");
+    const onlyGuaranteedStructures = structures.length > 0 && structures.every((object) => String(object.id ?? "").startsWith("guaranteed:"));
+    return (
+      normalized.generator === "hexagonalworldbuilder.big-world" &&
+      !hasProject &&
+      tiles.length >= normalized.chunkWidth * normalized.chunkHeight &&
+      uniqueTiles.size === 1 &&
+      uniqueTiles.has("grassland") &&
+      onlyGuaranteedStructures
+    );
+  }
+
   window.DepthboundWorldTravel = {
     version: worldVersion,
     chunkKey,
@@ -395,6 +416,7 @@
     biomeGroup,
     createInitialWorldState,
     normalizeWorldState,
+    worldNeedsRegeneration,
     generateChunk,
     findHomeVillage
   };
