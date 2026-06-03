@@ -2799,6 +2799,9 @@ function showDungeonObjectInfo(object) {
             <button type="button" data-action="open-library-tutorial" data-topic="homeExpansion">Home Expansion Guide</button>
             <button type="button" data-action="open-library-tutorial" data-topic="comfortZones">Comfort Zones Guide</button>
             <button type="button" data-action="open-library-tutorial" data-topic="stealth">Stealth Guide</button>
+            <button type="button" data-action="open-library-tutorial" data-topic="worldTravel">World Travel Guide</button>
+            <button type="button" data-action="open-library-tutorial" data-topic="factions">Factions Guide</button>
+            <button type="button" data-action="open-library-tutorial" data-topic="roadbuilding">Roadbuilding Guide</button>
           </div>`
         : object.type === "home-cooking-pot"
           ? `<button type="button" data-action="cook-home-meal">Cook Hearty Meal</button>`
@@ -4015,6 +4018,81 @@ const homeLibraryTutorials = {
       {
         title: "Too Close",
         body: "Moving within 5 ft of a monster also rolls a new Stealth check. The nearby monster rolls active Perception with advantage. If the hero is noticed, initiative starts.",
+      },
+    ],
+  },
+  worldTravel: {
+    title: "World Travel Guide",
+    steps: [
+      {
+        title: "Open Travel",
+        body: "Use the home door, choose Adventure, then choose Travel. The world map opens from your current settlement or camp location.",
+      },
+      {
+        title: "Read The Map",
+        body: "Colored hexes show biomes. Structure icons mark villages, cities, ruins, mines, camps, and other places worth visiting. The summary shows current location, home, and route state.",
+      },
+      {
+        title: "Plan A Route",
+        body: "Click neighboring hexes to draw a route from your current hex. Confirm Route locks the plan; Start Travel moves the party one travel day at a time.",
+      },
+      {
+        title: "Pack For Camp",
+        body: "Bring Trail Rations before leaving. Each camp meal can spend rations, and resting hungry is risky. Villages, cities, taverns, and travel events can help refill supplies.",
+      },
+      {
+        title: "First Goal",
+        body: "For early travel, aim for the nearest visible village, city, or structure. Settlements are good resupply points, and structures teach you what the surrounding road is like.",
+      },
+    ],
+  },
+  factions: {
+    title: "Factions Guide",
+    steps: [
+      {
+        title: "How Factions Arrive",
+        body: "Faction contacts can appear through tavern guests, settlement encounters, story progress, and special board unlocks. Impressing a contact can send a representative to your home village.",
+      },
+      {
+        title: "Home Representatives",
+        body: "When a faction unlocks, its representative appears in the Village directory. Visit them for contracts, turn-ins, reputation progress, and faction-specific services.",
+      },
+      {
+        title: "Faction Gear",
+        body: "Many factions sell gear sets once your rank is high enough. Gold buys a normal shareable copy; Hero Tokens buy a cheaper copy bound to the purchasing hero.",
+      },
+      {
+        title: "Reputation",
+        body: "Contracts, reports, trophies, relics, and completed objectives raise reputation or renown. Higher ranks unlock better rewards and more of each faction's catalog.",
+      },
+      {
+        title: "Expedition Board",
+        body: "The Expedition Board focuses on travel, surveys, dangerous routes, and road projects. Once unlocked, it becomes the home base for building safer links across the world map.",
+      },
+    ],
+  },
+  roadbuilding: {
+    title: "Roadbuilding Guide",
+    steps: [
+      {
+        title: "Unlock The Board",
+        body: "Road projects appear after the Expedition Board is unlocked. Visit the Expedition Board in the Village directory and open Road Projects.",
+      },
+      {
+        title: "Accept A Project",
+        body: "Accept a settlement road or road spur to receive Road-Building Kits. The project marks a route from a connected anchor toward a settlement or useful site.",
+      },
+      {
+        title: "Travel The Marked Route",
+        body: "Open Travel and add the highlighted project hexes to your route. Road work happens after a safe travel day, not when the route is first planned.",
+      },
+      {
+        title: "Build At Camp",
+        body: "At camp, use Build Road Segment to spend one Road-Building Kit and mark the safe connection between neighboring hexes. Some dangers must be cleared before road work can continue.",
+      },
+      {
+        title: "File The Road",
+        body: "When every segment is built, return to the Expedition Board and file the road project. Completed roads pay rewards, add reputation, and can make later travel safer or faster.",
       },
     ],
   },
@@ -9013,6 +9091,13 @@ function travelCampManualRoadBuildState(camp = state?.world?.travelCamp) {
   const to = travelNormalizeHex(build?.to);
   if (!build || !from || !to || travelSameHex(from, to)) return { visible: false, available: false, reason: "" };
   if (travelCampIsInn(camp)) return { visible: false, available: false, reason: "" };
+  if (travelRoadKitCount() < 1) {
+    return {
+      visible: false,
+      available: false,
+      reason: "The party needs 1 Road-Building Kit.",
+    };
+  }
   if (build.blockedReason && !build.blockedDanger?.event) {
     build.safe = true;
     build.pendingDanger = false;
@@ -9039,13 +9124,6 @@ function travelCampManualRoadBuildState(camp = state?.world?.travelCamp) {
       visible: true,
       available: false,
       reason: "Settle today's danger before building a road here.",
-    };
-  }
-  if (travelRoadKitCount() < 1) {
-    return {
-      visible: true,
-      available: false,
-      reason: "The party needs 1 Road-Building Kit.",
     };
   }
   return {
@@ -11040,11 +11118,24 @@ function renderTravelCampMenu() {
     }
     if (panel.continue) {
       panel.continue.classList.toggle("hidden", !rested);
-      panel.continue.disabled = routeLength === 0 || !rested;
+      panel.continue.textContent = routeLength === 0 ? "Plan New Route" : "Travel On";
+      panel.continue.disabled = !rested;
+      panel.continue.title = routeLength === 0
+        ? "Open the travel map to review your position and plan the next route."
+        : "Continue along the confirmed route.";
     }
   };
   bindCampPanel("travelCamp");
   bindCampPanel("campHome");
+}
+
+function travelContinueOrPlanRoute(options = {}) {
+  if (!travelRoute().length) {
+    showTravelMapMenu();
+    renderTravelRouteFeedback("Plan a new route from your current location.");
+    return;
+  }
+  travelOneDay(options);
 }
 
 async function showTravelCampMenu() {

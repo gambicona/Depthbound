@@ -77,7 +77,7 @@
   }
 
   function featureName(kind, seed, biome) {
-    return nameTools()?.generateName?.(kind, { seed, biome }) ?? `${kind.slice(0, 1).toUpperCase()}${kind.slice(1)}`;
+    return nameTools()?.randomName?.(kind, { seed, biome, preferCatalog: true }) ?? nameTools()?.generateName?.(kind, { seed, biome }) ?? `${kind.slice(0, 1).toUpperCase()}${kind.slice(1)}`;
   }
 
   function builderFrameMessageApi(iframe) {

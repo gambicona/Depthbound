@@ -551,7 +551,11 @@ function showHeroIdentityDialog({ title, message, nameValue, tokenArt = "", conf
     let cropDrag = null;
 
     const currentName = () => els.gameDialogField.querySelector("[data-hero-identity-name]")?.value ?? nameValue ?? "";
-    const suggestedNames = () => window.DepthboundHeroNames?.names ?? [];
+    const heroNameSuggestions = window.DepthboundHeroNames?.randomOptions?.(350) ?? window.DepthboundHeroNames?.names ?? [];
+    const suggestedNames = () => {
+      const names = heroNameSuggestions;
+      return nameValue && !names.includes(nameValue) ? [nameValue, ...names] : names;
+    };
     const updateCropPreviewTransform = () => {
       const image = els.gameDialogField.querySelector("[data-token-crop-preview] img");
       if (image) {
@@ -1719,8 +1723,12 @@ function showTutorial() {
       <li>The bottom action bar changes by context. Outside combat it handles rest, return home, items, abilities, and grabbing. In combat it adds attacks, Tactics, and End Turn.</li>
       <li>Open Tactics in combat for Dash, Dodge, Disengage, Off-Hand Attack, Grapple/Shove, Medicine, and Get Behind. Get Behind is a special Depthbound bonus action that can let a hero move through monster spaces for one turn.</li>
       <li>Inventory is the I button on the hero card. Abilities and spells are on the bottom Abilities button when the selected hero has something usable.</li>
-      <li>At home, Adventure opens Village, Build Your Home, and dungeon choices. Adventure then branches into Main Story, One-Shot, Random, and Custom dungeons when any are saved.</li>
-      <li>For a first real run, try The Barrow Crown under Main Story Dungeons, or choose a Random Dungeon if you want a lighter test run.</li>
+      <li>At home, the door menu opens Village, Build Your Home, Adventure, and Party Inventory. Village is for shops, NPCs, inns, and buying road supplies.</li>
+      <li>Adventure contains Travel plus the dungeon lists. Travel opens the world map. The party starts at its home village; colored hexes show biomes, structure icons show sites and settlements, and the current/home labels tell you where you are.</li>
+      <li>To travel, click neighboring hexes to draw a route, Confirm Route, then Start Travel. Each travel day can lead to events, camp, an inn, a new settlement, or a dungeon entrance.</li>
+      <li>Pack enough rations before leaving. Each camp meal can spend rations, and hungry rests are risky; buy Trail Rations from village stores or gather more through travel events.</li>
+      <li>For a first world-map goal, route to the nearest visible village or city. Settlements are safer than wandering deep into wild hexes, often offer stores or inns, and make a good first supply loop.</li>
+      <li>For a first dungeon run, try The Barrow Crown under Main Story Dungeons. Or travel to a nearby village or other structure to explore the world.</li>
     </ul>
   `;
   els.gameDialogActions.innerHTML = `<button type="button" data-tutorial-close>Close</button>`;
@@ -2018,7 +2026,7 @@ const interactiveTutorialSteps = [
   },
   {
     title: "Hero Card Tools",
-    body: "Each hero card has quick buttons. Stealth rolls Dexterity Stealth, Search checks the current room, I opens inventory, and ... renames the hero.",
+    body: "Each hero card has quick buttons in order: Inventory opens gear and items, and can also be opened by pressing I; Rename changes the character name; Stealth rolls Dexterity Stealth; Search checks the current room.",
     selector: ".card-actions",
     enter: () => enterTutorialDungeon(),
   },
@@ -2085,25 +2093,43 @@ const interactiveTutorialSteps = [
   },
   {
     title: "Home Menu",
-    body: "The Home Door menu starts with Village, Build Your Home, and Go on an Adventure. Village is for NPCs and shops; Build Your Home opens the house editor.",
+    body: "The Home Door menu starts with Village, Build Your Home, Adventure, and Party Inventory. Village is for NPCs, shops, inns, and supplies; Build Your Home opens the house editor.",
     selector: "#home-main-actions",
     enter: () => openTutorialHomeMenu("main"),
   },
   {
+    title: "Pack Before Travel",
+    body: "Before a road trip, buy enough Trail Rations in Village shops. Camp meals spend rations, and resting hungry is a bad habit with teeth.",
+    selector: "#go-village",
+    enter: () => openTutorialHomeMenu("main"),
+  },
+  {
+    title: "World Map",
+    body: "Adventure contains Travel. Travel opens the world map: you start at your home village, colored hexes are biomes, structure icons mark sites and settlements, and the labels show current location, home, and route state.",
+    selector: "#travel-map-menu .travel-map-panel",
+    enter: () => openTutorialTravelMap(),
+  },
+  {
+    title: "How To Travel",
+    body: "On the world map, click adjacent hexes to build a route, Confirm Route, then Start Travel. Aim first for the nearest visible village or city so the party can learn the road and resupply.",
+    selector: ".travel-map-route-actions",
+    enter: () => openTutorialTravelMap(),
+  },
+  {
     title: "Adventure Choices",
-    body: "Adventure opens the home hub. Main Story dungeons are authored chapters, Random Runs are quick procedural runs, and Custom Dungeons appear when local custom maps exist.",
+    body: "Adventure opens Travel and the dungeon lists. Main Story dungeons are authored chapters, One-Shot Dungeons are standalone adventures, and Custom Dungeons appear when local custom maps exist.",
     selector: "#home-adventure-actions",
     enter: () => openTutorialHomeMenu("adventure"),
   },
   {
     title: "First Dungeon Pick",
-    body: "For your first real outing, choose Main Story Dungeons and start The Barrow Crown. If you only want to test your build, choose a Random Dungeon instead.",
+    body: "For your first real outing, choose Main Story Dungeons and start The Barrow Crown. Or travel to any nearby village or other structure to explore the world.",
     selector: "#home-adventure-actions",
     enter: () => openTutorialHomeMenu("adventure"),
   },
   {
     title: "Home Objects",
-    body: "Left-click or right-click home objects to inspect them. The chest stores shared items; the bookshelf has the Monster Compendium and guides for stealth, comfort, and home expansion.",
+    body: "Left-click or right-click home objects to inspect them. The chest stores shared items; the bookshelf has the Monster Compendium and guides for stealth, comfort, home expansion, travel, factions, and roadbuilding.",
     selector: ".chest-token, .dungeon-object.home-bookshelf, .planning-table-token",
     enter: () => enterTutorialHome(),
   },
@@ -2119,6 +2145,7 @@ function enterTutorialDungeon() {
   hideInventoryMenu();
   hideAbilitiesMenu();
   hideHomeMenu();
+  if (typeof hideTravelMapMenu === "function") hideTravelMapMenu();
   switchInteractiveTutorialScene("dungeon");
 }
 
@@ -2126,6 +2153,7 @@ function enterTutorialHome() {
   hideInventoryMenu();
   hideAbilitiesMenu();
   hideHomeMenu();
+  if (typeof hideTravelMapMenu === "function") hideTravelMapMenu();
   switchInteractiveTutorialScene("home");
 }
 
@@ -2135,6 +2163,28 @@ function openTutorialHomeMenu(panel = "main") {
     if (!interactiveTutorialActive || state?.tutorialScene !== "home") return;
     showHomeMenu();
     setHomeMenuPanel(panel);
+  });
+}
+
+function openTutorialTravelMap() {
+  const expectedStep = interactiveTutorialStep;
+  enterTutorialHome();
+  window.requestAnimationFrame(async () => {
+    if (!interactiveTutorialActive || interactiveTutorialStep !== expectedStep || state?.tutorialScene !== "home") return;
+    showHomeMenu();
+    setHomeMenuPanel("adventure");
+    if (!state.world && window.DepthboundWorldTravel?.createInitialWorldState) {
+      try {
+        state.world = await window.DepthboundWorldTravel.createInitialWorldState({
+          seed: "depthbound-interactive-tutorial-world",
+        });
+      } catch (error) {
+        console.warn("Could not create tutorial travel map.", error);
+      }
+    }
+    if (!interactiveTutorialActive || interactiveTutorialStep !== expectedStep || state?.tutorialScene !== "home" || !state.world) return;
+    showTravelMapMenu();
+    updateInteractiveTutorial();
   });
 }
 

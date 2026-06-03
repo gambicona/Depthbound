@@ -869,7 +869,7 @@ els.travelCampClearRoadDanger?.addEventListener("click", () => void travelClearB
 els.travelCampLongRest?.addEventListener("click", travelLongRestAtCamp);
 els.travelCampExploreHere?.addEventListener("click", travelStayHereOneDay);
 els.travelCampVentureOffTrack?.addEventListener("click", () => travelOneDay({ roadMode: "offroad" }));
-els.travelCampContinue?.addEventListener("click", travelOneDay);
+els.travelCampContinue?.addEventListener("click", travelContinueOrPlanRoute);
 els.campHomeReviewRoute?.addEventListener("click", showTravelMapMenu);
 els.campHomeUseRations?.addEventListener("click", travelUseCampRations);
 els.campHomeForage?.addEventListener("click", travelForageForCamp);
@@ -879,7 +879,7 @@ els.campHomeClearRoadDanger?.addEventListener("click", () => void travelClearBlo
 els.campHomeLongRest?.addEventListener("click", travelLongRestAtCamp);
 els.campHomeExploreHere?.addEventListener("click", travelStayHereOneDay);
 els.campHomeVentureOffTrack?.addEventListener("click", () => travelOneDay({ roadMode: "offroad" }));
-els.campHomeContinue?.addEventListener("click", travelOneDay);
+els.campHomeContinue?.addEventListener("click", travelContinueOrPlanRoute);
 els.closeTravelCamp?.addEventListener("click", hideTravelCampMenu);
 els.travelCampMenu?.addEventListener("click", (event) => {
   if (event.target === els.travelCampMenu) {

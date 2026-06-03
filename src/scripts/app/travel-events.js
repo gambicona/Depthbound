@@ -38,10 +38,10 @@
   }
 
   const EVENT_CATEGORY_WEIGHTS = {
-    empty: { none: 38, text: 34, fight: 12, dungeon: 16 },
-    emptyRoad: { none: 60, text: 30, fight: 6, dungeon: 4 },
-    structure: { quiet: 15, text: 45, dungeon: 25, fight: 15 },
-    structureRevisit: { quiet: 30, text: 42, dungeon: 18, fight: 10 },
+    empty: { none: 34, text: 34, fight: 12, dungeon: 20 },
+    emptyRoad: { none: 58, text: 30, fight: 6, dungeon: 6 },
+    structure: { quiet: 13, text: 44, dungeon: 28, fight: 15 },
+    structureRevisit: { quiet: 28, text: 42, dungeon: 20, fight: 10 },
   };
 
   function eventCategory(event = {}) {
@@ -1128,7 +1128,152 @@
     },
   ];
 
-  function eventMatchesBiome(event, biomeGroup = "") {
+  const biomeVariantEventTiles = [
+    "arctic_aurorasnowfield", "arctic_crackedice", "arctic_glacierfield", "arctic_rockytundra", "arctic_snowplain", "arctic_snowypineedge",
+    "badlands", "cave_underdark", "coast_beach", "coast_rocky", "crystalfield",
+    "desert_canyon", "desert_crackeddry", "desert_oasis", "desert_red", "desert_rocky", "desert_saltflat", "desert_sanddune",
+    "forest_ancient", "forest_autuum", "forest_birch", "forest_burnt", "forest_dark", "forest_darkmagical", "forest_dead", "forest_densepine", "forest_fey", "forest_jungle", "forest_light", "forest_mixed", "forest_normal",
+    "grassland_flowermeadow", "grassland_hills", "grassland_lushplain", "grassland_openmeadow", "grassland_rocky", "grassland_rolllinghills", "grassland_windsweptsteppe",
+    "highlands", "hills",
+    "jungle_dense", "jungle_giantleaves", "jungle_hill", "jungle_mangrove", "jungle_stoneovergrown", "jungle_vine", "jungle_wet",
+    "mountain_canyon", "mountain_cliffplateau", "mountain_crystal", "mountain_greenhighland", "mountain_rocky", "mountain_snowy", "mountain_volcanic",
+    "ocean_coralreef", "ocean_darkabyssal", "ocean_deep", "ocean_icesea", "ocean_kelpforest", "ocean_shallow", "ocean_stormy",
+    "savanna_drygrassland",
+    "swamp_blackwater", "swamp_bog", "swamp_deadtreebog", "swamp_flooded", "swamp_misty", "swamp_muddymarsh", "swamp_mushroom", "swamp_reedmarsh", "swamp_toxic",
+    "volcanic_sulfurwasteland", "volcano_ashplain", "volcano_basaltfield", "volcano_lavacracks", "volcano_lavalake", "volcano_magmavent", "volcano_obsidianfield",
+    "wasteland", "wasteland_corrupted",
+  ];
+
+  const biomeVariantEventProfiles = {
+    arctic: { place: "ice", material: "frost", shelter: "snow hollow", food: "ice fish", danger: "whiteout", sign: "blue shadows", check: { ability: "wis", skill: "survival", dc: 14 }, reward: { rations: 1 } },
+    badlands: { place: "broken red stone", material: "dry clay", shelter: "cutbank", food: "bitter roots", danger: "falling shale", sign: "dust spirals", check: { ability: "wis", skill: "survival", dc: 14 }, reward: { money: { sp: 8 } } },
+    cave: { place: "underground dark", material: "glowstone", shelter: "stone pocket", food: "pale mushrooms", danger: "echoing cracks", sign: "cold drafts", check: { ability: "int", skill: "nature", dc: 14 }, reward: { rations: 1 } },
+    coast: { place: "tideline", material: "saltwood", shelter: "dry dune", food: "shellfish", danger: "wrong tide", sign: "gull cries", check: { ability: "wis", skill: "survival", dc: 12 }, reward: { rations: 2 } },
+    crystalfield: { place: "crystal field", material: "bright shard", shelter: "prism lee", food: "clearwater moss", danger: "razor glass", sign: "singing light", check: { ability: "int", skill: "arcana", dc: 13 }, reward: { money: { gp: 1 } } },
+    desert: { place: "hot sand", material: "sun-baked stone", shelter: "shade pocket", food: "cactus flesh", danger: "heat shimmer", sign: "mirage tracks", check: { ability: "wis", skill: "survival", dc: 15 }, reward: { rations: 1 } },
+    forest: { place: "woodland", material: "fallen boughs", shelter: "root hollow", food: "berries and mushrooms", danger: "watching trees", sign: "bird silence", check: { ability: "wis", skill: "survival", dc: 12 }, reward: { rations: 2 } },
+    grassland: { place: "open meadow", material: "dry thatch", shelter: "low rise", food: "field roots", danger: "fast weather", sign: "bending grass", check: { ability: "wis", skill: "perception", dc: 12 }, reward: { rations: 1 } },
+    highlands: { place: "moorland", material: "heather", shelter: "stone fold", food: "moor berries", danger: "knife wind", sign: "low clouds", check: { ability: "wis", skill: "survival", dc: 13 }, reward: { rations: 1 } },
+    hills: { place: "rolling hills", material: "fieldstone", shelter: "sheep-cut hollow", food: "wild onions", danger: "hidden holes", sign: "circling crows", check: { ability: "wis", skill: "perception", dc: 12 }, reward: { money: { sp: 6 } } },
+    jungle: { place: "wet green", material: "heavy vine", shelter: "leaf roof", food: "fruit and clean vines", danger: "biting canopy", sign: "seedpod drums", check: { ability: "int", skill: "nature", dc: 14 }, reward: { rations: 2 } },
+    mountain: { place: "high stone", material: "scree", shelter: "cliff notch", food: "lichen and snowmelt herbs", danger: "loose ledges", sign: "eagle calls", check: { ability: "str", skill: "athletics", dc: 14 }, reward: { money: { gp: 1 } } },
+    ocean: { place: "open water", material: "drift kelp", shelter: "reef calm", food: "fish and kelp", danger: "dark current", sign: "green swells", check: { ability: "wis", skill: "survival", dc: 15 }, reward: { rations: 2 } },
+    savanna: { place: "dry grass", material: "seed heads", shelter: "thorn shade", food: "tubers and small game", danger: "dust heat", sign: "far hooves", check: { ability: "wis", skill: "survival", dc: 13 }, reward: { rations: 1 } },
+    swamp: { place: "black water", material: "reeds", shelter: "root island", food: "frogs and watercress", danger: "sinking mud", sign: "will-o-lights", check: { ability: "wis", skill: "survival", dc: 14 }, reward: { rations: 2 } },
+    volcano: { place: "hot rock", material: "basalt", shelter: "cool vent", food: "smoke-black tubers", danger: "sulfur breath", sign: "red cracks", check: { ability: "con", skill: "athletics", dc: 15 }, reward: { money: { gp: 1 } } },
+    wasteland: { place: "dead ground", material: "old scrap", shelter: "ruin wall", food: "stubborn weeds", danger: "bitter dust", sign: "ash-colored birds", check: { ability: "wis", skill: "survival", dc: 15 }, reward: { money: { sp: 10 } } },
+  };
+
+  const biomeVariantEventPatterns = [
+    { title: "Trail Sign", text: "The {sign} line up across the {place}, marking a way that locals would read without slowing down.", primary: "Read The Sign", secondary: "Trust The Road", success: "The party reads the sign correctly and saves the best camp from the day's march.", failure: "The sign was older than it looked, and the party loses time correcting course.", check: "profile" },
+    { title: "Hidden Supper", text: "A sheltered patch of {food} waits near the route, half-hidden by {material}.", primary: "Gather Food", secondary: "Leave It", success: "The party gathers enough safe food to improve the evening meal.", failure: "The patch is spoiled or already claimed, and the search turns up nothing useful.", reward: "profile" },
+    { title: "Good Camp", text: "The {shelter} offers a cleaner camp than the exposed {place} around it.", primary: "Make It Ready", secondary: "Keep Moving", success: "A little work turns the shelter into a comfortable night site.", failure: "The shelter is cramped and noisy, but still better than open ground.", check: { ability: "wis", skill: "survival", dc: 11 } },
+    { title: "Weather Turn", text: "The {danger} moves over the {place} faster than expected.", primary: "Prepare Camp", secondary: "Push Through", success: "The party reads the turn early and avoids the worst of the weather.", failure: "Cold, heat, rain, or grit follows the party into camp.", check: "profile" },
+    { title: "Old Marker", text: "A marker made from {material} stands beside the route, worn smooth by older travelers.", primary: "Study It", secondary: "Mark Your Own", success: "The marker points toward a safer place to sleep.", failure: "The marker's meaning has changed, or maybe the party reads it backward.", check: { ability: "int", skill: "history", dc: 12 } },
+    { title: "Quiet Tracks", text: "Fresh tracks cross the {place} and vanish near a cluster of {material}.", primary: "Follow Carefully", secondary: "Avoid Them", success: "The tracks lead to water, forage, or a clearer path.", failure: "The tracks belong to something cautious enough to avoid being seen.", check: { ability: "wis", skill: "survival", dc: 13 } },
+    { title: "Trader's Scrap", text: "A torn bundle caught in {material} still carries the smell of road spices and old leather.", primary: "Search The Bundle", secondary: "Hang It High", success: "The bundle holds a few useful coins and a scrap of route advice.", failure: "Only mildew, broken straps, and a false-bottom joke remain.", reward: { money: { sp: 6, cp: 30 } }, check: { ability: "int", skill: "investigation", dc: 12 } },
+    { title: "Uneasy Silence", text: "The {place} falls quiet all at once. Even the {sign} seem to wait.", primary: "Listen", secondary: "Light A Fire", success: "The party hears the small warning in time and camps where sound returns.", failure: "Nothing attacks, but everyone sleeps lightly.", check: { ability: "wis", skill: "perception", dc: 13 } },
+    { title: "Useful Debris", text: "Broken {material} lies scattered in a pattern too tidy to be natural.", primary: "Salvage It", secondary: "Stack A Cairn", success: "The party salvages small supplies and leaves the route clearer.", failure: "Most of it crumbles as soon as it is touched.", reward: { money: { sp: 4 } }, check: { ability: "int", skill: "investigation", dc: 11 } },
+    { title: "Local Remedy", text: "A faint medicinal smell rises from the {food} growing where {material} keeps the wind away.", primary: "Prepare A Poultice", secondary: "Do Not Risk It", success: "The remedy is mild but real, easing the night's aches.", failure: "The smell was a warning rather than a promise.", check: { ability: "int", skill: "nature", dc: 13 } },
+    { title: "Distant Lantern", text: "A lantern glimmers beyond the {place}, then vanishes whenever the party stops.", primary: "Signal Back", secondary: "Ignore It", success: "The signal is another traveler, willing to trade road news.", failure: "The light never comes closer, but it keeps watch until dawn.", check: { ability: "cha", skill: "persuasion", dc: 12 } },
+    { title: "Animal Warning", text: "Small animals flee the {place}, cutting around the {shelter} without entering it.", primary: "Check The Shelter", secondary: "Camp Elsewhere", success: "The party finds the reason and chooses a safer watch order.", failure: "The shelter is harmless, which somehow makes the warning worse.", check: { ability: "wis", skill: "animal-handling", dc: 13 } },
+    { title: "Lost Tool", text: "A well-made tool lies half-buried under {material}, handle polished from years of use.", primary: "Recover It", secondary: "Leave A Token", success: "The tool is still usable and worth a little coin.", failure: "It snaps free in pieces, long past saving.", reward: { money: { sp: 8 } }, check: { ability: "str", skill: "athletics", dc: 11 } },
+    { title: "Boundary Stone", text: "Three stones mark a boundary across the {place}. The middle one has been turned recently.", primary: "Set It Right", secondary: "Cross Quietly", success: "Putting the stone right reveals a hidden trail mark.", failure: "The stones are heavier than they look and settle with an accusing thud.", check: { ability: "str", skill: "athletics", dc: 12 } },
+    { title: "Clean Water", text: "Water gathers near the {shelter}, clear despite the surrounding {place}.", primary: "Test The Water", secondary: "Boil Everything", success: "The water is clean, and the party refills before camp.", failure: "It tastes wrong enough that nobody argues about boiling it.", check: { ability: "int", skill: "nature", dc: 12 } },
+    { title: "Borrowed Firepit", text: "An old firepit sits ready in the {shelter}, cold ash arranged in careful rings.", primary: "Use It", secondary: "Build A New One", success: "The old firepit draws well and keeps smoke low.", failure: "The smoke curls strangely, forcing the camp to shift.", check: { ability: "wis", skill: "survival", dc: 11 } },
+    { title: "Half-Heard Song", text: "A tune drifts across the {place}, carried by {sign} and broken by distance.", primary: "Answer The Tune", secondary: "Stay Silent", success: "The answer earns a friendly call from a hidden traveler.", failure: "The tune stops at once, leaving only wind.", check: { ability: "cha", skill: "performance", dc: 12 } },
+    { title: "Map Scratch", text: "Someone scratched a crude map into {material}, showing the {place} as it was before the last hard season.", primary: "Copy It", secondary: "Trust Memory", success: "The copied scratch helps the party avoid a rough approach.", failure: "The map is more wish than fact, but still interesting.", check: { ability: "int", skill: "history", dc: 12 } },
+    { title: "Tense Crossing", text: "A narrow crossing cuts through the worst of the {danger}.", primary: "Guide Everyone Across", secondary: "Find Another Way", success: "The crossing is handled cleanly before dusk.", failure: "The party makes it across, but only after a slow and ugly scramble.", check: "profile" },
+    { title: "Forager's Lesson", text: "The {food} here grows in a pattern that says something useful about the land.", primary: "Learn The Pattern", secondary: "Gather Quickly", success: "The lesson helps the party gather food without stripping the patch bare.", failure: "The pattern remains stubbornly local and deeply smug.", reward: "profile", check: { ability: "int", skill: "nature", dc: 13 } },
+    { title: "Buried Cache", text: "A corner of waxed cloth peeks from under {material}, tucked away by careful hands.", primary: "Dig It Free", secondary: "Rebury It", success: "The cache holds plain travel supplies and a dry note of thanks in advance.", failure: "The cache is empty except for old crumbs and grit.", reward: { rations: 1 }, check: { ability: "int", skill: "investigation", dc: 13 } },
+    { title: "Odd Footing", text: "The ground across the {place} looks firm from a distance and questionable underfoot.", primary: "Pick A Line", secondary: "Skirt Around", success: "A careful line saves time and keeps boots dry.", failure: "The ground gives way just enough to make everyone regret confidence.", check: { ability: "wis", skill: "perception", dc: 12 } },
+    { title: "Watchful High Point", text: "A high point above the {place} promises a better look at tomorrow's travel.", primary: "Climb Up", secondary: "Camp Low", success: "From above, the party marks an easier morning route.", failure: "The view is fine, but the climb steals the last good light.", check: { ability: "str", skill: "athletics", dc: 13 } },
+    { title: "Strange Bloom", text: "A single bright bloom grows from {material}, impossible to miss and hard to trust.", primary: "Examine It", secondary: "Leave It Bright", success: "The bloom is harmless and points toward safe water nearby.", failure: "The bloom dust stains gloves and pride, but little else.", check: { ability: "int", skill: "nature", dc: 13 } },
+    { title: "Old Prayer", text: "A short prayer is carved into {material}, asking travelers to leave the {place} kinder than they found it.", primary: "Honor It", secondary: "Pass By", success: "The small rite steadies the camp mood before nightfall.", failure: "The words are older than the gods the party knows.", check: { ability: "int", skill: "religion", dc: 12 } },
+    { title: "Fast Shortcut", text: "A shortcut threads between {material} and the edge of the {danger}.", primary: "Take The Shortcut", secondary: "Keep The Main Path", success: "The shortcut works and gets the party to camp early.", failure: "The shortcut saves no time at all, which is exactly how shortcuts defend themselves.", check: "profile" },
+    { title: "Roadside Trade", text: "A lone peddler waits where the {shelter} meets the route, pack wrapped against the {place}.", primary: "Trade Stories", secondary: "Nod And Pass", success: "The peddler shares a snack, a warning, and an exaggeration in equal measure.", failure: "The peddler has already traded away anything useful.", reward: { rations: 1 }, check: { ability: "cha", skill: "persuasion", dc: 12 } },
+    { title: "Broken Charm", text: "A charm of {material} hangs from a bent twig, cracked clean through the middle.", primary: "Read The Charm", secondary: "Replace The String", success: "The charm marks a safe campsite with old traveler logic.", failure: "It was probably just someone's lost luck, and not enough of it.", check: { ability: "int", skill: "arcana", dc: 13 } },
+    { title: "Evening Herd", text: "A small herd moves across the {place}, calm until the wind shifts.", primary: "Let Them Pass", secondary: "Circle Around", success: "The herd's path reveals a dry, safe approach to camp.", failure: "The herd bolts away and leaves the party guessing.", check: { ability: "wis", skill: "animal-handling", dc: 12 } },
+    { title: "Quiet Repair", text: "A bit of old trailwork has failed where {material} meets the {place}.", primary: "Repair It", secondary: "Step Around", success: "The repair is small, satisfying, and useful for whoever follows.", failure: "The repair holds for exactly long enough to be funny later.", check: { ability: "str", skill: "athletics", dc: 12 } },
+  ];
+
+  function titleFromTile(tile = "") {
+    return String(tile || "wilds")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+      .join(" ");
+  }
+
+  function biomeGroupForTile(tile = "") {
+    return (window.DepthboundWorldNames?.biomeGroup?.(tile) ?? String(tile || "").split("_")[0]) || "wilds";
+  }
+
+  function fillVariantText(text = "", profile = {}, label = "") {
+    return String(text)
+      .replace(/\{variant\}/g, label)
+      .replace(/\{place\}/g, profile.place)
+      .replace(/\{material\}/g, profile.material)
+      .replace(/\{shelter\}/g, profile.shelter)
+      .replace(/\{food\}/g, profile.food)
+      .replace(/\{danger\}/g, profile.danger)
+      .replace(/\{sign\}/g, profile.sign);
+  }
+
+  function variantPatternCheck(pattern = {}, profile = {}) {
+    return pattern.check === "profile" ? profile.check : pattern.check;
+  }
+
+  function variantPatternReward(pattern = {}, profile = {}) {
+    return pattern.reward === "profile" ? profile.reward : pattern.reward;
+  }
+
+  function makeVariantEvent(tile, pattern, index) {
+    const group = biomeGroupForTile(tile);
+    const profile = biomeVariantEventProfiles[group] ?? biomeVariantEventProfiles.grassland;
+    const label = titleFromTile(tile);
+    const check = variantPatternCheck(pattern, profile);
+    const reward = variantPatternReward(pattern, profile);
+    const success = { text: fillVariantText(pattern.success, profile, label) };
+    if (reward) success.rewards = clone(reward);
+    return {
+      id: `variant-${tile}-${String(index + 1).padStart(2, "0")}`,
+      title: `${label}: ${pattern.title}`,
+      tags: ["text", "variant"],
+      biomes: [group],
+      variants: [tile],
+      tiles: [tile],
+      weight: 3,
+      text: fillVariantText(pattern.text, profile, label),
+      choices: [
+        {
+          id: "try",
+          label: pattern.primary,
+          description: check ? `${titleFromTile(check.skill ?? check.ability)} DC ${check.dc}.` : "Take the careful option.",
+          ...(check ? { check } : {}),
+          success,
+          failure: { text: fillVariantText(pattern.failure, profile, label) },
+        },
+        {
+          id: "pass",
+          label: pattern.secondary,
+          description: "Avoid spending more of the travel day here.",
+          outcome: { text: `The party leaves the ${label.toLowerCase()} behind and makes camp without chasing the sign further.` },
+        },
+      ],
+    };
+  }
+
+  const biomeVariantEvents = biomeVariantEventTiles.flatMap((tile) => biomeVariantEventPatterns.map((pattern, index) => makeVariantEvent(tile, pattern, index)));
+  travelEmptyHexEvents.push(...biomeVariantEvents);
+
+  function eventMatchesBiome(event, biomeGroup = "", tile = "") {
+    const variants = [...(event.variants ?? []), ...(event.tiles ?? [])].map(normalizedTile);
+    const normalized = normalizedTile(tile);
+    if (variants.length) return variants.includes(normalized);
     return !event.biomes?.length || event.biomes.includes(String(biomeGroup || "").toLowerCase());
   }
 
@@ -1163,7 +1308,7 @@
     const weights = context.safeRoute ? EVENT_CATEGORY_WEIGHTS.emptyRoad : EVENT_CATEGORY_WEIGHTS.empty;
     const category = weightedCategory(weights, random);
     if (category === "none") return null;
-    const biomePool = travelEmptyHexEvents.filter((event) => eventMatchesBiome(event, biomeGroup) && !event.kinds?.includes("road"));
+    const biomePool = travelEmptyHexEvents.filter((event) => eventMatchesBiome(event, biomeGroup, context.biome) && !event.kinds?.includes("road"));
     const roadPool = context.safeRoute ? travelEmptyHexEvents.filter((event) => event.kinds?.includes("road")) : [];
     const combinedPool = [...biomePool, ...roadPool];
     const pool = recentlyFiltered(combinedPool.length ? combinedPool : travelEmptyHexEvents, context.recentEventIds);

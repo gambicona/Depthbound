@@ -5671,6 +5671,53 @@ button[data-ui-icon]::before,
   gap: 10px;
 }
 
+.travel-camp-tent-rider {
+  border: 1px solid rgba(244, 223, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(12, 9, 8, 0.24);
+  overflow: hidden;
+  width: 100%;
+}
+
+.travel-camp-tent-rider summary {
+  align-items: center;
+  color: var(--gold);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.68rem;
+  font-weight: 900;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 34px;
+  padding: 8px 10px;
+  text-transform: uppercase;
+}
+
+.travel-camp-tent-rider summary::-webkit-details-marker {
+  display: none;
+}
+
+.travel-camp-tent-rider summary::after {
+  color: rgba(244, 223, 184, 0.72);
+  content: "+";
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.travel-camp-tent-rider[open] summary::after {
+  content: "-";
+}
+
+.travel-camp-tent-rider[open] .travel-camp-tents {
+  padding: 8px;
+}
+
+.travel-camp-scene .travel-camp-tent-rider {
+  align-self: end;
+  position: relative;
+  z-index: 1;
+}
+
 .travel-camp-kicker {
   color: var(--gold);
   font-size: 0.72rem;
@@ -5871,6 +5918,23 @@ button[data-ui-icon]::before,
   display: grid;
   gap: 8px;
   margin-top: 4px;
+}
+
+.travel-camp-food-actions,
+.travel-camp-utility-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+}
+
+.travel-camp-food-actions button,
+.travel-camp-utility-actions button {
+  font-size: 0.72rem;
+  min-height: 34px;
+  min-width: 0;
+  padding: 7px 8px;
+  width: 100%;
 }
 
 .travel-camp-next-actions {

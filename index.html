@@ -261,7 +261,10 @@
             <span id="camp-home-kicker" class="travel-camp-kicker">Day Travel</span>
             <b id="camp-home-location" class="travel-camp-home-location">Unknown</b>
             <p id="camp-home-details" class="small-note">The party makes camp for the night.</p>
-            <div id="camp-home-tents" class="travel-camp-tents travel-camp-home-tents"></div>
+            <details class="travel-camp-tent-rider">
+              <summary>Tent Decoration</summary>
+              <div id="camp-home-tents" class="travel-camp-tents travel-camp-home-tents"></div>
+            </details>
             <div class="travel-camp-supplies" aria-label="Camp supplies">
               <div>
                 <span>Rations</span>
@@ -272,14 +275,18 @@
                 <b id="camp-home-meal">Needed</b>
               </div>
             </div>
-            <button id="camp-home-use-rations" type="button">Use Rations</button>
-            <button id="camp-home-forage" class="ghost-button" type="button">Forage</button>
+            <div class="travel-camp-food-actions">
+              <button id="camp-home-use-rations" type="button">Use Rations</button>
+              <button id="camp-home-forage" class="ghost-button" type="button">Forage</button>
+            </div>
             <button id="camp-home-hungry-rest" class="ghost-button" type="button">Rest Hungry</button>
             <button id="camp-home-build-road" class="ghost-button" type="button">Build Road Segment</button>
             <button id="camp-home-clear-road-danger" class="ghost-button" type="button">Clear Road Danger</button>
             <button id="camp-home-long-rest" type="button">Long Rest</button>
-            <button id="camp-home-review-route" class="ghost-button" type="button">Review Route</button>
-            <button class="ghost-button" type="button" data-action="open-party-inventory">Party Inventory</button>
+            <div class="travel-camp-utility-actions">
+              <button id="camp-home-review-route" class="ghost-button" type="button">Review Route</button>
+              <button class="ghost-button" type="button" data-action="open-party-inventory">Party Inventory</button>
+            </div>
             <div class="travel-camp-next-actions">
               <button id="camp-home-continue" type="button">Travel On</button>
               <button id="camp-home-explore-here" type="button">Explore Here</button>
@@ -399,14 +406,16 @@
         <div class="panel-heading">
           <h2 id="travel-camp-title">Camp</h2>
           <div class="panel-actions">
-            <button id="travel-camp-review-route" class="ghost-button panel-back-button" type="button">Review Route</button>
             <button id="close-travel-camp" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
           </div>
         </div>
         <div class="fighter-info-body travel-camp-body">
           <section class="travel-camp-scene" aria-label="Travel camp">
             <div class="travel-camp-fire" aria-hidden="true"></div>
-            <div id="travel-camp-tents" class="travel-camp-tents"></div>
+            <details class="travel-camp-tent-rider">
+              <summary>Tent Decoration</summary>
+              <div id="travel-camp-tents" class="travel-camp-tents"></div>
+            </details>
           </section>
           <section class="travel-camp-summary">
             <span id="travel-camp-kicker">Day Travel</span>
@@ -423,13 +432,18 @@
               </div>
             </div>
             <div class="travel-camp-actions">
-              <button id="travel-camp-use-rations" type="button">Use Rations</button>
-              <button id="travel-camp-forage" class="ghost-button" type="button">Forage</button>
+              <div class="travel-camp-food-actions">
+                <button id="travel-camp-use-rations" type="button">Use Rations</button>
+                <button id="travel-camp-forage" class="ghost-button" type="button">Forage</button>
+              </div>
               <button id="travel-camp-hungry-rest" class="ghost-button" type="button">Rest Hungry</button>
               <button id="travel-camp-build-road" class="ghost-button" type="button">Build Road Segment</button>
               <button id="travel-camp-clear-road-danger" class="ghost-button" type="button">Clear Road Danger</button>
               <button id="travel-camp-long-rest" type="button">Long Rest</button>
-              <button class="ghost-button" type="button" data-action="open-party-inventory">Party Inventory</button>
+              <div class="travel-camp-utility-actions">
+                <button id="travel-camp-review-route" class="ghost-button" type="button">Review Route</button>
+                <button class="ghost-button" type="button" data-action="open-party-inventory">Party Inventory</button>
+              </div>
               <div class="travel-camp-next-actions">
                 <button id="travel-camp-continue" type="button">Travel On</button>
                 <button id="travel-camp-explore-here" type="button">Explore Here</button>
