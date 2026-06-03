@@ -12513,9 +12513,17 @@ async function travelStayHereOneDay(options = {}) {
   return true;
 }
 
-function showTravelMapMenu() {
+async function showTravelMapMenu() {
   if (!els.travelMapMenu) return;
   state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state.world;
+  if (!state.world && typeof ensureWorldForLoadedSave === "function") {
+    await ensureWorldForLoadedSave(state.saveSlotId ?? activeSaveSlot).catch((error) => {
+      console.warn("Could not generate a world map for this save.", error);
+      addLog("The world map could not be generated yet. Try opening Travel again in a moment.", "warning");
+      return false;
+    });
+    state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state.world;
+  }
   hideHomeMenu();
   hideTravelCampMenu();
   renderTravelMap();

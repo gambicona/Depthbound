@@ -3558,6 +3558,11 @@ async function loadAdventure(slotId) {
     state = normalizeLoadedState(payload.state);
     selectedHeroIds = new Set([state.party.activeHeroId]);
     state.saveSlotId = slotId;
+    await ensureWorldForLoadedSave(slotId).catch((error) => {
+      console.warn("Could not upgrade old save with a world map.", error);
+      updateSaveStatus("Loaded save, but the world map upgrade could not finish. Open Travel to try again.");
+      return false;
+    });
     showDungeonLayout = false;
     roomIsBuilt = false;
     hideMainMenu();
@@ -3569,6 +3574,22 @@ async function loadAdventure(slotId) {
   } catch (error) {
     updateSaveStatus("Could not load the saved adventure.");
   }
+}
+
+async function ensureWorldForLoadedSave(slotId = activeSaveSlot) {
+  if (state?.world || !window.DepthboundWorldTravel?.createInitialWorldState) return false;
+  const active = state?.fighters?.[state?.party?.activeHeroId] ?? state?.fighters?.hero;
+  const heroName = String(active?.name ?? "hero").trim() || "hero";
+  const initialWorld = await window.DepthboundWorldTravel.createInitialWorldState({
+    seed: `save-upgrade:${slotId || "slot"}:${heroName}:${Date.now()}`,
+    chunkWidth: 10,
+    chunkHeight: 10,
+  });
+  state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(initialWorld) ?? initialWorld;
+  if (typeof travelEnsureHomeVillageState === "function") travelEnsureHomeVillageState(state.world);
+  state.worldDay = normalizeWorldDay(state.worldDay);
+  addLog("This older save has been upgraded with a world map, home village, and local quest-board territory.", "important");
+  return true;
 }
 
 async function saveAdventure(slotId = activeSaveSlot, options = {}) {
