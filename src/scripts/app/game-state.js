@@ -51,6 +51,7 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
   if (dungeonSize?.gridSize) dungeonOptions.gridSize = dungeonSize.gridSize;
   Object.assign(dungeonOptions, generatorOverrides ?? {});
   const dungeon = generateDungeon(dungeonOptions);
+  if (generatorOverrides?.ambientLight) dungeon.ambientLight = generatorOverrides.ambientLight;
   const classId = heroOptions.classId ?? defaultContent.heroClass;
   const heroTemplate = applyHeroCreationOptions(
     {
@@ -71,7 +72,7 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
   const dungeonObjects = createDungeonObjects(dungeon, [hero.position, exit.position], themeId, dungeonSize?.id);
   const terrainSummary = terrainFloorSummary(dungeonObjects);
   const encounterTarget = randomDungeonSizeEncounterTarget(dungeonSize?.id, Math.max(0, dungeon.roomCount - 1));
-  const monsters = createDungeonMonsters(dungeon, hero.position, heroForDifficulty ?? hero, exit.roomId, dungeonObjects, themeId, encounterTarget);
+  const monsters = createDungeonMonsters(dungeon, hero.position, heroForDifficulty ?? hero, exit.roomId, dungeonObjects, themeId, encounterTarget, generatorOverrides ?? {});
 
   return {
     themeId,
@@ -105,6 +106,13 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
     saveRollMode: normalizeSaveRollMode(heroOptions.saveRollMode ?? "manual"),
     shortRestsUsed: 0,
     shortRestLimit: shortRestLimitForTheme(theme, 3),
+    runStats: {
+      heroesDied: 0,
+      healingPotionsDrunk: 0,
+      deathSaveHeroIds: [],
+      currentFightHadBoss: false,
+      currentFightDeathSaveSuccess: false,
+    },
     dungeonClock: createDungeonClock(),
     grabbedEntity: null,
     chest: [],
@@ -505,9 +513,11 @@ function consumeMaterialsForRequirement(requirement = {}, quantity = 1) {
 
 function createDungeonStateForParty(partyMembers, previousState, themeId = defaultContent.theme, dungeonSizeId = "large", generatorOverrides = {}) {
   const leader = partyMembers[0] ?? previousState?.fighters?.hero;
+  const difficultyCategory = Math.max(0, Math.floor(Number(generatorOverrides?.difficultyCategory) || 0));
+  const difficultyLevel = difficultyCategory > 0 ? difficultyCategory * 2 : averagePartyLevel({ level: leader?.level ?? 1 });
   const partyDifficulty = {
     ...(leader ?? {}),
-    level: averagePartyLevel({ level: leader?.level ?? 1 }),
+    level: difficultyLevel,
     partySize: partyMembers.length,
   };
   const nextState = createInitialState(leader?.name ?? getHeroTemplate().name, partyDifficulty, {}, themeId, dungeonSizeId, generatorOverrides);
@@ -1962,6 +1972,7 @@ function recordMonsterKill(monster) {
   state.monsterCompendium[monsterId].encountered = true;
   state.monsterCompendium[monsterId].kills = Math.max(0, Math.floor(state.monsterCompendium[monsterId].kills ?? 0)) + 1;
   monster.compendiumKillRecorded = true;
+  window.DepthboundAchievements?.monsterKill?.(monster);
   return true;
 }
 
@@ -2148,6 +2159,8 @@ function createFriendlyBeastFromMonster(monsterId, options = {}) {
     className: options.className ?? (companion ? "Beast Companion" : "Beast Ally"),
     sidekickClassName: options.sidekickClassName,
     sidekickWarriorRole: options.sidekickWarriorRole,
+    sidekickStartingLevel: options.sidekickStartingLevel,
+    sidekickEligibleClasses: options.sidekickEligibleClasses,
     rangerCompanion: options.rangerCompanion,
     rangerCompanionOwnerId: options.rangerCompanionOwnerId,
     rangerCompanionNormalMaxHp: options.rangerCompanionNormalMaxHp ?? template.maxHp,
@@ -3937,20 +3950,27 @@ function idsMatchingTagGroups(type, tagGroups = [], options = {}) {
     .map((entry) => entry.id);
 }
 
-function dungeonMonsterIds(themeId = currentThemeId()) {
+function dungeonMonsterIds(themeId = currentThemeId(), options = {}) {
   const theme = getContentDefinition("themes", themeId);
-  const tagGroups = normalizeTagGroups(theme?.monsterTagGroups, theme?.monsterTags);
+  const tagGroups = [
+    ...normalizeTagGroups(theme?.monsterTagGroups, theme?.monsterTags),
+    ...normalizeTagGroups(options.monsterTagGroups, options.monsterTags),
+  ];
   const taggedMonsterIds = monsterIdsMatchingTagGroups(tagGroups, { includeBosses: false });
   if (taggedMonsterIds.length) return taggedMonsterIds;
-  return theme?.monsterIds?.length ? theme.monsterIds : [defaultContent.monster];
+  const monsterIds = [...(theme?.monsterIds ?? []), ...(options.monsterIds ?? [])];
+  return monsterIds.length ? monsterIds : [defaultContent.monster];
 }
 
-function dungeonBossMonsterIds(themeId = currentThemeId()) {
+function dungeonBossMonsterIds(themeId = currentThemeId(), options = {}) {
   const theme = getContentDefinition("themes", themeId);
-  const bossTagGroups = normalizeTagGroups(theme?.bossMonsterTagGroups, theme?.bossMonsterTags);
+  const bossTagGroups = [
+    ...normalizeTagGroups(theme?.bossMonsterTagGroups, theme?.bossMonsterTags),
+    ...normalizeTagGroups(options.bossMonsterTagGroups, options.bossMonsterTags),
+  ];
   const taggedBossMonsterIds = monsterIdsMatchingTagGroups(bossTagGroups);
   if (taggedBossMonsterIds.length) return taggedBossMonsterIds;
-  return theme?.bossMonsterIds ?? [];
+  return [...(theme?.bossMonsterIds ?? []), ...(options.bossMonsterIds ?? [])];
 }
 
 function categoryForHeroLevel(level = 1) {
@@ -4074,9 +4094,9 @@ function roomMonsterSpawnCount(monsterTemplate, hero) {
   return minimum + Math.floor(Math.random() * (maximum - minimum + 1));
 }
 
-function weightedMonsterIdsForHero(hero, themeId = currentThemeId()) {
+function weightedMonsterIdsForHero(hero, themeId = currentThemeId(), options = {}) {
   const targetCategory = partyTargetMonsterCategory(hero);
-  const allowedMonsterIds = dungeonMonsterIds(themeId);
+  const allowedMonsterIds = dungeonMonsterIds(themeId, options);
   const entries = allowedMonsterIds
     .map((id) => ({ id, template: getMonsterTemplate(id) }))
     .filter((entry) => entry.template && monsterCategory(entry.template) <= targetCategory)
@@ -4128,10 +4148,12 @@ function monsterRolesComplement(a = "melee", b = "melee") {
   return false;
 }
 
-function pickCompanionMonsterTemplate(anchorTemplate, roomTemplates, monsterEntries, usedCounts, localCounts, fallbackTemplate) {
+function pickCompanionMonsterTemplate(anchorTemplate, roomTemplates, monsterEntries, usedCounts, localCounts, fallbackTemplate, options = {}) {
   const anchorTags = monsterMeaningfulTags(anchorTemplate);
   const roomRoles = new Set(roomTemplates.map(monsterCombatRole));
   const anchorRole = monsterCombatRole(anchorTemplate);
+  const sameMonsterWeight = Number.isFinite(options.sameMonsterWeight) ? options.sameMonsterWeight : 0.7;
+  const localDuplicatePenalty = Number.isFinite(options.localDuplicatePenalty) ? options.localDuplicatePenalty : 0.9;
   const matchingTagCandidates = monsterEntries
     .map((entry) => entry.template ?? getMonsterTemplate(entry.id))
     .filter((template) => template && template.behavior !== "swarm")
@@ -4151,8 +4173,9 @@ function pickCompanionMonsterTemplate(anchorTemplate, roomTemplates, monsterEntr
       if (sharedTagCount === 0) weight *= offThemeAllowed ? 0.04 : 0;
       if (monsterRolesComplement(anchorRole, role) || Array.from(roomRoles).some((existingRole) => monsterRolesComplement(existingRole, role))) weight *= 1.75;
       if (roomRoles.has(role)) weight *= 0.65;
-      if (entry.id === anchorTemplate.id && monsterEntries.length > 1) weight *= 0.22;
-      weight /= Math.max(1, (usedCounts[entry.id] ?? 0) + alreadyInRoom + 1);
+      if (entry.id === anchorTemplate.id && monsterEntries.length > 1) weight *= sameMonsterWeight;
+      weight /= Math.max(1, (usedCounts[entry.id] ?? 0) + 1);
+      if (alreadyInRoom > 0) weight /= 1 + alreadyInRoom * localDuplicatePenalty;
       return { template, weight: weight > 0 ? Math.max(0.01, weight) : 0 };
     })
     .filter((entry) => entry.weight > 0);
@@ -4170,17 +4193,24 @@ function roomMonsterComposition(anchorTemplate, spawnCount, monsterEntries, used
   if (anchorTemplate.behavior === "swarm" || spawnCount <= 1) return Array.from({ length: spawnCount }, () => anchorTemplate);
   const templates = [anchorTemplate];
   const localCounts = { [anchorTemplate.id]: 1 };
+  const repeatPack = Math.random() < 0.38;
   while (templates.length < spawnCount) {
-    const companion = pickCompanionMonsterTemplate(anchorTemplate, templates, monsterEntries, usedCounts, localCounts, anchorTemplate);
+    const useAnchorRepeat = repeatPack && templates.length < spawnCount && Math.random() < (templates.length === 1 ? 0.72 : 0.48);
+    const companion = useAnchorRepeat
+      ? anchorTemplate
+      : pickCompanionMonsterTemplate(anchorTemplate, templates, monsterEntries, usedCounts, localCounts, anchorTemplate, {
+          sameMonsterWeight: repeatPack ? 3.2 : 0.75,
+          localDuplicatePenalty: repeatPack ? 0.25 : 0.9,
+        });
     templates.push(companion);
     localCounts[companion.id] = (localCounts[companion.id] ?? 0) + 1;
   }
   return templates;
 }
 
-function bossMonsterIdForHero(hero, themeId = currentThemeId()) {
+function bossMonsterIdForHero(hero, themeId = currentThemeId(), options = {}) {
   const targetCategory = partyTargetMonsterCategory(hero);
-  const bosses = dungeonBossMonsterIds(themeId)
+  const bosses = dungeonBossMonsterIds(themeId, options)
     .map((id) => ({ id, template: getMonsterTemplate(id) }))
     .filter((entry) => entry.template && monsterCategory(entry.template) <= targetCategory)
     .sort((a, b) => monsterCategory(b.template) - monsterCategory(a.template));
@@ -4897,6 +4927,64 @@ function tryCreatePortalPair(dungeon, blockedKeys, objects, objectId, themeId = 
   blockedKeys.add(positionKey(second));
 }
 
+function roomCenterCell(room) {
+  const cells = room?.cells ?? [];
+  if (!cells.length) return null;
+  const total = cells.reduce((sum, cell) => ({ x: sum.x + cell.x, y: sum.y + cell.y }), { x: 0, y: 0 });
+  return {
+    x: Math.round(total.x / cells.length),
+    y: Math.round(total.y / cells.length),
+  };
+}
+
+function towerPortalCell(room, blockedKeys, preference = null) {
+  const centerCell = roomCenterCell(room);
+  const origin = preference ?? centerCell;
+  const doorKeys = roomDoorKeys(room);
+  return (room?.cells ?? [])
+    .filter((cell) => !doorKeys.has(positionKey(cell)))
+    .filter((cell) => !blockedKeys.has(positionKey(cell)))
+    .slice()
+    .sort((a, b) => {
+      const aCenterDistance = centerCell ? distance(a, centerCell) : 0;
+      const bCenterDistance = centerCell ? distance(b, centerCell) : 0;
+      const aPreferenceDistance = origin ? distance(a, origin) : 0;
+      const bPreferenceDistance = origin ? distance(b, origin) : 0;
+      return aPreferenceDistance + aCenterDistance * 0.35 - (bPreferenceDistance + bCenterDistance * 0.35);
+    })[0] ?? null;
+}
+
+function createTowerPortalLinks(dungeon, blockedKeys, objects, themeId = currentThemeId()) {
+  const links = dungeon?.portalLinks ?? [];
+  if (!links.length || !objectTemplate("portal")) return false;
+
+  const roomsById = new Map((dungeon.rooms ?? []).map((room) => [room.id, room]));
+  let createdAny = false;
+  links.forEach((link, index) => {
+    const fromRoom = roomsById.get(link.fromRoomId);
+    const toRoom = roomsById.get(link.toRoomId);
+    if (!fromRoom || !toRoom) return;
+
+    const fromCenter = roomCenterCell(fromRoom);
+    const toCenter = roomCenterCell(toRoom);
+    const from = towerPortalCell(fromRoom, blockedKeys, toCenter);
+    const to = towerPortalCell(toRoom, blockedKeys, fromCenter);
+    if (!from || !to) return;
+
+    const firstId = `tower-portal-${index + 1}-up`;
+    const secondId = `tower-portal-${index + 1}-down`;
+    objects.push(
+      { ...createFeatureObject("portal", from, firstId, themeId), roomId: fromRoom.id, pairId: secondId },
+      { ...createFeatureObject("portal", to, secondId, themeId), roomId: toRoom.id, pairId: firstId },
+    );
+    blockedKeys.add(positionKey(from));
+    blockedKeys.add(positionKey(to));
+    createdAny = true;
+  });
+
+  return createdAny;
+}
+
 function chestLootPool(level = averagePartyLevel()) {
   const budget = lootBudgetForPartyLevel(level);
   const sourceItems = typeof dungeonLootItems === "function" ? dungeonLootItems() : window.DungeonContent.list("items");
@@ -4974,6 +5062,7 @@ function createDungeonObjects(dungeon, reservedPositions = [], themeId = current
   const blockedKeys = new Set((dungeon.doors ?? []).map(positionKey));
   reservedPositions.forEach((position) => blockedKeys.add(positionKey(position)));
   const objectId = (type) => `${type}-${objects.length + 1}`;
+  const hasTowerPortalLinks = createTowerPortalLinks(dungeon, blockedKeys, objects, themeId);
 
   const placeObjectInRoom = (type, room) => {
     const template = objectTemplate(type);
@@ -5040,7 +5129,7 @@ function createDungeonObjects(dungeon, reservedPositions = [], themeId = current
     }
   }
 
-  if (allowedFurniture.has("portal")) {
+  if (allowedFurniture.has("portal") && !hasTowerPortalLinks) {
     tryCreatePortalPair(dungeon, blockedKeys, objects, objectId, themeId);
   }
 
@@ -6656,13 +6745,13 @@ function dungeonEncounterRooms(dungeon, bossRoomId = "", encounterTarget = null)
   );
 }
 
-function createDungeonMonsters(dungeon, heroPosition, hero, exitRoomId = "", dungeonObjects = [], themeId = currentThemeId(), encounterTarget = null) {
+function createDungeonMonsters(dungeon, heroPosition, hero, exitRoomId = "", dungeonObjects = [], themeId = currentThemeId(), encounterTarget = null, options = {}) {
   const monsters = {};
   const rooms = dungeon.rooms;
-  const bossMonsterId = heroNeedsDungeonBoss(hero) ? bossMonsterIdForHero(hero, themeId) : null;
+  const bossMonsterId = heroNeedsDungeonBoss(hero) ? bossMonsterIdForHero(hero, themeId, options) : null;
   const bossRoomId = bossMonsterId ? exitRoomId || createDungeonExit(dungeon, heroPosition).roomId : null;
   const encounterRoomIds = dungeonEncounterRooms(dungeon, bossRoomId, encounterTarget);
-  const monsterEntries = weightedMonsterIdsForHero(hero, themeId);
+  const monsterEntries = weightedMonsterIdsForHero(hero, themeId, options);
   const usedMonsterCounts = {};
   const floorKeys = spawnFloorKeysForDungeon(dungeon);
   const objectBlockedKeys = new Set(
@@ -6837,6 +6926,13 @@ function normalizeLoadedState(loadedState) {
     worldDay: normalizeWorldDay(loadedState.worldDay ?? freshState.worldDay),
     shortRestsUsed: loadedState.shortRestsUsed ?? (loadedState.shortRestUsed ? 1 : 0),
     shortRestLimit: loadedState.shortRestLimit ?? shortRestLimitForTheme(null, 3),
+    runStats: {
+      heroesDied: Math.max(0, Math.floor(Number(loadedState.runStats?.heroesDied) || 0)),
+      healingPotionsDrunk: Math.max(0, Math.floor(Number(loadedState.runStats?.healingPotionsDrunk) || 0)),
+      deathSaveHeroIds: Array.isArray(loadedState.runStats?.deathSaveHeroIds) ? loadedState.runStats.deathSaveHeroIds.filter(Boolean) : [],
+      currentFightHadBoss: Boolean(loadedState.runStats?.currentFightHadBoss),
+      currentFightDeathSaveSuccess: Boolean(loadedState.runStats?.currentFightDeathSaveSuccess),
+    },
     dungeonClock: createDungeonClock({ ...loadedState.dungeonClock, lastRealMs: Date.now() }),
     grabbedEntity: loadedState.grabbedEntity ?? null,
     chest: Array.isArray(loadedState.chest) ? loadedState.chest.map(normalizeItem) : [],

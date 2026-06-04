@@ -2706,6 +2706,14 @@ function showCombatantInfo(fighter) {
   els.fighterInfo.classList.remove("hidden");
 }
 
+function fighterCanPickLocks(fighter) {
+  if (!fighter) return false;
+  if (isRangerBeastCompanion(fighter) || isWildShaped(fighter)) return false;
+  const templateTags = fighter.baseMonsterId ? (getMonsterTemplate(fighter.baseMonsterId)?.tags ?? []) : [];
+  const tags = new Set([...(fighter.tags ?? []), ...templateTags].map((tag) => String(tag).toLowerCase()));
+  return fighter.type !== "beast" && !tags.has("beast");
+}
+
 function showDungeonObjectInfo(object) {
   els.fighterInfo.classList.remove("home-builder-dock");
   const template =
@@ -2736,7 +2744,7 @@ function showDungeonObjectInfo(object) {
   const specialLock = normalizeSpecialLock(object.specialLock);
   const canLootObject = (objectHasLoot(object) || isHomeChest || isHomePlacedContainer) && objectAdjacent && canActInCombat && !objectLocked;
   const heroTriedLock = Boolean(object.lockAttemptsByHero?.[hero.id]);
-  const canPickLock = objectLocked && !specialLock && objectAdjacent && canActInCombat && !heroTriedLock;
+  const canPickLock = objectLocked && !specialLock && objectAdjacent && canActInCombat && fighterCanPickLocks(hero) && !heroTriedLock;
   const canAnswerSpecialLock = objectLocked && specialLock && objectAdjacent && canActInCombat;
   const disarmTarget = object.trap ?? object;
   const heroTriedDisarm = Boolean(disarmTarget.disarmAttemptsByHero?.[hero.id]);
@@ -3092,6 +3100,14 @@ async function playHomeInstrument(objectId) {
   object.lastResult = instrument.magicalAutoplay
     ? `${hero.name} touches the ${objectTemplate(object.type)?.name ?? "instrument"}, and ${song.name ?? "a piece"} answers through the pipes.`
     : `${hero.name} plays ${song.name ?? "a piece"} on the ${toolName(requiredTool)}.`;
+  window.DepthboundAchievements?.unlock?.("room-with-a-tune", undefined, { objectId: object.id, songId: song.id });
+  if (
+    object.type === "haunted-organ" &&
+    state.campaignId === "barrow-crown" &&
+    (state.customDungeonId === "the-barrow-crown-dungeon-5" || Math.floor(Number(state.campaignIndex) || 0) === 5)
+  ) {
+    window.DepthboundAchievements?.unlock?.("silent-cathedral", undefined, { objectId: object.id, songId: song.id });
+  }
   addLog(object.lastResult, "important");
   updateBackgroundMusic();
   showDungeonObjectInfo(object);
@@ -3735,6 +3751,7 @@ function saveHomeBuilderChanges() {
   consumePendingHomeDecorPlacements();
   syncHomeLayoutToDungeon();
   homeBuilderSnapshot = cloneData(state.home);
+  window.DepthboundAchievements?.homeObjectCount?.();
   addLog(buildCostCp > 0 ? `Home layout saved. Paid ${moneyText(cpToMoney(buildCostCp))} from the home chest.` : "Home layout saved.", "important");
   renderHomeBuilder();
   render();
@@ -4169,6 +4186,7 @@ function cookHomeMeal() {
     hero.statusEffects.push({ id: "home-hearty-meal", label: "Hearty Meal", maxHpBonus: 2, saveBonus: 1, expiresAtHome: true });
     refreshDerivedStats(hero);
   }
+  window.DepthboundAchievements?.unlock?.("soup-before-steel");
   addLog("The party shares a hearty meal: +2 max HP and +1 saves until returning home.", "important");
   render();
   showDungeonObjectInfo(dungeonObjectForId("home-cooking-pot") ?? { type: "home-cooking-pot", position: { x: 2, y: 1 }, homePlaced: true });
@@ -4187,6 +4205,7 @@ function harvestHomeHerbs() {
     addLog(`${activeHero().name} harvests herbs and prepares ${potion.name}.`, "important");
     state.home.herbsReady = false;
     syncHomeLayoutToDungeon();
+    window.DepthboundAchievements?.unlock?.("green-thumb-red-hands");
   }
   render();
   showDungeonObjectInfo(dungeonObjectForId("home-herb-garden") ?? { type: "home-herb-garden", position: { x: 11, y: 18 }, homePlaced: true });
@@ -4207,6 +4226,7 @@ function assignHomeBed(objectId, heroId) {
   }
   if (normalizedHeroId) {
     bed.assignedHeroId = normalizedHeroId;
+    window.DepthboundAchievements?.unlock?.("the-first-good-bed");
     addLog(`${objectTemplate(bed.type)?.name ?? "Bed"} assigned to ${state.fighters[normalizedHeroId].name}.`, "important");
   } else {
     delete bed.assignedHeroId;
@@ -4361,7 +4381,12 @@ function captiveCreatureMonsterId(object) {
   if (!component) return null;
   if (object.captiveMonsterId) return object.captiveMonsterId;
   const monsterIds = component.monsterIds ?? (component.monsterId ? [component.monsterId] : []);
-  return monsterIds.find((monsterId) => getMonsterTemplate(monsterId)) ?? null;
+  const validIds = monsterIds.filter((monsterId) => getMonsterTemplate(monsterId));
+  if (component.randomCaptive && validIds.length) {
+    object.captiveMonsterId = validIds[Math.floor(Math.random() * validIds.length)];
+    return object.captiveMonsterId;
+  }
+  return validIds[0] ?? null;
 }
 
 function captiveCreatureLabel(object) {
@@ -4457,6 +4482,8 @@ function freeCaptiveCreature(objectId) {
       control: component.control ?? "ai",
       renameable: true,
       className: component.allyKind ?? (template.tags?.[0] === "undead" ? "Undead Ally" : "Beast Ally"),
+      sidekickStartingLevel: component.sidekickStartingLevel ?? template.recruitMockLevel ?? template.level ?? 1,
+      sidekickEligibleClasses: component.sidekickEligibleClasses,
     });
     if (ally) {
       ally.roomId = roomForPosition(position)?.id ?? roomForPosition(object.position)?.id ?? "captive";
@@ -4969,6 +4996,11 @@ function pickObjectLock(objectId) {
   const object = dungeonObjectForId(objectId);
   const hero = activeHero();
   if (!object || !object.locked || normalizeSpecialLock(object.specialLock)) return;
+  if (!fighterCanPickLocks(hero)) {
+    addLog(`${hero?.name ?? "That companion"} cannot pick locks.`);
+    renderLog();
+    return;
+  }
   if (
     (state.mode === "combat" && activeFighter()?.id !== hero.id) ||
     !objectCells(object).some((cell) => Math.max(Math.abs(hero.position.x - cell.x), Math.abs(hero.position.y - cell.y)) === 1)
@@ -4983,16 +5015,18 @@ function pickObjectLock(objectId) {
   const rollResult = rollD20ForFighter(hero);
   const roll = reliableTalentRoll(hero, "disarm", rollResult.roll);
   const bonus = thievesToolsCheckBonus(hero);
-  const total = roll + bonus;
+  const guidance = guidanceSkillBonus();
+  const total = roll + bonus + guidance;
   const dc = object.lockDc ?? 12;
   const training = thievesToolsTraining(hero);
   const trainingLabel = training === 2 ? " with thieves' tools expertise" : training === 1 ? " with thieves' tools proficiency" : "";
-  const attemptText = `${hero.name} picks the lock${trainingLabel}: DEX ${roll} ${abilityLabel(bonus)} = ${total} vs DC ${dc}.`;
+  const guidanceText = guidance ? ` + Guidance ${guidance}` : "";
+  const attemptText = `${hero.name} picks the lock${trainingLabel}: DEX ${roll} ${abilityLabel(bonus)}${guidanceText} = ${total} vs DC ${dc}.`;
   object.lockAttemptsByHero ??= {};
   object.lockAttemptsByHero[hero.id] = true;
   object.lastResult = attemptText;
   addLog(attemptText, "important");
-  addAdminCheckLog({ actor: hero, label: "Thieves' Tools check to pick lock", target: objectTemplate(object.type)?.name ?? "object", rollResult, bonus, total, dc, success: total >= dc, note: trainingLabel ? trainingLabel.trim() : "not proficient" });
+  addAdminCheckLog({ actor: hero, label: "Thieves' Tools check to pick lock", target: objectTemplate(object.type)?.name ?? "object", rollResult, bonus, guidance, total, dc, success: total >= dc, note: trainingLabel ? trainingLabel.trim() : "not proficient" });
   if (total >= dc) {
     object.locked = false;
     object.lastResult += " The lock clicks open.";
@@ -5676,6 +5710,13 @@ async function resolveBarrowCrownDecision(hero, object, template, component) {
   object.uniqueInteractionClaimed = true;
   object.spent = true;
   object.lastResult = choice === "destroy" ? "The party chooses to destroy the Barrow Crown." : "The party chooses to claim the Barrow Crown.";
+  if (
+    choice === "claim" &&
+    state.campaignId === "barrow-crown" &&
+    (state.customDungeonId === "the-barrow-crown-crown-vault" || Math.floor(Number(state.campaignIndex) || 0) === 6)
+  ) {
+    window.DepthboundAchievements?.unlock?.("ripple-no", undefined, { objectId: object.id, choice });
+  }
   if (state.customDungeon) {
     state.customDungeon.outro = {
       text: barrowCrownDecisionOutros[choice],
@@ -9390,6 +9431,7 @@ function buildManualRoadSegmentAtCamp() {
   build.safe = true;
   build.pendingDanger = false;
   build.blockedReason = "";
+  window.DepthboundAchievements?.unlock?.("one-segment-safer", undefined, { edge: key, projectId: project?.id ?? build.projectId ?? "manual" });
   addLog(`The party spends 1 Road-Building Kit and marks a road from ${travelPlaceLabelForHex(from)} to ${travelPlaceLabelForHex(to)}.`, "important");
   if (project && expeditionRoadProjectComplete(project)) addLog(`Road project ready to file: ${project.targetLabel}.`, "important");
   renderTravelCampMenu();
@@ -9419,6 +9461,7 @@ function travelAutoAttachSettlementRoad(manualRoadBuild = null, destinationName 
     settlementTieIn: true,
     builtAtDay: normalizeWorldDay(state.worldDay),
   };
+  window.DepthboundAchievements?.unlock?.("one-segment-safer", undefined, { edge: key, projectId: project?.id ?? build.projectId ?? "manual" });
   if (build) {
     build.built = true;
     build.safe = true;
@@ -9546,6 +9589,7 @@ function travelHexClasses(tile, structure, row, col, chunkX = null, chunkY = nul
   if (current && travelSameHex(current, hex)) classes.push("current");
   if (home && travelSameHex(home, hex)) classes.push("home");
   if (world.discoveredHexes?.[travelHexKey(row, col, chunkX, chunkY)]) classes.push("discovered");
+  if (expeditionTeleportCirclePlacementPending() && (world.discoveredHexes?.[travelHexKey(row, col, chunkX, chunkY)] || travelSameHex(current, hex))) classes.push("teleport-placement-target");
   if (adminTravelTeleportEnabled()) classes.push("admin-teleport-target");
   return classes.join(" ");
 }
@@ -9563,6 +9607,7 @@ function travelMarkerMarkup(structure, row, col, chunkX = null, chunkY = null) {
   const roadProject = expeditionActiveRoadProjectAtHex(hex);
   if (boardQuest) markers.push(`<span class="travel-marker quest-marker">Quest</span>`);
   if (roadProject && travelSameHex(roadProject.target, hex)) markers.push(`<span class="travel-marker quest-marker">Road</span>`);
+  if (travelTeleportCircleAtHex(hex)) markers.push(`<span class="travel-marker">Circle</span>`);
   if (travelRumorAtHex(hex)) markers.push(`<span class="travel-marker rumor-marker">Rumor</span>`);
   if (routeStep) markers.push(`<span class="travel-marker route-marker">${escapeHtml(routeStep)}</span>`);
   return markers.join("");
@@ -9850,6 +9895,7 @@ function adminTeleportTravelPartyToHex(row, col, chunkX = null, chunkY = null) {
 
 function handleTravelMapHexSelection(row, col, chunkX = null, chunkY = null) {
   if (adminTeleportTravelPartyToHex(row, col, chunkX, chunkY)) return;
+  if (placePendingExpeditionTeleportCircle(travelHexForCell(row, col, chunkX, chunkY))) return;
   selectTravelRouteHex(row, col, chunkX, chunkY);
 }
 
@@ -11624,6 +11670,7 @@ async function travelRememberTeleportCircle(hex = null) {
     discoveredDay: world.teleportCircles[id]?.discoveredDay ?? normalizeWorldDay(state.worldDay),
   };
   if (!home) world.teleportUnlocked = true;
+  if (!home) window.DepthboundAchievements?.unlock?.("old-circle-new-shortcut", undefined, { circleId: id, label: world.teleportCircles[id].label });
   if (firstKnownNonHome && !world.teleportIntroShown) {
     world.teleportIntroShown = true;
     await showTravelMapNotice({
@@ -12296,6 +12343,7 @@ function travelRegisterStructureVisit(feature = null, day = normalizeWorldDay(st
     lastVisitedDay: day,
   };
   state.world.visitedStructures[feature.id] = next;
+  window.DepthboundAchievements?.unlock?.("first-structure-visit", undefined, { structureId: feature.id, count: next.count });
   return next.count;
 }
 
@@ -14029,6 +14077,7 @@ function acceptSettlementBoardQuest(questId = "") {
   if (!entry?.quest || entry.quest.status !== "available") return false;
   entry.quest.status = "accepted";
   entry.quest.acceptedDay = normalizeWorldDay(state.worldDay);
+  window.DepthboundAchievements?.unlock?.("posted-work", undefined, { questId: entry.quest.id ?? questId });
   addLog(`${entry.quest.title} is accepted. The target is marked on the travel map.`, "important");
   render();
   renderSettlementQuestBoardMenu();
@@ -14048,6 +14097,7 @@ function completeSettlementBoardQuest(quest = null) {
   if (!quest || quest.status !== "accepted") return false;
   quest.status = "completed";
   quest.completedDay = normalizeWorldDay(state.worldDay);
+  window.DepthboundAchievements?.unlock?.("stamp-paid", undefined, { questId: quest.id ?? "" });
   addLog(`${quest.title} is complete. Return to ${quest.sourceName ?? "the quest board"} to claim the reward.`, "important");
   return true;
 }
@@ -14080,6 +14130,7 @@ function completeSettlementBoardQuestForTravelReturn(travelReturnCamp = null, qu
     if (!quest) continue;
     quest.status = "completed";
     quest.completedDay = normalizeWorldDay(state.worldDay);
+    window.DepthboundAchievements?.unlock?.("stamp-paid", undefined, { questId: quest.id ?? "" });
     return { title: quest.title, rewardCp: Math.max(0, Math.floor(Number(quest.rewardCp) || 0)), sourceName: quest.sourceName ?? "the quest board" };
   }
   return null;
@@ -15448,6 +15499,29 @@ function teleportToKnownCircle(circleId = "") {
     travelArriveHome(circle.label ?? "home");
     return;
   }
+  if (circle.playerPlaced) {
+    world.currentHex = cloneData(circle.hex);
+    world.travelPlan = [];
+    world.routeConfirmed = false;
+    world.travelCamp = {
+      active: true,
+      kind: "circle-camp",
+      locationName: circle.label ?? "Expedition Circle",
+      day: normalizeWorldDay(state.worldDay),
+      at: cloneData(circle.hex),
+      summary: `The party arrives through the teleportation circle at ${circle.label ?? "an expedition circle"}.`,
+      mealResolved: false,
+      rested: false,
+    };
+    world.discoveredHexes ??= {};
+    world.discoveredHexes[window.DepthboundWorldTravel?.cellId?.(circle.hex.chunkX, circle.hex.chunkY, circle.hex.row, circle.hex.col) ?? `${circle.hex.chunkX},${circle.hex.chunkY}:${circle.hex.row},${circle.hex.col}`] = true;
+    addLog(`The party steps through the teleportation circle and arrives at ${circle.label ?? "an expedition circle"}.`, "important");
+    hideVillageMenu();
+    hideHomeMenu();
+    showTravelCampMenu();
+    window.DepthboundPlaytest?.syncNow?.();
+    return;
+  }
   const settlementRest = travelSettlementRestData(circle.hex, circle.label ?? "known circle");
   world.currentHex = cloneData(circle.hex);
   world.travelPlan = [];
@@ -16438,7 +16512,9 @@ function maybeUnlockNpcProgress() {
 }
 
 function maybeTriggerNpcArrivals() {
-  return Object.values(window.DungeonNpcBehaviors ?? {}).some((behavior) => behavior.maybeTriggerArrival?.());
+  const triggered = Object.values(window.DungeonNpcBehaviors ?? {}).some((behavior) => behavior.maybeTriggerArrival?.());
+  if (triggered) window.DepthboundAchievements?.syncFromState?.();
+  return triggered;
 }
 
 function handleNpcDungeonComplete(context) {
@@ -17028,6 +17104,7 @@ function completeMonsterHunterContract(contractId) {
   const progress = monsterHunterProgress();
   progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
   progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
+  window.DepthboundAchievements?.factionWork?.(monsterHunterGuildId, "contract");
   addLog(`The Trophy Lodge pays ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
   render();
   renderMonsterHunterGuild();
@@ -17042,6 +17119,7 @@ function completeMonsterHunterTurnIn(turnInId) {
   const progress = monsterHunterProgress();
   progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
   progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
+  window.DepthboundAchievements?.factionWork?.(monsterHunterGuildId, "turn-in");
   addLog(`Kessa Briarhook accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Trophy Lodge reputation +${turnIn.reputation}.`, "important");
   render();
   renderMonsterHunterGuild();
@@ -17750,6 +17828,7 @@ function completeGravebinderContract(contractId) {
   const progress = gravebinderProgress();
   progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
   progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
+  window.DepthboundAchievements?.factionWork?.(gravebinderGuildId, "contract");
   addLog(`The Gravebinders pay ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
   render();
   renderGravebinderGuild();
@@ -17764,6 +17843,7 @@ function completeGravebinderTurnIn(turnInId) {
   const progress = gravebinderProgress();
   progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
   progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
+  window.DepthboundAchievements?.factionWork?.(gravebinderGuildId, "turn-in");
   addLog(`Odran Vellshade accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Gravebinder reputation +${turnIn.reputation}.`, "important");
   render();
   renderGravebinderGuild();
@@ -18302,6 +18382,7 @@ function completeCrucibleContract(contractId) {
   const progress = crucibleProgress();
   progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
   progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
+  window.DepthboundAchievements?.factionWork?.(crucibleGuildId, "contract");
   addLog(`The Crucible Collegium pays ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
   render();
   renderCrucibleGuild();
@@ -18316,6 +18397,7 @@ function completeCrucibleTurnIn(turnInId) {
   const progress = crucibleProgress();
   progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
   progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
+  window.DepthboundAchievements?.factionWork?.(crucibleGuildId, "turn-in");
   addLog(`Tavren Quillflare accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Collegium reputation +${turnIn.reputation}.`, "important");
   render();
   renderCrucibleGuild();
@@ -18875,6 +18957,7 @@ function completeAntiquarianContract(contractId) {
   const progress = antiquarianProgress();
   progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
   progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
+  window.DepthboundAchievements?.factionWork?.(antiquarianGuildId, "contract");
   addLog(`The Antiquarian Society pays ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
   render();
   renderAntiquarianGuild();
@@ -18889,6 +18972,7 @@ function completeAntiquarianTurnIn(turnInId) {
   const progress = antiquarianProgress();
   progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
   progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
+  window.DepthboundAchievements?.factionWork?.(antiquarianGuildId, "turn-in");
   addLog(`Professor Seraphel Inkglass accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Antiquarian reputation +${turnIn.reputation}.`, "important");
   render();
   renderAntiquarianGuild();
@@ -19345,6 +19429,7 @@ function createCompactGuildBoard(config) {
     const guildProgress = progress();
     guildProgress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
     guildProgress.completedContracts[contract.id] = (guildProgress.completedContracts[contract.id] ?? 0) + 1;
+    window.DepthboundAchievements?.factionWork?.(config.id, "contract");
     addLog(`${config.payLogName} pays ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
     render();
     renderGuild();
@@ -19359,6 +19444,7 @@ function createCompactGuildBoard(config) {
     const guildProgress = progress();
     guildProgress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
     guildProgress.turnIns[turnIn.id] = (guildProgress.turnIns[turnIn.id] ?? 0) + 1;
+    window.DepthboundAchievements?.factionWork?.(config.id, "turn-in");
     addLog(`${config.turnInLogName} accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Reputation +${turnIn.reputation}.`, "important");
     render();
     renderGuild();
@@ -19795,6 +19881,8 @@ function claimExpeditionRoadProject(projectId = "") {
   project.completedAt = Date.now();
   const progress = expeditionBoardApi.progress();
   progress.reputation += Math.max(0, Math.floor(Number(project.reputation) || 0));
+  window.DepthboundAchievements?.unlock?.("line-on-the-ledger", undefined, { projectId: project.id, targetLabel: project.targetLabel });
+  window.DepthboundAchievements?.factionWork?.("expedition-board", "road");
   addMoney(partyPurse(), project.rewardCp);
   addTravelRoadKits(Math.max(1, Math.floor(Number(project.bonusKits) || 1)));
   roadState.connectedTargets[project.targetId || travelHexKeyForHex(project.target)] = {
@@ -19855,15 +19943,89 @@ const expeditionMilepostMissionNames = [
   "The Last Milepost",
 ];
 
+const expeditionMilepostMissionDifficulties = [
+  { category: 2, partyLevels: "3-4" },
+  { category: 4, partyLevels: "7-8" },
+  { category: 6, partyLevels: "11-12" },
+  { category: 8, partyLevels: "15-16" },
+];
+
+const expeditionTeleportCircleCostCp = 500000;
+
 function expeditionMilepostContractState() {
   return expeditionBoardApi.progress().contracts?.["campaign-mileposts"] ?? null;
+}
+
+function expeditionMilepostCompletedCount() {
+  return Math.max(0, Math.floor(Number(state?.campaignProgress?.["expedition-mileposts"]) || 0));
+}
+
+function expeditionTeleportCirclesUnlocked() {
+  return Boolean(state?.questFlags?.expeditionTeleportCirclesUnlocked) || expeditionMilepostCompletedCount() >= expeditionMilepostMissionNames.length;
+}
+
+function expeditionTeleportCirclePlacementPending() {
+  return state?.questFlags?.expeditionTeleportCirclePlacement?.pending ? state.questFlags.expeditionTeleportCirclePlacement : null;
+}
+
+function expeditionPlayerTeleportCircles() {
+  return travelKnownTeleportCircles().filter((circle) => circle.playerPlaced || circle.kind === "Expedition Circle");
+}
+
+function travelTeleportCircleAtHex(hex = null) {
+  const target = travelNormalizeHex(hex);
+  if (!target) return null;
+  return travelKnownTeleportCircles().find((circle) => travelSameHex(circle.hex, target)) ?? null;
+}
+
+function expeditionTeleportRewardMarkup() {
+  const unlocked = expeditionTeleportCirclesUnlocked();
+  const pending = expeditionTeleportCirclePlacementPending();
+  const circles = expeditionPlayerTeleportCircles();
+  const affordable = moneyToCp(partyPurse()) >= expeditionTeleportCircleCostCp;
+  const progress = `${Math.min(expeditionMilepostCompletedCount(), expeditionMilepostMissionNames.length)} / ${expeditionMilepostMissionNames.length}`;
+  return `
+    <section class="guild-section expedition-milepost-reward">
+      <h3>Ledger Reward: Expedition Circles</h3>
+      <p>${escapeHtml(unlocked
+        ? "The Board will now sell permanent teleportation circle charters for explored hexes."
+        : `Complete all Milepost Ledger missions to unlock buyable expedition teleportation circles. Progress: ${progress}.`)}</p>
+      <article class="store-row ${unlocked ? "" : "locked"}">
+        <div>
+          <b>Teleportation Circle Charter</b>
+          <span>${escapeHtml(unlocked
+            ? pending
+              ? "A paid charter is ready. Open Travel and click an explored hex to place it."
+              : "Buy a charter, then place the circle on any explored world-map hex."
+            : "Reward preview: permanent custom circles, renameable and usable like known settlement circles.")}</span>
+          <small>Price: ${escapeHtml(priceText(expeditionTeleportCircleCostCp))}. Party purse: ${escapeHtml(moneyText(partyPurse()))}.</small>
+        </div>
+        <button type="button" data-action="buy-expedition-teleport-circle" ${unlocked && affordable && !pending ? "" : "disabled"}>${escapeHtml(unlocked ? pending ? "Placement Pending" : "Buy Charter" : "Locked")}</button>
+      </article>
+      ${
+        circles.length
+          ? `<div class="store-list">${circles
+              .map((circle) => `
+                <article class="store-row">
+                  <div>
+                    <b>${escapeHtml(circle.label ?? "Expedition Circle")}</b>
+                    <span>Chunk ${escapeHtml(circle.hex.chunkX)}, ${escapeHtml(circle.hex.chunkY)} / Hex ${escapeHtml(circle.hex.row)}, ${escapeHtml(circle.hex.col)}</span>
+                  </div>
+                  <button type="button" data-action="rename-expedition-teleport-circle" data-circle="${escapeAttribute(circle.id)}">Rename</button>
+                </article>
+              `)
+              .join("")}</div>`
+          : ""
+      }
+    </section>
+  `;
 }
 
 function expeditionMilepostCampaignMarkup() {
   const contract = expeditionMilepostContractState();
   const accepted = contract?.status === "accepted";
   const completedContract = contract?.status === "completed";
-  const completed = Math.max(0, Math.floor(Number(state?.campaignProgress?.["expedition-mileposts"]) || 0));
+  const completed = expeditionMilepostCompletedCount();
   const currentReports = Math.min(2, Math.max(0, Math.floor(Number(contract?.progress) || 0)));
   const progressText = completedContract
     ? "Filed with the Board."
@@ -19879,11 +20041,13 @@ function expeditionMilepostCampaignMarkup() {
           const number = index + 1;
           const done = completed >= number;
           const unlocked = accepted && number <= completed + 1;
+          const difficulty = expeditionMilepostMissionDifficulties[index] ?? {};
           return `
             <article class="store-row ${done ? "completed" : ""}">
               <div>
                 <b>${escapeHtml(number)}. ${escapeHtml(name)}</b>
                 <span>${escapeHtml(done ? "The Board has this proof in the ledger." : "Follow a dangerous old road marker and return with a sealed field report.")}</span>
+                <small>Category ${escapeHtml(difficulty.category ?? "?")} - Party levels ${escapeHtml(difficulty.partyLevels ?? "?")}</small>
               </div>
               <button type="button" data-action="start-expedition-milepost" data-index="${number}" ${unlocked && !done ? "" : "disabled"}>${escapeHtml(done ? "Report Filed" : unlocked ? "Start Mission" : "Locked")}</button>
             </article>
@@ -19891,16 +20055,96 @@ function expeditionMilepostCampaignMarkup() {
         }).join("")}
       </div>
     </section>
+    ${expeditionTeleportRewardMarkup()}
   `;
 }
 
 async function startExpeditionMilepostMission(index) {
   const missionIndex = Math.max(1, Math.min(expeditionMilepostMissionNames.length, Math.floor(Number(index) || 1)));
-  const completed = Math.max(0, Math.floor(Number(state?.campaignProgress?.["expedition-mileposts"]) || 0));
+  const completed = expeditionMilepostCompletedCount();
   const contract = expeditionMilepostContractState();
   if (contract?.status !== "accepted" || missionIndex > completed + 1) return;
   hideVillageMenu();
   await startCampaignDungeon("expedition-mileposts", { dungeonIndex: missionIndex });
+}
+
+function buyExpeditionTeleportCircle() {
+  if (!expeditionTeleportCirclesUnlocked() || expeditionTeleportCirclePlacementPending()) return;
+  if (moneyToCp(partyPurse()) < expeditionTeleportCircleCostCp) {
+    addLog(`The Expedition Board needs ${priceText(expeditionTeleportCircleCostCp)} for a teleportation circle charter.`, "important");
+    expeditionBoardApi.renderGuild();
+    return;
+  }
+  addMoney(partyPurse(), -expeditionTeleportCircleCostCp);
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags.expeditionTeleportCirclePlacement = {
+    pending: true,
+    purchasedAt: Date.now(),
+  };
+  addLog("The Expedition Board issues a teleportation circle charter. Open Travel and click any explored hex to place it.", "important");
+  render();
+  if (typeof showTravelMapMenu === "function") {
+    void showTravelMapMenu().then(() => renderTravelRouteFeedback("Teleportation circle charter ready: click any explored hex to place it.", "note"));
+  } else {
+    expeditionBoardApi.renderGuild();
+  }
+}
+
+function placePendingExpeditionTeleportCircle(hex = null) {
+  const pending = expeditionTeleportCirclePlacementPending();
+  const world = travelEnsureTeleportData();
+  const target = travelNormalizeHex(hex);
+  if (!pending || !world || !target) return false;
+  if (!travelHexInChunk(target)) {
+    renderTravelRouteFeedback("That hex is not in a generated chunk yet.", "blocked");
+    return true;
+  }
+  const key = travelHexKeyForHex(target);
+  const discovered = Boolean(world.discoveredHexes?.[key] || travelSameHex(target, world.currentHex));
+  if (!discovered) {
+    renderTravelRouteFeedback("Expedition circles can only be placed on explored hexes.", "blocked");
+    return true;
+  }
+  if (travelTeleportCircleAtHex(target)) {
+    renderTravelRouteFeedback("A teleportation circle already marks that hex.", "blocked");
+    return true;
+  }
+  const defaultName = `Expedition Circle ${expeditionPlayerTeleportCircles().length + 1}`;
+  const entered = window.prompt?.("Name this teleportation circle:", defaultName);
+  const label = String(entered || defaultName).trim().slice(0, 60) || defaultName;
+  const id = `expedition-circle-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 7)}`;
+  world.teleportCircles[id] = {
+    id,
+    label,
+    kind: "Expedition Circle",
+    hex: cloneData(target),
+    playerPlaced: true,
+    discoveredDay: normalizeWorldDay(state.worldDay),
+  };
+  world.teleportUnlocked = true;
+  window.DepthboundAchievements?.unlock?.("old-circle-new-shortcut", undefined, { circleId: id, label });
+  world.discoveredHexes ??= {};
+  world.discoveredHexes[key] = true;
+  delete state.questFlags.expeditionTeleportCirclePlacement;
+  addLog(`The Expedition Board charter is set as ${label}.`, "important");
+  renderTravelMap();
+  renderTravelMapTooltip(target.row, target.col, target.chunkX, target.chunkY);
+  renderTravelRouteFeedback(`${label} placed. It is now available from known teleportation circles.`, "note");
+  window.DepthboundPlaytest?.syncNow?.();
+  return true;
+}
+
+function renameExpeditionTeleportCircle(circleId = "") {
+  const world = travelEnsureTeleportData();
+  const circle = world?.teleportCircles?.[circleId];
+  if (!circle?.playerPlaced) return;
+  const entered = window.prompt?.("Rename this teleportation circle:", circle.label ?? "Expedition Circle");
+  const label = String(entered || "").trim().slice(0, 60);
+  if (!label) return;
+  circle.label = label;
+  addLog(`Teleportation circle renamed to ${label}.`, "important");
+  expeditionBoardApi.renderGuild();
+  renderQuestLogButton();
 }
 
 const expeditionBoardApi = createCompactGuildBoard({
@@ -20613,6 +20857,7 @@ function awardFightingPitWave() {
   progress.bestWave = Math.max(progress.bestWave, wave);
   progress.bestCategory = Math.max(progress.bestCategory, category);
   if (boss) progress.bossesDefeated += 1;
+  window.DepthboundAchievements?.pitWave?.({ wave, category, boss, defeated, rewardCp, renown });
   addLog(`The pit adds ${priceText(rewardCp)} to the reward purse and awards ${renown} renown for ${defeated} defeated foe${defeated === 1 ? "" : "s"}.`, "important");
   return { wave, category, boss, defeated, rewardCp, renown };
 }
@@ -23787,6 +24032,8 @@ async function useUsableInventoryItem(itemId, targetId = null, options = {}) {
 
   if (item.use?.kind === "healing") {
     if (!spendItemCharge(item)) return;
+    state.runStats ??= {};
+    state.runStats.healingPotionsDrunk = Math.max(0, Math.floor(Number(state.runStats.healingPotionsDrunk) || 0)) + 1;
     const healingRoll = rollDice(item.use.dice.count, item.use.dice.sides);
     const healing = healingRoll.total + (item.use.bonus ?? 0);
     const healed = applyHealingToHero(target, healing, { sourceKind: "potion", itemId: item.id });
@@ -23802,6 +24049,8 @@ async function useUsableInventoryItem(itemId, targetId = null, options = {}) {
     void maybeFinishEncounterAfterHeroRecovery();
   } else if (item.use?.kind === "fullHealing") {
     if (!spendItemCharge(item)) return;
+    state.runStats ??= {};
+    state.runStats.healingPotionsDrunk = Math.max(0, Math.floor(Number(state.runStats.healingPotionsDrunk) || 0)) + 1;
     const healed = applyHealingToHero(target, Math.max(0, (target.maxHp ?? 0) - (target.hp ?? 0)), { sourceKind: "potion", itemId: item.id });
     playSoundEffect("potionDrink");
     const targetText = target.id === hero.id ? "" : ` on ${target.name}`;

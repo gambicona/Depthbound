@@ -181,9 +181,6 @@ Faction NPCs can:
 - Point to the settlement where the faction has a real branch.
 - Appear only in cities, or in settlements with matching traits.
 
-Current caution:
-
-- Expedition Board unlock is undecided. Their representatives should be rumor-only until the unlock route is chosen.
 
 ### Quest Unlock NPCs
 
@@ -370,13 +367,13 @@ Start with these before adding complex quest logic:
 
 ## Open Decisions
 
-- Should sidekicks count against active party size or use a separate follower slot?
-- Should recruitable NPCs be generated with random names, fixed names, or a mix?
-- Should shady sellers be able to sell cursed items before identify/curse systems are fully polished?
-- Should faction representatives unlock factions from taverns or only point toward faction headquarters?
-- Should tavern NPCs appear physically on the inn map in phase one, or start as menu cards?
-- Should the player be able to ask the innkeeper about current guests?
-- Should special guests cost a room fee or drink purchase to approach?
+- Should sidekicks count against active party size or use a separate follower slot? they already are ai allies with their own slots and not active party size.
+- Should recruitable NPCs be generated with random names, fixed names, or a mix? random but take fitting pregenerated stats as for the heros, so that they are not like totally bad in what they should do.
+- Should shady sellers be able to sell cursed items before identify/curse systems are fully polished? yes
+- Should faction representatives unlock factions from taverns or only point toward faction headquarters? mix of both
+- Should tavern NPCs appear physically on the inn map in phase one, or start as menu cards? phsyically as tokens and then the party can go to them and talk to them.
+- Should the player be able to ask the innkeeper about current guests? yeah thats cool. then add a barkeeper npc which is there always.
+- Should special guests cost a room fee or drink purchase to approach? yeah why not
 
 ## Notes For Later
 

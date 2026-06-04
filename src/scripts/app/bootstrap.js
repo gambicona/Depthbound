@@ -540,6 +540,8 @@ const els = {
   mainMenuBack: document.querySelector("#main-menu-back"),
   startAdventure: document.querySelector("#start-adventure"),
   loadMenu: document.querySelector("#load-menu"),
+  achievementsMenu: document.querySelector("#achievements-menu"),
+  achievementsPanel: document.querySelector("#main-achievements"),
   settingsMenu: document.querySelector("#settings-menu"),
   mainSettings: document.querySelector("#main-settings"),
   chooseSaveFolder: document.querySelector("#choose-save-folder"),

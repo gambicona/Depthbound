@@ -532,11 +532,6 @@
     if (role !== "guest") return;
     document.body.classList.toggle("menu-active", !gameHasStarted);
     els.mainMenu?.classList.toggle("hidden", Boolean(gameHasStarted));
-    if (gameHasStarted) {
-      [els.homeMenu, els.storeMenu, els.villageMenu, els.gameDialog].forEach((element) => {
-        if (!element?.classList.contains("playtest-host-mirrored")) element?.classList.add("hidden");
-      });
-    }
   }
 
   function refreshGuestOpenPlayerMenus() {
@@ -1940,6 +1935,31 @@
         ) {
           event.preventDefault();
           event.stopImmediatePropagation();
+          return;
+        }
+        const readOnlyQuestOrFactionAction = targetElement?.closest(
+          [
+            "#village-menu [data-action='accept-settlement-board-quest']",
+            "#village-menu [data-action='claim-settlement-board-quest']",
+            "#village-menu [data-action='accept-npc-quest']",
+            "#village-menu [data-action='complete-npc-quest']",
+            "#village-menu [data-action='buy-faction-set-item']",
+            "#village-menu [data-action='admin-faction-rank']",
+            "#village-menu [data-action='tavern-faction-check']",
+            "#village-menu [data-action='tavern-buy-guest-item']",
+            "#village-menu [data-action='tavern-recruit-guest']",
+            "#village-menu [data-action='tavern-complete-material-ask']",
+            "#village-menu [data-action='tavern-complete-monster-ask']",
+            "#game-dialog [data-dialog-action='cancel-quest']",
+            "#game-dialog [data-action='set-admin-progress']",
+            "#game-dialog [data-action='set-admin-campaign-progress']",
+          ].join(", "),
+        );
+        if (readOnlyQuestOrFactionAction) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          playtest.lastIntentStatus = "Guests can view quest and faction progress, but only the host can change it.";
+          renderPlaytestPanel();
           return;
         }
         if (targetElement?.closest(".playtest-host-mirrored")) {

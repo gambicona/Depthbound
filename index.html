@@ -19,11 +19,13 @@
           <div class="menu-actions">
             <button id="start-adventure" type="button">Start New Adventure</button>
             <button id="load-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="save-slots">Load</button>
+            <button id="achievements-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="main-achievements">Achievements</button>
             <button id="main-tutorial" class="ghost-button" type="button">Tutorial</button>
             <button id="settings-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="main-settings">Settings</button>
           </div>
           <button id="main-menu-back" class="ghost-button menu-back hidden" type="button">Back</button>
           <div id="save-slots" class="save-slots hidden" aria-label="Save slots"></div>
+          <div id="main-achievements" class="main-achievements hidden" aria-label="Achievements"></div>
           <div id="main-settings" class="main-settings hidden" aria-label="Settings">
             <label class="volume-controls menu-volume" aria-label="Sound volume">
               <span class="volume-text">Volume</span>
@@ -545,6 +547,7 @@
     <script src="src/scripts/content/monsters/beast-biome-high-tier-pack.js" defer></script>
     <script src="src/scripts/content/monsters/lair-boss-pack.js" defer></script>
     <script src="src/scripts/content/monsters/humanoid-enemy-pack.js" defer></script>
+    <script src="src/scripts/content/monsters/goblin-pack.js" defer></script>
     <script src="src/scripts/content/furniture/dungeon-furniture-pack.js?v=unique-interactions-1" defer></script>
     <script src="src/scripts/content/furniture/resource-nodes.js?v=resource-nodes-3" defer></script>
     <script src="src/scripts/content/furniture/desert-ruins-pack.js?v=unique-interactions-1" defer></script>
@@ -559,6 +562,8 @@
     <script src="src/scripts/content/themes/jungle.js" defer></script>
     <script src="src/scripts/content/themes/desert-ruins.js?v=magic-loot-1" defer></script>
     <script src="src/scripts/content/themes/depths-of-hells.js?v=magic-loot-1" defer></script>
+    <script src="src/scripts/content/themes/abyssal-scar.js" defer></script>
+    <script src="src/scripts/content/themes/haunted-battlefield.js" defer></script>
     <script src="src/scripts/content/themes/underdark-depths.js?v=magic-loot-1" defer></script>
     <script src="src/scripts/content/themes/embervein-deepworks.js?v=embervein-1" defer></script>
     <script src="src/scripts/content/themes/crucible-of-flame.js" defer></script>
@@ -595,6 +600,7 @@
     <script src="src/scripts/app/movement-ai-input.js?v=playtest-sync-31" defer></script>
     <script src="src/scripts/app/rendering-inventory.js?v=tavern-perf-fix-2" defer></script>
     <script src="src/scripts/app/home-comfort-bonuses.js" defer></script>
+    <script src="src/scripts/app/achievements.js" defer></script>
     <script src="src/scripts/app.js?v=tavern-perf-fix-2" defer></script>
     <script src="src/scripts/playtest-overlay.js?v=playtest-sync-37" defer></script>
   </body>

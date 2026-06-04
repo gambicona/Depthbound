@@ -72,6 +72,7 @@ const D = {
   "wasp-nest": "A papery nest clings nearby, buzzing with angry movement. Disturbing it would be a bad idea.",
   "beast-crate": "A rough wooden crate rattles with frightened movement. Something alive is trapped inside, and the slats have been clawed raw.",
   "beast-companion-crate": "A carefully barred animal crate shakes with nervous breath. The creature inside looks scared rather than savage.",
+  "goblin-cage": "A mean little prisoner cage hangs from bent hooks and stolen chain. A goblin inside watches for any chance that is not another bandit boot.",
   stalagmite: "A sharp stone spike rises from the cave floor, natural cover with an ugly point.",
   "stalactite-cluster": "Needle-like stone hangs overhead in a brittle cluster. The floor below is littered with old shards.",
   "crystal-growth": "Crystals jut from the stone in bright growths. A careful hand could harvest useful shards.",
@@ -872,6 +873,39 @@ feature("undead-crate", "Undead Crate", ["old-guardroom", "dungeon", "crypt", "r
   weight: 160,
   spawnChance: 0.02,
   components: [C.captive({ dc: 14, skill: "arcana", ability: "int", monsterIds: ["boneRecruit", "cryptGuard", "guardroomHound", "skeletalSpearman", "skeletonArcher"], allyKind: "Undead Ally" })],
+});
+
+feature("goblin-cage", "Goblin Cage", ["outlaw", "bandit", "wooden", "cage", "container", "prisoner"], {
+  blocksMovement: true,
+  inspectable: true,
+  interactable: true,
+  placement: "wall-adjacent",
+  symbol: "G",
+  weight: 125,
+  spawnChance: 0.02,
+  components: [
+    C.captive({
+      dc: 13,
+      skill: "persuasion",
+      ability: "cha",
+      randomCaptive: true,
+      monsterIds: [
+        "goblinMudToothCutthroat",
+        "goblinMudToothSneakbow",
+        "goblinMudToothSnarewright",
+        "goblinMudToothHexer",
+        "goblinRedcapCutthroat",
+        "goblinRedcapSneakbow",
+        "goblinRedcapSnarewright",
+        "goblinRedcapHexer",
+      ],
+      kind: "companion",
+      control: "player",
+      allyKind: "Goblin Ally",
+      sidekickStartingLevel: 1,
+      sidekickEligibleClasses: ["sidekick-warrior", "sidekick-expert", "sidekick-spellcaster"],
+    }),
+  ],
 });
 
 feature("continuous-spawner", "Invisible Continuous Spawner", ["custom-placement", "spawner", "invisible", "admin"], {

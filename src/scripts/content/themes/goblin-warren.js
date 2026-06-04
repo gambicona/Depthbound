@@ -44,7 +44,7 @@ window.DungeonContent.register("themes", "goblinWarren", {
   },
   generator: {
     layout: "branching",
-    roomCountByCategory: { 1: 8, 2: 17, 3: 18 },
+    roomCountByCategory: { 1: 8, 2: 17, 3: 18, 4: 18, 5: 19, 6: 19, 7: 20, 8: 20, 9: 21, 10: 21 },
     gridSize: 68,
     roomShapes: ["rectangle", "square", "l"],
     roomWidth: { min: 4, max: 9 },
@@ -58,15 +58,12 @@ window.DungeonContent.register("themes", "goblinWarren", {
     corridorPadding: 1,
   },
   monsterTagGroups: [
+    ["humanoid", "goblin", "goblin-camp"],
     ["humanoid", "goblin"],
-    ["humanoid", "criminal"],
-    ["humanoid", "skirmisher"],
-    ["beast", "cave"],
   ],
   bossMonsterTagGroups: [
+    ["humanoid", "goblin", "goblin-camp", "boss"],
     ["humanoid", "goblin", "boss"],
-    ["humanoid", "criminal", "boss"],
-    ["humanoid", "boss"],
   ],
   furnitureTagGroups: [
     ["dungeon"],

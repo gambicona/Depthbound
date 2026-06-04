@@ -16,6 +16,8 @@ const expeditionMilepostMissions = [
     themeId: "grasslands",
     dungeonSizeId: "small",
     roomCount: 6,
+    category: 2,
+    partyLevelRange: "3-4",
     intro: "Nella's ledger marks one stretch of road as guessed, smudged, and therefore embarrassing. Walk it end to end, mark the bad turns, and come back with proof that a cart could survive the route.",
     outro: "The last marker is set. The bad mile is no longer guesswork.",
     goal: { type: "reachExit" },
@@ -25,6 +27,8 @@ const expeditionMilepostMissions = [
     themeId: "outlawCamp",
     dungeonSizeId: "medium",
     roomCount: 7,
+    category: 4,
+    partyLevelRange: "7-8",
     intro: "A roofless wayhouse sits across the planned road line. Someone has been using it as a toll knife. Clear the rooms and leave the route fit for honest boots.",
     outro: "The wayhouse falls quiet. The road can pass through without asking permission.",
     goal: { type: "reachExit" },
@@ -34,6 +38,8 @@ const expeditionMilepostMissions = [
     themeId: "oldGuardroom",
     dungeonSizeId: "medium",
     roomCount: 8,
+    category: 6,
+    partyLevelRange: "11-12",
     intro: "The Board wants lantern posts tested under pressure: one straight push, no pretty detours, light every stretch, and prove the line holds when the dark presses back.",
     outro: "The final lantern catches. Behind the party, the road line shines in a clean, stubborn row.",
     goal: { type: "reachExit" },
@@ -43,10 +49,17 @@ const expeditionMilepostMissions = [
     themeId: "castleKeep",
     dungeonSizeId: "medium",
     roomCount: 9,
+    category: 8,
+    partyLevelRange: "15-16",
     intro: "Nella opens the sealed page at the back of the ledger. One old route still has no honest end-marker. Carry the Board's last milepost through the broken watchline and make the road official.",
     outro: "The last milepost is hammered into place. The route has a name now, and the Board has a road it can defend.",
     goal: { type: "reachExit" },
   },
+];
+
+const expeditionMilepostGoblinMonsterGroups = [
+  ["humanoid", "goblin", "goblin-camp"],
+  ["humanoid", "goblin"],
 ];
 
 function generatedExitForDungeon(dungeon) {
@@ -70,8 +83,12 @@ function expeditionMilepostTemplate(campaignId, index) {
     linearRoomShapes: ["rectangle", "square"],
     linearRoomWidth: { min: 5, max: 8 },
     linearRoomHeight: { min: 4, max: 7 },
+    ambientLight: "bright",
+    difficultyCategory: mission.category,
+    monsterTagGroups: expeditionMilepostGoblinMonsterGroups,
   };
   const dungeon = window.DungeonGenerator.generateDungeon(generatorOverrides);
+  dungeon.ambientLight = "bright";
   const id = `${campaignId}-${index}`;
   return {
     id,
@@ -86,6 +103,9 @@ function expeditionMilepostTemplate(campaignId, index) {
     dungeon,
     exit: generatedExitForDungeon(dungeon),
     goal: mission.goal,
+    difficultyCategory: mission.category,
+    partyLevelRange: mission.partyLevelRange,
+    ambientLight: "bright",
     intro: { text: mission.intro, images: [] },
     outro: { text: mission.outro, images: [] },
     customItems: [],

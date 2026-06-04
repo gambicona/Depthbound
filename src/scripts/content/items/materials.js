@@ -186,6 +186,35 @@ component("spider-silk", "Spider Silk", {
   description: "A bundle of tough, flexible silk strands. It is light, sticky, and surprisingly hard to cut.",
 });
 
+component("goblin-camp-scrap", "Goblin Camp Scrap", {
+  category: "salvage",
+  kind: "monster part",
+  material: "scrap",
+  form: "bundle",
+  cost: cp(6),
+  craftingValueCp: 6,
+  tags: ["monster-part", "monster", "humanoid", "goblin", "goblin-camp", "scrap", "trap", "repair", "crafting"],
+  professions: ["tinker", "weaponsmith", "carpenter", "leatherworker"],
+  themes: ["goblinWarren"],
+  short: "Bent wire, hooks, cord, teeth, and stolen fasteners.",
+  description: "A useful bundle of ugly little camp salvage: bent nails, snare wire, chipped hooks, and anything else a goblin could wedge into a trap.",
+});
+
+component("goblin-boss-charm", "Goblin Boss Charm", {
+  category: "trophy",
+  kind: "monster part",
+  material: "bone",
+  form: "charm",
+  rarity: "uncommon",
+  cost: sp(4),
+  craftingValueCp: 40,
+  tags: ["monster-part", "monster", "humanoid", "goblin", "goblin-camp", "boss", "trophy", "bone", "magic-reagent"],
+  professions: ["jeweler", "enchanter", "relic-scholar", "leatherworker"],
+  themes: ["goblinWarren"],
+  short: "A boss-token strung from bone, coin, and stolen ribbon.",
+  description: "A crude authority charm taken from a goblin boss. It carries just enough fear and superstition to matter in charms or trophies.",
+});
+
 component("verdant-sap", "Verdant Sap", {
   category: "alchemy reagent",
   kind: "monster part",

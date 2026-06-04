@@ -229,6 +229,7 @@ function showMainMenuRoot() {
   els.mainMenuBack?.classList.add("hidden");
   els.saveSlots?.classList.add("hidden");
   els.mainSettings?.classList.add("hidden");
+  els.achievementsPanel?.classList.add("hidden");
   renderSaveSlots();
 }
 
@@ -237,6 +238,7 @@ function showMainMenuSubmenu(section) {
   els.mainMenuBack?.classList.remove("hidden");
   els.saveSlots?.classList.toggle("hidden", section !== "load");
   els.mainSettings?.classList.toggle("hidden", section !== "settings");
+  els.achievementsPanel?.classList.toggle("hidden", section !== "achievements");
   renderSaveSlots();
 }
 
@@ -3430,6 +3432,7 @@ async function startCampaignDungeon(campaignId, options = {}) {
     );
     if (state) {
       const entranceRoom = state.dungeon?.rooms?.find((room) => room.id === state.dungeon?.entranceRoomId) ?? state.dungeon?.rooms?.[0];
+      if (template.ambientLight) state.dungeon.ambientLight = template.ambientLight;
       state.campaignId = template.campaignId ?? campaignId;
       state.campaignIndex = template.campaignIndex ?? dungeonIndex;
       state.customDungeonId = template.id;

@@ -2,600 +2,113 @@ Missing Monster Token Assets
 
 Generated from the current monster catalogue by comparing each monster tokenArt path against assets/tokens.
 Each missing entry lists the expected filename without .jpg, the monster name, the monster description/role, and gear cues for matching armor/weapons in the image.
-The beast-biome pack is additionally grouped by biome tag.
+The beast-biome high-tier pack is additionally grouped by biome tag.
 
-beast-biome-pack.js (91 missing)
-
-Swamp (15)
-
-- ancient-mire-gator | Ancient Mire Gator | Category 3 swamp beast boss | Gear: weapon: natural attack (1d12 + 5 piercing); armor: none specified
-- bog-frog | Bog Frog | Leaping swamp beast | Gear: weapon: natural attack (1d4 + 2 bludgeoning); armor: none specified
-- bogback-boar | Bogback Boar | Heavy swamp beast | Gear: weapon: natural attack (1d8 + 3 piercing); armor: none specified
-- fen-reaper-cat | Fen Reaper Cat | Fast swamp predator | Gear: weapon: natural attack (1d8 + 5 slashing); armor: none specified
-- giant-swamp-leech | Giant Swamp Leech | Huge blood-drinking beast | Gear: weapon: natural attack (1d10 + 4 piercing); armor: none specified
-- leech-hound | Leech Hound | Hungry swamp predator | Gear: weapon: natural attack (1d6 + 2 piercing); armor: none specified
-- mire-stag | Mire Stag | Swamp charger | Gear: weapon: natural attack (1d8 + 3 piercing); armor: none specified
-
-- mossjaw-croc | Mossjaw Croc | Category 2 swamp beast boss | Gear: weapon: natural attack (1d10 + 4 piercing); armor: none specified
-- mud-snapper | Mud Snapper | Small swamp biter | Gear: weapon: natural attack (1d6 + 2 piercing); armor: none specified
-- mudmaw-behemoth | Mudmaw Behemoth | Massive swamp brute | Gear: weapon: natural attack (1d12 + 4 bludgeoning); armor: armored body
-- old-bog-gator | Old Bog Gator | Category 1 swamp beast boss | Gear: weapon: natural attack (1d8 + 3 piercing); armor: none specified
-- plague-mire-toad | Plague-Mire Toad | Poisonous swamp brute | Gear: weapon: magical/natural attack (1d8 + 3 poison); armor: none specified
-- reed-viper | Reed Viper | Venomous swamp snake | Gear: weapon: natural attack (1d4 + 2 piercing); armor: none specified
-- rotwater-croc | Rotwater Croc | Large swamp ambusher | Gear: weapon: natural attack (1d10 + 3 piercing); armor: none specified
-- venom-bog-hydra | Venom-Bog Hydra | Poisonous swamp monster | Gear: weapon: natural attack (1d10 + 4 piercing); armor: none specified
-
-Water (15)
-
-- ancient-harbor-shark | Ancient Harbor Shark | Category 3 water beast boss | Gear: weapon: natural attack (1d12 + 5 piercing); armor: none specified
-- armored-reef-crab | Armored Reef Crab | Huge shell-armored beast | Gear: weapon: natural attack (1d10 + 4 bludgeoning); armor: armored body
-- blackwater-croc | Blackwater Croc | Large aquatic ambusher | Gear: weapon: natural attack (1d10 + 3 piercing); armor: none specified
-- deepwater-shark | Deepwater Shark | Large aquatic predator | Gear: weapon: natural attack (1d10 + 4 piercing); armor: none specified
-- giant-reef-crab | Giant Reef Crab | Armored aquatic beast | Gear: weapon: natural attack (1d8 + 3 bludgeoning); armor: armored body
-- marsh-otter | Marsh Otter | Quick aquatic hunter | Gear: weapon: natural attack (1d4 + 2 slashing); armor: none specified
-- old-river-croc | Old River Croc | Category 1 water beast boss | Gear: weapon: natural attack (1d8 + 3 piercing); armor: none specified
-
-- razorfin-barracuda | Razorfin Barracuda | Fast aquatic striker | Gear: weapon: natural attack (1d8 + 3 piercing); armor: spines or hard growths
-- reef-eel | Reef Eel | Small aquatic biter | Gear: weapon: natural attack (1d4 + 2 piercing); armor: none specified
-- reefjaw-shark | Reefjaw Shark | Category 2 water beast boss | Gear: weapon: natural attack (1d10 + 4 piercing); armor: none specified
-- river-snapper | River Snapper | Armored freshwater beast | Gear: weapon: natural attack (1d6 + 2 piercing); armor: armored body
-- shock-eel | Shock Eel | Electric water predator | Gear: weapon: magical/natural attack (1d8 + 3 lightning); armor: none specified
-- silverfin-piranha | Silverfin Piranha | Aggressive fish predator | Gear: weapon: natural attack (1d6 + 2 piercing); armor: none specified
-- storm-eel | Storm Eel | Lightning aquatic predator | Gear: weapon: magical/natural attack (1d10 + 4 lightning); armor: none specified
-- tide-mauler | Tide Mauler | Massive aquatic brute | Gear: weapon: held or conjured weapon (1d12 + 4 bludgeoning); armor: armored body
-
-Arctic (15)
-
-- ancient-frosthorn-mammoth | Ancient Frosthorn Mammoth | Category 3 arctic beast boss | Gear: weapon: natural attack (1d12 + 5 bludgeoning); armor: spines or hard growths
-- frost-wolf | Frost Wolf | Cold-land hunter | Gear: weapon: natural attack (1d6 + 2 piercing); armor: none specified
-- frostbite-viper | Frostbite Viper | Cold venom snake | Gear: weapon: natural attack (1d8 + 3 piercing); armor: none specified
-- glacier-wolf | Glacier Wolf | Elite arctic predator | Gear: weapon: natural attack (1d8 + 5 piercing); armor: none specified
-- ice-claw-lynx | Ice-Claw Lynx | Fast arctic hunter | Gear: weapon: natural attack (1d8 + 3 slashing); armor: none specified
-- ice-fox | Ice Fox | Quick arctic predator | Gear: weapon: natural attack (1d4 + 2 piercing); armor: none specified
-- iceplate-tortoise | Iceplate Tortoise | Armored arctic beast | Gear: weapon: natural attack (1d10 + 4 bludgeoning); armor: armored body
-
-- mammoth-calf-rampager | Mammoth Calf Rampager | Young but massive arctic charger | Gear: weapon: natural attack (1d12 + 4 bludgeoning); armor: none specified
-- old-icehorn-ram | Old Icehorn Ram | Category 1 arctic beast boss | Gear: weapon: natural attack (1d8 + 3 bludgeoning); armor: none specified
-- polar-mauler | Polar Mauler | Huge arctic bear | Gear: weapon: held or conjured weapon (1d10 + 4 slashing); armor: none specified
-- snow-hare | Snow Hare | Small arctic beast | Gear: weapon: natural attack (1d4 + 2 slashing); armor: none specified
-- snowback-boar | Snowback Boar | Hardy arctic charger | Gear: weapon: natural attack (1d8 + 2 piercing); armor: none specified
-- snowhide-bear | Snowhide Bear | Category 2 arctic beast boss | Gear: weapon: natural attack (1d10 + 4 slashing); armor: none specified
-- tundra-ox | Tundra Ox | Heavy arctic beast | Gear: weapon: natural attack (1d8 + 3 bludgeoning); armor: none specified
-- white-dire-wolf | White Dire Wolf | Large arctic wolf | Gear: weapon: natural attack (1d8 + 3 piercing); armor: none specified
-
-Mountain (15)
-
-- ancient-stonehorn-yak | Ancient Stonehorn Yak | Category 3 mountain beast boss | Gear: weapon: natural attack (1d12 + 5 bludgeoning); armor: none specified
-- avalanche-ram | Avalanche Ram | Elite mountain charger | Gear: weapon: natural attack (1d10 + 4 bludgeoning); armor: none specified
-- boulder-boar | Boulder Boar | Heavy mountain charger | Gear: weapon: natural attack (1d10 + 3 piercing); armor: none specified
-- cliff-goat | Cliff Goat | Sure-footed mountain beast | Gear: weapon: natural attack (1d6 + 2 bludgeoning); armor: none specified
-- crag-wolf | Crag Wolf | Mountain wolf | Gear: weapon: natural attack (1d6 + 2 piercing); armor: none specified
-- dire-crag-wolf | Dire Crag Wolf | Large mountain hunter | Gear: weapon: natural attack (1d8 + 3 piercing); armor: none specified
-- graniteback-bear | Graniteback Bear | Huge armored mountain bear | Gear: weapon: natural attack (1d10 + 4 slashing); armor: armored body
-
-- ironhorn-ram | Ironhorn Ram | Armored mountain beast | Gear: weapon: natural attack (1d8 + 3 bludgeoning); armor: armored body
-- mountain-mane-lion | Mountain-Mane Lion | Apex mountain cat | Gear: weapon: natural attack (1d10 + 4 slashing); armor: none specified
-- old-granite-ram | Old Granite Ram | Category 1 mountain beast boss | Gear: weapon: natural attack (1d8 + 3 bludgeoning); armor: none specified
-- ridge-lion | Ridge Lion | Fast mountain predator | Gear: weapon: natural attack (1d8 + 3 slashing); armor: none specified
-- scarred-peak-bear | Scarred Peak Bear | Category 2 mountain beast boss | Gear: weapon: natural attack (1d10 + 4 slashing); armor: none specified
-- sky-talon-rocling | Sky-Talon Rocling | Young giant mountain bird | Gear: weapon: natural attack (1d8 + 5 slashing); armor: none specified
-- stone-marmot | Stone Marmot | Small mountain biter | Gear: weapon: natural attack (1d4 + 2 piercing); armor: none specified
-- talon-hawk | Talon Hawk | Mountain bird predator | Gear: weapon: natural attack (1d6 + 2 slashing); armor: none specified
-
-Grassland (15)
-
-- ancient-thunderhoof | Ancient Thunderhoof | Category 3 grassland beast boss | Gear: weapon: natural attack (1d12 + 5 bludgeoning); armor: none specified
-- burrow-mongoose | Burrow Mongoose | Small darting hunter | Gear: weapon: natural attack (1d6 + 2 piercing); armor: none specified
-- elder-prairie-lion | Elder Prairie Lion | Elite grassland predator | Gear: weapon: natural attack (1d8 + 5 slashing); armor: none specified
-- field-boar | Field Boar | Aggressive grassland charger | Gear: weapon: natural attack (1d8 + 2 piercing); armor: none specified
-- ironhide-rhino | Ironhide Rhino | Armored grassland brute | Gear: weapon: natural attack (1d10 + 4 piercing); armor: armored body
-- old-plainstusk | Old Plainstusk | Category 1 grassland beast boss | Gear: weapon: natural attack (1d8 + 3 piercing); armor: none specified
-- plainstalker-hyena | Plainstalker Hyena | Enduring scavenger hunter | Gear: weapon: natural attack (1d8 + 3 piercing); armor: none specified
-
-- prairie-jackal | Prairie Jackal | Small grassland hunter | Gear: weapon: natural attack (1d4 + 2 piercing); armor: none specified
-- razor-mane-hyena | Razor-Mane Hyena | Savage grassland scavenger | Gear: weapon: natural attack (1d10 + 4 piercing); armor: spines or hard growths
-- savanna-lioness | Savanna Lioness | Large grassland predator | Gear: weapon: natural attack (1d8 + 3 slashing); armor: none specified
-- scarred-savanna-lion | Scarred Savanna Lion | Category 2 grassland beast boss | Gear: weapon: natural attack (1d10 + 4 slashing); armor: none specified
-- shieldback-pangolin | Shieldback Pangolin | Armored grassland beast | Gear: weapon: natural attack (1d8 + 3 slashing); armor: armored body, shield-like guard
-- stampede-bison | Stampede Bison | Massive grassland charger | Gear: weapon: natural attack (1d12 + 4 bludgeoning); armor: none specified
-- swift-step-antelope | Swift-Step Antelope | Fast grassland beast | Gear: weapon: natural attack (1d4 + 2 bludgeoning); armor: none specified
-- thunderhoof-bison | Thunderhoof Bison | Heavy grassland charger | Gear: weapon: natural attack (1d10 + 3 bludgeoning); armor: none specified
-
-Urban (15)
-
-- alley-rat | Alley Rat | Urban scavenger | Gear: weapon: natural attack (1d4 + 2 piercing); armor: none specified
-- chimney-marten | Chimney Marten | Fast rooftop predator | Gear: weapon: natural attack (1d8 + 3 slashing); armor: none specified
-- cistern-shellback | Cistern Shellback | Armored cistern beast | Gear: weapon: natural attack (1d10 + 4 bludgeoning); armor: armored body
-- dire-sewer-gator | Dire Sewer Gator | Huge sewer predator | Gear: weapon: natural attack (1d12 + 4 piercing); armor: none specified
-- ironhide-sewer-boar | Ironhide Sewer Boar | Armored urban brute | Gear: weapon: natural attack (1d8 + 3 piercing); armor: armored body
-- king-of-the-kennels | King of the Kennels | Category 2 urban beast boss | Gear: weapon: natural attack (1d10 + 4 piercing); armor: none specified
-- mange-wolf | Mange Wolf | Diseased city wolf | Gear: weapon: natural attack (1d8 + 3 piercing); armor: none specified
-
-- old-sewer-king | Old Sewer King | Category 3 urban beast boss | Gear: weapon: natural attack (1d12 + 5 piercing); armor: none specified
-- old-yard-mastiff | Old Yard Mastiff | Category 1 urban beast boss | Gear: weapon: natural attack (1d8 + 3 piercing); armor: none specified
-- plague-alley-mastiff | Plague Alley Mastiff | Diseased elite street beast | Gear: weapon: natural attack (1d10 + 4 piercing); armor: none specified
-- roof-crow-swarm | Roof Crow Swarm | Aggressive urban bird swarm | Gear: weapon: natural attack (1d6 + 2 slashing); armor: none specified
-- rooftop-razorwing | Rooftop Razorwing | Large urban flying predator | Gear: weapon: natural attack (1d8 + 5 slashing); armor: spines or hard growths
-- sewer-gator | Sewer Gator | Large sewer predator | Gear: weapon: natural attack (1d10 + 3 piercing); armor: none specified
-- sewer-snapper | Sewer Snapper | Small sewer beast | Gear: weapon: natural attack (1d6 + 2 piercing); armor: none specified
-- stray-fighting-dog | Stray Fighting Dog | Aggressive street hound | Gear: weapon: natural attack (1d6 + 2 piercing); armor: none specified
-
-elemental-air-pack.js (40 missing)
-
-- aurora-razorwing | Aurora Razorwing | Beautiful lethal upper-air hunter | Gear: weapon: magical/natural attack (4d12 + 9 radiant); armor: spines or hard growths
-- baron-of-the-open-sky | Baron of the Open Sky | Category 7 air boss | Gear: weapon: magical/natural attack (5d8 + 9 thunder); armor: none specified
-- breeze-wisp | Breeze Wisp | Tiny evasive air spirit | Gear: weapon: natural attack (1d6 + 2 bludgeoning); armor: incorporeal form
-- cloud-palace-tyrant | Cloud Palace Tyrant | Category 6 air boss | Gear: weapon: magical/natural attack (5d6 + 8 thunder); armor: none specified
-- cloudstep-duelist | Cloudstep Duelist | Elegant cloud-blade fighter | Gear: weapon: held or conjured weapon (2d8 + 5 piercing); armor: none specified
-- continental-cyclone | Continental Cyclone | Cyclone large enough to erase cities | Gear: weapon: natural attack (6d6 + 10 slashing); armor: none specified
-- cyclone-cathedral | Cyclone Cathedral | Massive sacred storm formation | Gear: weapon: magical/natural attack (5d8 + 8 thunder); armor: none specified
-- cyclone-myrmidon | Cyclone Myrmidon | Armored wind soldier | Gear: weapon: held or conjured weapon (2d6 + 3 bludgeoning); armor: armored body
-- dust-devil | Dust Devil | Dust-air paraelemental spinner | Gear: weapon: natural attack (1d8 + 2 slashing); armor: none specified
-- endless-gale-colossus | Endless Gale Colossus | Colossus of pure pressure and wind | Gear: weapon: natural attack (7d6 + 12 bludgeoning); armor: armored body
-
-- eye-of-the-lesser-storm | Eye of the Lesser Storm | Category 4 air boss | Gear: weapon: spell or elemental attack (3d6 + 6 lightning); armor: none specified
-- fogbank-harrier | Fogbank Harrier | Air-water fog paraelemental | Gear: weapon: magical/natural attack (1d10 + 3 cold); armor: none specified
-- gale-roost-screamer | Gale-Roost Screamer | Category 1 air boss | Gear: weapon: magical/natural attack (1d10 + 3 thunder); armor: none specified
-- glasswind-assassin | Glasswind Assassin | Invisible glass-dust wind killer | Gear: weapon: natural attack (3d6 + 6 slashing); armor: spines or hard growths
-- gravityless-voidwind | Gravityless Voidwind | Airless anti-gravity horror | Gear: weapon: spell or elemental attack (6d8 + 9 force); armor: none specified
-- heaven-splitting-thunderhead | Heaven-Splitting Thunderhead | Mythic thundercloud colossus | Gear: weapon: magical/natural attack (5d12 + 10 thunder); armor: armored body
-- hurricane-myrmidon | Hurricane Myrmidon | Elite hurricane soldier | Gear: weapon: held or conjured weapon (4d10 + 7 slashing); armor: armored body
-- lightning-lash-elemental | Lightning Lash Elemental | Reach lightning striker | Gear: weapon: held or conjured weapon (2d6 + 4 lightning); armor: none specified
-- lightning-rod-colossus | Lightning Rod Colossus | Tall storm conductor | Gear: weapon: magical/natural attack (4d6 + 7 lightning); armor: armored body
-- living-tornado | Living Tornado | Huge mobile vortex | Gear: weapon: natural attack (4d8 + 5 bludgeoning); armor: none specified
-
-- mirage-gale-oracle | Mirage Gale Oracle | Illusory heat-wind caster | Gear: weapon: spell or elemental attack (4d10 + 6 psychic); armor: none specified
-- needlewind-skirmisher | Needlewind Skirmisher | Sharp wind duelist | Gear: weapon: held or conjured weapon (1d8 + 3 slashing); armor: none specified
-- pressure-rift-horror | Pressure Rift Horror | Vacuum-pressure controller | Gear: weapon: spell or elemental attack (2d10 + 4 force); armor: none specified
-- primordial-tempest | Primordial Tempest | Ancient storm incarnation | Gear: weapon: spell or elemental attack (7d8 + 11 lightning); armor: none specified
-- queen-of-the-high-tempest | Queen of the High Tempest | Category 8 air boss | Gear: weapon: spell or elemental attack (6d8 + 10 lightning); armor: none specified
-- razor-gale | Razor Gale | High-speed cutting wind | Gear: weapon: natural attack (2d8 + 4 slashing); armor: spines or hard growths
-- sirocco-reaver | Sirocco Reaver | Hot desert wind paraelemental | Gear: weapon: magical/natural attack (2d8 + 3 fire); armor: none specified
-- sky-crown-stormlord | Sky-Crown Stormlord | Category 5 air boss | Gear: weapon: spell or elemental attack (3d10 + 7 lightning); armor: none specified
-- sovereign-of-the-inner-air | Sovereign of the Inner Air | Category 10 air boss | Gear: weapon: magical/natural attack (8d8 + 13 thunder); armor: none specified
-- sparkwing-mephitling | Sparkwing Mephitling | Weak lightning paraelemental | Gear: weapon: spell or elemental attack (1d6 + 2 lightning); armor: none specified
-
-- starstorm-elemental | Starstorm Elemental | Upper-sky starfire storm spirit | Gear: weapon: spell or elemental attack (8d6 + 11 radiant); armor: incorporeal form
-- storm-shell-core | Storm-Shell Core | Category 2 air boss | Gear: weapon: magical/natural attack (2d6 + 4 lightning); armor: armored body
-- stratosphere-sentinel | Stratosphere Sentinel | High-altitude guardian | Gear: weapon: held or conjured weapon (4d8 + 8 cold); armor: armored body
-- tempest-choir-caller | Tempest Choir Caller | Category 3 air boss | Gear: weapon: spell or elemental attack (2d8 + 5 thunder); armor: none specified
-- the-skybreaker-regent | The Skybreaker Regent | Category 9 air boss | Gear: weapon: spell or elemental attack (6d10 + 11 lightning); armor: none specified
-- thunder-serpent | Thunder Serpent | Serpentine storm elemental | Gear: weapon: magical/natural attack (5d6 + 7 lightning); armor: none specified
-- thunderclap-sprite | Thunderclap Sprite | Small thunder caster | Gear: weapon: spell or elemental attack (1d8 + 3 thunder); armor: none specified
-- thunderhead-ravager | Thunderhead Ravager | Heavy thundercloud bruiser | Gear: weapon: magical/natural attack (3d8 + 5 thunder); armor: none specified
-- vacuum-maw | Vacuum Maw | Airless void paraelemental | Gear: weapon: magical/natural attack (3d10 + 5 force); armor: none specified
-- worldstorm-avatar | Worldstorm Avatar | Avatar of a global storm | Gear: weapon: spell or elemental attack (5d10 + 8 lightning); armor: none specified
-
-elemental-earth-pack.js (40 missing)
-
-- adamantine-myrmidon | Adamantine Myrmidon | Elite metal earth soldier | Gear: weapon: held or conjured weapon (5d10 + 8 bludgeoning); armor: armored body
-- archon-of-buried-cities | Archon of Buried Cities | Category 8 earth boss | Gear: weapon: natural attack (6d8 + 10 bludgeoning); armor: none specified
-- barrow-stone-bully | Barrow-Stone Bully | Category 1 earth boss | Gear: weapon: natural attack (1d10 + 3 bludgeoning); armor: none specified
-- basalt-stomper | Basalt Stomper | Massive basalt bruiser | Gear: weapon: natural attack (3d10 + 5 bludgeoning); armor: none specified
-- claybinder-acolyte | Claybinder Acolyte | Binding clay caster | Gear: weapon: spell or elemental attack (1d10 + 3 bludgeoning); armor: none specified
-- continental-shard | Continental Shard | Fragment of a living continent | Gear: weapon: natural attack (6d8 + 9 bludgeoning); armor: armored body
-- crystal-choir-seer | Crystal Choir Seer | Ranged crystal resonance caster | Gear: weapon: spell or elemental attack (3d6 + 6 thunder); armor: spines or hard growths
-- crystal-monolith | Crystal Monolith | Immobile-ish ranged crystal artillery | Gear: weapon: spell or elemental attack (5d8 + 8 radiant); armor: spines or hard growths
-- crystalback-mauler | Crystalback Mauler | Crystalline melee brute | Gear: weapon: held or conjured weapon (2d6 + 3 slashing); armor: armored body, spines or hard growths
-- deep-mantle-regent | Deep Mantle Regent | Category 6 earth boss | Gear: weapon: natural attack (5d6 + 8 bludgeoning); armor: none specified
-
-- diamond-fault-avatar | Diamond Fault Avatar | Cutting diamond-earth demigod | Gear: weapon: natural attack (7d6 + 12 slashing); armor: none specified
-- dust-mephitling | Dust Mephitling | Weak flying dust paraelemental | Gear: weapon: spell or elemental attack (1d6 + 2 necrotic); armor: none specified
-- gemscale-earth-serpent | Gemscale Earth Serpent | Burrowing crystal serpent | Gear: weapon: natural attack (4d8 + 8 piercing); armor: spines or hard growths
-- glass-edge-terran | Glass-Edge Terran | High damage glass earth assassin | Gear: weapon: natural attack (4d6 + 7 slashing); armor: spines or hard growths
-- granite-bulwark | Granite Bulwark | Defensive stone wall monster | Gear: weapon: held or conjured weapon (2d10 + 4 bludgeoning); armor: armored body
-- grave-soil-elemental | Grave-Soil Elemental | Necrotic earth paraelemental | Gear: weapon: magical/natural attack (2d6 + 4 necrotic); armor: none specified
-- graven-idol-guardian | Graven Idol Guardian | Category 2 earth boss | Gear: weapon: held or conjured weapon (2d6 + 4 bludgeoning); armor: armored body
-- gravity-geode | Gravity Geode | Gravity-bending crystal elemental | Gear: weapon: spell or elemental attack (6d6 + 10 force); armor: spines or hard growths
-- iron-ore-myrmidon | Iron Ore Myrmidon | Dense ore soldier | Gear: weapon: held or conjured weapon (2d8 + 3 bludgeoning); armor: armored body
-- ironroot-colossus | Ironroot Colossus | Root-and-ore giant defender | Gear: weapon: natural attack (4d8 + 5 bludgeoning); armor: armored body
-
-- king-beneath-the-fault | King Beneath the Fault | Category 7 earth boss | Gear: weapon: natural attack (5d8 + 9 bludgeoning); armor: none specified
-- living-landslide | Living Landslide | Rolling terrain disaster | Gear: weapon: natural attack (5d6 + 7 bludgeoning); armor: none specified
-- living-mountain | Living Mountain | Walking mountain catastrophe | Gear: weapon: natural attack (8d6 + 11 bludgeoning); armor: armored body
-- mountain-heart-golem | Mountain-Heart Golem | Category 5 earth boss | Gear: weapon: natural attack (3d10 + 7 bludgeoning); armor: armored body
-- mud-grip-crawler | Mud Grip Crawler | Low mud restrainer | Gear: weapon: natural attack (1d8 + 2 bludgeoning); armor: none specified
-- mudslide-ravager | Mudslide Ravager | Heavy mud-wave charger | Gear: weapon: natural attack (2d8 + 5 bludgeoning); armor: none specified
-- obsidian-razor | Obsidian Razor | Sharp volcanic glass duelist | Gear: weapon: held or conjured weapon (2d8 + 4 slashing); armor: spines or hard growths
-- obsidian-titanling | Obsidian Titanling | Young black-glass titan | Gear: weapon: natural attack (4d10 + 7 slashing); armor: armored body, spines or hard growths
-- pebbleling | Pebbleling | Tiny stone swarm skirmisher | Gear: weapon: natural attack (1d6 + 2 bludgeoning); armor: none specified
-- primordial-bedrock | Primordial Bedrock | Ancient bedrock avatar | Gear: weapon: natural attack (7d8 + 11 bludgeoning); armor: none specified
-
-- quake-fist-champion | Quake-Fist Champion | Category 3 earth boss | Gear: weapon: natural attack (2d8 + 5 bludgeoning); armor: none specified
-- sandglass-needler | Sandglass Needler | Ranged glass-sand striker | Gear: weapon: held or conjured weapon (1d8 + 3 piercing); armor: spines or hard growths
-- sandstorm-burrower | Sandstorm Burrower | Burrowing abrasive paraelemental | Gear: weapon: natural attack (3d8 + 5 slashing); armor: none specified
-- shale-hound | Shale Hound | Fast jagged stone hunter | Gear: weapon: natural attack (1d8 + 3 piercing); armor: none specified
-- sinkhole-devourer | Sinkhole Devourer | Terrain-eating earth horror | Gear: weapon: natural attack (4d12 + 9 bludgeoning); armor: none specified
-- sovereign-of-the-inner-earth | Sovereign of the Inner Earth | Category 10 earth boss | Gear: weapon: natural attack (8d8 + 13 bludgeoning); armor: none specified
-- stone-crown-warden | Stone-Crown Warden | Category 4 earth boss | Gear: weapon: natural attack (3d6 + 6 bludgeoning); armor: none specified
-- the-seismic-patriarch | The Seismic Patriarch | Category 9 earth boss | Gear: weapon: natural attack (6d10 + 11 bludgeoning); armor: none specified
-- tremor-shell-behemoth | Tremor-Shell Behemoth | Armored tremor beast | Gear: weapon: natural attack (4d10 + 6 bludgeoning); armor: armored body
-- worldpillar-colossus | Worldpillar Colossus | Tower-sized pillar guardian | Gear: weapon: held or conjured weapon (5d12 + 10 bludgeoning); armor: armored body
-
-elemental-fire-pack.js (40 missing)
-
-- apocalypse-ash-elemental | Apocalypse Ash Elemental | Soul-choking ash disaster | Gear: weapon: spell or elemental attack (6d6 + 9 necrotic); armor: none specified
-- ash-cyclone-ravager | Ash Cyclone Ravager | Flying ash vortex controller | Gear: weapon: spell or elemental attack (4d6 + 6 slashing); armor: none specified
-- ash-monsoon | Ash Monsoon | Massive flying ash storm | Gear: weapon: spell or elemental attack (5d6 + 6 necrotic); armor: none specified
-- ash-paraelemental-strangler | Ash Paraelemental Strangler | Choking ash controller | Gear: weapon: magical/natural attack (2d6 + 3 necrotic); armor: none specified
-- ash-scuttler | Ash Scuttler | Small choking ash pest | Gear: weapon: magical/natural attack (1d6 + 1 necrotic); armor: none specified
-- ashen-pyre-lord | Ashen Pyre Lord | Category 4 elemental boss | Gear: weapon: spell or elemental attack (3d6 + 5 fire); armor: none specified
-- brass-caldera-efreet | Brass-Caldera Efreet | Category 7 elemental boss | Gear: weapon: spell or elemental attack (5d8 + 8 fire); armor: none specified
-- cinder-crown-elder | Cinder-Crown Elder | Category 6 elemental boss | Gear: weapon: spell or elemental attack (5d6 + 7 fire); armor: none specified
-- cinder-sprite | Cinder Sprite | Weak fire elemental ambusher | Gear: weapon: spell or elemental attack (1d6 + 2 fire); armor: none specified
-- cinderstorm-dancer | Cinderstorm Dancer | Mobile burning skirmisher | Gear: weapon: spell or elemental attack (2d6 + 5 fire); armor: none specified
-
-- coal-heart-igniter | Coal-Heart Igniter | Lesser fire artillery | Gear: weapon: spell or elemental attack (1d10 + 3 fire); armor: none specified
-- ember-wisp | Ember Wisp | Tiny flying fire mote | Gear: weapon: spell or elemental attack (1d6 + 2 fire); armor: none specified
-- emberstorm-artillery | Emberstorm Artillery | Long-range fire blaster | Gear: weapon: spell or elemental attack (4d6 + 4 fire); armor: none specified
-- furnace-core-myrmidon | Furnace-Core Myrmidon | Category 3 elemental boss | Gear: weapon: held or conjured weapon (2d8 + 5 fire); armor: armored body
-- glassfire-oracle | Glassfire Oracle | Burning crystal spellcaster | Gear: weapon: spell or elemental attack (4d6 + 7 fire); armor: spines or hard growths
-- heart-of-the-elemental-pyre | Heart of the Elemental Pyre | Living gate to the Plane of Fire | Gear: weapon: spell or elemental attack (8d6 + 10 fire); armor: none specified
-- kindled-ash-brute | Kindled Ash Brute | Category 1 elemental boss | Gear: weapon: magical/natural attack (1d10 + 3 fire); armor: none specified
-- lava-glass-skitterer | Lava-Glass Skitterer | Fast obsidian fire beast | Gear: weapon: natural attack (1d8 + 3 slashing); armor: spines or hard growths
-- lava-tide-colossus | Lava-Tide Colossus | Huge molten area brute | Gear: weapon: magical/natural attack (4d8 + 5 fire); armor: armored body
-- lesser-fire-myrmidon | Lesser Fire Myrmidon | Armored fire elemental soldier | Gear: weapon: held or conjured weapon (2d6 + 3 fire); armor: armored body
-
-- living-volcano | Living Volcano | Walking eruption engine | Gear: weapon: magical/natural attack (5d10 + 8 fire); armor: none specified
-- lord-of-the-burning-fault | Lord of the Burning Fault | Category 9 elemental boss | Gear: weapon: magical/natural attack (6d10 + 10 fire); armor: armored body
-- magma-drake-elemental | Magma Drake Elemental | Molten flying predator | Gear: weapon: magical/natural attack (4d8 + 8 fire); armor: none specified
-- magma-myrmidon | Magma Myrmidon | Heavy molten frontline | Gear: weapon: held or conjured weapon (3d8 + 5 fire); armor: armored body
-- magma-shard-hound | Magma Shard Hound | Molten pursuit beast | Gear: weapon: magical/natural attack (2d6 + 4 fire); armor: none specified
-- magma-worldbreaker | Magma Worldbreaker | Massive lava siege elemental | Gear: weapon: magical/natural attack (5d12 + 9 fire); armor: none specified
-- obsidian-phoenix | Obsidian Phoenix | Rebirthing firestorm flyer | Gear: weapon: spell or elemental attack (5d8 + 8 fire); armor: spines or hard growths
-- obsidian-smelter | Obsidian Smelter | Slow armor-breaking brute | Gear: weapon: natural attack (2d10 + 4 bludgeoning); armor: armored body, spines or hard growths
-- primordial-firestorm | Primordial Firestorm | Avatar-tier flying inferno | Gear: weapon: spell or elemental attack (7d8 + 10 fire); armor: none specified
-- primordial-sultan-of-cinder | Primordial Sultan of Cinder | Category 10 elemental boss | Gear: weapon: spell or elemental attack (8d8 + 12 fire); armor: none specified
-
-- pyroclasm-titanling | Pyroclasm Titanling | Siege-scale fire elemental | Gear: weapon: magical/natural attack (4d10 + 7 fire); armor: armored body
-- pyroglass-juggernaut | Pyroglass Juggernaut | Obsidian armored destroyer | Gear: weapon: held or conjured weapon (4d12 + 8 slashing); armor: armored body, spines or hard growths
-- salamander-flameguard | Salamander Flameguard | Reach fire soldier | Gear: weapon: held or conjured weapon (2d8 + 4 fire); armor: none specified
-- smoke-mephit-sneak | Smoke Mephit Sneak | Flying smoke harrier | Gear: weapon: spell or elemental attack (1d8 + 3 fire); armor: none specified
-- smoke-veil-assassin | Smoke-Veil Assassin | Flying obscuring striker | Gear: weapon: magical/natural attack (3d6 + 5 necrotic); armor: none specified
-- solar-furnace-avatar | Solar Furnace Avatar | Radiant-hot fire artillery | Gear: weapon: spell or elemental attack (6d8 + 8 fire); armor: none specified
-- sootflame-taskmaster | Sootflame Taskmaster | Category 2 elemental boss | Gear: weapon: spell or elemental attack (2d6 + 4 fire); armor: none specified
-- volcanic-heart-tyrant | Volcanic Heart Tyrant | Category 5 elemental boss | Gear: weapon: magical/natural attack (3d10 + 6 fire); armor: none specified
-- warden-of-the-caldera-gate | Warden of the Caldera Gate | Category 8 elemental boss | Gear: weapon: held or conjured weapon (6d8 + 9 fire); armor: armored body
-- world-ash-colossus | World-Ash Colossus | Primordial ash extinction brute | Gear: weapon: magical/natural attack (7d6 + 11 necrotic); armor: armored body
-
-elemental-water-pack.js (40 missing)
-
-- absolute-zero-elemental | Absolute Zero Elemental | Extreme cold paraelemental | Gear: weapon: magical/natural attack (6d6 + 10 cold); armor: none specified
-- acidic-mire-paraelemental | Acidic Mire Paraelemental | Water-earth acid mire monster | Gear: weapon: magical/natural attack (3d6 + 6 acid); armor: none specified
-- blackwater-colossus | Blackwater Colossus | Toxic deep-water giant | Gear: weapon: magical/natural attack (4d8 + 5 poison); armor: armored body
-- blood-brine-ravager | Blood-Brine Ravager | Red saltwater berserker | Gear: weapon: magical/natural attack (5d6 + 7 necrotic); armor: none specified
-- boiling-spray-elemental | Boiling Spray Elemental | Steam-water ranged burner | Gear: weapon: spell or elemental attack (2d8 + 3 fire); armor: none specified
-- boiling-worldspring | Boiling Worldspring | Scalding world-source spirit | Gear: weapon: spell or elemental attack (5d12 + 10 fire); armor: incorporeal form
-- brine-crowned-horror | Brine-Crowned Horror | Category 4 water boss | Gear: weapon: magical/natural attack (3d6 + 6 necrotic); armor: none specified
-- brine-lash | Brine Lash | Saltwater whip striker | Gear: weapon: held or conjured weapon (1d8 + 3 slashing); armor: none specified
-- cloudburst-world-eater | Cloudburst World-Eater | Water-air deluge catastrophe | Gear: weapon: spell or elemental attack (8d6 + 11 lightning); armor: none specified
-- coral-cathedral-beast | Coral Cathedral Beast | Massive living coral temple | Gear: weapon: natural attack (4d12 + 9 piercing); armor: none specified
-
-- coral-spear-sentinel | Coral-Spear Sentinel | Coral-armored reach guard | Gear: weapon: held or conjured weapon (2d10 + 4 piercing); armor: armored body
-- deepcurrent-crusher | Deepcurrent Crusher | Heavy pressure bruiser | Gear: weapon: natural attack (2d8 + 4 bludgeoning); armor: none specified
-- dripling | Dripling | Tiny water elemental nuisance | Gear: weapon: natural attack (1d6 + 2 bludgeoning); armor: none specified
-- drowned-pool-lurker | Drowned-Pool Lurker | Category 1 water boss | Gear: weapon: magical/natural attack (1d10 + 3 cold); armor: none specified
-- drowning-mist-archon | Drowning Mist Archon | High mist-controller elemental | Gear: weapon: spell or elemental attack (5d8 + 8 cold); armor: none specified
-- frost-slick-spriggan | Frost-Slick Spriggan | Small ice slick skirmisher | Gear: weapon: magical/natural attack (1d6 + 2 cold); armor: none specified
-- frost-tide-leviathan | Frost-Tide Leviathan | Category 5 water boss | Gear: weapon: magical/natural attack (3d10 + 7 cold); armor: none specified
-- glacierback-guardian | Glacierback Guardian | Huge ice-backed defender | Gear: weapon: held or conjured weapon (3d8 + 5 cold); armor: armored body
-- hailglass-harrier | Hailglass Harrier | Flying ice-glass paraelemental | Gear: weapon: held or conjured weapon (4d8 + 8 piercing); armor: spines or hard growths
-- ice-shard-impaler | Ice Shard Impaler | Ranged ice spear elemental | Gear: weapon: held or conjured weapon (1d8 + 3 piercing); armor: none specified
-
-- iceberg-breaker | Iceberg Breaker | Massive ice impact brute | Gear: weapon: natural attack (4d10 + 6 bludgeoning); armor: none specified
-- living-glacier | Living Glacier | Slow catastrophic ice mass | Gear: weapon: magical/natural attack (5d10 + 8 cold); armor: armored body
-- maelstrom-baron | Maelstrom Baron | Category 7 water boss | Gear: weapon: natural attack (5d8 + 9 bludgeoning); armor: none specified
-- mistveil-strangler | Mistveil Strangler | Misty grappling hunter | Gear: weapon: magical/natural attack (1d10 + 3 cold); armor: none specified
-- oceanic-avatar | Oceanic Avatar | Avatar of the open sea | Gear: weapon: natural attack (6d8 + 9 bludgeoning); armor: none specified
-- pearl-eyed-abyssal-regent | Pearl-Eyed Abyssal Regent | Category 6 water boss | Gear: weapon: spell or elemental attack (5d6 + 8 psychic); armor: none specified
-- polar-night-colossus | Polar Night Colossus | Dark arctic colossus | Gear: weapon: magical/natural attack (7d6 + 12 cold); armor: armored body
-- primordial-sea | Primordial Sea | Ancient sea incarnation | Gear: weapon: magical/natural attack (7d8 + 11 cold); armor: none specified
-- queen-of-the-crushing-deep | Queen of the Crushing Deep | Category 8 water boss | Gear: weapon: magical/natural attack (6d8 + 10 cold); armor: none specified
-- rimefin-hunter | Rimefin Hunter | Fast ice-water predator | Gear: weapon: natural attack (2d6 + 4 piercing); armor: none specified
-
-- river-myrmidon | River Myrmidon | Armored current soldier | Gear: weapon: held or conjured weapon (2d6 + 3 bludgeoning); armor: armored body
-- snowmelt-phantom | Snowmelt Phantom | Cold mist paraelemental stalker | Gear: weapon: magical/natural attack (2d8 + 5 cold); armor: incorporeal form
-- sovereign-of-the-endless-deluge | Sovereign of the Endless Deluge | Category 10 water boss | Gear: weapon: magical/natural attack (8d8 + 13 cold); armor: none specified
-- steam-mephitling | Steam Mephitling | Weak steam paraelemental caster | Gear: weapon: spell or elemental attack (1d8 + 2 fire); armor: none specified
-- steamstorm-oracle | Steamstorm Oracle | Steam and rain spellcaster | Gear: weapon: spell or elemental attack (4d6 + 7 lightning); armor: none specified
-- the-leviathan-current | The Leviathan Current | Category 9 water boss | Gear: weapon: natural attack (6d10 + 11 bludgeoning); armor: none specified
-- tidepool-tyrant | Tidepool Tyrant | Category 2 water boss | Gear: weapon: natural attack (2d6 + 4 bludgeoning); armor: none specified
-- tsunami-herald | Tsunami Herald | Walking wall of water | Gear: weapon: natural attack (4d10 + 7 bludgeoning); armor: none specified
-- whirlpool-dancer | Whirlpool Dancer | Fast rotating water duelist | Gear: weapon: held or conjured weapon (3d10 + 5 slashing); armor: none specified
-- whitewater-matron | Whitewater Matron | Category 3 water boss | Gear: weapon: natural attack (2d8 + 5 bludgeoning); armor: none specified
-
-embervein-deepworks-monster-pack.js (40 missing)
-
-- adamantine-mine-golem | Adamantine Mine Golem | Extremely tough construct tank | Gear: weapon: natural attack (6d6 + 7 bludgeoning); armor: armored body
-- animated-anvil | Animated Anvil | Heavy forge construct | Gear: weapon: natural attack (2d8 + 3 bludgeoning); armor: none specified
-- awakened-support-beam | Awakened Support Beam | Living timber wall | Gear: weapon: natural attack (4d8 + 5 bludgeoning); armor: none specified
-- bent-gear-scarab | Bent-Gear Scarab | Tiny construct crawler | Gear: weapon: natural attack (1d6 + 2 slashing); armor: none specified
-- black-furnace-drow-overseer | Black-Furnace Drow Overseer | Cruel foundry commander | Gear: weapon: held or conjured weapon (4d6 + 5 poison); armor: none specified
-- broken-gear-horror | Broken-Gear Horror | Grinding construct predator | Gear: weapon: natural attack (3d8 + 4 slashing); armor: none specified
-- catastrophe-engine | Catastrophe Engine | Apocalyptic mining machine | Gear: weapon: magical/natural attack (8d8 + 11 force); armor: none specified
-- chain-hoist-overseer | Chain-Hoist Overseer | Category 2 control boss | Gear: weapon: held or conjured weapon (2d6 + 3 slashing); armor: none specified
-- coal-dust-goblin | Coal-Dust Goblin | Weak ambusher with dirty tricks | Gear: weapon: natural attack (1d6 + 1 piercing); armor: none specified
-- conveyor-belt-devourer | Conveyor-Belt Devourer | Industrial maw construct | Gear: weapon: natural attack (6d10 + 8 piercing); armor: none specified
-
-- deep-dwarf-chain-guard | Deep Dwarf Chain Guard | Mine-owner guard | Gear: weapon: held or conjured weapon (1d8 + 3 slashing); armor: none specified
-- embervein-pit-engineer | Embervein Pit Engineer | Infernal machine master | Gear: weapon: spell or elemental attack (7d8 + 9 fire); armor: none specified
-- forgeheart-colossus | Forgeheart Colossus | Category 8 construct boss | Gear: weapon: magical/natural attack (7d8 + 9 fire); armor: armored body
-- furnace-mephit | Furnace Mephit | Flying fire nuisance | Gear: weapon: spell or elemental attack (1d8 + 2 fire); armor: none specified
-- furnace-ward-guardian | Furnace-Ward Guardian | Category 3 forge boss | Gear: weapon: held or conjured weapon (2d10 + 4 fire); armor: armored body
-- glass-slag-elemental | Glass-Slag Elemental | Bleeding-shard paraelemental | Gear: weapon: natural attack (6d6 + 7 slashing); armor: spines or hard growths
-- hellfire-stoker | Hellfire Stoker | Infernal forge attendant | Gear: weapon: spell or elemental attack (5d6 + 6 fire); armor: none specified
-- infernal-chainwright | Infernal Chainwright | Devil chain controller | Gear: weapon: held or conjured weapon (6d6 + 8 slashing); armor: none specified
-- ironthane-of-the-deepworks | Ironthane of the Deepworks | Category 7 deep dwarf boss | Gear: weapon: natural attack (6d8 + 8 bludgeoning); armor: none specified
-- living-black-oil | Living Black Oil | Ignitable toxic ooze | Gear: weapon: magical/natural attack (6d8 + 8 poison); armor: none specified
-
-- magma-vein-loper | Magma-Vein Loper | Fast lava elemental | Gear: weapon: magical/natural attack (3d6 + 4 fire); armor: none specified
-- master-of-broken-gears | Master of Broken Gears | Category 6 machine boss | Gear: weapon: natural attack (5d10 + 7 slashing); armor: none specified
-- ore-eating-wormling | Ore-Eating Wormling | Burrowing mine monstrosity | Gear: weapon: natural attack (5d6 + 6 piercing); armor: none specified
-- ore-shell-crawler | Ore-Shell Crawler | Armored mine predator | Gear: weapon: natural attack (1d10 + 2 piercing); armor: armored body
-- orevein-titan | Orevein Titan | Living giant of the mine | Gear: weapon: natural attack (7d10 + 9 bludgeoning); armor: armored body
-- powder-keg-saboteur | Powder-Keg Saboteur | Explosive ranged humanoid | Gear: weapon: held or conjured weapon (3d6 + 4 fire); armor: none specified
-- pressure-core-elemental | Pressure-Core Elemental | Steam and force avatar | Gear: weapon: spell or elemental attack (7d8 + 9 force); armor: none specified
-- primordial-slag-ancient | Primordial Slag Ancient | World-old molten elemental | Gear: weapon: magical/natural attack (8d8 + 10 fire); armor: none specified
-- queen-of-cinders-and-chains | Queen of Cinders and Chains | Category 9 infernal boss | Gear: weapon: spell or elemental attack (8d8 + 10 fire); armor: none specified
-- red-valve-engine | Red Valve Engine | Category 5 pressure boss | Gear: weapon: spell or elemental attack (4d10 + 6 fire); armor: none specified
-
-- salamander-forge-noble | Salamander Forge Noble | Elite elemental weaponmaster | Gear: weapon: held or conjured weapon (5d8 + 6 fire); armor: none specified
-- slag-slime | Slag Slime | Burning ooze hazard | Gear: weapon: magical/natural attack (2d6 + 3 acid); armor: none specified
-- slagmaw-brute | Slagmaw Brute | Category 4 molten boss | Gear: weapon: magical/natural attack (3d10 + 5 fire); armor: none specified
-- smoke-belcher | Smoke Belcher | Vision-denial elemental | Gear: weapon: spell or elemental attack (4d6 + 5 necrotic); armor: none specified
-- soot-tunnel-rat | Soot-Tunnel Rat | Fast mine pest | Gear: weapon: natural attack (1d4 + 2 piercing); armor: none specified
-- sootbeard-shift-boss | Sootbeard Shift Boss | Category 1 mine boss | Gear: weapon: natural attack (1d8 + 2 bludgeoning); armor: none specified
-- steam-pipe-gremlin | Steam-Pipe Gremlin | Saboteur skirmisher | Gear: weapon: spell or elemental attack (2d6 + 3 fire); armor: none specified
-- the-embervein-awakened | The Embervein, Awakened | Category 10 dungeon-core boss | Gear: weapon: spell or elemental attack (9d8 + 12 fire); armor: none specified
-- volcanic-deep-drake | Volcanic Deep Drake | Lava-breath dragonkin | Gear: weapon: magical/natural attack (7d6 + 8 fire); armor: none specified
-- world-anvil-dragon | World-Anvil Dragon | Legendary forge dragon | Gear: weapon: magical/natural attack (8d10 + 10 fire); armor: none specified
-
-fiend-demon-pack.js (40 missing)
-
-- abyss-gate-colossus | Abyss-Gate Colossus | Living portal titan | Gear: weapon: magical/natural attack (8d8 + 10 force); armor: armored body
-- abyss-knight-ravager | Abyss Knight Ravager | Armored chaotic melee elite | Gear: weapon: held or conjured weapon (3d10 + 5 slashing); armor: armored body
-- abyss-storm-reaver | Abyss Storm Reaver | Lightning demon artillery | Gear: weapon: spell or elemental attack (6d8 + 8 lightning); armor: none specified
-- abyssal-dretchling | Abyssal Dretchling | Small stinking demon brute | Gear: weapon: natural attack (1d8 + 1 slashing); armor: none specified
-- abyssal-maw-artillery | Abyssal Maw Artillery | Long-range acid vomiter | Gear: weapon: spell or elemental attack (4d8 + 6 acid); armor: none specified
-- abyssal-siege-titan | Abyssal Siege Titan | Colossal wall-breaker demon | Gear: weapon: natural attack (7d10 + 9 bludgeoning); armor: armored body
-- abyssal-spine-thrower | Abyssal Spine-Thrower | Chaotic ranged attacker | Gear: weapon: held or conjured weapon (2d8 + 3 piercing); armor: spines or hard growths
-- abyssal-tyrant-spawn | Abyssal Tyrant Spawn | Huge commanding brute | Gear: weapon: natural attack (5d10 + 7 bludgeoning); armor: none specified
-- apocalypse-goristro | Apocalypse Goristro | Siege-sized charger | Gear: weapon: natural attack (6d10 + 8 bludgeoning); armor: none specified
-- avatar-of-endless-hunger | Avatar of Endless Hunger | Demon prince hunger aspect | Gear: weapon: natural attack (8d10 + 10 piercing); armor: none specified
-
-- balor-ashbringer | Balor Ashbringer | Flying fire-and-whip destroyer | Gear: weapon: held or conjured weapon (6d8 + 8 fire); armor: none specified
-- balor-rift-general | Balor Rift-General | Category 8 demon boss | Gear: weapon: magical/natural attack (7d8 + 8 fire); armor: none specified
-- blade-queen-sarthyxa | Blade-Queen Sarthyxa | Category 7 demon boss | Gear: weapon: held or conjured weapon (6d8 + 8 slashing); armor: none specified
-- blink-rift-predator | Blink-Rift Predator | Teleporting abyss hunter | Gear: weapon: magical/natural attack (3d6 + 5 force); armor: none specified
-- blood-smoke-howler | Blood-Smoke Howler | Ranged fear screamer | Gear: weapon: spell or elemental attack (1d8 + 3 thunder); armor: none specified
-- chaos-flame-binder | Chaos-Flame Binder | Wild fire caster | Gear: weapon: spell or elemental attack (3d6 + 4 fire); armor: none specified
-- chaos-star-seraph | Chaos-Star Seraph | Flying abyssal spell destroyer | Gear: weapon: spell or elemental attack (8d8 + 10 psychic); armor: none specified
-- claw-imp-of-ruin | Claw Imp of Ruin | Fast lesser demon skirmisher | Gear: weapon: natural attack (1d6 + 2 slashing); armor: none specified
-- glabrezu-pact-breaker | Glabrezu Pact-Breaker | Claw caster tempter | Gear: weapon: natural attack (3d8 + 5 slashing); armor: none specified
-- gut-maw-bully | Gut-Maw Bully | Category 1 demon boss | Gear: weapon: natural attack (1d10 + 3 piercing); armor: none specified
-
-- herald-of-the-demon-prince | Herald of the Demon Prince | Prince-touched ruin commander | Gear: weapon: spell or elemental attack (6d10 + 9 necrotic); armor: none specified
-- hezrou-mudmauler | Hezrou Mudmauler | Toxic heavy bruiser | Gear: weapon: held or conjured weapon (2d10 + 4 bludgeoning); armor: none specified
-- horned-rift-gorger | Horned Rift-Gorger | Category 2 demon boss | Gear: weapon: natural attack (1d12 + 4 slashing); armor: none specified
-- madness-leaper | Madness Leaper | Pouncing psychic skirmisher | Gear: weapon: magical/natural attack (2d8 + 4 psychic); armor: none specified
-- manifest-demon-prince-azrakhul | Manifest Demon Prince Azrakhul | Category 10 final demon boss | Gear: weapon: spell or elemental attack (9d8 + 10 necrotic); armor: none specified
-- maw-demon-gnawer | Maw Demon Gnawer | Hungry melee attacker | Gear: weapon: natural attack (1d10 + 3 piercing); armor: none specified
-- mutation-gorger | Mutation Gorger | Scaling melee monster | Gear: weapon: natural attack (4d10 + 6 piercing); armor: none specified
-- nalfeshnee-flesh-judge | Nalfeshnee Flesh-Judge | Psychic judgement brute | Gear: weapon: magical/natural attack (4d8 + 6 psychic); armor: none specified
-- plague-belly-hezrou | Plague-Belly Hezrou | Category 4 demon boss | Gear: weapon: natural attack (3d8 + 5 bludgeoning); armor: none specified
-- prince-spawn-gharazhul | Prince-Spawn Gharazhul | Category 9 demon boss | Gear: weapon: magical/natural attack (7d8 + 9 force); armor: none specified
-
-- +quasit-needler | Quasit Needler | Tiny flying poison demon | Gear: weapon: held or conjured weapon (1d8 + 3 piercing); armor: none specified
-- +ruin-choir-warlock | Ruin-Choir Warlock | Abyssal chant caster | Gear: weapon: spell or elemental attack (5d8 + 7 necrotic); armor: none specified
-- +screaming-vrock-matriarch | Screaming Vrock Matriarch | Category 3 demon boss | Gear: weapon: natural attack (2d8 + 4 slashing); armor: none specified
-- shadow-rift-demon | Shadow Rift Demon | Necrotic ambusher | Gear: weapon: magical/natural attack (2d6 + 3 necrotic); armor: none specified
-- +six-blade-marilith | Six-Blade Marilith | Multiweapon melee master | Gear: weapon: held or conjured weapon (5d8 + 7 slashing); armor: none specified
-- soul-eater-of-the-rift | Soul-Eater of the Rift | Flying life-drain executioner | Gear: weapon: magical/natural attack (6d8 + 9 necrotic); armor: none specified
-- spite-mote | Spite Mote | Floating abyssal nuisance | Gear: weapon: spell or elemental attack (1d6 + 2 psychic); armor: incorporeal form
-- +three-mouthed-ruin-judge | Three-Mouthed Ruin Judge | Category 6 demon boss | Gear: weapon: spell or elemental attack (5d8 + 7 psychic); armor: none specified
-- +vrock-fledgling | Vrock Fledgling | Flying screeching demon | Gear: weapon: natural attack (2d6 + 4 slashing); armor: none specified
-- +wish-rot-deceiver | Wish-Rot Deceiver | Category 5 demon boss | Gear: weapon: spell or elemental attack (4d8 + 6 psychic); armor: none specified
-
-fiend-devil-pack.js (40 missing)
-
-- archdevils-burning-hand | Archdevil's Burning Hand | Chosen infernal executioner | Gear: weapon: spell or elemental attack (6d8 + 9 fire); armor: none specified
-- ash-maw-hound | Ash-Maw Hound | Fast infernal beast | Gear: weapon: natural attack (1d10 + 3 piercing); armor: none specified
-- ashen-erinyes | Ashen Erinyes | Elite flying archer devil | Gear: weapon: held or conjured weapon (3d10 + 7 piercing); armor: none specified
-- aspect-of-the-pit | Aspect of the Pit | Avatar-level pit devil | Gear: weapon: magical/natural attack (7d8 + 10 fire); armor: none specified
-- barbed-enforcer | Barbed Enforcer | Punishing melee bruiser | Gear: weapon: natural attack (1d12 + 4 piercing); armor: spines or hard growths
-- bonehook-stalker | Bonehook Stalker | Hooked devil assassin | Gear: weapon: held or conjured weapon (3d8 + 6 piercing); armor: none specified
-- brass-horn-overseer | Brass-Horn Overseer | Category 1 devil boss | Gear: weapon: magical/natural attack (1d10 + 3 fire); armor: none specified
-- brimstone-bombardier | Brimstone Bombardier | Area fire artillery | Gear: weapon: spell or elemental attack (3d6 + 4 fire); armor: none specified
-- chain-magistrate | Chain Magistrate | Category 4 devil boss | Gear: weapon: held or conjured weapon (2d10 + 5 slashing); armor: none specified
-- chain-snag-devil | Chain-Snag Devil | Early reach controller | Gear: weapon: held or conjured weapon (1d8 + 3 slashing); armor: none specified
-
-- cinder-lemure | Cinder Lemure | Slow burning fiend brute | Gear: weapon: natural attack (1d8 + 1 bludgeoning); armor: none specified
-- contract-titan | Contract Titan | Colossal infernal enforcer | Gear: weapon: natural attack (7d10 + 10 bludgeoning); armor: armored body
-- contract-whelp | Contract Whelp | Weak pact-mark caster | Gear: weapon: spell or elemental attack (1d6 + 2 fire); armor: none specified
-- crimson-contract-judge | Crimson Contract Judge | Category 5 devil boss | Gear: weapon: spell or elemental attack (3d8 + 5 fire); armor: none specified
-- crowned-archdevil-avatar | Crowned Archdevil Avatar | Category 10 final devil boss | Gear: weapon: spell or elemental attack (8d10 + 10 fire); armor: none specified
-- duke-of-chains-voragul | Duke of Chains Voragul | Category 9 devil boss | Gear: weapon: held or conjured weapon (6d10 + 9 slashing); armor: none specified
-- emberwing-pursuer | Emberwing Pursuer | Flying fire skirmisher | Gear: weapon: magical/natural attack (1d10 + 4 fire); armor: none specified
-- forked-spear-devil | Forked-Spear Devil | Reach-line infantry devil | Gear: weapon: held or conjured weapon (2d8 + 4 piercing); armor: none specified
-- furnace-tyrant | Furnace Tyrant | Burning aura juggernaut | Gear: weapon: magical/natural attack (4d8 + 7 fire); armor: armored body
-- gloomhorn-hellsteed | Gloomhorn Hellsteed | Infernal charger mount | Gear: weapon: natural attack (2d12 + 5 bludgeoning); armor: none specified
-
-- hell-crown-praetor | Hell-Crown Praetor | Archdevil guard captain | Gear: weapon: held or conjured weapon (5d10 + 9 slashing); armor: none specified
-- hellchain-exarch | Hellchain Exarch | Elite chain commander | Gear: weapon: held or conjured weapon (4d8 + 7 slashing); armor: none specified
-- hellfire-centurion | Hellfire Centurion | Elite infernal frontliner | Gear: weapon: held or conjured weapon (2d10 + 5 fire); armor: none specified
-- hellmarked-adjudicator | Hellmarked Adjudicator | Category 3 devil boss | Gear: weapon: spell or elemental attack (2d8 + 4 fire); armor: none specified
-- infernal-gaoler | Infernal Gaoler | Category 2 devil boss | Gear: weapon: held or conjured weapon (1d12 + 4 slashing); armor: none specified
-- infernal-seraph-of-chains | Infernal Seraph of Chains | Fallen angelic devil caster | Gear: weapon: spell or elemental attack (7d8 + 10 radiant); armor: none specified
-- infernal-siege-brute | Infernal Siege Brute | Massive wall-breaker devil | Gear: weapon: natural attack (3d10 + 6 bludgeoning); armor: none specified
-- infernal-soul-reaper | Infernal Soul Reaper | Flying soul executioner | Gear: weapon: magical/natural attack (5d12 + 9 necrotic); armor: none specified
-- inquisitor-malrec | Inquisitor Malrec | Category 7 devil boss | Gear: weapon: held or conjured weapon (4d10 + 7 necrotic); armor: none specified
-- nine-brand-maledictor | Nine-Brand Maledictor | High curse caster | Gear: weapon: spell or elemental attack (3d8 + 6 psychic); armor: none specified
-
-- oathbrand-tempter | Oathbrand Tempter | Charm and bargain fiend | Gear: weapon: spell or elemental attack (2d8 + 4 psychic); armor: none specified
-- pact-duchess-of-the-red-seal | Pact Duchess of the Red Seal | Category 6 devil boss | Gear: weapon: spell or elemental attack (4d8 + 6 fire); armor: none specified
-- pit-born-devastator | Pit-Born Devastator | Huge infernal destroyer | Gear: weapon: natural attack (5d8 + 8 bludgeoning); armor: none specified
-- pit-imp-scout | Pit Imp Scout | Tiny flying devil harrier | Gear: weapon: natural attack (1d6 + 2 piercing); armor: none specified
-- soul-furnace-hierarch | Soul-Furnace Hierarch | Soul-burning archcaster | Gear: weapon: spell or elemental attack (5d8 + 8 necrotic); armor: none specified
-- soul-ledger-scribe | Soul-Ledger Scribe | Contract curse artillery | Gear: weapon: spell or elemental attack (3d6 + 5 necrotic); armor: none specified
-- spined-hellion | Spined Hellion | Ranged spine thrower | Gear: weapon: held or conjured weapon (1d8 + 3 piercing); armor: spines or hard growths
-- stygian-brand-devil | Stygian Brand Devil | Cold-iron infernal elite | Gear: weapon: held or conjured weapon (4d10 + 8 cold); armor: none specified
-- sulphur-hexer | Sulphur Hexer | Infernal debuff caster | Gear: weapon: spell or elemental attack (2d6 + 3 fire); armor: none specified
-- war-duke-asteroth | War Duke Asteroth | Category 8 devil boss | Gear: weapon: magical/natural attack (5d10 + 8 fire); armor: none specified
-
-ghost-undead-pack.js (40 missing)
-
-- abyssal-wraith | Abyssal Wraith | High-tier necrotic predator | Gear: weapon: spell or elemental attack (5d8 + 9 necrotic); armor: incorporeal form
-- allip-of-forbidden-names | Allip of Forbidden Names | Psychic knowledge-curse caster | Gear: weapon: spell or elemental attack (3d6 + 6 psychic); armor: incorporeal form
-- ancient-phantom-dragon | Ancient Phantom Dragon | Large flying breath ghost | Gear: weapon: spell or elemental attack (5d6 + 8 cold); armor: incorporeal form
-- astral-death-wraith | Astral Death Wraith | Final-tier soul reaper | Gear: weapon: spell or elemental attack (7d8 + 10 necrotic); armor: incorporeal form
-- barrow-queen-in-white | Barrow Queen in White | Category 5 ghost boss | Gear: weapon: spell or elemental attack (3d6 + 6 cold); armor: incorporeal form
-- candleflame-wisp | Candleflame Wisp | Small soul-light ranged kiter | Gear: weapon: spell or elemental attack (1d6 + 2 cold); armor: incorporeal form
-- cathedral-wraith-saint | Cathedral Wraith-Saint | Category 8 ghost boss | Gear: weapon: spell or elemental attack (5d8 + 9 necrotic); armor: incorporeal form
-- chainbound-phantom | Chainbound Phantom | Melee ghost controller | Gear: weapon: spell or elemental attack (1d10 + 3 necrotic); armor: incorporeal form
-- chilling-poltergeist | Chilling Poltergeist | Telekinetic object thrower | Gear: weapon: spell or elemental attack (1d8 + 3 bludgeoning); armor: incorporeal form
-- corpse-light-will-o-wisp | Corpse-Light Will-o'-Wisp | Fast evasive ranged ghost | Gear: weapon: spell or elemental attack (1d10 + 4 lightning); armor: incorporeal form
-
-- dead-king-under-the-moon | Dead King Under the Moon | Category 9 ghost boss | Gear: weapon: spell or elemental attack (6d8 + 10 necrotic); armor: incorporeal form
-- death-choir-banshee | Death-Choir Banshee | High-damage cone caster | Gear: weapon: spell or elemental attack (3d6 + 5 psychic); armor: incorporeal form
-- doom-herald-banshee | Doom-Herald Banshee | Lethal scream artillery | Gear: weapon: spell or elemental attack (4d6 + 7 thunder); armor: incorporeal form
-- dread-cavalier-ghost | Dread Cavalier Ghost | Charging spectral knight | Gear: weapon: spell or elemental attack (2d10 + 7 force); armor: incorporeal form
-- elder-eidolon | Elder Eidolon | Ancient balanced ghost champion | Gear: weapon: spell or elemental attack (6d8 + 11 force); armor: incorporeal form
-- grave-lantern-specter | Grave-Lantern Specter | Category 1 ghost boss | Gear: weapon: spell or elemental attack (1d10 + 3 necrotic); armor: incorporeal form
-- grave-mist-banshee | Grave-Mist Banshee | Area fear and psychic damage caster | Gear: weapon: spell or elemental attack (2d6 + 4 psychic); armor: incorporeal form
-- grave-storm-apparition | Grave-Storm Apparition | Lightning and thunder area ghost | Gear: weapon: spell or elemental attack (3d6 + 7 lightning); armor: incorporeal form
-- grave-titan-phantom | Grave-Titan Phantom | Massive incorporeal bruiser | Gear: weapon: spell or elemental attack (6d6 + 10 force); armor: armored body, incorporeal form
-- greater-wraith | Greater Wraith | Life-draining melee striker | Gear: weapon: spell or elemental attack (2d10 + 5 necrotic); armor: incorporeal form
-
-- hollow-wail-spirit | Hollow-Wail Spirit | Fear-based ghost caster | Gear: weapon: spell or elemental attack (1d10 + 3 psychic); armor: incorporeal form
-- lord-of-the-unburied-court | Lord of the Unburied Court | Category 7 ghost boss | Gear: weapon: spell or elemental attack (4d8 + 8 necrotic); armor: incorporeal form
-- memory-eater-allip | Memory-Eater Allip | Debuffing psychic elite | Gear: weapon: spell or elemental attack (4d8 + 8 psychic); armor: incorporeal form
-- mirror-hall-haunt | Mirror-Hall Haunt | Illusory evasive ghost | Gear: weapon: spell or elemental attack (2d6 + 6 psychic); armor: incorporeal form
-- moonless-nightshade | Moonless Nightshade | Darkness-wrapped ghost assassin | Gear: weapon: spell or elemental attack (3d8 + 7 necrotic); armor: incorporeal form
-- mourning-apparition | Mourning Apparition | Fragile fear ghost | Gear: weapon: spell or elemental attack (1d8 + 1 necrotic); armor: incorporeal form
-- mourning-duke-eidolon | Mourning Duke Eidolon | Category 4 ghost boss | Gear: weapon: spell or elemental attack (2d8 + 6 necrotic); armor: incorporeal form
-- oracle-of-dead-stars | Oracle of Dead Stars | Cosmic psychic ghost caster | Gear: weapon: spell or elemental attack (6d6 + 9 psychic); armor: incorporeal form
-- phantom-knight | Phantom Knight | Durable spectral melee guard | Gear: weapon: spell or elemental attack (2d8 + 5 force); armor: incorporeal form
-- possessing-remnant | Possessing Remnant | Control-oriented ghost | Gear: weapon: spell or elemental attack (2d6 + 5 necrotic); armor: incorporeal form
-
-- prince-of-the-hollow-name | Prince of the Hollow Name | Category 6 ghost boss | Gear: weapon: spell or elemental attack (3d8 + 7 psychic); armor: incorporeal form
-- soul-drinker-phantom | Soul-Drinker Phantom | Sustaining ghost bruiser | Gear: weapon: spell or elemental attack (2d8 + 6 necrotic); armor: incorporeal form
-- spectral-duelist | Spectral Duelist | Precise melee ghost striker | Gear: weapon: spell or elemental attack (1d12 + 5 force); armor: incorporeal form
-- spectral-executioner | Spectral Executioner | Heavy melee finisher | Gear: weapon: spell or elemental attack (4d6 + 8 force); armor: incorporeal form
-- tempest-of-lost-souls | Tempest of Lost Souls | Mobile storm area ghost | Gear: weapon: spell or elemental attack (5d6 + 9 lightning); armor: incorporeal form
-- the-first-ghost | The First Ghost | Category 10 ghost boss | Gear: weapon: spell or elemental attack (8d8 + 12 necrotic); armor: incorporeal form
-- void-bell-banshee | Void-Bell Banshee | Mythic scream caster | Gear: weapon: spell or elemental attack (8d6 + 10 thunder); armor: incorporeal form
-- whispering-shade | Whispering Shade | Weak flying ghost skirmisher | Gear: weapon: spell or elemental attack (1d6 + 2 necrotic); armor: incorporeal form
-- widow-of-the-white-bell | Widow of the White Bell | Category 3 ghost boss | Gear: weapon: spell or elemental attack (2d6 + 5 psychic); armor: incorporeal form
-- wraith-of-the-locked-door | Wraith of the Locked Door | Category 2 ghost boss | Gear: weapon: spell or elemental attack (1d10 + 4 necrotic); armor: incorporeal form
-
-
-Total missing token JPGs: 411
-
-beast-biome-high-tier-pack.js (189 missing)
+beast-biome-high-tier-pack.js (187 missing)
 
 Forest (21)
 
-- ironwood-bear | Ironwood Bear | Armored forest bruiser | Gear: weapon: natural attack (3d6 + 4 bludgeoning); armor: armored body
-- thornback-stag | Thornback Stag | Charging antler predator | Gear: weapon: natural attack (3d8 + 4 bludgeoning); armor: spines or hard growths
 - elder-briarboar | Elder Briarboar | Category 4 forest beast boss | Gear: weapon: natural attack (3d10 + 5 bludgeoning); armor: none specified
-- moonfang-dire-wolf | Moonfang Dire Wolf | Fast pack hunter | Gear: weapon: natural attack (4d6 + 5 slashing); armor: none specified
+- ironwood-bear | Ironwood Bear | Armored forest bruiser | Gear: weapon: natural attack (3d6 + 4 bludgeoning); armor: armored body
+- thornback-stag | Thornback Stag | Charging antler predator | Gear: weapon: natural attack (3d8 + 4 bludgeoning); armor: armored body
 - gloomweb-broodmother | Gloomweb Broodmother | Huge venomous spider | Gear: weapon: natural attack (4d8 + 5 piercing); armor: none specified
+- moonfang-dire-wolf | Moonfang Dire Wolf | Fast pack hunter | Gear: weapon: natural attack (4d6 + 5 slashing); armor: none specified
 - oakmaw-cave-bear | Oakmaw Cave Bear | Category 5 forest beast boss | Gear: weapon: natural attack (4d10 + 6 bludgeoning); armor: none specified
-- moss-horn-megaloceros | Moss-Horn Megaloceros | Huge trampling forest grazer | Gear: weapon: natural attack (5d6 + 6 bludgeoning); armor: spines or hard growths
 - greenfang-panther | Greenfang Panther | Silent forest ambusher | Gear: weapon: natural attack (5d8 + 6 slashing); armor: none specified
-- thousand-bramble-boar | Thousand-Bramble Boar | Category 6 forest beast boss | Gear: weapon: natural attack (5d10 + 7 bludgeoning); armor: spines or hard growths
+- moss-horn-megaloceros | Moss-Horn Megaloceros | Huge trampling forest grazer | Gear: weapon: natural attack (5d6 + 6 bludgeoning); armor: none specified
+- thousand-bramble-boar | Thousand-Bramble Boar | Category 6 forest beast boss | Gear: weapon: natural attack (5d10 + 7 bludgeoning); armor: none specified
 - ancient-dire-owlbear | Ancient Dire Owlbear | Savage old-growth predator | Gear: weapon: natural attack (6d6 + 7 slashing); armor: none specified
 
-- venomroot-serpent | Venomroot Serpent | Poisonous root-colored constrictor | Gear: weapon: natural attack (6d8 + 7 piercing); armor: none specified
 - hart-of-the-sleeping-grove | Hart of the Sleeping Grove | Category 7 forest beast boss | Gear: weapon: natural attack (6d10 + 8 bludgeoning); armor: none specified
+- venomroot-serpent | Venomroot Serpent | Poisonous root-colored constrictor | Gear: weapon: natural attack (6d8 + 7 piercing); armor: none specified
 - elder-mossback-mammoth | Elder Mossback Mammoth | Massive forest trampler | Gear: weapon: natural attack (6d10 + 8 bludgeoning); armor: none specified
 - nightleaf-roc | Nightleaf Roc | Dark-winged forest hunter | Gear: weapon: natural attack (7d8 + 8 slashing); armor: none specified
 - root-tusk-behemoth | Root-Tusk Behemoth | Category 8 forest beast boss | Gear: weapon: natural attack (7d10 + 9 bludgeoning); armor: none specified
-- primeval-fangcat | Primeval Fangcat | Apex old-forest stalker | Gear: weapon: natural attack (7d8 + 9 slashing); armor: none specified
-- stormbark-elk | Stormbark Elk | Thunderous antlered giant | Gear: weapon: natural attack (7d10 + 9 bludgeoning); armor: spines or hard growths
 - old-king-bear | Old King Bear | Category 9 forest beast boss | Gear: weapon: natural attack (8d10 + 10 bludgeoning); armor: none specified
-- worldwood-mammoth | Worldwood Mammoth | Living mountain of forest flesh | Gear: weapon: natural attack (8d8 + 10 bludgeoning); armor: none specified
+- primeval-fangcat | Primeval Fangcat | Apex old-forest stalker | Gear: weapon: natural attack (7d8 + 9 slashing); armor: none specified
+- stormbark-elk | Stormbark Elk | Thunderous antlered giant | Gear: weapon: natural attack (7d10 + 9 bludgeoning); armor: none specified
 - green-eclipse-roc | Green Eclipse Roc | Vast canopy-shadow bird | Gear: weapon: natural attack (8d10 + 10 slashing); armor: none specified
-
 - the-first-wolf-of-the-wildwood | The First Wolf of the Wildwood | Category 10 forest beast boss | Gear: weapon: natural attack (9d10 + 12 slashing); armor: none specified
+
+- worldwood-mammoth | Worldwood Mammoth | Living mountain of forest flesh | Gear: weapon: natural attack (8d8 + 10 bludgeoning); armor: none specified
 
 Desert (21)
 
 - glassdune-scorpion | Glassdune Scorpion | Crystal-shelled desert stinger | Gear: weapon: natural attack (3d6 + 4 piercing); armor: armored body
-- sunmane-lion | Sunmane Lion | Golden desert ambusher | Gear: weapon: natural attack (3d8 + 4 slashing); armor: none specified
 - old-glassback-scorpion | Old Glassback Scorpion | Category 4 desert beast boss | Gear: weapon: natural attack (3d10 + 5 piercing); armor: none specified
-- duneplate-tortoise | Duneplate Tortoise | Slow desert fortress-beast | Gear: weapon: natural attack (4d6 + 5 slashing); armor: armored body
+- sunmane-lion | Sunmane Lion | Golden desert ambusher | Gear: weapon: natural attack (3d8 + 4 slashing); armor: none specified
 - ashwind-raptor | Ashwind Raptor | Fast hot-wind pack predator | Gear: weapon: natural attack (4d8 + 5 slashing); armor: none specified
+- duneplate-tortoise | Duneplate Tortoise | Slow desert fortress-beast | Gear: weapon: natural attack (4d6 + 5 slashing); armor: armored body
 - mirage-mane-manticore | Mirage-Mane Manticore | Category 5 desert beast boss | Gear: weapon: natural attack (4d10 + 6 slashing); armor: none specified
 - bone-dune-bulette | Bone-Dune Bulette | Burrowing desert landshark | Gear: weapon: natural attack (5d6 + 6 bludgeoning); armor: none specified
-- sunspine-basilisk | Sunspine Basilisk | Heat-staring desert reptile | Gear: weapon: natural attack (5d8 + 6 slashing); armor: spines or hard growths
 - great-sandmaw-worm | Great Sandmaw Worm | Category 6 desert beast boss | Gear: weapon: natural attack (5d10 + 7 bludgeoning); armor: none specified
-- sirocco-wyvern | Sirocco Wyvern | Hot-wind flying hunter | Gear: weapon: natural attack (6d6 + 7 piercing); armor: none specified
+- sunspine-basilisk | Sunspine Basilisk | Heat-staring desert reptile | Gear: weapon: natural attack (5d8 + 6 slashing); armor: spines or hard growths
+- dune-emperor-lion | Dune-Emperor Lion | Category 7 desert beast boss | Gear: weapon: natural attack (6d10 + 8 slashing); armor: none specified
 
 - saltjaw-crocodile | Saltjaw Crocodile | Desert oasis ambusher | Gear: weapon: natural attack (6d8 + 7 piercing); armor: none specified
-- dune-emperor-lion | Dune-Emperor Lion | Category 7 desert beast boss | Gear: weapon: natural attack (6d10 + 8 slashing); armor: none specified
-- thunder-dune-trampler | Thunder-Dune Trampler | Massive horned desert charger | Gear: weapon: natural attack (6d10 + 8 bludgeoning); armor: spines or hard growths
+- sirocco-wyvern | Sirocco Wyvern | Hot-wind flying hunter | Gear: weapon: natural attack (6d6 + 7 piercing); armor: none specified
 - crystal-viper-matriarch | Crystal Viper Matriarch | Huge venomous glass snake | Gear: weapon: natural attack (7d8 + 8 piercing); armor: none specified
-- the-walking-dune | The Walking Dune | Category 8 desert beast boss | Gear: weapon: natural attack (7d10 + 9 bludgeoning); armor: armored body
-- red-mirage-roc | Red Mirage Roc | Blazing sky predator | Gear: weapon: natural attack (7d8 + 9 slashing); armor: none specified
+- the-walking-dune | The Walking Dune | Category 8 desert beast boss | Gear: weapon: natural attack (7d10 + 9 bludgeoning); armor: none specified
+- thunder-dune-trampler | Thunder-Dune Trampler | Massive horned desert charger | Gear: weapon: natural attack (6d10 + 8 bludgeoning); armor: none specified
 - blackglass-dune-lurker | Blackglass Dune Lurker | Buried cutting ambusher | Gear: weapon: natural attack (7d10 + 9 slashing); armor: none specified
-- sultan-scorpion-of-the-wastes | Sultan Scorpion of the Wastes | Category 9 desert beast boss | Gear: weapon: natural attack (8d10 + 10 piercing); armor: armored body
-- titan-dune-worm | Titan Dune Worm | Colossal desert burrower | Gear: weapon: natural attack (8d8 + 10 bludgeoning); armor: none specified
+- red-mirage-roc | Red Mirage Roc | Blazing sky predator | Gear: weapon: natural attack (7d8 + 9 slashing); armor: none specified
+- sultan-scorpion-of-the-wastes | Sultan Scorpion of the Wastes | Category 9 desert beast boss | Gear: weapon: natural attack (8d10 + 10 piercing); armor: none specified
 - solar-fang-manticore | Solar Fang Manticore | Radiant-hot desert aerial brute | Gear: weapon: natural attack (8d10 + 10 slashing); armor: none specified
-
 - the-sand-that-hunts | The Sand That Hunts | Category 10 desert beast boss | Gear: weapon: natural attack (9d10 + 12 slashing); armor: none specified
+
+- titan-dune-worm | Titan Dune Worm | Colossal desert burrower | Gear: weapon: natural attack (8d8 + 10 bludgeoning); armor: none specified
 
 Underground (21)
 
 - caveback-hookclaw | Caveback Hookclaw | Blind cavern ambusher | Gear: weapon: natural attack (3d6 + 4 slashing); armor: none specified
+- deepclaw-matriarch | Deepclaw Matriarch | Category 4 underground beast boss | Gear: weapon: natural attack (3d10 + 5 slashing); armor: none specified
 - ironfang-molebear | Ironfang Molebear | Digging brute | Gear: weapon: natural attack (3d8 + 4 slashing); armor: none specified
-- deepclaw-matriarch | Deepclaw Matriarch | Category 4 underground beast boss | Gear: weapon: natural attack (3d10 + 5 slashing); armor: armored body
 - echo-bat-swarmking | Echo-Bat Swarmking | Shrieking cavern flier | Gear: weapon: natural attack (4d6 + 5 slashing); armor: none specified
 - rockhide-cave-rhino | Rockhide Cave Rhino | Armored underground charger | Gear: weapon: natural attack (4d8 + 5 bludgeoning); armor: armored body
 - the-blind-tunnel-bull | The Blind Tunnel Bull | Category 5 underground beast boss | Gear: weapon: natural attack (4d10 + 6 bludgeoning); armor: none specified
 - crystalback-cave-spider | Crystalback Cave Spider | Gem-shelled web predator | Gear: weapon: natural attack (5d6 + 6 piercing); armor: armored body
 - deep-maw-badger | Deep Maw Badger | Ripping burrow hunter | Gear: weapon: natural attack (5d8 + 6 slashing); armor: none specified
-- gloomhorn-under-rhino | Gloomhorn Under-Rhino | Category 6 underground beast boss | Gear: weapon: natural attack (5d10 + 7 bludgeoning); armor: armored body
-- pale-cave-wyvern | Pale Cave Wyvern | Winged cavern stinger | Gear: weapon: natural attack (6d6 + 7 piercing); armor: none specified
-
+- gloomhorn-under-rhino | Gloomhorn Under-Rhino | Category 6 underground beast boss | Gear: weapon: natural attack (5d10 + 7 bludgeoning); armor: none specified
 - basalt-shelled-ankylosaur | Basalt-Shelled Ankylosaur | Armored tail-crusher | Gear: weapon: natural attack (6d8 + 7 bludgeoning); armor: armored body
-- old-stone-eater | Old Stone-Eater | Category 7 underground beast boss | Gear: weapon: natural attack (6d10 + 8 slashing); armor: armored body
+
+- old-stone-eater | Old Stone-Eater | Category 7 underground beast boss | Gear: weapon: natural attack (6d10 + 8 slashing); armor: none specified
+- pale-cave-wyvern | Pale Cave Wyvern | Winged cavern stinger | Gear: weapon: natural attack (6d6 + 7 piercing); armor: none specified
 - cavern-leviathan-cub | Cavern Leviathan Cub | Massive tunnel serpent | Gear: weapon: natural attack (6d10 + 8 slashing); armor: none specified
 - diamond-eyed-basilisk | Diamond-Eyed Basilisk | Crystalline cave reptile | Gear: weapon: natural attack (7d8 + 8 slashing); armor: none specified
 - echo-tyrant-bat | Echo Tyrant Bat | Category 8 underground beast boss | Gear: weapon: natural attack (7d10 + 9 slashing); armor: none specified
 - abyssal-cave-bear | Abyssal Cave Bear | Huge pale apex brute | Gear: weapon: natural attack (7d8 + 9 bludgeoning); armor: none specified
-- subterranean-thunderhorn | Subterranean Thunderhorn | Cave-cracking horned beast | Gear: weapon: natural attack (7d10 + 9 bludgeoning); armor: spines or hard growths
 - mother-of-the-black-tunnels | Mother of the Black Tunnels | Category 9 underground beast boss | Gear: weapon: natural attack (8d10 + 10 piercing); armor: none specified
-- world-root-burrower | World-Root Burrower | Legendary tunneling beast | Gear: weapon: natural attack (8d8 + 10 bludgeoning); armor: none specified
+- subterranean-thunderhorn | Subterranean Thunderhorn | Cave-cracking horned beast | Gear: weapon: natural attack (7d10 + 9 bludgeoning); armor: none specified
+- the-maw-below-all-roads | The Maw Below All Roads | Category 10 underground beast boss | Gear: weapon: natural attack (9d10 + 12 slashing); armor: none specified
 - titan-cave-drakebeast | Titan Cave Drakebeast | Winged cavern apex beast | Gear: weapon: natural attack (8d10 + 10 slashing); armor: none specified
 
-- the-maw-below-all-roads | The Maw Below All Roads | Category 10 underground beast boss | Gear: weapon: natural attack (9d10 + 12 slashing); armor: none specified
+- world-root-burrower | World-Root Burrower | Legendary tunneling beast | Gear: weapon: natural attack (8d8 + 10 bludgeoning); armor: none specified
 
 Swamp (21)
 
 - bog-tusk-boar | Bog-Tusk Boar | Mud-splattered charger | Gear: weapon: natural attack (3d6 + 4 bludgeoning); armor: none specified
 - leechhide-crocodile | Leechhide Crocodile | Blood-drinking swamp predator | Gear: weapon: natural attack (3d8 + 4 piercing); armor: none specified
 - old-mire-crocodile | Old Mire Crocodile | Category 4 swamp beast boss | Gear: weapon: natural attack (3d10 + 5 piercing); armor: none specified
+- blackfen-hydra-beast | Blackfen Hydra-Beast | Category 5 swamp beast boss | Gear: weapon: natural attack (4d10 + 6 slashing); armor: none specified
 - mirefang-panther | Mirefang Panther | Silent reed hunter | Gear: weapon: natural attack (4d6 + 5 slashing); armor: none specified
 - rotwater-serpent | Rotwater Serpent | Venomous marsh constrictor | Gear: weapon: natural attack (4d8 + 5 piercing); armor: none specified
-- blackfen-hydra-beast | Blackfen Hydra-Beast | Category 5 swamp beast boss | Gear: weapon: natural attack (4d10 + 6 slashing); armor: none specified
-- stilt-leg-horror-crane | Stilt-Leg Horror Crane | Tall stabbing marsh bird | Gear: weapon: natural attack (5d6 + 6 slashing); armor: none specified
 - mudback-behemoth | Mudback Behemoth | Huge swamp trampler | Gear: weapon: natural attack (5d8 + 6 bludgeoning); armor: none specified
+- stilt-leg-horror-crane | Stilt-Leg Horror Crane | Tall stabbing marsh bird | Gear: weapon: natural attack (5d6 + 6 slashing); armor: none specified
 - the-drowning-boar | The Drowning Boar | Category 6 swamp beast boss | Gear: weapon: natural attack (5d10 + 7 bludgeoning); armor: none specified
 - corpse-reed-alligator | Corpse-Reed Alligator | Grave-water ambusher | Gear: weapon: natural attack (6d6 + 7 piercing); armor: none specified
 
+- sloughback-tyrant | Sloughback Tyrant | Category 7 swamp beast boss | Gear: weapon: natural attack (6d10 + 8 piercing); armor: none specified
 - vile-mosquito-queen | Vile Mosquito Queen | Venomous flying swarm mother | Gear: weapon: natural attack (6d8 + 7 piercing); armor: none specified
-- sloughback-tyrant | Sloughback Tyrant | Category 7 swamp beast boss | Gear: weapon: natural attack (6d10 + 8 piercing); armor: armored body
 - fen-leviathan-spawn | Fen Leviathan Spawn | Gigantic water serpent | Gear: weapon: natural attack (6d10 + 8 piercing); armor: none specified
-- moldhorn-rhinobeast | Moldhorn Rhinobeast | Fungal marsh charger | Gear: weapon: natural attack (7d8 + 8 piercing); armor: spines or hard growths
+- moldhorn-rhinobeast | Moldhorn Rhinobeast | Fungal marsh charger | Gear: weapon: natural attack (7d8 + 8 piercing); armor: none specified
 - mud-crowned-behemoth | Mud-Crowned Behemoth | Category 8 swamp beast boss | Gear: weapon: natural attack (7d10 + 9 bludgeoning); armor: none specified
 - blackwater-fangcat | Blackwater Fangcat | Huge nocturnal swamp cat | Gear: weapon: natural attack (7d8 + 9 slashing); armor: none specified
 - gravefen-crocolisk | Gravefen Crocolisk | Ancient armored swamp hunter | Gear: weapon: natural attack (7d10 + 9 piercing); armor: armored body
 - mother-mosquito-of-the-mire | Mother Mosquito of the Mire | Category 9 swamp beast boss | Gear: weapon: natural attack (8d10 + 10 piercing); armor: none specified
-- world-mire-crocodile | World-Mire Crocodile | Colossal swamp apex beast | Gear: weapon: natural attack (8d8 + 10 piercing); armor: none specified
 - plaguewing-marsh-roc | Plaguewing Marsh Roc | Toxic swamp sky hunter | Gear: weapon: natural attack (8d10 + 10 piercing); armor: none specified
-
 - the-fen-that-bites | The Fen That Bites | Category 10 swamp beast boss | Gear: weapon: natural attack (9d10 + 12 piercing); armor: none specified
+
+- world-mire-crocodile | World-Mire Crocodile | Colossal swamp apex beast | Gear: weapon: natural attack (8d8 + 10 piercing); armor: none specified
 
 Arctic (21)
 
@@ -603,33 +116,33 @@ Arctic (21)
 - snowplate-bear | Snowplate Bear | Armored polar bruiser | Gear: weapon: natural attack (3d8 + 4 piercing); armor: armored body
 - whitefang-packmother | Whitefang Packmother | Category 4 arctic beast boss | Gear: weapon: natural attack (3d10 + 5 piercing); armor: none specified
 - icehook-owl | Icehook Owl | Silent arctic flier | Gear: weapon: natural attack (4d6 + 5 piercing); armor: none specified
-- rimehorn-elk | Rimehorn Elk | Cold antler charger | Gear: weapon: natural attack (4d8 + 5 piercing); armor: spines or hard growths
 - old-snowmaw-bear | Old Snowmaw Bear | Category 5 arctic beast boss | Gear: weapon: natural attack (4d10 + 6 piercing); armor: none specified
+- rimehorn-elk | Rimehorn Elk | Cold antler charger | Gear: weapon: natural attack (4d8 + 5 piercing); armor: none specified
 - glacierback-mammoth | Glacierback Mammoth | Huge arctic trampler | Gear: weapon: natural attack (5d6 + 6 piercing); armor: none specified
 - iceflow-sealion | Iceflow Sealion | Amphibious cold-water hunter | Gear: weapon: natural attack (5d8 + 6 piercing); armor: none specified
 - rime-tusk-mammoth | Rime-Tusk Mammoth | Category 6 arctic beast boss | Gear: weapon: natural attack (5d10 + 7 piercing); armor: none specified
-- pale-sabertooth | Pale Sabertooth | Frozen saber-cat | Gear: weapon: natural attack (6d6 + 7 piercing); armor: none specified
-
-- whiteout-roc | Whiteout Roc | Snowstorm sky predator | Gear: weapon: natural attack (6d8 + 7 piercing); armor: none specified
 - king-walrus-of-the-ice-shelf | King Walrus of the Ice Shelf | Category 7 arctic beast boss | Gear: weapon: natural attack (6d10 + 8 piercing); armor: none specified
-- frostscale-spinosaur | Frostscale Spinosaur | Cold river dinosaur | Gear: weapon: natural attack (6d10 + 8 piercing); armor: none specified
-- aurora-serpent | Aurora Serpent | Shimmering arctic snake | Gear: weapon: natural attack (7d8 + 8 piercing); armor: none specified
-- the-white-mammoth | The White Mammoth | Category 8 arctic beast boss | Gear: weapon: natural attack (7d10 + 9 piercing); armor: none specified
-- polar-night-bear | Polar Night Bear | Huge shadow-white killer | Gear: weapon: natural attack (7d8 + 9 piercing); armor: none specified
-- icecliff-wyvern | Icecliff Wyvern | Frozen cliff flier | Gear: weapon: natural attack (7d10 + 9 piercing); armor: none specified
-- glacierjaw-tyrant | Glacierjaw Tyrant | Category 9 arctic beast boss | Gear: weapon: natural attack (8d10 + 10 piercing); armor: none specified
-- world-ice-mammoth | World-Ice Mammoth | Legendary glacier trampler | Gear: weapon: natural attack (8d8 + 10 piercing); armor: none specified
-- aurora-crown-roc | Aurora Crown Roc | Colossal polar sky hunter | Gear: weapon: natural attack (8d10 + 10 piercing); armor: none specified
 
+- pale-sabertooth | Pale Sabertooth | Frozen saber-cat | Gear: weapon: natural attack (6d6 + 7 piercing); armor: none specified
+- whiteout-roc | Whiteout Roc | Snowstorm sky predator | Gear: weapon: natural attack (6d8 + 7 piercing); armor: none specified
+- aurora-serpent | Aurora Serpent | Shimmering arctic snake | Gear: weapon: natural attack (7d8 + 8 piercing); armor: none specified
+- frostscale-spinosaur | Frostscale Spinosaur | Cold river dinosaur | Gear: weapon: natural attack (6d10 + 8 piercing); armor: none specified
+- the-white-mammoth | The White Mammoth | Category 8 arctic beast boss | Gear: weapon: natural attack (7d10 + 9 piercing); armor: none specified
+- glacierjaw-tyrant | Glacierjaw Tyrant | Category 9 arctic beast boss | Gear: weapon: natural attack (8d10 + 10 piercing); armor: none specified
+- icecliff-wyvern | Icecliff Wyvern | Frozen cliff flier | Gear: weapon: natural attack (7d10 + 9 piercing); armor: none specified
+- polar-night-bear | Polar Night Bear | Huge shadow-white killer | Gear: weapon: natural attack (7d8 + 9 piercing); armor: none specified
+- aurora-crown-roc | Aurora Crown Roc | Colossal polar sky hunter | Gear: weapon: natural attack (8d10 + 10 piercing); armor: none specified
 - the-first-winter-bear | The First Winter Bear | Category 10 arctic beast boss | Gear: weapon: natural attack (9d10 + 12 piercing); armor: none specified
+
+- world-ice-mammoth | World-Ice Mammoth | Legendary glacier trampler | Gear: weapon: natural attack (8d8 + 10 piercing); armor: none specified
 
 Urban (21)
 
 - gutterfang-dire-rat | Gutterfang Dire Rat | Oversized sewer pack beast | Gear: weapon: natural attack (3d6 + 4 slashing); armor: none specified
-- rooftop-razorbat | Rooftop Razorbat | City flier ambusher | Gear: weapon: natural attack (3d8 + 4 slashing); armor: none specified
 - old-underbridge-boar | Old Underbridge Boar | Category 4 urban beast boss | Gear: weapon: natural attack (3d10 + 5 bludgeoning); armor: none specified
-- kennel-born-dire-hound | Kennel-Born Dire Hound | War-trained city beast | Gear: weapon: natural attack (4d6 + 5 slashing); armor: none specified
+- rooftop-razorbat | Rooftop Razorbat | City flier ambusher | Gear: weapon: natural attack (3d8 + 4 slashing); armor: spines or hard growths
 - bell-tower-vulture | Bell-Tower Vulture | Carrion city flier | Gear: weapon: natural attack (4d8 + 5 slashing); armor: none specified
+- kennel-born-dire-hound | Kennel-Born Dire Hound | War-trained city beast | Gear: weapon: natural attack (4d6 + 5 slashing); armor: none specified
 - sewer-crocodile-ancient | Sewer Crocodile Ancient | Category 5 urban beast boss | Gear: weapon: natural attack (4d10 + 6 piercing); armor: none specified
 - market-shadow-panther | Market-Shadow Panther | Escaped exotic stalker | Gear: weapon: natural attack (5d6 + 6 slashing); armor: none specified
 - rust-mane-hyena | Rust-Mane Hyena | Street scavenger brute | Gear: weapon: natural attack (5d8 + 6 slashing); armor: none specified
@@ -638,11 +151,11 @@ Urban (21)
 
 - foundry-yard-bull | Foundry Yard Bull | Industrial charging beast | Gear: weapon: natural attack (6d8 + 7 bludgeoning); armor: none specified
 - gutter-maw-swarm-queen | Gutter-Maw Swarm Queen | Category 7 urban beast boss | Gear: weapon: natural attack (6d10 + 8 slashing); armor: none specified
-- stone-mastiff-ravager | Stone-Mastiff Ravager | Armored guard-beast gone feral | Gear: weapon: natural attack (6d10 + 8 slashing); armor: armored body
 - aqueduct-serpent | Aqueduct Serpent | Waterway constrictor | Gear: weapon: natural attack (7d8 + 8 piercing); armor: none specified
+- stone-mastiff-ravager | Stone-Mastiff Ravager | Armored guard-beast gone feral | Gear: weapon: natural attack (6d10 + 8 slashing); armor: armored body
 - the-bell-tower-roc | The Bell-Tower Roc | Category 8 urban beast boss | Gear: weapon: natural attack (7d10 + 9 slashing); armor: none specified
-- palace-menagerie-lion | Palace Menagerie Lion | Royal predator unleashed | Gear: weapon: natural attack (7d8 + 9 slashing); armor: none specified
 - old-plague-rat-titan | Old Plague Rat Titan | Huge diseased sewer beast | Gear: weapon: natural attack (7d10 + 9 piercing); armor: none specified
+- palace-menagerie-lion | Palace Menagerie Lion | Royal predator unleashed | Gear: weapon: natural attack (7d8 + 9 slashing); armor: none specified
 - the-thing-under-the-bridge | The Thing Under the Bridge | Category 9 urban beast boss | Gear: weapon: natural attack (8d10 + 10 piercing); armor: none specified
 - city-eater-dire-rat | City-Eater Dire Rat | Colossal urban infestation beast | Gear: weapon: natural attack (8d8 + 10 slashing); armor: none specified
 - clocktower-harrier-roc | Clocktower Harrier Roc | Vast bird nesting over the city | Gear: weapon: natural attack (8d10 + 10 slashing); armor: none specified
@@ -651,143 +164,222 @@ Urban (21)
 
 Water (21)
 
-- reefclaw-shark | Reefclaw Shark | Coral reef predator | Gear: weapon: natural attack (3d6 + 4 piercing); armor: none specified
-- pearlback-turtle | Pearlback Turtle | Armored sea beast | Gear: weapon: natural attack (3d8 + 4 piercing); armor: armored body
 - old-reef-shark | Old Reef Shark | Category 4 water beast boss | Gear: weapon: natural attack (3d10 + 5 piercing); armor: none specified
-- tidefang-crocodile | Tidefang Crocodile | Brackish ambusher | Gear: weapon: natural attack (4d6 + 5 piercing); armor: none specified
-- stingray-matriarch | Stingray Matriarch | Venomous gliding hunter | Gear: weapon: natural attack (4d8 + 5 piercing); armor: none specified
+- pearlback-turtle | Pearlback Turtle | Armored sea beast | Gear: weapon: natural attack (3d8 + 4 piercing); armor: armored body
+- reefclaw-shark | Reefclaw Shark | Coral reef predator | Gear: weapon: natural attack (3d6 + 4 piercing); armor: none specified
 - blackfin-sawshark | Blackfin Sawshark | Category 5 water beast boss | Gear: weapon: natural attack (4d10 + 6 piercing); armor: none specified
+- stingray-matriarch | Stingray Matriarch | Venomous gliding hunter | Gear: weapon: natural attack (4d8 + 5 piercing); armor: none specified
+- tidefang-crocodile | Tidefang Crocodile | Brackish ambusher | Gear: weapon: natural attack (4d6 + 5 piercing); armor: none specified
 - kelp-strangler-serpent | Kelp-Strangler Serpent | Water constrictor | Gear: weapon: natural attack (5d6 + 6 piercing); armor: none specified
-- whitewater-bull-hippo | Whitewater Bull Hippo | Violent river beast | Gear: weapon: natural attack (5d8 + 6 piercing); armor: none specified
 - the-river-maw | The River Maw | Category 6 water beast boss | Gear: weapon: natural attack (5d10 + 7 piercing); armor: none specified
+- whitewater-bull-hippo | Whitewater Bull Hippo | Violent river beast | Gear: weapon: natural attack (5d8 + 6 piercing); armor: none specified
 - abyss-lantern-eel | Abyss Lantern Eel | Deep electric hunter | Gear: weapon: natural attack (6d6 + 7 piercing); armor: none specified
 
-- riptide-orca | Riptide Orca | Fast pack whale predator | Gear: weapon: natural attack (6d8 + 7 piercing); armor: none specified
 - coral-shell-dragon-turtle | Coral-Shell Dragon Turtle | Category 7 water beast boss | Gear: weapon: natural attack (6d10 + 8 piercing); armor: armored body
+- riptide-orca | Riptide Orca | Fast pack whale predator | Gear: weapon: natural attack (6d8 + 7 piercing); armor: none specified
 - leviathan-calf | Leviathan Calf | Young sea titan | Gear: weapon: natural attack (6d10 + 8 piercing); armor: none specified
-- stormfin-manta | Stormfin Manta | Huge thunderstorm ray | Gear: weapon: natural attack (7d8 + 8 piercing); armor: none specified
 - old-whitewater-hippo | Old Whitewater Hippo | Category 8 water beast boss | Gear: weapon: natural attack (7d10 + 9 piercing); armor: none specified
+- stormfin-manta | Stormfin Manta | Huge thunderstorm ray | Gear: weapon: natural attack (7d8 + 8 piercing); armor: none specified
 - abyssal-sawtooth-shark | Abyssal Sawtooth Shark | Deep black apex shark | Gear: weapon: natural attack (7d8 + 9 piercing); armor: none specified
 - crown-eel-of-the-deep | Crown-Eel of the Deep | Huge lightning eel | Gear: weapon: natural attack (7d10 + 9 piercing); armor: none specified
 - the-tide-leviathan | The Tide Leviathan | Category 9 water beast boss | Gear: weapon: natural attack (8d10 + 10 piercing); armor: none specified
-- world-sea-serpent | World-Sea Serpent | Colossal ocean constrictor | Gear: weapon: natural attack (8d8 + 10 piercing); armor: none specified
 - abyss-crown-whale | Abyss Crown Whale | Ancient deep whale beast | Gear: weapon: natural attack (8d10 + 10 piercing); armor: none specified
-
 - the-first-shark | The First Shark | Category 10 water beast boss | Gear: weapon: natural attack (9d10 + 12 piercing); armor: none specified
 
-Mountain (21)
+- world-sea-serpent | World-Sea Serpent | Colossal ocean constrictor | Gear: weapon: natural attack (8d8 + 10 piercing); armor: none specified
+
+Mountain (19)
 
 - cragclaw-lion | Cragclaw Lion | Mountain ledge stalker | Gear: weapon: natural attack (3d6 + 4 slashing); armor: none specified
-- ironhorn-ram | Ironhorn Ram | Cliffside charger | Gear: weapon: natural attack (3d8 + 4 bludgeoning); armor: spines or hard growths
 - old-crag-ram | Old Crag Ram | Category 4 mountain beast boss | Gear: weapon: natural attack (3d10 + 5 bludgeoning); armor: none specified
-- razorwing-eagle | Razorwing Eagle | High-cliff hunter | Gear: weapon: natural attack (4d6 + 5 slashing); armor: none specified
-- stoneback-goatbeast | Stoneback Goatbeast | Hardy ledge bruiser | Gear: weapon: natural attack (4d8 + 5 slashing); armor: armored body
 - cliff-mane-sabertooth | Cliff-Mane Sabertooth | Category 5 mountain beast boss | Gear: weapon: natural attack (4d10 + 6 slashing); armor: none specified
-- thunderhorn-yak | Thunderhorn Yak | Storm-mountain charger | Gear: weapon: natural attack (5d6 + 6 bludgeoning); armor: spines or hard growths
-- graniteback-bear | Graniteback Bear | Stone-furred mountain bear | Gear: weapon: natural attack (5d8 + 6 bludgeoning); armor: armored body
+- razorwing-eagle | Razorwing Eagle | High-cliff hunter | Gear: weapon: natural attack (4d6 + 5 slashing); armor: spines or hard growths
+- stoneback-goatbeast | Stoneback Goatbeast | Hardy ledge bruiser | Gear: weapon: natural attack (4d8 + 5 slashing); armor: armored body
 - ironbeak-roc | Ironbeak Roc | Category 6 mountain beast boss | Gear: weapon: natural attack (5d10 + 7 slashing); armor: none specified
+- thunderhorn-yak | Thunderhorn Yak | Storm-mountain charger | Gear: weapon: natural attack (5d6 + 6 bludgeoning); armor: none specified
 - avalanche-mammoth | Avalanche Mammoth | Snow-mountain trampler | Gear: weapon: natural attack (6d6 + 7 piercing); armor: none specified
-
 - skycrag-wyvern | Skycrag Wyvern | Cliff-nesting stinger | Gear: weapon: natural attack (6d8 + 7 piercing); armor: none specified
-- the-stonehorn-bull | The Stonehorn Bull | Category 7 mountain beast boss | Gear: weapon: natural attack (6d10 + 8 bludgeoning); armor: armored body
+- the-stonehorn-bull | The Stonehorn Bull | Category 7 mountain beast boss | Gear: weapon: natural attack (6d10 + 8 bludgeoning); armor: none specified
+
 - peak-tyrant-eagle | Peak-Tyrant Eagle | Gigantic mountain bird | Gear: weapon: natural attack (6d10 + 8 slashing); armor: none specified
 - shalehide-dinosaur | Shalehide Dinosaur | Plate-backed mountain relic | Gear: weapon: natural attack (7d8 + 8 bludgeoning); armor: armored body
 - the-avalanche-bear | The Avalanche Bear | Category 8 mountain beast boss | Gear: weapon: natural attack (7d10 + 9 piercing); armor: none specified
 - cloudpiercer-roc | Cloudpiercer Roc | Sky-shadow apex flier | Gear: weapon: natural attack (7d8 + 9 bludgeoning); armor: none specified
+- king-thunderhorn | King Thunderhorn | Category 9 mountain beast boss | Gear: weapon: natural attack (8d10 + 10 bludgeoning); armor: none specified
 - world-crag-mammoth | World-Crag Mammoth | Colossal mountain trampler | Gear: weapon: natural attack (7d10 + 9 bludgeoning); armor: none specified
-- king-thunderhorn | King Thunderhorn | Category 9 mountain beast boss | Gear: weapon: natural attack (8d10 + 10 bludgeoning); armor: spines or hard growths
-- titan-cliff-lion | Titan Cliff Lion | Legendary mountain stalker | Gear: weapon: natural attack (8d8 + 10 slashing); armor: none specified
 - stormcrown-roc | Stormcrown Roc | Colossal bird of mountain storms | Gear: weapon: natural attack (8d10 + 10 slashing); armor: none specified
-
 - the-mountain-s-first-ram | The Mountain's First Ram | Category 10 mountain beast boss | Gear: weapon: natural attack (9d10 + 12 bludgeoning); armor: none specified
+- titan-cliff-lion | Titan Cliff Lion | Legendary mountain stalker | Gear: weapon: natural attack (8d8 + 10 slashing); armor: none specified
 
 Grassland (21)
 
+- old-redhorn-bull | Old Redhorn Bull | Category 4 grassland beast boss | Gear: weapon: natural attack (3d10 + 5 bludgeoning); armor: none specified
+- redhorn-aurochs | Redhorn Aurochs | Heavy plains charger | Gear: weapon: natural attack (3d8 + 4 bludgeoning); armor: none specified
 - tallgrass-saber-cat | Tallgrass Saber Cat | Ambush predator in high grass | Gear: weapon: natural attack (3d6 + 4 slashing); armor: none specified
-- redhorn-aurochs | Redhorn Aurochs | Heavy plains charger | Gear: weapon: natural attack (3d8 + 4 bludgeoning); armor: spines or hard growths
-- old-redhorn-bull | Old Redhorn Bull | Category 4 grassland beast boss | Gear: weapon: natural attack (3d10 + 5 bludgeoning); armor: spines or hard growths
-- steppe-hyena-matron | Steppe Hyena Matron | Pack scavenger leader | Gear: weapon: natural attack (4d6 + 5 slashing); armor: none specified
 - bladegrass-raptor | Bladegrass Raptor | Fast plains runner | Gear: weapon: natural attack (4d8 + 5 slashing); armor: none specified
+- steppe-hyena-matron | Steppe Hyena Matron | Pack scavenger leader | Gear: weapon: natural attack (4d6 + 5 slashing); armor: none specified
 - the-golden-mane | The Golden Mane | Category 5 grassland beast boss | Gear: weapon: natural attack (4d10 + 6 slashing); armor: none specified
-- prairie-thunderbeast | Prairie Thunderbeast | Rhino-like plains charger | Gear: weapon: natural attack (5d6 + 6 bludgeoning); armor: none specified
 - dustwing-vulture | Dustwing Vulture | Carrion sky predator | Gear: weapon: natural attack (5d8 + 6 slashing); armor: none specified
 - great-steppe-rhino | Great Steppe Rhino | Category 6 grassland beast boss | Gear: weapon: natural attack (5d10 + 7 bludgeoning); armor: none specified
+- prairie-thunderbeast | Prairie Thunderbeast | Rhino-like plains charger | Gear: weapon: natural attack (5d6 + 6 bludgeoning); armor: none specified
 - crowned-plains-lion | Crowned Plains Lion | Apex savanna hunter | Gear: weapon: natural attack (6d6 + 7 slashing); armor: none specified
 
-- ironhide-buffalo-herdmaster | Ironhide Buffalo Herdmaster | Armored herd brute | Gear: weapon: natural attack (6d8 + 7 bludgeoning); armor: armored body
 - hyena-queen-of-the-dry-grass | Hyena Queen of the Dry Grass | Category 7 grassland beast boss | Gear: weapon: natural attack (6d10 + 8 slashing); armor: none specified
-- thunderstep-elephant | Thunderstep Elephant | Huge plains trampler | Gear: weapon: natural attack (6d10 + 8 bludgeoning); armor: none specified
+- ironhide-buffalo-herdmaster | Ironhide Buffalo Herdmaster | Armored herd brute | Gear: weapon: natural attack (6d8 + 7 bludgeoning); armor: armored body
 - golden-roc-of-the-savanna | Golden Roc of the Savanna | Huge plains sky hunter | Gear: weapon: natural attack (7d8 + 8 slashing); armor: none specified
 - the-red-grass-tyrant | The Red Grass Tyrant | Category 8 grassland beast boss | Gear: weapon: natural attack (7d10 + 9 slashing); armor: none specified
-- world-herd-mammoth | World-Herd Mammoth | Colossal herd leader | Gear: weapon: natural attack (7d8 + 9 bludgeoning); armor: none specified
+- thunderstep-elephant | Thunderstep Elephant | Huge plains trampler | Gear: weapon: natural attack (6d10 + 8 bludgeoning); armor: none specified
 - eclipse-mane-lion | Eclipse-Mane Lion | Mythic plains hunter | Gear: weapon: natural attack (7d10 + 9 slashing); armor: none specified
 - the-herdbreaker-aurochs | The Herdbreaker Aurochs | Category 9 grassland beast boss | Gear: weapon: natural attack (8d10 + 10 bludgeoning); armor: none specified
-- titan-steppe-elephant | Titan Steppe Elephant | Legendary plains trampler | Gear: weapon: natural attack (8d8 + 10 bludgeoning); armor: none specified
+- world-herd-mammoth | World-Herd Mammoth | Colossal herd leader | Gear: weapon: natural attack (7d8 + 9 bludgeoning); armor: none specified
 - sun-crowned-raptor | Sun-Crowned Raptor | Ancient plains pursuit predator | Gear: weapon: natural attack (8d10 + 10 slashing); armor: none specified
-
 - the-first-lion-of-the-open-sky | The First Lion of the Open Sky | Category 10 grassland beast boss | Gear: weapon: natural attack (9d10 + 12 slashing); armor: none specified
+
+- titan-steppe-elephant | Titan Steppe Elephant | Legendary plains trampler | Gear: weapon: natural attack (8d8 + 10 bludgeoning); armor: none specified
+
+goblin-pack.js (50 missing)
+
+Category 1 (5)
+
+- goblin-mud-tooth-boss | Mud-Tooth Goblin Boss | Category 1 goblin boss commander | Gear: weapon: Boss Cleaver (1d10 + 4 slashing); armor: studded-leather
+- goblin-mud-tooth-cutthroat | Mud-Tooth Goblin Cutthroat | Category 1 goblin Knife skirmisher with hamstring pressure | Gear: weapon: Notched Knife (1d6 + 3 piercing); armor: leather
+- goblin-mud-tooth-hexer | Mud-Tooth Goblin Hexer | Category 1 goblin Cackling cave caster with fear and fire | Gear: weapon: Goblin Hex (1d8 + 3 necrotic); armor: leather
+- goblin-mud-tooth-snarewright | Mud-Tooth Goblin Snarewright | Category 1 goblin Trap handler using nets, hooks, and dirty tricks | Gear: weapon: Hooked Snare (1d8 + 3 slashing); armor: studded-leather
+- goblin-mud-tooth-sneakbow | Mud-Tooth Goblin Sneakbow | Category 1 goblin Shortbow kiter and tunnel marksman | Gear: weapon: Shortbow (1d6 + 3 piercing); armor: leather
+
+Category 2 (5)
+
+- goblin-redcap-boss | Redcap Goblin Boss | Category 2 goblin boss commander | Gear: weapon: Boss Cleaver (1d10 + 5 slashing); armor: studded-leather
+- goblin-redcap-cutthroat | Redcap Goblin Cutthroat | Category 2 goblin Knife skirmisher with hamstring pressure | Gear: weapon: Notched Knife (1d6 + 3 piercing); armor: leather
+- goblin-redcap-hexer | Redcap Goblin Hexer | Category 2 goblin Cackling cave caster with fear and fire | Gear: weapon: Goblin Hex (1d8 + 3 necrotic); armor: leather
+- goblin-redcap-snarewright | Redcap Goblin Snarewright | Category 2 goblin Trap handler using nets, hooks, and dirty tricks | Gear: weapon: Hooked Snare (1d8 + 3 slashing); armor: studded-leather
+- goblin-redcap-sneakbow | Redcap Goblin Sneakbow | Category 2 goblin Shortbow kiter and tunnel marksman | Gear: weapon: Shortbow (1d6 + 3 piercing); armor: leather
+
+Category 3 (5)
+
+- goblin-blackpot-boss | Blackpot Goblin Boss | Category 3 goblin boss commander | Gear: weapon: Boss Cleaver (1d10 + 6 slashing); armor: studded-leather
+- goblin-blackpot-cutthroat | Blackpot Goblin Cutthroat | Category 3 goblin Knife skirmisher with hamstring pressure | Gear: weapon: Notched Knife (1d6 + 4 piercing); armor: leather
+- goblin-blackpot-hexer | Blackpot Goblin Hexer | Category 3 goblin Cackling cave caster with fear and fire | Gear: weapon: Goblin Hex (1d8 + 4 necrotic); armor: leather
+- goblin-blackpot-snarewright | Blackpot Goblin Snarewright | Category 3 goblin Trap handler using nets, hooks, and dirty tricks | Gear: weapon: Hooked Snare (1d8 + 4 slashing); armor: studded-leather
+- goblin-blackpot-sneakbow | Blackpot Goblin Sneakbow | Category 3 goblin Shortbow kiter and tunnel marksman | Gear: weapon: Shortbow (1d6 + 4 piercing); armor: leather
+
+Category 4 (5)
+
+- goblin-iron-tusk-boss | Iron-Tusk Goblin Boss | Category 4 goblin boss commander | Gear: weapon: Boss Cleaver (2d10 + 7 slashing); armor: studded-leather
+- goblin-iron-tusk-cutthroat | Iron-Tusk Goblin Cutthroat | Category 4 goblin Knife skirmisher with hamstring pressure | Gear: weapon: Notched Knife (1d6 + 4 piercing); armor: leather
+- goblin-iron-tusk-hexer | Iron-Tusk Goblin Hexer | Category 4 goblin Cackling cave caster with fear and fire | Gear: weapon: Goblin Hex (2d8 + 4 fire); armor: leather
+- goblin-iron-tusk-snarewright | Iron-Tusk Goblin Snarewright | Category 4 goblin Trap handler using nets, hooks, and dirty tricks | Gear: weapon: Hooked Snare (1d8 + 4 slashing); armor: studded-leather
+- goblin-iron-tusk-sneakbow | Iron-Tusk Goblin Sneakbow | Category 4 goblin Shortbow kiter and tunnel marksman | Gear: weapon: Shortbow (1d6 + 4 piercing); armor: leather
+
+Category 5 (5)
+
+- goblin-mire-king-boss | Mire-King Goblin Boss | Category 5 goblin boss commander | Gear: weapon: Boss Cleaver (2d10 + 8 slashing); armor: studded-leather
+- goblin-mire-king-cutthroat | Mire-King Goblin Cutthroat | Category 5 goblin Knife skirmisher with hamstring pressure | Gear: weapon: Notched Knife (2d6 + 5 piercing); armor: leather
+- goblin-mire-king-hexer | Mire-King Goblin Hexer | Category 5 goblin Cackling cave caster with fear and fire | Gear: weapon: Goblin Hex (2d8 + 5 fire); armor: leather
+- goblin-mire-king-snarewright | Mire-King Goblin Snarewright | Category 5 goblin Trap handler using nets, hooks, and dirty tricks | Gear: weapon: Hooked Snare (2d8 + 5 slashing); armor: studded-leather
+- goblin-mire-king-sneakbow | Mire-King Goblin Sneakbow | Category 5 goblin Shortbow kiter and tunnel marksman | Gear: weapon: Shortbow (2d6 + 5 piercing); armor: leather
+
+Category 6 (5)
+
+- goblin-ash-knife-boss | Ash-Knife Goblin Boss | Category 6 goblin boss commander | Gear: weapon: Boss Cleaver (2d10 + 9 slashing); armor: breastplate
+- goblin-ash-knife-cutthroat | Ash-Knife Goblin Cutthroat | Category 6 goblin Knife skirmisher with hamstring pressure | Gear: weapon: Notched Knife (2d6 + 5 piercing); armor: leather
+- goblin-ash-knife-hexer | Ash-Knife Goblin Hexer | Category 6 goblin Cackling cave caster with fear and fire | Gear: weapon: Goblin Hex (2d8 + 5 fire); armor: leather
+- goblin-ash-knife-snarewright | Ash-Knife Goblin Snarewright | Category 6 goblin Trap handler using nets, hooks, and dirty tricks | Gear: weapon: Hooked Snare (2d8 + 5 slashing); armor: studded-leather
+- goblin-ash-knife-sneakbow | Ash-Knife Goblin Sneakbow | Category 6 goblin Shortbow kiter and tunnel marksman | Gear: weapon: Shortbow (2d6 + 5 piercing); armor: leather
+
+Category 7 (5)
+
+- goblin-wolf-banner-boss | Wolf-Banner Goblin Boss | Category 7 goblin boss commander | Gear: weapon: Boss Cleaver (3d10 + 10 slashing); armor: breastplate
+- goblin-wolf-banner-cutthroat | Wolf-Banner Goblin Cutthroat | Category 7 goblin Knife skirmisher with hamstring pressure | Gear: weapon: Notched Knife (2d6 + 6 piercing); armor: leather
+- goblin-wolf-banner-hexer | Wolf-Banner Goblin Hexer | Category 7 goblin Cackling cave caster with fear and fire | Gear: weapon: Goblin Hex (3d8 + 6 fire); armor: leather
+- goblin-wolf-banner-snarewright | Wolf-Banner Goblin Snarewright | Category 7 goblin Trap handler using nets, hooks, and dirty tricks | Gear: weapon: Hooked Snare (2d8 + 6 slashing); armor: studded-leather
+- goblin-wolf-banner-sneakbow | Wolf-Banner Goblin Sneakbow | Category 7 goblin Shortbow kiter and tunnel marksman | Gear: weapon: Shortbow (2d6 + 6 piercing); armor: leather
+
+Category 8 (5)
+
+- goblin-hex-crown-boss | Hex-Crown Goblin Boss | Category 8 goblin boss commander | Gear: weapon: Boss Cleaver (3d10 + 11 slashing); armor: breastplate
+- goblin-hex-crown-cutthroat | Hex-Crown Goblin Cutthroat | Category 8 goblin Knife skirmisher with hamstring pressure | Gear: weapon: Notched Knife (2d6 + 6 piercing); armor: leather
+- goblin-hex-crown-hexer | Hex-Crown Goblin Hexer | Category 8 goblin Cackling cave caster with fear and fire | Gear: weapon: Goblin Hex (3d8 + 6 fire); armor: leather
+- goblin-hex-crown-snarewright | Hex-Crown Goblin Snarewright | Category 8 goblin Trap handler using nets, hooks, and dirty tricks | Gear: weapon: Hooked Snare (2d8 + 6 slashing); armor: studded-leather
+- goblin-hex-crown-sneakbow | Hex-Crown Goblin Sneakbow | Category 8 goblin Shortbow kiter and tunnel marksman | Gear: weapon: Shortbow (2d6 + 6 piercing); armor: leather
+
+Category 9 (5)
+
+- goblin-gloom-pact-boss | Gloom-Pact Goblin Boss | Category 9 goblin boss commander | Gear: weapon: Boss Cleaver (3d10 + 12 slashing); armor: breastplate
+- goblin-gloom-pact-cutthroat | Gloom-Pact Goblin Cutthroat | Category 9 goblin Knife skirmisher with hamstring pressure | Gear: weapon: Notched Knife (3d6 + 7 piercing); armor: leather
+- goblin-gloom-pact-hexer | Gloom-Pact Goblin Hexer | Category 9 goblin Cackling cave caster with fear and fire | Gear: weapon: Goblin Hex (3d8 + 7 fire); armor: leather
+- goblin-gloom-pact-snarewright | Gloom-Pact Goblin Snarewright | Category 9 goblin Trap handler using nets, hooks, and dirty tricks | Gear: weapon: Hooked Snare (3d8 + 7 slashing); armor: studded-leather
+- goblin-gloom-pact-sneakbow | Gloom-Pact Goblin Sneakbow | Category 9 goblin Shortbow kiter and tunnel marksman | Gear: weapon: Shortbow (3d6 + 7 piercing); armor: leather
+
+Category 10 (5)
+
+- goblin-underboss-boss | Underboss Goblin Boss | Category 10 goblin boss commander | Gear: weapon: Boss Cleaver (4d10 + 13 slashing); armor: breastplate
+- goblin-underboss-cutthroat | Underboss Goblin Cutthroat | Category 10 goblin Knife skirmisher with hamstring pressure | Gear: weapon: Notched Knife (3d6 + 7 piercing); armor: leather
+- goblin-underboss-hexer | Underboss Goblin Hexer | Category 10 goblin Cackling cave caster with fear and fire | Gear: weapon: Goblin Hex (4d8 + 7 fire); armor: leather
+- goblin-underboss-snarewright | Underboss Goblin Snarewright | Category 10 goblin Trap handler using nets, hooks, and dirty tricks | Gear: weapon: Hooked Snare (3d8 + 7 slashing); armor: studded-leather
+- goblin-underboss-sneakbow | Underboss Goblin Sneakbow | Category 10 goblin Shortbow kiter and tunnel marksman | Gear: weapon: Shortbow (3d6 + 7 piercing); armor: leather
 
 undead-skeletal-zombie-high-tier-pack.js (42 missing)
 
 Category 4 (6)
 
-- ashbone-duelist | Ashbone Duelist | Fast skeletal swordfighter | Gear: weapon: natural attack (3d6 + 4 slashing); armor: none specified
-- ribcage-arbalester | Ribcage Arbalester | Skeletal ranged pinning unit | Gear: weapon: natural attack (3d6 + 4 piercing); armor: none specified
-- ossuary-captain | Ossuary Captain | Category 4 skeletal boss | Gear: weapon: natural attack (4d8 + 5 slashing); armor: none specified
-- plague-bloated-guard | Plague-Bloated Guard | Durable zombie shield body | Gear: weapon: natural attack (3d8 + 4 bludgeoning); armor: armored body
-- graveyard-mauler | Graveyard Mauler | Charging corpse brute | Gear: weapon: natural attack (3d10 + 4 bludgeoning); armor: none specified
-- rotgut-bannerbearer | Rotgut Bannerbearer | Category 4 zombie boss | Gear: weapon: natural attack (4d8 + 5 necrotic); armor: none specified
+- ashbone-duelist | Ashbone Duelist | Fast skeletal swordfighter | Gear: weapon: held or conjured weapon (3d6 + 4 slashing); armor: none specified
+- graveyard-mauler | Graveyard Mauler | Charging corpse brute | Gear: weapon: held or conjured weapon (3d10 + 4 bludgeoning); armor: none specified
+- ossuary-captain | Ossuary Captain | Category 4 skeletal boss | Gear: weapon: held or conjured weapon (4d8 + 5 slashing); armor: none specified
+- plague-bloated-guard | Plague-Bloated Guard | Durable zombie shield body | Gear: weapon: held or conjured weapon (3d8 + 4 bludgeoning); armor: none specified
+- ribcage-arbalester | Ribcage Arbalester | Skeletal ranged pinning unit | Gear: weapon: held or conjured weapon (3d6 + 4 piercing); armor: none specified
+- rotgut-bannerbearer | Rotgut Bannerbearer | Category 4 zombie boss | Gear: weapon: held or conjured weapon (4d8 + 5 necrotic); armor: none specified
 
 Category 5 (6)
 
-- crownless-grave-knight | Crownless Grave Knight | Elite skeletal knight | Gear: weapon: natural attack (4d6 + 5 slashing); armor: none specified
-- boneflute-hexer | Boneflute Hexer | Skeletal curse caster | Gear: weapon: magical/natural attack (4d6 + 5 necrotic); armor: none specified
-- marrow-magistrate | Marrow Magistrate | Category 5 skeletal boss | Gear: weapon: magical/natural attack (5d8 + 6 necrotic); armor: none specified
-- corpse-bloom-hulk | Corpse-Bloom Hulk | Poisonous swollen zombie | Gear: weapon: natural attack (4d8 + 5 poison); armor: none specified
-- drowned-crypt-zombie | Drowned Crypt Zombie | Dragging waterlogged corpse | Gear: weapon: natural attack (4d8 + 5 bludgeoning); armor: none specified
-- blightcart-abomination | Blightcart Abomination | Category 5 zombie boss | Gear: weapon: natural attack (5d8 + 6 poison); armor: none specified
+- blightcart-abomination | Blightcart Abomination | Category 5 zombie boss | Gear: weapon: held or conjured weapon (5d8 + 6 poison); armor: none specified
+- boneflute-hexer | Boneflute Hexer | Skeletal curse caster | Gear: weapon: spell or elemental attack (4d6 + 5 necrotic); armor: none specified
+- corpse-bloom-hulk | Corpse-Bloom Hulk | Poisonous swollen zombie | Gear: weapon: held or conjured weapon (4d8 + 5 poison); armor: none specified
+- crownless-grave-knight | Crownless Grave Knight | Elite skeletal knight | Gear: weapon: held or conjured weapon (4d6 + 5 slashing); armor: none specified
+- drowned-crypt-zombie | Drowned Crypt Zombie | Dragging waterlogged corpse | Gear: weapon: held or conjured weapon (4d8 + 5 bludgeoning); armor: none specified
+- marrow-magistrate | Marrow Magistrate | Category 5 skeletal boss | Gear: weapon: spell or elemental attack (5d8 + 6 necrotic); armor: none specified
 
 Category 6 (6)
 
-- black-bone-halberdier | Black-Bone Halberdier | Reach skeletal elite | Gear: weapon: natural attack (5d6 + 6 slashing); armor: none specified
-- ossuary-spellblade | Ossuary Spellblade | Mobile skeletal necro-duelist | Gear: weapon: natural attack (5d6 + 6 necrotic); armor: none specified
-- bone-priest-of-the-hollow-choir | Bone-Priest of the Hollow Choir | Category 6 skeletal boss | Gear: weapon: magical/natural attack (6d8 + 7 necrotic); armor: none specified
-- stitched-siege-corpse | Stitched Siege Corpse | Huge stitched zombie attacker | Gear: weapon: natural attack (5d10 + 6 bludgeoning); armor: none specified
-- grave-tar-vomiter | Grave-Tar Vomiter | Ranged plague zombie | Gear: weapon: magical/natural attack (5d6 + 6 acid); armor: none specified
-- corpse-mason-juggernaut | Corpse-Mason Juggernaut | Category 6 zombie boss | Gear: weapon: natural attack (6d8 + 7 bludgeoning); armor: none specified
+- black-bone-halberdier | Black-Bone Halberdier | Reach skeletal elite | Gear: weapon: held or conjured weapon (5d6 + 6 slashing); armor: none specified
+- bone-priest-of-the-hollow-choir | Bone-Priest of the Hollow Choir | Category 6 skeletal boss | Gear: weapon: spell or elemental attack (6d8 + 7 necrotic); armor: none specified
+- corpse-mason-juggernaut | Corpse-Mason Juggernaut | Category 6 zombie boss | Gear: weapon: held or conjured weapon (6d8 + 7 bludgeoning); armor: none specified
+- grave-tar-vomiter | Grave-Tar Vomiter | Ranged plague zombie | Gear: weapon: spell or elemental attack (5d6 + 6 acid); armor: none specified
+- ossuary-spellblade | Ossuary Spellblade | Mobile skeletal necro-duelist | Gear: weapon: held or conjured weapon (5d6 + 6 necrotic); armor: none specified
+- stitched-siege-corpse | Stitched Siege Corpse | Huge stitched zombie attacker | Gear: weapon: held or conjured weapon (5d10 + 6 bludgeoning); armor: none specified
 
 Category 7 (6)
 
-- adamant-bone-sentinel | Adamant-Bone Sentinel | High-AC skeletal guardian | Gear: weapon: natural attack (6d6 + 7 slashing); armor: none specified
-- marrow-standard-bearer | Marrow Standard Bearer | Skeletal command unit | Gear: weapon: natural attack (6d6 + 7 necrotic); armor: none specified
-- barrowbone-castellan | Barrowbone Castellan | Category 7 skeletal boss | Gear: weapon: natural attack (7d8 + 8 necrotic); armor: none specified
-- grave-mound-devourer | Grave-Mound Devourer | Hungry corpse mass | Gear: weapon: natural attack (6d8 + 7 necrotic); armor: none specified
-- rotting-plague-giant | Rotting Plague Giant | Oversized zombie plague brute | Gear: weapon: natural attack (6d10 + 7 bludgeoning); armor: none specified
-- carrion-crown-brute | Carrion Crown Brute | Category 7 zombie boss | Gear: weapon: natural attack (7d8 + 8 poison); armor: none specified
+- adamant-bone-sentinel | Adamant-Bone Sentinel | High-AC skeletal guardian | Gear: weapon: held or conjured weapon (6d6 + 7 slashing); armor: none specified
+- barrowbone-castellan | Barrowbone Castellan | Category 7 skeletal boss | Gear: weapon: held or conjured weapon (7d8 + 8 necrotic); armor: none specified
+- carrion-crown-brute | Carrion Crown Brute | Category 7 zombie boss | Gear: weapon: held or conjured weapon (7d8 + 8 poison); armor: none specified
+- grave-mound-devourer | Grave-Mound Devourer | Hungry corpse mass | Gear: weapon: held or conjured weapon (6d8 + 7 necrotic); armor: none specified
+- marrow-standard-bearer | Marrow Standard Bearer | Skeletal command unit | Gear: weapon: held or conjured weapon (6d6 + 7 necrotic); armor: none specified
+- rotting-plague-giant | Rotting Plague Giant | Oversized zombie plague brute | Gear: weapon: held or conjured weapon (6d10 + 7 bludgeoning); armor: none specified
 
 Category 8 (6)
 
-- royal-ossuary-lancer | Royal Ossuary Lancer | Devastating skeletal charger | Gear: weapon: natural attack (7d6 + 8 piercing); armor: none specified
-- shardbone-reaper | Shardbone Reaper | Skeletal executioner | Gear: weapon: natural attack (7d8 + 8 slashing); armor: spines or hard growths
-- bone-tax-collector | Bone Tax Collector | Category 8 skeletal boss | Gear: weapon: natural attack (8d8 + 9 necrotic); armor: armored body
-- corpse-tide-colossus | Corpse-Tide Colossus | Mass of corpses that pushes the room | Gear: weapon: natural attack (7d10 + 8 bludgeoning); armor: none specified
-- black-mold-cadaver | Black Mold Cadaver | Fungal plague zombie | Gear: weapon: natural attack (7d6 + 8 poison); armor: none specified
-- plague-king-s-carcass | Plague King's Carcass | Category 8 zombie boss | Gear: weapon: magical/natural attack (8d8 + 9 poison); armor: none specified
+- black-mold-cadaver | Black Mold Cadaver | Fungal plague zombie | Gear: weapon: held or conjured weapon (7d6 + 8 poison); armor: none specified
+- bone-tax-collector | Bone Tax Collector | Category 8 skeletal boss | Gear: weapon: held or conjured weapon (8d8 + 9 necrotic); armor: none specified
+- corpse-tide-colossus | Corpse-Tide Colossus | Mass of corpses that pushes the room | Gear: weapon: held or conjured weapon (7d10 + 8 bludgeoning); armor: none specified
+- plague-king-s-carcass | Plague King's Carcass | Category 8 zombie boss | Gear: weapon: spell or elemental attack (8d8 + 9 poison); armor: none specified
+- royal-ossuary-lancer | Royal Ossuary Lancer | Devastating skeletal charger | Gear: weapon: held or conjured weapon (7d6 + 8 piercing); armor: none specified
+- shardbone-reaper | Shardbone Reaper | Skeletal executioner | Gear: weapon: held or conjured weapon (7d8 + 8 slashing); armor: none specified
 
 Category 9 (6)
 
-- pale-bell-marrow-knight | Pale-Bell Marrow Knight | Skeletal terror knight | Gear: weapon: natural attack (8d6 + 9 necrotic); armor: none specified
-- tomb-star-arbalest | Tomb-Star Arbalest | High-tier skeletal artillery | Gear: weapon: natural attack (8d8 + 9 piercing); armor: none specified
-- ossuary-regent | Ossuary Regent | Category 9 skeletal boss | Gear: weapon: magical/natural attack (9d8 + 10 necrotic); armor: none specified
-- thousand-stitch-corpse-engine | Thousand-Stitch Corpse Engine | Engine of sewn corpses | Gear: weapon: natural attack (8d10 + 9 bludgeoning); armor: none specified
-- hunger-pit-corpse | Hunger-Pit Corpse | Soul-hungry zombie pit brute | Gear: weapon: natural attack (8d8 + 9 necrotic); armor: none specified
-- rot-sovereign-of-the-mass-grave | Rot Sovereign of the Mass Grave | Category 9 zombie boss | Gear: weapon: magical/natural attack (9d8 + 10 necrotic); armor: none specified
+- hunger-pit-corpse | Hunger-Pit Corpse | Soul-hungry zombie pit brute | Gear: weapon: held or conjured weapon (8d8 + 9 necrotic); armor: none specified
+- ossuary-regent | Ossuary Regent | Category 9 skeletal boss | Gear: weapon: spell or elemental attack (9d8 + 10 necrotic); armor: none specified
+- pale-bell-marrow-knight | Pale-Bell Marrow Knight | Skeletal terror knight | Gear: weapon: held or conjured weapon (8d6 + 9 necrotic); armor: none specified
+- rot-sovereign-of-the-mass-grave | Rot Sovereign of the Mass Grave | Category 9 zombie boss | Gear: weapon: spell or elemental attack (9d8 + 10 necrotic); armor: none specified
+- thousand-stitch-corpse-engine | Thousand-Stitch Corpse Engine | Engine of sewn corpses | Gear: weapon: held or conjured weapon (8d10 + 9 bludgeoning); armor: none specified
+- tomb-star-arbalest | Tomb-Star Arbalest | High-tier skeletal artillery | Gear: weapon: held or conjured weapon (8d8 + 9 piercing); armor: none specified
 
 Category 10 (6)
 
-- ancient-bone-tyrant | Ancient Bone Tyrant | Legendary skeletal tyrant | Gear: weapon: natural attack (9d8 + 10 slashing); armor: none specified
-- starved-legion-avatar | Starved Legion Avatar | Composite skeleton legion | Gear: weapon: natural attack (9d8 + 10 necrotic); armor: none specified
-- the-first-skeleton-king | The First Skeleton King | Category 10 skeletal boss | Gear: weapon: magical/natural attack (10d8 + 12 necrotic); armor: none specified
-- world-grave-colossus | World-Grave Colossus | Apocalyptic zombie giant | Gear: weapon: natural attack (9d10 + 10 bludgeoning); armor: none specified
-- crown-rot-devourer | Crown-Rot Devourer | Royal corpse-eating horror | Gear: weapon: natural attack (9d8 + 10 necrotic); armor: none specified
-- the-last-corpse-emperor | The Last Corpse Emperor | Category 10 zombie boss | Gear: weapon: magical/natural attack (10d8 + 12 necrotic); armor: none specified
+- ancient-bone-tyrant | Ancient Bone Tyrant | Legendary skeletal tyrant | Gear: weapon: held or conjured weapon (9d8 + 10 slashing); armor: none specified
+- crown-rot-devourer | Crown-Rot Devourer | Royal corpse-eating horror | Gear: weapon: held or conjured weapon (9d8 + 10 necrotic); armor: none specified
+- starved-legion-avatar | Starved Legion Avatar | Composite skeleton legion | Gear: weapon: held or conjured weapon (9d8 + 10 necrotic); armor: none specified
+- the-first-skeleton-king | The First Skeleton King | Category 10 skeletal boss | Gear: weapon: spell or elemental attack (10d8 + 12 necrotic); armor: none specified
+- the-last-corpse-emperor | The Last Corpse Emperor | Category 10 zombie boss | Gear: weapon: spell or elemental attack (10d8 + 12 necrotic); armor: none specified
+- world-grave-colossus | World-Grave Colossus | Apocalyptic zombie giant | Gear: weapon: held or conjured weapon (9d10 + 10 bludgeoning); armor: none specified

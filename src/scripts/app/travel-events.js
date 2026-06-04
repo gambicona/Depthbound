@@ -608,8 +608,28 @@
       weight: 18,
       text: "A purple-black tear hangs above the ground. It breathes warm rot and distant screaming, then widens as the party draws near.",
       choices: [
-        { id: "enter", label: "Enter The Rift", description: "Step through and face what waits in the Abyss.", outcome: { text: "The party steps through the rift and the world peels open into clawed dark.", dungeon: { size: "medium", themeId: "depthsOfHells" } } },
+        { id: "enter", label: "Enter The Rift", description: "Step through and face what waits in the Abyss.", outcome: { text: "The party steps through the rift and the world peels open into clawed dark.", dungeon: { size: "medium", themeId: "abyssalScar" } } },
         { id: "ward", label: "Mark The Rift", description: "Leave warning marks and camp well away from the tear.", outcome: { text: "The party marks stones around the rift and keeps the camp outside its breathing." } },
+      ],
+    },
+    {
+      id: "demonscar-lair",
+      title: "Demon Scar",
+      tiles: ["demon scar", "demonscar"],
+      always: true,
+      weight: 16,
+      text: "A black wound splits the ground. The soil around it has fused into glassy ribs, and something below breathes against the crust.",
+      choices: [
+        { id: "draw-out", label: "Draw It Out", description: "Rattle the scar and face the demon nesting inside.", outcome: { text: "The party strikes the scar. The ground coughs smoke, and a demon tears itself free.", fight: { monsterTags: ["fiend", "demon"], count: 1, size: "skirmish", themeId: "abyssalScar" } } },
+        {
+          id: "seal",
+          label: "Salt The Scar",
+          description: "Religion DC 14. Success quiets the wound; failure wakes its resident.",
+          check: { ability: "int", skill: "religion", dc: 14 },
+          success: { text: "Salt, ash, and a steady prayer make the scar draw tight. Whatever nests below keeps still." },
+          failure: { text: "The scar drinks the salt and opens wider. The demon below answers.", fight: { monsterTags: ["fiend", "demon"], count: 1, size: "skirmish", themeId: "abyssalScar" } },
+        },
+        { id: "avoid", label: "Avoid The Scar", description: "Give the wound a wide berth.", outcome: { text: "The party leaves the scar muttering behind them." } },
       ],
     },
     {
@@ -703,6 +723,26 @@
       choices: [
         { id: "harvest", label: "Harvest Herbs", description: "Nature DC 11. Success gathers useful herbs. The garden should be left to regrow before heavy picking.", check: { ability: "int", skill: "nature", dc: 11 }, success: { text: "The party gathers clean herbs and leaves the roots whole for regrowth.", cooldownDays: 7, rewards: { items: { "medicinal-herb": 2, "green-vines": 1 } } }, failure: { text: "The party gathers a few bruised leaves but leaves most of the garden untouched.", cooldownDays: 7, rewards: { items: { "medicinal-herb": 1 } } } },
         { id: "respect", label: "Leave It Growing", description: "Mark the garden and leave the plants untouched.", outcome: { text: "The party marks the garden on the map and lets the bees keep working." } },
+      ],
+    },
+    {
+      id: "battlefield-ruins-threshold",
+      title: "Battlefield Ruins",
+      tiles: ["ruins_battlefield"],
+      always: true,
+      weight: 18,
+      text: "Broken walls and half-buried barricades cut across the battlefield. Beyond them, old trench lines descend under the grass like wounds that never closed.",
+      choices: [
+        { id: "enter", label: "Enter The Lines", description: "Descend into the haunted battlefield below.", outcome: { text: "The party follows the trench line down into the remembered war.", dungeon: { size: "medium", themeId: "hauntedBattlefield" } } },
+        {
+          id: "read",
+          label: "Read The Standards",
+          description: "History DC 13. Success finds a safer approach; failure raises sentries.",
+          check: { ability: "int", skill: "history", dc: 13 },
+          success: { text: "The old standards mark command posts and dead zones. The party finds a safer way into the fieldworks.", dungeon: { size: "small", themeId: "hauntedBattlefield" } },
+          failure: { text: "The standard snaps in a wind that has no weather. Dead sentries rise from the line.", fight: { monsterTags: ["undead", "ghost"], count: "party", size: "skirmish", themeId: "hauntedBattlefield" } },
+        },
+        { id: "bypass", label: "Bypass The Field", description: "Leave the trenches undisturbed.", outcome: { text: "The party gives the old lines a wide berth." } },
       ],
     },
     {
@@ -998,8 +1038,9 @@
           description: "Religion DC 13. Success quiets the field; failure raises it.",
           check: { ability: "int", skill: "religion", dc: 13 },
           success: { text: "The marching grass stills. A half-buried strongbox offers a final soldier's pay.", rewards: { money: { gp: 1, sp: 8 } } },
-          failure: { text: "The field remembers the wrong side of death.", fight: { monsterTags: ["undead"], count: "party", size: "skirmish", themeId: "oldGuardroom" } },
+          failure: { text: "The field remembers the wrong side of death.", fight: { monsterTags: ["undead"], count: "party", size: "skirmish", themeId: "hauntedBattlefield" } },
         },
+        { id: "descend", label: "Follow The March", description: "Follow the marching grass into the buried fieldworks.", outcome: { text: "The marching grass opens into old fieldworks below.", dungeon: { size: "small", themeId: "hauntedBattlefield" } } },
         { id: "cross", label: "Cross Fast", description: "Do not linger.", outcome: { text: "The party crosses before sunset and camps where the grass grows straight." } },
       ],
     },

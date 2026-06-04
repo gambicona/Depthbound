@@ -1,13 +1,3 @@
-TEST:
-fitting campaing for mileposts
-
-DO:
-revisit all spawnawble structures. do we have any in middletiles that cannot spawn?
-for each: what can happen eventwise when stepping on the structure? full catalogue as file
-
-haunted battlefield dungeon
-demon abyss dungeon
-
 Spell sound effects
 Sidekicks expert and spellcaster availability
 
@@ -32,11 +22,10 @@ camp and castle sieges: add ranged positions like towers etc on the map where mo
 fog of war/exploration fog on the world map if not in chunk 0,0
 add teleport circles for fast travel, add teleportation circle and teleport as spells as well as this transport via plants
 
-goblin pack
-
 add relique items for antiquarian society
 
-
+trophys!
+eastereggs
 
 remove abandon dungeon penalty?
 
@@ -60,6 +49,7 @@ assets/furniture/thin-ice-patch.png - fragile icy floor hazard.
 assets/furniture/cliff-ledge.png - narrow mountain stone ledge.
 assets/furniture/wind-carved-shrine.png - small mountain shrine/landmark.
 assets/furniture/goat-trail-scree.png - loose mountain trail stones.
+
 assets/furniture/coral-growth.png - sharp reef coral cover/hazard.
 assets/furniture/kelp-forest.png - underwater concealment fronds.
 assets/furniture/shipwreck-planks.png - broken wreckage cover/loot.

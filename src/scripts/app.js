@@ -268,6 +268,9 @@ els.showDungeonIntro?.addEventListener("click", () => {
 els.tutorial.addEventListener("click", showTutorial);
 els.mainTutorial?.addEventListener("click", startInteractiveTutorial);
 els.loadMenu?.addEventListener("click", () => showMainMenuSubmenu("load"));
+els.achievementsMenu?.addEventListener("click", showAchievementsMenu);
+els.achievementsPanel?.addEventListener("click", (event) => window.DepthboundAchievements?.handlePanelClick?.(event));
+els.achievementsPanel?.addEventListener("input", (event) => window.DepthboundAchievements?.handlePanelInput?.(event));
 els.settingsMenu?.addEventListener("click", () => showMainMenuSubmenu("settings"));
 els.mainMenuBack?.addEventListener("click", showMainMenuRoot);
 els.tutorialTourBack?.addEventListener("click", () => {
@@ -1061,6 +1064,12 @@ els.villageMenu?.addEventListener("click", (event) => {
   }
   if (button?.dataset.action === "start-expedition-milepost") {
     void startExpeditionMilepostMission(button.dataset.index);
+  }
+  if (button?.dataset.action === "buy-expedition-teleport-circle") {
+    buyExpeditionTeleportCircle();
+  }
+  if (button?.dataset.action === "rename-expedition-teleport-circle") {
+    renameExpeditionTeleportCircle(button.dataset.circle);
   }
   if (button?.dataset.action === "buy-faction-set-item") {
     buyFactionSetItem(button.dataset.faction, button.dataset.item, button.dataset.method);

@@ -101,6 +101,7 @@ window.DungeonContent.register("themes", "outlawCamp", {
     "weapon-rack": 0.14,
     "armor-stand": 0.07,
     "rubble-pile": 0.08,
+    "goblin-cage": 0.035,
     "standing-lantern": 0.08,
     "wall-torch": 0.06,
     "market-stall-wreckage": 0.05,

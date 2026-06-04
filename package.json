@@ -1,4 +1,9 @@
 {
+  "scripts": {
+    "playtest:functional": "node tools/playtests/normal-functionality-check.js",
+    "playtest:multiplayer": "node tools/playtests/multiplayer-visibility-check.js",
+    "playtest:all": "npm run playtest:functional && npm run playtest:multiplayer"
+  },
   "devDependencies": {
     "playwright": "^1.60.0"
   }

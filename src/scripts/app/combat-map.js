@@ -60,6 +60,8 @@ function killHero(hero) {
   hero.hp = 0;
   hero.alive = false;
   hero.dead = true;
+  state.runStats ??= {};
+  state.runStats.heroesDied = Math.max(0, Math.floor(Number(state.runStats.heroesDied) || 0)) + 1;
   hero.stableAtZero = false;
   hero.deathSaves = { successes: 0, failures: 3 };
   if (activeMagicItemByTemplate(hero, barrowCrownItemIds.barrowCrown)) {
@@ -321,6 +323,8 @@ function showDeathSaveMenu(hero) {
 async function rollDeathSave(hero) {
   if (!isPartyHeroId(hero.id) || hero.hp > 0 || hero.dead) return;
   hero.deathSaves = hero.deathSaves ?? { successes: 0, failures: 0 };
+  state.runStats ??= {};
+  state.runStats.deathSaveHeroIds = Array.from(new Set([...(state.runStats.deathSaveHeroIds ?? []), hero.id]));
   if (heroIsStableAtZero(hero)) {
     addLog(`${hero.name} is stable at 0 HP.`, "important");
     await maybeFinishEncounterAfterHeroRecovery();
@@ -333,12 +337,17 @@ async function rollDeathSave(hero) {
     clearStableAtZero(hero);
     resetDeathSaveCounters(hero);
     addLog(`${hero.name} rolls a 20 death save and gets back up with 1 HP.`, "important");
+    state.runStats.currentFightDeathSaveSuccess = true;
+    window.DepthboundAchievements?.unlock?.("back-on-their-feet", undefined, { heroId: hero.id });
     recordD20OutcomeForFighter(hero, true);
     await maybeFinishEncounterAfterHeroRecovery();
     return;
   }
   if (roll === 1) hero.deathSaves.failures += 2;
-  else if (roll >= 10) hero.deathSaves.successes += 1;
+  else if (roll >= 10) {
+    hero.deathSaves.successes += 1;
+    state.runStats.currentFightDeathSaveSuccess = true;
+  }
   else hero.deathSaves.failures += 1;
   recordD20OutcomeForFighter(hero, roll >= 10);
   addLog(`${hero.name} death save: ${roll}. Successes ${hero.deathSaves.successes}/3, failures ${hero.deathSaves.failures}/3.`, "important");
@@ -346,6 +355,7 @@ async function rollDeathSave(hero) {
   else if (hero.deathSaves.successes >= 3) {
     markFighterStableAtZero(hero);
     addLog(`${hero.name} stabilizes.`, "important");
+    window.DepthboundAchievements?.unlock?.("steady-pulse", undefined, { heroId: hero.id });
     await maybeFinishEncounterAfterHeroRecovery();
   }
 }
@@ -3887,6 +3897,11 @@ async function finishEncounterAfterLastMonsterFalls() {
   }
 
   if (combatMonsters().length === 0 && state.combatStarted && !partyDefeatedOrDying()) {
+    const fightResult = {
+      boss: Boolean(state.runStats?.currentFightHadBoss),
+      deathSaveSuccess: Boolean(state.runStats?.currentFightDeathSaveSuccess),
+      rounds: Math.max(0, Math.floor(Number(state.round) || 0)),
+    };
     Object.values(state.fighters ?? {})
       .filter((fighter) => fighter?.barrowCrownDustAfterCombat && fighter.alive)
       .forEach((fighter) => {
@@ -3896,6 +3911,10 @@ async function finishEncounterAfterLastMonsterFalls() {
         addLog(`${fighter.name} turns to dust as the Crownshard's stolen command ends.`, "important");
     });
     endCurrentEncounter();
+    window.DepthboundAchievements?.fightComplete?.(fightResult);
+    state.runStats ??= {};
+    state.runStats.currentFightHadBoss = false;
+    state.runStats.currentFightDeathSaveSuccess = false;
     addLog("The room falls quiet. Exploration resumes.", "important");
     if (typeof handleFightingPitWaveClear === "function" && typeof fightingPitCurrentRun === "function" && fightingPitCurrentRun()) await handleFightingPitWaveClear();
     await handleCustomDungeonWaveClear();
@@ -4248,6 +4267,7 @@ function checkDungeonCompletion(hero = activeHero()) {
       boardQuestId: travelReturnCamp?.boardQuestId ?? state.customDungeon?.settlementBoardQuestId ?? "",
       dungeonName: state.customDungeon?.name ?? state.dungeon?.name ?? "",
     };
+    window.DepthboundAchievements?.dungeonComplete?.(completedContext);
     handleNpcDungeonComplete(completedContext);
     const completedCampaign = state.campaignId && state.campaignIndex ? { ...state.campaignProgress } : state.campaignProgress;
     const questFlags = { ...(state.questFlags ?? {}) };
@@ -4255,6 +4275,11 @@ function checkDungeonCompletion(hero = activeHero()) {
     if (state.campaignId && state.campaignIndex) {
       completedCampaign[state.campaignId] = Math.max(completedCampaign[state.campaignId] ?? 0, state.campaignIndex);
     }
+    const expeditionCircleRewardUnlocked =
+      state.campaignId === "expedition-mileposts" &&
+      Math.max(0, Math.floor(Number(completedCampaign["expedition-mileposts"]) || 0)) >= 4 &&
+      !questFlags.expeditionTeleportCirclesUnlocked;
+    if (expeditionCircleRewardUnlocked) questFlags.expeditionTeleportCirclesUnlocked = true;
     if (state.customDungeon?.oneShotDungeonId) {
       questFlags.oneShotDungeonCompletions = {
         ...(questFlags.oneShotDungeonCompletions ?? {}),
@@ -4312,6 +4337,7 @@ function checkDungeonCompletion(hero = activeHero()) {
       state.combatStarted = false;
       roomIsBuilt = false;
       addLog(`${hero.name} reaches the exit. The party returns to camp after ${travelReturnCamp.eventTitle ?? "the travel encounter"}.`, "important");
+      if (expeditionCircleRewardUnlocked) addLog("The Milepost Ledger is complete. The Expedition Board now sells teleportation circle charters for explored hexes.", "important");
       if (boardQuestCompletion) {
         addLog(`${boardQuestCompletion.title} is complete. Return to ${boardQuestCompletion.sourceName} to claim ${priceText(boardQuestCompletion.rewardCp)}.`, "important");
       }
@@ -4339,6 +4365,7 @@ function checkDungeonCompletion(hero = activeHero()) {
     roomIsBuilt = false;
     maybeUnlockNpcProgress();
     addLog(`${hero.name} reaches the exit. Dungeon complete. The party gained ${tokenAward} Hero Token${tokenAward === 1 ? "" : "s"} each.`, "important");
+    if (expeditionCircleRewardUnlocked) addLog("The Milepost Ledger is complete. The Expedition Board now sells teleportation circle charters for explored hexes.", "important");
     if (storedCoins > 0) addLog(`${moneyText(cpToMoney(storedCoins))} is secured in the party purse.`, "important");
     if (consumedGoalItems) addLog(`${consumedGoalItems} goal item${consumedGoalItems === 1 ? " was" : "s were"} left behind.`, "important");
     render();
@@ -4415,7 +4442,6 @@ function addMonsterMaterialDrops(monster) {
   if (!monster || monster.materialDropsAdded) return;
   monster.materialDropsAdded = true;
   const ids = new Set([monster.baseMonsterId, monster.templateId, monster.id, ...(monster.tags ?? [])].filter(Boolean));
-  if (ids.has("humanoid")) return;
   const textFields = [
     ...Array.from(ids),
     monster.name,
@@ -4458,6 +4484,11 @@ function addMonsterMaterialDrops(monster) {
   const add = (itemId, options = {}) => {
     monster.extraLoot = [...(monster.extraLoot ?? []), { kind: "item", itemId, ...options }];
   };
+  if (ids.has("goblin")) {
+    add("goblin-camp-scrap", { chance: ids.has("boss") ? 0.32 : 0.22 });
+    if (ids.has("boss")) add("goblin-boss-charm", { chance: 0.16 });
+  }
+  if (ids.has("humanoid")) return;
   if (hasWornMetalArmorCue()) {
     add("iron-scrap", { chance: ids.has("boss") ? 0.08 : 0.045 });
   }
@@ -4707,6 +4738,9 @@ function dropLootForMonster(monster) {
   if (monster?.fightingPitMonster) return;
   addMonsterMaterialDrops(monster);
   const loot = createLootForMonster(monster);
+  if (monster?.id?.startsWith("boss-") || monster?.tags?.includes("boss") || monster?.customBoss) {
+    window.DepthboundAchievements?.bossLoot?.(monster, loot.items ?? []);
+  }
   const resolvedLoot = resolveMonsterLootDrop(monster, loot);
   if (!resolvedLoot) return;
   addLootPile(resolvedLoot);
@@ -5573,6 +5607,9 @@ async function rollInitiative() {
 
   state.combatStarted = true;
   state.mode = "combat";
+  state.runStats ??= {};
+  state.runStats.currentFightHadBoss = monsterEntries.some((entry) => entry.fighter?.customBoss || entry.fighter?.id?.startsWith("boss-") || entry.fighter?.tags?.includes("boss"));
+  state.runStats.currentFightDeathSaveSuccess = false;
   startNextEncounterEffects();
   for (const entry of state.initiative) {
     const fighter = state.fighters[entry.fighterId];
@@ -8160,6 +8197,12 @@ async function applySpellDamage(caster, target, spell, context = {}) {
   }
   if (raw <= 0) return { save, damaged: false };
   applySpecialDamage(caster, target, raw, spell.effect.type ?? "force", spell.name);
+  if (spell.id === "vicious-mockery" && !target.alive && !isPartyHeroId(target.id)) {
+    window.DepthboundAchievements?.unlock?.("vicious-last-word", undefined, {
+      casterId: caster.id,
+      targetId: target.id,
+    });
+  }
   if (spell.effect?.status && (!save || !save.success)) await applySpellStatus(caster, target, spell, { skipSave: true });
   else applySpellForcedMovement(caster, target, spell, save, context);
   return { save, damaged: true };
@@ -8276,6 +8319,7 @@ function reviveCorpseWithSpell(caster, corpseHero, spell) {
   if (!state.party.activeHeroId || state.fighters[state.party.activeHeroId]?.dead) state.party.activeHeroId = corpseHero.id;
   refreshDerivedStats(corpseHero);
   addLog(`${caster.name} casts ${spell.name}. ${corpseHero.name} returns to life with ${corpseHero.hp} HP.`, "important");
+  window.DepthboundAchievements?.unlock?.("the-healer-was-busy", undefined, { casterId: caster.id, heroId: corpseHero.id, spellId: spell.id });
   void maybeFinishEncounterAfterHeroRecovery();
   return true;
 }
@@ -8554,6 +8598,7 @@ async function castSummonSpell(caster, spell, originTarget = caster, options = {
     return [];
   }
   addLog(`${caster.name}'s ${spell.name} summons ${actors.map((actor) => actor.name).join(", ")}.`, "important");
+  if (spell.id === "find-familiar") window.DepthboundAchievements?.findFamiliarCheck?.();
   return actors;
 }
 

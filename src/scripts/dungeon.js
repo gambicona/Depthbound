@@ -11,10 +11,20 @@ function key(position) {
 
 function makeShapeCells(shape, width, height) {
   const cells = [];
+  const radiusX = (width - 1) / 2;
+  const radiusY = (height - 1) / 2;
+  const centerX = radiusX;
+  const centerY = radiusY;
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       let include = true;
+
+      if (shape === "circle") {
+        const normalizedX = radiusX > 0 ? (x - centerX) / radiusX : 0;
+        const normalizedY = radiusY > 0 ? (y - centerY) / radiusY : 0;
+        include = normalizedX * normalizedX + normalizedY * normalizedY <= 1.08;
+      }
 
       if (shape === "l") {
         include = x < Math.ceil(width * 0.48) || y >= Math.floor(height * 0.52);
@@ -347,11 +357,201 @@ function generateLinearDungeon(options = {}) {
   };
 }
 
+function estimateBattlefieldGridSize(options = {}, roomCount = 12) {
+  const baseGridSize = options.gridSize ?? 84;
+  const rows = Math.max(2, Math.min(4, Math.floor(Number(options.battlefieldRows) || 3)));
+  const columns = Math.ceil(roomCount / rows);
+  const maxWidth = options.battlefieldRoomWidth?.max ?? options.roomWidth?.max ?? options.squareSize?.max ?? 12;
+  const maxHeight = options.battlefieldRoomHeight?.max ?? options.roomHeight?.max ?? options.squareSize?.max ?? 9;
+  const gapX = options.battlefieldColumnGap ?? 7;
+  const gapY = options.battlefieldRowGap ?? 5;
+  const neededWidth = 10 + columns * (maxWidth + gapX);
+  const neededHeight = 10 + rows * (maxHeight + gapY);
+  return Math.max(baseGridSize, Math.min(180, Math.max(neededWidth, neededHeight)));
+}
+
+function generateBattlefieldDungeon(options = {}) {
+  const roomCount = Math.max(1, Math.floor(Number(options.roomCount) || 12));
+  const rows = Math.max(2, Math.min(4, Math.floor(Number(options.battlefieldRows) || 3)));
+  const columns = Math.ceil(roomCount / rows);
+  const gridSize = estimateBattlefieldGridSize(options, roomCount);
+  const rooms = [];
+  const roomSlots = [];
+  const corridors = { cells: [], passages: [] };
+  const fieldOptions = {
+    ...options,
+    roomShapes: options.battlefieldRoomShapes ?? options.roomShapes ?? ["rectangle", "l", "t"],
+    roomWidth: options.battlefieldRoomWidth ?? options.roomWidth ?? { min: 6, max: 12 },
+    roomHeight: options.battlefieldRoomHeight ?? options.roomHeight ?? { min: 4, max: 8 },
+    squareSize: options.battlefieldSquareSize ?? options.squareSize ?? { min: 6, max: 8 },
+    corridorWidth: options.battlefieldCorridorWidth ?? options.corridorWidth ?? 2,
+    corridorStyle: options.battlefieldCorridorStyle ?? options.corridorStyle ?? "horizontal-first",
+  };
+  const maxWidth = fieldOptions.roomWidth?.max ?? fieldOptions.squareSize?.max ?? 12;
+  const maxHeight = fieldOptions.roomHeight?.max ?? fieldOptions.squareSize?.max ?? 9;
+  const columnStep = maxWidth + (options.battlefieldColumnGap ?? 7);
+  const rowStep = maxHeight + (options.battlefieldRowGap ?? 5);
+  const startX = 3;
+  const startY = Math.max(3, Math.floor(gridSize / 2) - Math.floor((rows * rowStep) / 2));
+
+  for (let column = 0; column < columns && rooms.length < roomCount; column += 1) {
+    for (let row = 0; row < rows && rooms.length < roomCount; row += 1) {
+      const shape = rooms.length === 0 ? (options.entranceShape ?? "rectangle") : pick(fieldOptions.roomShapes, "rectangle");
+      const stagger = row % 2 === 1 ? Math.floor(columnStep / 4) : 0;
+      const x = startX + column * columnStep + stagger + randomInt(-1, 1);
+      const y = startY + row * rowStep + randomInt(-1, 1);
+      const room = makeRoom(rooms.length, x, y, fieldOptions, shape);
+      if (!isInBounds(room, gridSize) || overlaps(room, rooms, options.roomPadding ?? 1)) continue;
+      rooms.push(room);
+      roomSlots.push({ room, row, column });
+    }
+  }
+
+  const roomAt = (row, column) => roomSlots.find((slot) => slot.row === row && slot.column === column)?.room ?? null;
+  const connectBattlefieldRooms = (a, b) => {
+    if (!a || !b || a.id === b.id || a.connections.includes(b.id)) return false;
+    return connectRooms(a, b, corridors, rooms, fieldOptions) || connectLinearRooms(a, b, corridors, fieldOptions);
+  };
+  for (const slot of roomSlots) {
+    const left = roomAt(slot.row, slot.column - 1);
+    if (left) connectBattlefieldRooms(left, slot.room);
+    const leftFlank = roomAt(slot.row - 1, slot.column - 1) ?? roomAt(slot.row + 1, slot.column - 1);
+    if (leftFlank && Math.random() < 0.55) connectBattlefieldRooms(leftFlank, slot.room);
+    const sameColumnFlank = roomAt(slot.row - 1, slot.column);
+    if (sameColumnFlank && Math.random() < 0.35) connectBattlefieldRooms(sameColumnFlank, slot.room);
+  }
+
+  const extraConnections = Math.floor(roomCount * (options.extraConnectionRatio ?? 0.25));
+  for (let i = 0; i < extraConnections; i += 1) {
+    const a = rooms[randomInt(0, rooms.length - 1)];
+    const b = rooms[randomInt(0, rooms.length - 1)];
+    connectBattlefieldRooms(a, b);
+  }
+
+  pruneDanglingDoors(rooms, corridors.cells);
+
+  const walkable = new Set();
+  const doors = [];
+  for (const room of rooms) {
+    room.cells.forEach((cell) => walkable.add(key(cell)));
+    room.doors.forEach((door) => {
+      walkable.add(key(door));
+      doors.push({ ...door, roomId: room.id });
+    });
+  }
+  corridors.cells.forEach((cell) => walkable.add(key(cell)));
+
+  const entranceRoom = rooms[0];
+  const entranceDoor = entranceRoom?.doors?.[0] ?? center(entranceRoom);
+  const startPosition = roomStartPosition(entranceRoom);
+
+  return {
+    id: `dungeon-${Date.now()}`,
+    gridSize,
+    roomCount: rooms.length,
+    rooms,
+    corridors: corridors.cells,
+    corridorPassages: corridors.passages,
+    doors,
+    entranceRoomId: entranceRoom.id,
+    entranceDoor,
+    startPosition,
+    walkable: Array.from(walkable).map((cellKey) => {
+      const [x, y] = cellKey.split(",").map(Number);
+      return { x, y };
+    }),
+  };
+}
+
+function estimateTowerGridSize(options = {}, roomCount = 5) {
+  const maxDiameter = options.towerRoomDiameter?.max ?? options.roomWidth?.max ?? options.squareSize?.max ?? 15;
+  const gap = options.towerFloorGap ?? 4;
+  const neededHeight = 8 + roomCount * (maxDiameter + gap);
+  const neededWidth = 8 + maxDiameter * 2;
+  return Math.max(options.gridSize ?? 72, Math.min(180, Math.max(neededWidth, neededHeight)));
+}
+
+function makeTowerRoom(id, x, y, diameter) {
+  const size = Math.max(3, Math.floor(diameter));
+  const cells = makeShapeCells("circle", size, size).map((cell) => ({ x: x + cell.x, y: y + cell.y }));
+  return {
+    id: `room-${id}`,
+    name: id === 0 ? "Tower Base" : `Tower Floor ${id + 1}`,
+    shape: "circle",
+    x,
+    y,
+    width: size,
+    height: size,
+    cells,
+    doors: [],
+    connections: [],
+  };
+}
+
+function generateTowerDungeon(options = {}) {
+  const requestedRoomCount = Math.max(1, Math.floor(Number(options.roomCount) || 5));
+  const roomCount = Math.max(
+    options.towerMinRooms ?? 4,
+    Math.min(options.towerMaxRooms ?? 9, requestedRoomCount),
+  );
+  const diameterRange = options.towerRoomDiameter ?? { min: 5, max: 15 };
+  const minDiameter = Math.max(3, Math.floor(diameterRange.min ?? 5));
+  const maxDiameter = Math.max(minDiameter, Math.floor(diameterRange.max ?? 15));
+  const gridSize = estimateTowerGridSize(options, roomCount);
+  const rooms = [];
+  const walkable = new Set();
+  const portalLinks = [];
+  const gap = options.towerFloorGap ?? 4;
+  const centerX = Math.floor(gridSize / 2);
+  let cursorY = gridSize - maxDiameter - 4;
+
+  for (let index = 0; index < roomCount; index += 1) {
+    const progress = roomCount <= 1 ? 0 : index / (roomCount - 1);
+    const diameter = Math.max(minDiameter, Math.round(maxDiameter - (maxDiameter - minDiameter) * progress));
+    const room = makeTowerRoom(index, centerX - Math.floor(diameter / 2), cursorY, diameter);
+    rooms.push(room);
+    cursorY -= diameter + gap;
+  }
+
+  for (let index = 0; index < rooms.length; index += 1) {
+    const room = rooms[index];
+    room.cells.forEach((cell) => walkable.add(key(cell)));
+    if (index > 0) room.connections.push(rooms[index - 1].id);
+    if (index < rooms.length - 1) {
+      room.connections.push(rooms[index + 1].id);
+      portalLinks.push({ fromRoomId: room.id, toRoomId: rooms[index + 1].id });
+    }
+  }
+
+  const entranceRoom = rooms[0];
+  const startPosition = roomStartPosition(entranceRoom);
+
+  return {
+    id: `dungeon-${Date.now()}`,
+    gridSize,
+    roomCount: rooms.length,
+    rooms,
+    corridors: [],
+    corridorPassages: [],
+    doors: [],
+    portalLinks,
+    entranceRoomId: entranceRoom.id,
+    entranceDoor: center(entranceRoom),
+    startPosition,
+    walkable: Array.from(walkable).map((cellKey) => {
+      const [x, y] = cellKey.split(",").map(Number);
+      return { x, y };
+    }),
+  };
+}
+
 function generateDungeon(options = {}) {
   const gridSize = options.gridSize ?? 72;
   const roomCount = options.roomCount ?? 20;
   const layout = options.layout ?? "branching";
   if (layout === "linear") return generateLinearDungeon({ ...options, gridSize, roomCount });
+  if (layout === "battlefield") return generateBattlefieldDungeon({ ...options, gridSize, roomCount });
+  if (layout === "tower") return generateTowerDungeon({ ...options, gridSize, roomCount });
   const entranceShape = options.entranceShape ?? "rectangle";
   const rooms = [makeRoom(0, Math.floor(gridSize / 2) - 4, Math.floor(gridSize / 2) - 3, options, entranceShape)];
   const corridors = { cells: [], passages: [] };
