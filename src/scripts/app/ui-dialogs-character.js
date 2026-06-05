@@ -75,6 +75,25 @@ async function chooseSaveSlotForAdventure() {
   }
 }
 
+function showLoadingScreen(title = "Loading", message = "Preparing the adventure.", detail = "") {
+  if (!els.loadingScreen) return;
+  if (els.loadingTitle) els.loadingTitle.textContent = title;
+  if (els.loadingMessage) els.loadingMessage.textContent = message;
+  if (els.loadingDetail) els.loadingDetail.textContent = detail;
+  els.loadingScreen.classList.remove("hidden");
+}
+
+function updateLoadingScreen(title = "", message = "", detail = "") {
+  if (!els.loadingScreen) return;
+  if (title && els.loadingTitle) els.loadingTitle.textContent = title;
+  if (message && els.loadingMessage) els.loadingMessage.textContent = message;
+  if (els.loadingDetail) els.loadingDetail.textContent = detail;
+}
+
+function hideLoadingScreen() {
+  els.loadingScreen?.classList.add("hidden");
+}
+
 function escapeAttribute(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -3161,23 +3180,33 @@ async function startNewAdventure() {
     initialDungeonState.fighters.hero.unusedFeatChoiceCredits =
       (initialDungeonState.fighters.hero.unusedFeatChoiceCredits ?? 0) + heroOptions.skippedStartingFeatChoiceCount;
   }
-  const initialWorld = await window.DepthboundWorldTravel?.createInitialWorldState?.({
-    seed: `adventure:${slotId}:${chosenName || "hero"}:${Date.now()}`,
-    chunkWidth: 10,
-    chunkHeight: 10,
-  });
-  state = createHomeState([initialDungeonState.fighters.hero], [], { cp: 0, sp: 0, gp: 0 }, { ...initialDungeonState.party, partyTomes: initialDungeonState.partyTomes ?? [], world: initialWorld });
-  state.saveSlotId = slotId;
-  activeSaveSlot = slotId;
-  await saveAdventure(slotId, { skipOverwriteWarning: true, slotName });
+  showLoadingScreen("Building World", "Generating your home village and nearby quest-board territory.", "This can take a moment on GitHub Pages.");
   try {
-    await saveQuickstart(state);
+    const initialWorld = await window.DepthboundWorldTravel?.createInitialWorldState?.({
+      seed: `adventure:${slotId}:${chosenName || "hero"}:${Date.now()}`,
+      chunkWidth: 10,
+      chunkHeight: 10,
+    });
+    updateLoadingScreen("Preparing Home", "Saving the new adventure.", "Almost there.");
+    state = createHomeState([initialDungeonState.fighters.hero], [], { cp: 0, sp: 0, gp: 0 }, { ...initialDungeonState.party, partyTomes: initialDungeonState.partyTomes ?? [], world: initialWorld });
+    state.saveSlotId = slotId;
+    activeSaveSlot = slotId;
+    await saveAdventure(slotId, { skipOverwriteWarning: true, slotName });
+    try {
+      await saveQuickstart(state);
+    } catch (error) {
+      updateSaveStatus(error?.message ?? "Could not write the dungeon restart save.");
+    }
   } catch (error) {
-    updateSaveStatus(error?.message ?? "Could not write the dungeon restart save.");
+    console.warn("Could not create the starting world.", error);
+    hideLoadingScreen();
+    updateSaveStatus("Could not generate the world map. Try Start New Adventure again.");
+    return;
   }
   roomIsBuilt = false;
   hideMainMenu();
   render();
+  hideLoadingScreen();
   window.DepthboundPlaytest?.syncNow?.();
   centerViewOnHero();
 }
@@ -3550,9 +3579,11 @@ async function returnHomeEarly() {
 }
 
 async function loadAdventure(slotId) {
+  showLoadingScreen("Loading Adventure", "Reading the save file.", "");
   try {
     const payload = await load(slotId);
     if (!payload) {
+      hideLoadingScreen();
       updateSaveStatus("No saved adventure found.");
       return;
     }
@@ -3562,6 +3593,7 @@ async function loadAdventure(slotId) {
     state = normalizeLoadedState(payload.state);
     selectedHeroIds = new Set([state.party.activeHeroId]);
     state.saveSlotId = slotId;
+    updateLoadingScreen("Loading Adventure", "Preparing the world map.", "Old saves may need a one-time world upgrade.");
     await ensureWorldForLoadedSave(slotId).catch((error) => {
       console.warn("Could not upgrade old save with a world map.", error);
       updateSaveStatus("Loaded save, but the world map upgrade could not finish. Open Travel to try again.");
@@ -3572,10 +3604,12 @@ async function loadAdventure(slotId) {
     hideMainMenu();
     addLog(`Loaded "${payload.name}".`, "important");
     render();
+    hideLoadingScreen();
     window.DepthboundPlaytest?.syncNow?.();
     centerViewOnHero();
     maybeRunMonsterTurn();
   } catch (error) {
+    hideLoadingScreen();
     updateSaveStatus("Could not load the saved adventure.");
   }
 }

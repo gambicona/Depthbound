@@ -268,7 +268,16 @@ els.showDungeonIntro?.addEventListener("click", () => {
 els.tutorial.addEventListener("click", showTutorial);
 els.mainTutorial?.addEventListener("click", startInteractiveTutorial);
 els.loadMenu?.addEventListener("click", () => showMainMenuSubmenu("load"));
-els.achievementsMenu?.addEventListener("click", showAchievementsMenu);
+els.achievementsMenu?.addEventListener("click", () => {
+  if (window.DepthboundAchievements?.show) {
+    window.DepthboundAchievements.show();
+    return;
+  }
+  showMainMenuSubmenu("achievements");
+  if (els.achievementsPanel) {
+    els.achievementsPanel.innerHTML = `<p class="achievements-empty">Achievements are still loading. Refresh the page and try again.</p>`;
+  }
+});
 els.achievementsPanel?.addEventListener("click", (event) => window.DepthboundAchievements?.handlePanelClick?.(event));
 els.achievementsPanel?.addEventListener("input", (event) => window.DepthboundAchievements?.handlePanelInput?.(event));
 els.settingsMenu?.addEventListener("click", () => showMainMenuSubmenu("settings"));

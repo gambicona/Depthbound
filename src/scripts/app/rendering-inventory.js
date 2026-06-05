@@ -12755,11 +12755,13 @@ async function showTravelMapMenu() {
   if (!els.travelMapMenu) return;
   state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state.world;
   if ((!state.world || window.DepthboundWorldTravel?.worldNeedsRegeneration?.(state.world)) && typeof ensureWorldForLoadedSave === "function") {
+    showLoadingScreen?.("Building World", "Generating the world map for this save.", "This one-time upgrade can take a moment on GitHub Pages.");
     await ensureWorldForLoadedSave(state.saveSlotId ?? activeSaveSlot).catch((error) => {
       console.warn("Could not generate a world map for this save.", error);
       addLog("The world map could not be generated yet. Try opening Travel again in a moment.", "warning");
       return false;
     });
+    hideLoadingScreen?.();
     state.world = window.DepthboundWorldTravel?.normalizeWorldState?.(state?.world) ?? state.world;
   }
   hideHomeMenu();

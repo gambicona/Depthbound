@@ -566,6 +566,71 @@ h1 {
   display: none !important;
 }
 
+.loading-screen {
+  align-items: center;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(115, 218, 205, 0.16), transparent 34%),
+    rgba(2, 8, 9, 0.88);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 20px;
+  position: fixed;
+  z-index: 11000;
+}
+
+.loading-panel {
+  background: var(--chrome-dialog-bg);
+  border: 1px solid var(--chrome-panel-border);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58);
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 26px;
+  text-align: center;
+  width: 100%;
+}
+
+.loading-spinner {
+  animation: depthbound-loading-spin 900ms linear infinite;
+  border: 3px solid rgba(246, 234, 216, 0.18);
+  border-top-color: var(--chrome-accent);
+  border-radius: 50%;
+  height: 44px;
+  width: 44px;
+}
+
+.loading-panel span {
+  color: var(--chrome-accent);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.loading-panel h2 {
+  font-size: 1.35rem;
+  margin: 0;
+}
+
+.loading-panel p {
+  color: var(--text);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.loading-panel small {
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
+@keyframes depthbound-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .main-menu {
   align-items: center;
   background: #070606;
