@@ -1,0 +1,2449 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Depthbound Lore Compendium</title>
+    <link rel="stylesheet" href="../src/styles/main.css" />
+    <style>
+      body {
+        background:
+          linear-gradient(rgba(5, 13, 14, 0.86), rgba(5, 13, 14, 0.96)),
+          var(--chrome-body-bg);
+        min-height: 100vh;
+        overflow: hidden;
+        padding-bottom: 0;
+      }
+
+      .lore-page {
+        display: grid;
+        grid-template-columns: 320px minmax(0, 1fr) 360px;
+        height: 100vh;
+        min-height: 0;
+      }
+
+      body.editor-closed .lore-page {
+        grid-template-columns: 320px minmax(0, 1fr);
+      }
+
+      body.editor-closed .lore-editor {
+        display: none;
+      }
+
+      .lore-nav,
+      .lore-editor {
+        background: var(--panel);
+        border-color: var(--line);
+        display: grid;
+        min-height: 0;
+      }
+
+      .lore-nav {
+        border-right: 1px solid var(--line);
+        grid-template-rows: auto auto auto minmax(0, 1fr);
+      }
+
+      .lore-editor {
+        border-left: 1px solid var(--line);
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .lore-header,
+      .lore-editor-header {
+        align-items: center;
+        background: var(--panel-2);
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+        padding: 12px 14px;
+      }
+
+      .lore-header h1,
+      .lore-editor-header h2 {
+        font-size: 1rem;
+        margin: 0;
+      }
+
+      .lore-header-actions,
+      .lore-toolbar,
+      .lore-editor-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .lore-search {
+        border-bottom: 1px solid var(--line);
+        display: grid;
+        gap: 8px;
+        padding: 12px 14px;
+      }
+
+      .lore-search input,
+      .lore-search select,
+      .lore-field input,
+      .lore-field select,
+      .lore-field textarea {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--text);
+        min-height: 36px;
+        padding: 8px 10px;
+        width: 100%;
+      }
+
+      .lore-search-grid {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .lore-field {
+        color: var(--muted);
+        display: grid;
+        font-size: 0.76rem;
+        font-weight: 800;
+        gap: 5px;
+      }
+
+      .lore-tree {
+        min-height: 0;
+        overflow: auto;
+        padding: 12px 14px;
+      }
+
+      .lore-folder {
+        margin-bottom: 12px;
+      }
+
+      .lore-folder-title {
+        align-items: center;
+        color: var(--gold);
+        display: flex;
+        font-size: 0.78rem;
+        font-weight: 900;
+        gap: 8px;
+        letter-spacing: 0.04em;
+        margin: 0 0 7px;
+        text-transform: uppercase;
+      }
+
+      .lore-article-list {
+        display: grid;
+        gap: 6px;
+      }
+
+      .lore-article-button {
+        align-items: start;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        color: var(--text);
+        cursor: pointer;
+        display: grid;
+        gap: 3px;
+        min-height: 48px;
+        padding: 8px 9px;
+        text-align: left;
+      }
+
+      .lore-article-button.active,
+      .lore-article-button:hover {
+        border-color: var(--chrome-accent);
+      }
+
+      .lore-article-button b {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .lore-article-button span {
+        color: var(--muted);
+        font-size: 0.74rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .lore-main {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-height: 0;
+      }
+
+      .lore-article-topbar {
+        background: rgba(7, 20, 20, 0.72);
+        border-bottom: 1px solid var(--line);
+        display: grid;
+        gap: 8px;
+        padding: 16px 20px 12px;
+      }
+
+      .lore-article-topbar h2 {
+        font-size: clamp(1.35rem, 2.4vw, 2.2rem);
+        line-height: 1.05;
+        margin: 0;
+      }
+
+      .lore-meta-row {
+        align-items: center;
+        color: var(--muted);
+        display: flex;
+        flex-wrap: wrap;
+        font-size: 0.78rem;
+        gap: 8px;
+      }
+
+      .lore-title-row {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        min-width: 0;
+      }
+
+      .lore-chip {
+        background: rgba(115, 218, 205, 0.08);
+        border: 1px solid rgba(115, 218, 205, 0.24);
+        border-radius: 999px;
+        color: var(--muted);
+        display: inline-flex;
+        font-size: 0.72rem;
+        font-weight: 800;
+        padding: 3px 8px;
+      }
+
+      .lore-content {
+        min-height: 0;
+        overflow: auto;
+        padding: 20px;
+      }
+
+      .lore-rendered {
+        color: var(--text);
+        font-size: 0.95rem;
+        line-height: 1.62;
+        max-width: 980px;
+      }
+
+      .lore-rendered h1,
+      .lore-rendered h2,
+      .lore-rendered h3 {
+        line-height: 1.16;
+      }
+
+      .lore-rendered h1 {
+        color: var(--gold);
+        font-size: 1.65rem;
+        margin: 0 0 14px;
+      }
+
+      .lore-rendered h2 {
+        border-top: 1px solid var(--line);
+        color: var(--text);
+        font-size: 1.25rem;
+        margin: 28px 0 10px;
+        padding-top: 18px;
+      }
+
+      .lore-rendered h3 {
+        color: var(--gold);
+        font-size: 1.05rem;
+        margin: 22px 0 8px;
+      }
+
+      .lore-rendered p,
+      .lore-rendered ul,
+      .lore-rendered ol,
+      .lore-rendered blockquote,
+      .lore-rendered table {
+        margin: 0 0 13px;
+      }
+
+      .lore-rendered blockquote {
+        border-left: 3px solid var(--chrome-accent);
+        color: var(--gold);
+        font-weight: 800;
+        padding-left: 14px;
+      }
+
+      .lore-rendered a {
+        color: var(--chrome-accent);
+        cursor: pointer;
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      .lore-rendered a:hover {
+        text-decoration: underline;
+      }
+
+      .lore-rendered table {
+        border-collapse: collapse;
+        display: block;
+        overflow-x: auto;
+        width: 100%;
+      }
+
+      .lore-rendered th,
+      .lore-rendered td {
+        border: 1px solid var(--line);
+        padding: 8px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .lore-rendered th {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--gold);
+      }
+
+      .lore-gallery {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        margin-bottom: 18px;
+      }
+
+      .lore-image {
+        background: rgba(0, 0, 0, 0.22);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        overflow: hidden;
+      }
+
+      .lore-image img {
+        aspect-ratio: 4 / 3;
+        display: block;
+        object-fit: cover;
+        width: 100%;
+      }
+
+      .lore-image figcaption {
+        color: var(--muted);
+        font-size: 0.76rem;
+        padding: 7px 9px;
+      }
+
+      .lore-editor-body {
+        display: grid;
+        gap: 12px;
+        min-height: 0;
+        overflow: auto;
+        padding: 12px 14px;
+      }
+
+      .lore-field textarea {
+        min-height: 330px;
+        resize: vertical;
+      }
+
+      .lore-image-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .lore-image-row {
+        align-items: center;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        display: grid;
+        gap: 8px;
+        grid-template-columns: 48px minmax(0, 1fr) auto;
+        padding: 7px;
+      }
+
+      .lore-image-row img {
+        border-radius: 5px;
+        height: 48px;
+        object-fit: cover;
+        width: 48px;
+      }
+
+      .lore-image-row b {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .lore-empty {
+        color: var(--muted);
+        display: grid;
+        min-height: 240px;
+        place-items: center;
+        text-align: center;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      @media (max-width: 1180px) {
+        body {
+          overflow: auto;
+        }
+
+        .lore-page {
+          grid-template-columns: 290px minmax(0, 1fr);
+          height: auto;
+          min-height: 100vh;
+        }
+
+        .lore-editor {
+          border-left: 0;
+          border-top: 1px solid var(--line);
+          grid-column: 1 / -1;
+          min-height: 560px;
+        }
+
+        body.editor-closed .lore-page {
+          grid-template-columns: 290px minmax(0, 1fr);
+        }
+      }
+
+      @media (max-width: 760px) {
+        .lore-page {
+          grid-template-columns: 1fr;
+        }
+
+        .lore-nav,
+        .lore-main,
+        .lore-editor {
+          min-height: auto;
+        }
+
+        .lore-tree,
+        .lore-content,
+        .lore-editor-body {
+          overflow: visible;
+        }
+      }
+    </style>
+  </head>
+  <body class="editor-closed">
+    <main class="lore-page">
+      <aside class="lore-nav" aria-label="Lore navigation">
+        <div class="lore-header">
+          <h1>Depthbound Lore</h1>
+          <div class="lore-header-actions">
+            <a class="ghost-button button-link" href="../index.html">Game</a>
+          </div>
+        </div>
+        <div class="lore-search">
+          <label class="lore-field">
+            Search
+            <input id="lore-search" type="search" placeholder="Find articles, tags, text..." />
+          </label>
+          <div class="lore-search-grid">
+            <label class="lore-field">
+              Folder
+              <select id="folder-filter"></select>
+            </label>
+            <label class="lore-field">
+              Sort
+              <select id="sort-mode">
+                <option value="title">Title</option>
+                <option value="updated">Updated</option>
+                <option value="folder">Folder</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="lore-toolbar">
+          <button id="new-article" type="button">New Article</button>
+          <button id="new-folder" class="ghost-button" type="button">New Folder</button>
+          <button id="export-lore" class="ghost-button" type="button">Export</button>
+          <label class="ghost-button button-link" for="import-lore">Import</label>
+          <input id="import-lore" class="hidden" type="file" accept="application/json" />
+        </div>
+        <div id="lore-tree" class="lore-tree"></div>
+      </aside>
+
+      <section class="lore-main" aria-label="Selected lore article">
+        <header class="lore-article-topbar">
+          <div class="lore-meta-row">
+            <span id="article-folder" class="lore-chip">World Bible</span>
+            <span id="article-updated"></span>
+          </div>
+          <div class="lore-title-row">
+            <h2 id="article-title">Depthbound World Bible</h2>
+            <button id="toggle-editor" class="ghost-button" type="button">Edit</button>
+          </div>
+          <div id="article-tags" class="lore-meta-row"></div>
+        </header>
+        <div class="lore-content">
+          <div id="article-gallery" class="lore-gallery"></div>
+          <article id="article-body" class="lore-rendered"></article>
+        </div>
+      </section>
+
+      <aside class="lore-editor" aria-label="Lore editor">
+        <div class="lore-editor-header">
+          <h2>Editor</h2>
+          <div class="lore-editor-actions">
+            <button id="save-article" type="button">Save</button>
+            <button id="close-editor" class="ghost-button" type="button">Close</button>
+            <button id="duplicate-article" class="ghost-button" type="button">Duplicate</button>
+            <button id="delete-article" class="ghost-button" type="button">Delete</button>
+          </div>
+        </div>
+        <div id="editor-body" class="lore-editor-body"></div>
+      </aside>
+    </main>
+
+    <script>
+      const STORAGE_KEY = "depthbound.loreCompendium.v1";
+
+      const seedMarkdown = `# Depthbound World Bible v0.1 - Core Premise
+
+Depthbound should be a **broken post-empire frontier** world where the main game loop is also the metaphysics of the setting.
+
+The old world was not held together by borders alone. It was held together by **Five Great Bonds**:
+
+1. **The Hearth** - homes, villages, food, rest, family, companions.
+2. **The Road** - travel, mileposts, maps, trade, teleport circles, settlement links.
+3. **The Crown** - rule, law, oaths, war-banners, protection, command.
+4. **The Name** - burial rites, records, histories, labels, relic catalogues, remembered dead.
+5. **The Pact** - bargains with wilderness, monsters, elements, mines, gods, and old powers.
+
+When those Bonds were strong, civilization could push into darkness without being swallowed. Roads stayed safe. Villages endured. The dead slept. Mines produced wealth without waking horrors. Elemental shrines stayed balanced. Monsters had territories instead of invasions.
+
+Then the Bonds broke.
+
+Now the world is **Depthbound**: everything forgotten, unburied, unclaimed, unnamed, or abandoned is slowly pulled downward into the metaphysical Depth beneath reality. Ruins sink. Old wars wake. Dungeons surface. Monsters crawl out of broken pacts. Settlement boards become local survival organs. Every road built, grave named, relic catalogued, trophy mounted, meal cooked, companion housed, and dungeon cleared becomes a tiny act of resistance against the world's downward pull.
+
+That gives you one clean thesis:
+
+> **Depthbound is a world where civilization survives by remembering, naming, connecting, and anchoring things before the Depth takes them.**
+
+## 1. High-Level Creation Myth / Ancient History
+
+### The First Myth: The World Was Raised, Not Made
+
+In the oldest temple stories, there was first only **the Below Without Bottom** - a vast unlit pressure beneath all possible things. It was not evil in a moral sense. It was hunger, weight, silence, erosion, forgetting.
+
+The gods did not create the world from nothing. They **raised land out of the Depth** and pinned it in place.
+
+They used five divine tools:
+
+- **A Lantern** to give direction.
+- **A Hearthstone** to make shelter.
+- **A Crown** to bind people into law.
+- **A Road-Nail** to fix distance into something crossable.
+- **A Name-Bell** to keep souls from dissolving into the dark.
+
+Where these tools struck, the first mountains, rivers, roads, graves, kingdoms, and villages formed.
+
+This is why clerics matter: gods are real, but they are not omnipotent sky-beings solving every problem. They are **cosmic anchor-powers** whose influence is strongest where mortals maintain shrines, rites, oaths, roads, and sacred customs.
+
+### The Ancient Age: The Crownroad Concord
+
+Long after the first myths, many kingdoms formed a great civilizing alliance called **the Crownroad Concord**.
+
+It was not exactly one empire. It was more like a divine-political network of kingdoms, city-states, dwarven holds, shrine-roads, mage colleges, burial orders, monster treaties, and elemental pacts.
+
+The Concord built:
+
+- fortress-guardrooms along dangerous roads,
+- dwarven claims in Embervein,
+- teleport circles in city-states,
+- waystations and mileposts,
+- grave-ledgers for soldiers and commoners,
+- elemental Crucible shrines,
+- royal barrows for oath-bound kings,
+- border pacts with beast forests and old fey woods.
+
+This era is why the world has so many ruins that still feel purposeful. The old world was organized, ambitious, and heavily ritualized.
+
+### The Breaking: The War of Unfastening
+
+The Concord fell during a long collapse called **the War of Unfastening**.
+
+No single disaster caused it. Several things happened at once:
+
+- kings fought over succession relics,
+- dwarven clans opened claims too deep,
+- elemental scholars overused Crucible shrines,
+- armies died without burial,
+- road-ledgers were burned,
+- wild pacts were broken,
+- teleport circles were sabotaged,
+- gods withdrew from direct intervention,
+- something beneath the world began pulling harder.
+
+The most infamous relic of the collapse is **the Barrow Crown**.
+
+The Barrow Crown was not just a royal item. It was a command-symbol used to bind dead kings, battlefield spirits, old guardrooms, and oath-sworn soldiers into service. When the Crown broke, its authority did not vanish. It scattered into barrows, haunted keeps, dead commanders, warning signs, organ-haunted crypts, and undead courts.
+
+That gives your existing campaign immediate mythic weight:
+
+**The Barrow Crown campaign is not just about one cursed crown. It is about one of the old world's Five Bonds becoming corrupted.**
+
+And the achievement text **"RIPPLE NO!"** can be lore-friendly without losing its joke. The Crown is tied to the Depth. When taken, something ancient feels the ripple and refuses it.
+
+## 2. Current Political Shape of the World
+
+The world should be **many kingdoms and city-states on a broken frontier**, not a single stable continent-spanning empire.
+
+That supports procedural maps perfectly: each save/adventure can begin in one local "Verge" - a semi-isolated frontier region with its own home village, nearby city, roads, mines, wilderness, boards, dungeons, and forgotten structures.
+
+### Major Political Regions
+
+#### The Hearthland Villages
+
+Small settlements that survive around wells, shrines, farms, taverns, and old road-stones.
+
+They matter because they are the last places where normal life still pushes back against the Depth. A village is not "just a hub." It is a **living anchor**.
+
+Common features:
+
+- quest board,
+- tavern,
+- small shrine,
+- graveyard,
+- herbalist,
+- carpenter,
+- road marker,
+- maybe a hidden old foundation beneath it.
+
+#### The Free Cities of the Ledger
+
+City-states that replaced old royal authority with boards, ledgers, contracts, guild charters, and civic militias.
+
+They are practical, bureaucratic, and a little corrupt. They love stamps, fees, official records, expedition charters, and monster bounty proofs.
+
+These cities support:
+
+- Expedition Board,
+- Antiquarian Society,
+- Fighting Pit,
+- merchants,
+- teleport circle discovery,
+- higher-tier quest boards.
+
+#### The Barrow Marches
+
+Old royal lands full of tombs, guardrooms, undead ruins, haunted battlefields, and keeps with dead banners.
+
+This is where the Barrow Crown has the strongest influence.
+
+People avoid these places unless they are desperate, brave, paid, cursed, or all four.
+
+#### The Embervein Holds
+
+Dwarven and mining territories built around deep ore, coal, iron, gemstones, old forge-temples, and elemental heat.
+
+The Embervein is not just a mine. It is a world-vein: a deep mineral artery where the gods once hammered the underside of reality into shape.
+
+This supports:
+
+- Embervein Deepworks,
+- The First Claim of Embervein,
+- The Dwarven Smithy: The Ember Oath,
+- forge relics,
+- mine dungeons,
+- dwarven faction drama.
+
+#### The Thornwood Pactlands
+
+Ancient forests, beast territories, druid stones, old hunting laws, and villages that know better than to cut certain trees.
+
+The Thornwood Pact was a treaty between people, beasts, spirits, and the Thorn Mother. It is now fraying.
+
+This supports:
+
+- The Thornwood Pact campaign,
+- forest beast dungeons,
+- monster hunting,
+- natural shrines,
+- weird animal omens,
+- trophy lodge quests with moral ambiguity.
+
+#### The Crucible Territories
+
+Scattered elemental sites where the old Collegium once studied Flame, Storm, Stone, and Tides.
+
+These are not normal biomes. They are **places where reality was deliberately exposed to elemental law**.
+
+This supports:
+
+- Crucible of Flame,
+- Crucible of Storms,
+- Crucible of Stone,
+- Crucible of Tides,
+- elemental samples,
+- arcane research,
+- unstable shrines.
+
+#### The Unclaimed Verge
+
+The procedural frontier.
+
+Every new world map can be treated as a newly charted stretch of the Verge: partly civilized, partly forgotten, partly generated by whatever the Depth has recently pushed back toward the surface.
+
+This is where the player belongs.
+
+## 3. Major Deities and Divine Powers
+
+The gods are definitely real, but their power is mediated through **rites, anchors, domains, shrines, relics, and mortal action**. They do not simply fix the world because the world is too fractured.
+
+### Asterion, the First Lantern
+
+**Domains:** Light, protection, courage, truth, dawn
+**Symbol:** A lantern with seven rays
+**Wants:** Settlements to endure, roads to be relit, people to act bravely in darkness.
+**Normal worship:** People hang lanterns above doors, light candles before journeys, and swear truth-oaths by flame.
+
+Asterion is ideal for clerics, paladins, village shrines, undead-cleansing quests, and "last light in the dungeon" moments.
+
+### Maera Hearthwise, Lady of the Threshold
+
+**Domains:** Home, food, healing, hospitality, family, rest
+**Symbol:** A bowl above a small flame
+**Wants:** Homes to remain inhabited and welcoming.
+**Normal worship:** Meals are blessed, guest-right is sacred, empty beds are covered with clean cloth so wandering spirits do not claim them.
+
+Maera directly supports your home/base systems: cooking, beds, companions, decoration, familiars, gardens, and cozy moments. A well-kept Home is a shrine to Maera whether the player says so or not.
+
+### Kelvorn Mile-Saint
+
+**Domains:** Roads, travel, maps, messengers, safe return
+**Symbol:** A bootprint beside a milepost
+**Wants:** Roads rebuilt, settlements reconnected, lost routes filed into ledgers.
+**Normal worship:** Travelers leave nails, coins, chalk marks, or written names at mileposts.
+
+Kelvorn is the patron of the Expedition Board, roads, teleport circles, travel events, scouting, and The Milepost Ledger.
+
+### Naevra, Keeper of Names
+
+**Domains:** Death, memory, burial, records, ghosts
+**Symbol:** A bell tied with grave-thread
+**Wants:** The dead named, the nameless restored, undead either laid to rest or bound properly.
+**Normal worship:** Families keep death-books. Soldiers carry name-tags. Grave candles are lit on foggy nights.
+
+Naevra is the divine backbone for the Gravebinders. Her priests are not just undertakers; they are metaphysical archivists preventing souls from sinking into the Depth.
+
+### Orund Embervein
+
+**Domains:** Forge, mines, craft, oaths, endurance
+**Symbol:** A hammer over a glowing vein
+**Wants:** Claims honored, dangerous depths respected, craft used responsibly.
+**Normal worship:** Miners mark first strikes with oil and ash. Smiths swear never to forge an oath-blade falsely.
+
+Orund supports dwarven content, mines, deepworks, smithing, crafting, Ember Oath lore, and relic weapons.
+
+### Thessa Thorn-Crowned
+
+**Domains:** Beasts, forests, growth, hunt, blood-price
+**Symbol:** Antlers wrapped in thorn-vine
+**Wants:** Mortals to remember that wilderness is not empty land.
+**Normal worship:** Hunters leave part of the kill. Woodcutters ask permission before felling old trees. Villages keep thorn charms over livestock gates.
+
+Thessa makes the Thornwood Pact more than a forest questline. She also creates friction with the Trophy Lodge: is a trophy proof of respect, or theft from the wild?
+
+### Arkhon, the Buried Crown
+
+**Domains:** Law, kingship, command, duty, war-dead
+**Symbol:** A crown half-buried in black soil
+**Wants:** Oaths fulfilled, rulers worthy, armies remembered, command purified of tyranny.
+**Normal worship:** Magistrates swear by his buried crown. Soldiers salute old barrows before battle.
+
+Arkhon is not evil, but his domain is damaged. The Barrow Crown is a corrupted or broken expression of his power. His clerics may be stern, grave, and obsessed with rightful command.
+
+### The Four Crucible Powers
+
+These are elemental divine powers worshipped both separately and together.
+
+- **Veyraflame** - Flame, change, hunger, purification.
+- **Korrum Stoneheart** - Stone, endurance, weight, memory.
+- **Ilyr Tidemarked** - Tides, adaptation, grief, hidden paths.
+- **Sathren Storm-Eye** - Storms, motion, breath, revelation.
+
+They want balance, exchange, and respect. The Crucible Collegium studies them, sometimes reverently, sometimes recklessly.
+
+### The Hollow Below
+
+**Domains:** Depth, forgetting, pressure, hunger, unmaking
+**Symbol:** Usually none; cultists use a black spiral or downward eye.
+**Wants:** All bonds loosened. All names lost. All roads broken. All crowns buried. All hearths cold.
+
+The Hollow Below is not necessarily a god in the same way the others are. It is the divine face of the Depth. Some cults worship it. Some monsters hear it. Some ruins are shaped by it.
+
+It should remain mysterious, recurring, and terrifying.
+
+## 4. Background Lore for Existing Factions
+
+### Trophy Lodge / Monster Hunter Guild
+
+Originally called **the Cullwardens**, they were royal monster-trackers under the Crownroad Concord.
+
+Their job was not just killing beasts. They recorded migration patterns, marked lairs, identified unnatural mutations, and determined when a monster was part of a local pact versus when it had become Depth-touched.
+
+Modern Trophy Lodge hunters are more flamboyant. They mount skulls, keep notebooks, sell contracts, and brag loudly in taverns. But their oldest members still know the truth:
+
+> A trophy is not decoration. It is proof that a danger has been named, faced, and fixed in memory.
+
+This makes trophy walls and monster compendiums feel lore-relevant.
+
+### Gravebinders
+
+The Gravebinders descend from Naevra's burial orders.
+
+Their doctrine is simple:
+
+> The dead become dangerous when the living fail to remember them correctly.
+
+They handle:
+
+- burial rites,
+- haunted graves,
+- nameless corpses,
+- undead identification,
+- spirit negotiations,
+- curse removal,
+- battlefield ledgers,
+- grave candles.
+
+They do not automatically hate all undead. Some undead are victims, some are oath-bound, some are echoes, and some are hollow things wearing the dead like clothing.
+
+### Crucible Collegium
+
+The Collegium began as a sacred-scientific order studying elemental pact sites.
+
+They believe the elements are not just damage types; they are laws of reality.
+
+- Flame changes.
+- Stone remembers.
+- Storm reveals.
+- Tide returns.
+
+Their modern members collect samples, stabilize shrines, document anomalies, and occasionally cause terrible explosions by assuming "stable enough" means "safe."
+
+They are perfect for strange magic, elemental dungeons, research quests, sample gathering, and morally questionable experiments.
+
+### Antiquarian Society
+
+The Antiquarian Society believes labels are holy.
+
+To normal people, they look like relic nerds with tags, wax seals, catalogues, and too many opinions about pottery. But their work matters because naming and cataloguing old things slows the Depth's pull.
+
+A cursed sword with no record becomes a hungry legend.
+A cursed sword with a name, origin label, warning tag, and sealed box becomes manageable.
+
+This faction supports:
+
+- relic collection,
+- cursed items,
+- ruin cataloguing,
+- lore entries,
+- museum-like home displays,
+- achievements as objects.
+
+### Expedition Board
+
+The Expedition Board is the descendant of the old **Crownroad Office**.
+
+Its original duty was to maintain roads, waystations, bridges, circles, mileposts, and route ledgers. After the Concord collapsed, the Board became a practical frontier institution.
+
+It files:
+
+- road construction,
+- dangerous routes,
+- missing caravans,
+- settlement links,
+- monster-blocked trails,
+- teleport circle discoveries,
+- milepost repairs.
+
+The Milepost Ledger campaign fits perfectly as a story about restoring the Road Bond.
+
+### Boom Club
+
+The Boom Club is the reckless offspring of the Crucible Collegium, alchemists, siege engineers, failed wizards, gnome inventors, and bored apprentices.
+
+Their motto should be something like:
+
+> "If it glows, leaks, ticks, screams, or smokes, bring it here."
+
+They support:
+
+- unstable inventions,
+- explosive samples,
+- alchemy,
+- weird rewards,
+- hazardous crafting,
+- comic relief,
+- dungeon devices,
+- failed experiments that become travel events.
+
+They are dangerous, but useful.
+
+### Fighting Pit
+
+The Fighting Pit descends from old war-trials and gladiatorial musters.
+
+In the Concord era, warriors proved themselves before taking posts in guardrooms, monster frontiers, and royal campaigns. Today, the Pit is part sport, part ritual, part recruitment ground.
+
+The Pit gives you a clean lore reason for:
+
+- arena waves,
+- category bosses,
+- combat tutorials,
+- renown,
+- champion banners,
+- boss rematches,
+- spectators from different factions.
+
+The Pit does not need to be morally clean. Some cities regulate it honorably. Others let it become bloodsport.
+
+## 5. How Each Dungeon Theme Fits the World
+
+| Dungeon Theme | World Lore Function |
+| --- | --- |
+| **Old guardrooms / undead ruins** | Former Crownroad military posts where oath-bound soldiers were never released from duty. |
+| **Forest of beasts** | Territories under the Thornwood Pact where beasts, spirits, and hunters once followed sacred rules. |
+| **Jungle** | Overgrown southern or lowland ruins where old temples and roads were swallowed by growth. |
+| **Desert ruins** | Former trade cities whose road-bonds failed; sand preserved what memory abandoned. |
+| **Depths of hells** | Infernal debt-sites from old war contracts, oath-breaking kings, and fiendish bargains. |
+| **Underdark depths** | Deep places closest to the Hollow Below; home to ancient tunnels, aberrations, fungi, and lost peoples. |
+| **Embervein deepworks / mine dungeon** | Dwarven claim-sites that reached divine ore, elemental heat, or something beneath the permitted depth. |
+| **Crucible of Flame** | Elemental change, purification, destruction, forge-testing, runaway fire rites. |
+| **Crucible of Storms** | Broken sky-shrines, air temples, lightning engines, sound, revelation, unstable movement. |
+| **Crucible of Stone** | Memory-heavy ruins, petrified halls, earth elementals, ancient pressure-seals. |
+| **Crucible of Tides** | Flooded shrines, return-curses, moon pools, drowned teleport circles, grief-magic. |
+| **Grasslands** | Old roadlands, caravan fields, barrow mounds, open monster migrations. |
+| **Swamp** | Drowned villages, rotting ledgers, corpse-lights, bog graves, failed burial rites. |
+| **Arctic** | Frozen pre-Concord ruins, preserved monsters, sleeping gods, ice-locked wars. |
+| **Mountain** | Watch-fortresses, giant roads, storm shrines, avalanche-buried passes. |
+| **Underwater** | Drowned cities, broken tide pacts, sunken circles, relic ships. |
+| **Urban** | Fallen districts, plague wards, cursed noble houses, sewer cults, city ruins. |
+| **Outlaw camp** | People living outside roads and ledgers; some criminals, some refugees, some anti-Board rebels. |
+| **Goblin warren** | Survival societies in cracks of old infrastructure; not always evil, but often desperate and territorial. |
+| **Wizard tower** | Failed anchor experiments, private teleport research, relic hoards, magical isolation. |
+| **Castle keep** | Broken Crown Bond: lordly oaths, old sieges, cursed banners, inheritance wars. |
+| **Abyssal scar** | A place where the Depth tore upward directly; reality is wounded there. |
+| **Haunted battlefield** | Mass death without proper names, burial, or victory rites. Prime Gravebinder territory. |
+
+## 6. Why So Many Dungeons, Ruins, Undead, Monsters, and Magical Sites Exist
+
+The short version:
+
+> The old world built too deeply, swore too many oaths, broke too many pacts, and forgot too many names.
+
+The practical reasons:
+
+- **Ruins exist** because the Crownroad Concord was vast and collapsed unevenly.
+- **Dungeons keep appearing** because the Depth pushes buried places back into the world when their unresolved bond becomes active again.
+- **Undead exist** because the Name Bond failed: soldiers, kings, villagers, and criminals died without correct rites.
+- **Monsters are common** because wild pacts broke, territories shifted, and Depth-touched mutations spread.
+- **Elemental sites are unstable** because the Crucible shrines were designed to channel elemental law and are now cracked.
+- **Mines become dangerous** because the Embervein was never meant to be claimed greedily or endlessly.
+- **Fiends and abyssal things appear** because old war bargains and infernal contracts were never paid.
+- **Haunted battlefields remain** because no side truly won, no ledger was completed, and no god received the dead properly.
+
+This explains dungeon crawling without making every dungeon feel identical.
+
+A dungeon is a **knot of unresolved history**.
+
+## 7. Why the Player's Home and Starting Village Matter
+
+The player's Home should look ordinary at first.
+
+But beneath it lies an old buried junction: a forgotten place where **Hearth, Road, Name, Crown, and Pact once crossed**.
+
+Maybe it was:
+
+- a Crownroad waystation,
+- a shrine-foundation,
+- an old milepost court,
+- a grave-ledger archive,
+- a sealed teleport junction,
+- a pre-Concord hearthstone,
+- or all of these layered together.
+
+The starting village survives because it unknowingly grew around this buried anchor.
+
+That makes Home important without forcing the player into epic destiny immediately.
+
+At first, Home is just shelter.
+
+Over time, it becomes an **Anchorhold**.
+
+Home activities gain lore weight:
+
+- **Decorations** make the place more remembered.
+- **Beds** give companions a true place in the world.
+- **Meals** strengthen the Hearth Bond.
+- **Herb gardens** tame wilderness into care, not conquest.
+- **Instruments** create memory, morale, and ritual.
+- **Familiars** become household spirits rather than disposable summons.
+- **Trophies** mark dangers that have been faced and named.
+- **Achievements** become objects because memory is power.
+
+The starting village matters because it is the first community the player helps keep from sliding into isolation.
+
+## 8. Lore Hooks Supporting Procedural Generation and Repeatable Quests
+
+Procedural generation fits beautifully if the world is full of **Verge-regions**: semi-isolated frontiers where old bonds broke differently.
+
+Each generated map is not random "because game." It is a newly charted area where the Depth has exposed a different arrangement of old ruins, roads, settlements, monsters, and magical wounds.
+
+### Repeatable Quest Logic
+
+Settlement boards exist because local people constantly need small acts of stabilization.
+
+A board quest can be framed as one of these:
+
+- **Road Work:** scout route, clear ambush, repair bridge, place milepost.
+- **Name Work:** identify corpse, recover dog tags, cleanse grave, return heirloom.
+- **Hearth Work:** gather food, protect village, rescue worker, recover supplies.
+- **Pact Work:** calm beasts, punish poachers, restore shrine, investigate monster migration.
+- **Crown Work:** clear keep, stop bandits, recover banner, defeat oath-wight.
+- **Crucible Work:** gather sample, close vent, stabilize elemental rupture.
+- **Claim Work:** secure mine, map vein, recover tools, stop deep breach.
+
+This gives procedural quests a strong world-language.
+
+### Travel Events
+
+Travel events can be categorized as "the road testing whether it still exists."
+
+Examples:
+
+- abandoned milepost with fresh chalk,
+- merchant whose map shows a road that is not there,
+- ghost asking for the next town's name,
+- beast standing peacefully beside a broken shrine,
+- teleport circle half-buried in moss,
+- goblin toll collectors using old legal language,
+- storm that only hits unfiled roads,
+- Gravebinder cart with too many unnamed bodies,
+- Boom Club crater with apology note,
+- Trophy Lodge hunter trapped by the monster they came to mount.
+
+## 9. Recurring Mysteries Across Many Campaigns
+
+These should unfold slowly and not depend on one campaign only.
+
+### Mystery 1: What Is the Depth?
+
+At first, it seems like an underworld.
+
+Later, it seems like gravity, oblivion, or a buried god.
+
+Eventually, the player may learn the Depth is not merely below the world. It is what the world was raised out of - and it may be trying to reclaim everything because the first divine act was also a wound.
+
+### Mystery 2: Why Does Home Keep Matter So Much?
+
+Different campaigns can reveal pieces:
+
+- an old road-map shows Home's location,
+- a teleport circle points toward it,
+- a Gravebinder recognizes a buried name,
+- an Antiquarian label matches the foundation stones,
+- a deity's shrine reacts to the hearth,
+- the Barrow Crown sends a ripple toward it.
+
+Home may be a lost **Fifth Anchor**, not important because the player is chosen, but because the player keeps choosing to restore it.
+
+### Mystery 3: What Was the Barrow Crown Really For?
+
+Possible answer:
+
+The Barrow Crown was not created to rule the living. It was created to command the dead during a war so terrible that the living could not hold the roads alone.
+
+That makes it tragic. It began as desperate protection and became necromantic tyranny.
+
+### Mystery 4: Why Are Teleport Circles in Non-Home Settlements?
+
+Teleport circles were not conveniences. They were emergency anchor-points for the Crownroad Concord.
+
+When rediscovered, they reconnect pieces of the Road Bond.
+
+But something else may also notice when a circle is reactivated.
+
+### Mystery 5: Who Wrote the First Milepost Ledger?
+
+The Expedition Board thinks it was a bureaucrat-saint.
+
+The Gravebinders think it was a death priest.
+
+The Antiquarians think it was an imperial surveyor.
+
+The truth could be stranger: the first ledger may have been written by a god, a dragon, a nameless dead king, or a previous "Depthbound" wanderer.
+
+### Mystery 6: Are Achievements Just Meta, or Does the World Remember?
+
+You do not need to make this explicit mechanically, but the lore can imply that trophies across saves are echoes in a greater **Hall of Remembered Deeds**.
+
+Each hero may be different, but the profile-level achievement system can be interpreted as the player's mythic record beyond one life.
+
+## 10. Naming Conventions
+
+### General Tone
+
+Depthbound names should feel:
+
+- old,
+- practical,
+- slightly ritualistic,
+- dark but not edgy,
+- suitable for villages, boards, relics, and dungeon titles.
+
+Use recurring words tied to the Five Bonds:
+
+**Hearth, Wick, Road, Mile, Crown, Barrow, Bell, Thorn, Vein, Claim, Lantern, Ledger, Oath, Gate, Ford, Hollow, Ash, Deep, Tide, Stone, Storm, Ember, Grave, Root.**
+
+### Villages
+
+Village names should feel grounded and survivable.
+
+Patterns:
+
+- \`[Natural Feature] + wick\`
+- \`[Old Object] + ford\`
+- \`[Material] + hollow\`
+- \`[Protective Thing] + hearth\`
+- \`[Plant/Beast] + mere\`
+
+Examples:
+
+- Briarwick
+- Ashford
+- Bellhollow
+- Hearthmere
+- Crowmill
+- Lanternbrook
+- Thornwell
+- Barleygate
+- Mossford
+- Greywick
+- Oldmere
+- Blackroot
+
+### Cities
+
+Cities should sound older, larger, and more administrative.
+
+Patterns:
+
+- \`High + [road/crown/market term]\`
+- \`[Metal/Color] + span/gate/watch\`
+- \`[Saint/God name] + burg/hold\`
+- \`[Ledger/Trade term] + city suffix\`
+
+Examples:
+
+- Highmile
+- Goldspan
+- Veyrwatch
+- Crownmarket
+- Saint Kelvorn's Gate
+- Ledgerfall
+- Brazenford
+- Old Arkhon
+- Bellspire
+- Tidemark City
+
+### Roads
+
+Roads should sound filed, remembered, or dangerous.
+
+Examples:
+
+- The Ashmile Road
+- The Lantern Way
+- The Old Crownroad
+- The Salt-Marked Route
+- The Seven-Nail Road
+- The Barrow Spur
+- The Thorn Toll
+- The Ember Claim Road
+- The Drowned Mile
+- The Last Ford Line
+
+### Dungeons
+
+Dungeon names should combine structure, mood, and unresolved history.
+
+Patterns:
+
+- \`The [Adjective] [Structure]\`
+- \`[Relic/Object] of [Place/Event]\`
+- \`The [Faction/King/Beast]'s [Ruin/Lair/Keep]\`
+- \`[Element] Crucible of [Concept]\`
+
+Examples:
+
+- The Nameless Guardroom
+- Barrow of the Fifth Commander
+- The Organ Crypt of Blackmile
+- The Thorn-Stag Warren
+- Crucible of the Unfed Flame
+- The Drowned Ledger-Hall
+- Embervein Claim XIX
+- The Crownless Keep
+- The Bellgrave Catacombs
+- The Salt-Tide Circle
+
+### Relics
+
+Relics should sound like they were catalogued by Antiquarians but feared by commoners.
+
+Examples:
+
+- Crownshard Blade
+- Grave-Bronze Organ Pipe
+- The Unbroken Lantern
+- The Seventh Mile Nail
+- Bell of the Nameless Dead
+- Ember Oath Hammer
+- Thorn-Pact Antler
+- The Ledger of No Return
+- Hearthstone Cup
+- Tideglass Key
+
+### Gods
+
+God-names should be pronounceable and title-heavy.
+
+Examples:
+
+- Asterion, the First Lantern
+- Maera Hearthwise
+- Kelvorn Mile-Saint
+- Naevra, Keeper of Names
+- Orund Embervein
+- Thessa Thorn-Crowned
+- Arkhon, the Buried Crown
+- Ilyr Tidemarked
+- Korrum Stoneheart
+- Sathren Storm-Eye
+
+Common people may use titles more often than names:
+
+- "Light the First Lantern."
+- "Maera keep the pot warm."
+- "Kelvorn guide your boots."
+- "Naevra know his name."
+- "Orund watch the claim."
+- "Thessa take only what is owed."
+
+## How Existing Campaigns Fit
+
+### The Barrow Crown
+
+Theme: corrupted Crown Bond, undead command, royal barrows, old war authority.
+
+Main question:
+
+> Can command over the dead ever be righteous, or does every crown eventually become a grave-weight?
+
+The haunted organ in dungeon 5 can be an old royal mourning instrument that once called names of fallen soldiers. Now it plays names the Crown still claims.
+
+Dungeon 6 and "RIPPLE NO!" become the moment the Crown's removal sends a shock through the Depth, Home, or the old Barrow network.
+
+### The Thornwood Pact
+
+Theme: broken Pact Bond between civilization and wilderness.
+
+Main question:
+
+> Are monsters invading the world, or is the world trespassing on promises it forgot it made?
+
+This campaign can involve hunters, beasts, old druid stones, Trophy Lodge politics, and villages that unknowingly broke ancient hunting laws.
+
+### The First Claim of Embervein
+
+Theme: Claim Bond, dwarven law, mining, forge-oaths, greed, survival.
+
+Main question:
+
+> What does it mean to own what lies beneath you?
+
+This supports mines, dwarves, deepworks, and the idea that a "claim" is not just property. It is a sacred contract with the earth.
+
+### The Dwarven Smithy: The Ember Oath
+
+Theme: craft, inheritance, forge memory.
+
+Main question:
+
+> Can a broken oath be reforged, or only replaced?
+
+This can connect to Orund Embervein, old smithing rites, relic crafting, and faction progression.
+
+### The Milepost Ledger
+
+Theme: Road Bond, travel, settlement links, memory through infrastructure.
+
+Main question:
+
+> Is a road still real if no one files it, walks it, names it, or returns from it?
+
+This is your perfect Expedition Board lore campaign.
+
+## A Strong Starting Situation
+
+The player creates one hero and arrives at Home.
+
+Player-facing version:
+
+> You have inherited, claimed, bought, found, or been assigned a modest home near a small village on the edge of the Verge. The road is poor, the mines are dangerous, the woods are restless, and the village board is never empty. People need help. The world is old, broken, and full of places no one has properly remembered in generations.
+
+DM/lore truth:
+
+> Home stands above a buried crossing of the Five Bonds. Every trophy, companion, road, meal, relic, grave rite, and quest completed strengthens it. The player is not merely collecting rewards. They are building a new anchor in a world that forgot how to stay connected.
+
+That gives Depthbound a clear identity:
+
+**Dungeon crawling is not random violence. It is frontier restoration through danger, memory, and loot.**`;
+
+      const seedTime = new Date().toISOString();
+      const seedData = {
+        folders: ["World Bible", "Gods", "Factions", "Places", "Campaigns", "Relics", "Naming", "Images", "Archive"],
+        articles: [
+          {
+            id: "world-bible-core",
+            title: "Depthbound World Bible",
+            folder: "World Bible",
+            tags: ["world bible", "five bonds", "depth", "frontier"],
+            content: `# Depthbound World Bible
+
+Depthbound is a **broken post-empire frontier** where dungeon crawling is also metaphysical repair. Civilization survives by remembering, naming, connecting, and anchoring things before [[the-depth|the Depth]] takes them.
+
+## Core Pages
+
+- [[five-great-bonds|The Five Great Bonds]]
+- [[creation-myth|Creation Myth and Ancient History]]
+- [[political-regions|Political Regions]]
+- [[the-depth|The Depth and the Hollow Below]]
+- [[home-anchorhold|Home and the Anchorhold]]
+- [[procedural-verge|The Procedural Verge]]
+- [[dungeon-themes|Dungeon Theme Lore]]
+
+## People and Powers
+
+- [[major-deities|Major Deities and Divine Powers]]
+- [[faction-overview|Faction Overview]]
+- [[campaign-overview|Campaign Overview]]
+- [[naming-conventions|Naming Conventions]]
+
+## Archive
+
+The original pasted world bible is kept intact at [[world-bible-archive|World Bible Archive]].`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "five-great-bonds",
+            title: "The Five Great Bonds",
+            folder: "World Bible",
+            tags: ["hearth", "road", "crown", "name", "pact"],
+            content: `# The Five Great Bonds
+
+The old world was not held together by borders alone. It was held together by five civilizing forces.
+
+- **The Hearth** - homes, villages, food, rest, family, companions.
+- **The Road** - travel, mileposts, maps, trade, teleport circles, settlement links.
+- **The Crown** - rule, law, oaths, war-banners, protection, command.
+- **The Name** - burial rites, records, histories, labels, relic catalogues, remembered dead.
+- **The Pact** - bargains with wilderness, monsters, elements, mines, gods, and old powers.
+
+When the Bonds were strong, villages endured, roads stayed safe, the dead slept, mines produced wealth without waking horrors, and monsters had territories instead of invasions.
+
+When the Bonds broke, everything forgotten, unburied, unclaimed, unnamed, or abandoned began to slide toward [[the-depth|the Depth]].
+
+Related: [[home-anchorhold|Home and the Anchorhold]], [[procedural-verge|The Procedural Verge]], [[faction-overview|Faction Overview]].`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "creation-myth",
+            title: "Creation Myth and Ancient History",
+            folder: "World Bible",
+            tags: ["creation", "concord", "war of unfastening"],
+            content: `# Creation Myth and Ancient History
+
+## The First Myth: The World Was Raised, Not Made
+
+In the oldest temple stories, there was first only **the Below Without Bottom**: a vast unlit pressure beneath all possible things. It was hunger, weight, silence, erosion, and forgetting.
+
+The gods did not create the world from nothing. They **raised land out of the Depth** and pinned it in place with divine anchor-tools:
+
+- **A Lantern** to give direction.
+- **A Hearthstone** to make shelter.
+- **A Crown** to bind people into law.
+- **A Road-Nail** to fix distance into something crossable.
+- **A Name-Bell** to keep souls from dissolving into the dark.
+
+## The Crownroad Concord
+
+Long after the first myths, many kingdoms formed the **Crownroad Concord**: a divine-political network of kingdoms, city-states, dwarven holds, shrine-roads, mage colleges, burial orders, monster treaties, and elemental pacts.
+
+The Concord built guarded roads, Embervein claims, teleport circles, waystations, mileposts, grave-ledgers, Crucible shrines, royal barrows, and border pacts.
+
+## The War of Unfastening
+
+The Concord fell when too many bonds failed at once: succession wars, claims dug too deep, broken pacts, unburied armies, burned road-ledgers, sabotaged teleport circles, and divine withdrawal.
+
+The most infamous relic of the collapse is [[barrow-crown|the Barrow Crown]].`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "political-regions",
+            title: "Political Regions",
+            folder: "Places",
+            tags: ["regions", "villages", "cities", "verge"],
+            content: `# Political Regions
+
+The world is many kingdoms and city-states on a broken frontier, not a single stable empire.
+
+## Hearthland Villages
+
+Small settlements around wells, shrines, farms, taverns, graveyards, and old road-stones. A village is a **living anchor**.
+
+## Free Cities of the Ledger
+
+Practical city-states that replaced old royal authority with boards, ledgers, contracts, guild charters, and civic militias.
+
+## Barrow Marches
+
+Old royal lands full of tombs, guardrooms, undead ruins, haunted battlefields, and dead banners. This is where [[barrow-crown|the Barrow Crown]] has its strongest influence.
+
+## Embervein Holds
+
+Dwarven and mining territories built around divine ore, coal, iron, gemstones, forge-temples, and elemental heat.
+
+## Thornwood Pactlands
+
+Ancient forests, beast territories, druid stones, old hunting laws, and villages that know better than to cut certain trees.
+
+## Crucible Territories
+
+Elemental sites where the old Collegium exposed reality to Flame, Storm, Stone, and Tides.
+
+## The Unclaimed Verge
+
+The procedural frontier where each new adventure begins: partly civilized, partly forgotten, and partly pushed back toward the surface by [[the-depth|the Depth]].`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "the-depth",
+            title: "The Depth and the Hollow Below",
+            folder: "World Bible",
+            tags: ["depth", "hollow below", "mystery"],
+            content: `# The Depth and the Hollow Below
+
+The Depth is not merely underground. It is what the world was raised out of: pressure, hunger, forgetting, and unmaking.
+
+The **Hollow Below** is the divine face of the Depth. Some cults worship it. Some monsters hear it. Some ruins are shaped by it.
+
+## What It Wants
+
+- All bonds loosened.
+- All names lost.
+- All roads broken.
+- All crowns buried.
+- All hearths cold.
+
+## Mystery Thread
+
+At first, the Depth seems like an underworld. Later, it may seem like gravity, oblivion, or a buried god. Eventually, the player may learn the first divine act of raising the world was also a wound.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "home-anchorhold",
+            title: "Home and the Anchorhold",
+            folder: "Places",
+            tags: ["home", "village", "anchorhold"],
+            content: `# Home and the Anchorhold
+
+The player's Home looks ordinary at first, but beneath it lies a buried crossing of [[five-great-bonds|the Five Great Bonds]].
+
+It may have been a Crownroad waystation, shrine-foundation, milepost court, grave-ledger archive, sealed teleport junction, pre-Concord hearthstone, or all of these layered together.
+
+At first, Home is just shelter. Over time, it becomes an **Anchorhold**.
+
+## Home Activities as Lore
+
+- **Decorations** make the place more remembered.
+- **Beds** give companions a true place in the world.
+- **Meals** strengthen the Hearth Bond.
+- **Herb gardens** tame wilderness into care, not conquest.
+- **Instruments** create memory, morale, and ritual.
+- **Familiars** become household spirits.
+- **Trophies** mark dangers faced and named.
+- **Achievements** become objects because memory is power.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "procedural-verge",
+            title: "Procedural Verge and Repeatable Quests",
+            folder: "Places",
+            tags: ["procedural", "quests", "travel"],
+            content: `# Procedural Verge and Repeatable Quests
+
+Each generated map is a newly charted Verge-region where old bonds broke differently.
+
+Settlement boards exist because local people constantly need small acts of stabilization.
+
+## Quest Language
+
+- **Road Work:** scout route, clear ambush, repair bridge, place milepost.
+- **Name Work:** identify corpse, recover dog tags, cleanse grave, return heirloom.
+- **Hearth Work:** gather food, protect village, rescue worker, recover supplies.
+- **Pact Work:** calm beasts, punish poachers, restore shrine, investigate monster migration.
+- **Crown Work:** clear keep, stop bandits, recover banner, defeat oath-wight.
+- **Crucible Work:** gather sample, close vent, stabilize elemental rupture.
+- **Claim Work:** secure mine, map vein, recover tools, stop deep breach.
+
+Travel events are the road testing whether it still exists.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "major-deities",
+            title: "Major Deities and Divine Powers",
+            folder: "Gods",
+            tags: ["gods", "shrines", "anchors"],
+            content: `# Major Deities and Divine Powers
+
+The gods are real, but their power is mediated through rites, anchors, domains, shrines, relics, and mortal action.
+
+- [[god-asterion|Asterion, the First Lantern]]
+- [[god-maera|Maera Hearthwise, Lady of the Threshold]]
+- [[god-kelvorn|Kelvorn Mile-Saint]]
+- [[god-naevra|Naevra, Keeper of Names]]
+- [[god-orund|Orund Embervein]]
+- [[god-thessa|Thessa Thorn-Crowned]]
+- [[god-arkhon|Arkhon, the Buried Crown]]
+- [[god-crucible-powers|The Four Crucible Powers]]
+- [[the-depth|The Hollow Below]]`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "god-asterion",
+            title: "Asterion, the First Lantern",
+            folder: "Gods",
+            tags: ["light", "protection", "dawn"],
+            content: `# Asterion, the First Lantern
+
+**Domains:** Light, protection, courage, truth, dawn
+
+**Symbol:** A lantern with seven rays
+
+**Wants:** Settlements to endure, roads to be relit, and people to act bravely in darkness.
+
+**Normal worship:** People hang lanterns above doors, light candles before journeys, and swear truth-oaths by flame.
+
+Asterion is ideal for clerics, paladins, village shrines, undead-cleansing quests, and "last light in the dungeon" moments.
+
+Related: [[major-deities|Major Deities]], [[five-great-bonds|The Five Great Bonds]].`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "god-maera",
+            title: "Maera Hearthwise, Lady of the Threshold",
+            folder: "Gods",
+            tags: ["home", "food", "healing"],
+            content: `# Maera Hearthwise, Lady of the Threshold
+
+**Domains:** Home, food, healing, hospitality, family, rest
+
+**Symbol:** A bowl above a small flame
+
+**Wants:** Homes to remain inhabited and welcoming.
+
+**Normal worship:** Meals are blessed, guest-right is sacred, and empty beds are covered with clean cloth so wandering spirits do not claim them.
+
+A well-kept [[home-anchorhold|Home]] is a shrine to Maera whether the player says so or not.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "god-kelvorn",
+            title: "Kelvorn Mile-Saint",
+            folder: "Gods",
+            tags: ["roads", "maps", "travel"],
+            content: `# Kelvorn Mile-Saint
+
+**Domains:** Roads, travel, maps, messengers, safe return
+
+**Symbol:** A bootprint beside a milepost
+
+**Wants:** Roads rebuilt, settlements reconnected, lost routes filed into ledgers.
+
+**Normal worship:** Travelers leave nails, coins, chalk marks, or written names at mileposts.
+
+Kelvorn is the patron of the [[faction-expedition-board|Expedition Board]], roads, teleport circles, travel events, scouting, and [[campaign-milepost-ledger|The Milepost Ledger]].`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "god-naevra",
+            title: "Naevra, Keeper of Names",
+            folder: "Gods",
+            tags: ["death", "memory", "burial"],
+            content: `# Naevra, Keeper of Names
+
+**Domains:** Death, memory, burial, records, ghosts
+
+**Symbol:** A bell tied with grave-thread
+
+**Wants:** The dead named, the nameless restored, undead either laid to rest or bound properly.
+
+**Normal worship:** Families keep death-books. Soldiers carry name-tags. Grave candles are lit on foggy nights.
+
+Naevra is the divine backbone for the [[faction-gravebinders|Gravebinders]].`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "god-orund",
+            title: "Orund Embervein",
+            folder: "Gods",
+            tags: ["forge", "mines", "oaths"],
+            content: `# Orund Embervein
+
+**Domains:** Forge, mines, craft, oaths, endurance
+
+**Symbol:** A hammer over a glowing vein
+
+**Wants:** Claims honored, dangerous depths respected, craft used responsibly.
+
+**Normal worship:** Miners mark first strikes with oil and ash. Smiths swear never to forge an oath-blade falsely.
+
+Orund supports dwarven content, mines, deepworks, smithing, crafting, Ember Oath lore, and relic weapons.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "god-thessa",
+            title: "Thessa Thorn-Crowned",
+            folder: "Gods",
+            tags: ["beasts", "forests", "hunt"],
+            content: `# Thessa Thorn-Crowned
+
+**Domains:** Beasts, forests, growth, hunt, blood-price
+
+**Symbol:** Antlers wrapped in thorn-vine
+
+**Wants:** Mortals to remember that wilderness is not empty land.
+
+**Normal worship:** Hunters leave part of the kill. Woodcutters ask permission before felling old trees. Villages keep thorn charms over livestock gates.
+
+Thessa creates useful tension with the [[faction-trophy-lodge|Trophy Lodge]]: is a trophy proof of respect, or theft from the wild?`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "god-arkhon",
+            title: "Arkhon, the Buried Crown",
+            folder: "Gods",
+            tags: ["law", "kingship", "war-dead"],
+            content: `# Arkhon, the Buried Crown
+
+**Domains:** Law, kingship, command, duty, war-dead
+
+**Symbol:** A crown half-buried in black soil
+
+**Wants:** Oaths fulfilled, rulers worthy, armies remembered, command purified of tyranny.
+
+Arkhon is not evil, but his domain is damaged. [[barrow-crown|The Barrow Crown]] is a corrupted or broken expression of his power.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "god-crucible-powers",
+            title: "The Four Crucible Powers",
+            folder: "Gods",
+            tags: ["flame", "stone", "tide", "storm"],
+            content: `# The Four Crucible Powers
+
+Elemental divine powers worshipped separately and together.
+
+- **Veyraflame** - Flame, change, hunger, purification.
+- **Korrum Stoneheart** - Stone, endurance, weight, memory.
+- **Ilyr Tidemarked** - Tides, adaptation, grief, hidden paths.
+- **Sathren Storm-Eye** - Storms, motion, breath, revelation.
+
+They want balance, exchange, and respect. The [[faction-crucible-collegium|Crucible Collegium]] studies them, sometimes reverently and sometimes recklessly.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "faction-overview",
+            title: "Faction Overview",
+            folder: "Factions",
+            tags: ["factions", "boards", "guilds"],
+            content: `# Faction Overview
+
+- [[faction-trophy-lodge|Trophy Lodge / Monster Hunter Guild]]
+- [[faction-gravebinders|Gravebinders]]
+- [[faction-crucible-collegium|Crucible Collegium]]
+- [[faction-antiquarian-society|Antiquarian Society]]
+- [[faction-expedition-board|Expedition Board]]
+- [[faction-boom-club|Boom Club]]
+- [[faction-fighting-pit|Fighting Pit]]`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "faction-trophy-lodge",
+            title: "Trophy Lodge / Monster Hunter Guild",
+            folder: "Factions",
+            tags: ["monsters", "hunters", "trophies"],
+            content: `# Trophy Lodge / Monster Hunter Guild
+
+Originally called **the Cullwardens**, they were royal monster-trackers under the Crownroad Concord.
+
+Their old job was not just killing beasts. They recorded migration patterns, marked lairs, identified mutations, and determined when a monster belonged to a local pact versus when it had become Depth-touched.
+
+> A trophy is not decoration. It is proof that a danger has been named, faced, and fixed in memory.
+
+Related: [[god-thessa|Thessa Thorn-Crowned]], [[dungeon-themes|Dungeon Theme Lore]].`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "faction-gravebinders",
+            title: "Gravebinders",
+            folder: "Factions",
+            tags: ["dead", "burial", "undead"],
+            content: `# Gravebinders
+
+The Gravebinders descend from [[god-naevra|Naevra's]] burial orders.
+
+> The dead become dangerous when the living fail to remember them correctly.
+
+They handle burial rites, haunted graves, nameless corpses, undead identification, spirit negotiations, curse removal, battlefield ledgers, and grave candles.
+
+They do not automatically hate all undead. Some undead are victims, some are oath-bound, some are echoes, and some are hollow things wearing the dead like clothing.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "faction-crucible-collegium",
+            title: "Crucible Collegium",
+            folder: "Factions",
+            tags: ["elemental", "research", "shrines"],
+            content: `# Crucible Collegium
+
+The Collegium began as a sacred-scientific order studying elemental pact sites.
+
+They believe the elements are laws of reality:
+
+- Flame changes.
+- Stone remembers.
+- Storm reveals.
+- Tide returns.
+
+Their modern members collect samples, stabilize shrines, document anomalies, and occasionally cause terrible explosions by assuming "stable enough" means "safe."`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "faction-antiquarian-society",
+            title: "Antiquarian Society",
+            folder: "Factions",
+            tags: ["relics", "catalogues", "records"],
+            content: `# Antiquarian Society
+
+The Antiquarian Society believes labels are holy.
+
+To normal people, they look like relic nerds with tags, wax seals, catalogues, and too many opinions about pottery. Their work matters because naming and cataloguing old things slows [[the-depth|the Depth's]] pull.
+
+A cursed sword with no record becomes a hungry legend. A cursed sword with a name, origin label, warning tag, and sealed box becomes manageable.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "faction-expedition-board",
+            title: "Expedition Board",
+            folder: "Factions",
+            tags: ["roads", "quests", "mileposts"],
+            content: `# Expedition Board
+
+The Expedition Board descends from the old **Crownroad Office**.
+
+It files road construction, dangerous routes, missing caravans, settlement links, monster-blocked trails, teleport circle discoveries, and milepost repairs.
+
+[[campaign-milepost-ledger|The Milepost Ledger]] is a story about restoring the Road Bond.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "faction-boom-club",
+            title: "Boom Club",
+            folder: "Factions",
+            tags: ["alchemy", "inventions", "explosives"],
+            content: `# Boom Club
+
+The Boom Club is the reckless offspring of the Crucible Collegium, alchemists, siege engineers, failed wizards, gnome inventors, and bored apprentices.
+
+> "If it glows, leaks, ticks, screams, or smokes, bring it here."
+
+They support unstable inventions, explosive samples, alchemy, weird rewards, hazardous crafting, comic relief, dungeon devices, and failed experiments that become travel events.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "faction-fighting-pit",
+            title: "Fighting Pit",
+            folder: "Factions",
+            tags: ["arena", "war-trials", "renown"],
+            content: `# Fighting Pit
+
+The Fighting Pit descends from old war-trials and gladiatorial musters.
+
+In the Concord era, warriors proved themselves before taking posts in guardrooms, monster frontiers, and royal campaigns. Today, the Pit is part sport, part ritual, part recruitment ground.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "dungeon-themes",
+            title: "Dungeon Theme Lore",
+            folder: "Places",
+            tags: ["dungeons", "ruins", "themes"],
+            content: `# Dungeon Theme Lore
+
+| Dungeon Theme | World Lore Function |
+| --- | --- |
+| **Old guardrooms / undead ruins** | Former Crownroad posts where oath-bound soldiers were never released from duty. |
+| **Forest of beasts** | Territories under the Thornwood Pact. |
+| **Desert ruins** | Former trade cities whose road-bonds failed. |
+| **Embervein deepworks / mine dungeon** | Dwarven claims that reached divine ore or something too deep. |
+| **Crucible sites** | Elemental shrines where reality was exposed to Flame, Storm, Stone, or Tides. |
+| **Swamp** | Drowned villages, rotting ledgers, bog graves, and failed burial rites. |
+| **Castle keep** | Broken Crown Bond: lordly oaths, old sieges, cursed banners. |
+| **Abyssal scar** | A place where [[the-depth|the Depth]] tore upward directly. |
+| **Haunted battlefield** | Mass death without names, burial, or victory rites. |
+
+A dungeon is a **knot of unresolved history**.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "campaign-overview",
+            title: "Campaign Overview",
+            folder: "Campaigns",
+            tags: ["campaigns", "story arcs"],
+            content: `# Campaign Overview
+
+- [[campaign-barrow-crown|The Barrow Crown]]
+- [[campaign-thornwood-pact|The Thornwood Pact]]
+- [[campaign-first-claim-embervein|The First Claim of Embervein]]
+- [[campaign-ember-oath|The Dwarven Smithy: The Ember Oath]]
+- [[campaign-milepost-ledger|The Milepost Ledger]]`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "barrow-crown",
+            title: "The Barrow Crown",
+            folder: "Relics",
+            tags: ["crown", "undead", "relic"],
+            content: `# The Barrow Crown
+
+The Barrow Crown was not just a royal item. It was a command-symbol used to bind dead kings, battlefield spirits, old guardrooms, and oath-sworn soldiers into service.
+
+When the Crown broke, its authority scattered into barrows, haunted keeps, dead commanders, warning signs, organ-haunted crypts, and undead courts.
+
+Related: [[god-arkhon|Arkhon, the Buried Crown]], [[campaign-barrow-crown|The Barrow Crown Campaign]].`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "campaign-barrow-crown",
+            title: "The Barrow Crown Campaign",
+            folder: "Campaigns",
+            tags: ["barrow crown", "undead", "crown bond"],
+            content: `# The Barrow Crown Campaign
+
+**Theme:** corrupted Crown Bond, undead command, royal barrows, old war authority.
+
+> Can command over the dead ever be righteous, or does every crown eventually become a grave-weight?
+
+The haunted organ can be an old royal mourning instrument that once called names of fallen soldiers. Now it plays names the Crown still claims.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "campaign-thornwood-pact",
+            title: "The Thornwood Pact Campaign",
+            folder: "Campaigns",
+            tags: ["thornwood", "pact", "beasts"],
+            content: `# The Thornwood Pact Campaign
+
+**Theme:** broken Pact Bond between civilization and wilderness.
+
+> Are monsters invading the world, or is the world trespassing on promises it forgot it made?
+
+This campaign can involve hunters, beasts, old druid stones, Trophy Lodge politics, and villages that unknowingly broke ancient hunting laws.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "campaign-first-claim-embervein",
+            title: "The First Claim of Embervein",
+            folder: "Campaigns",
+            tags: ["embervein", "dwarves", "claims"],
+            content: `# The First Claim of Embervein
+
+**Theme:** Claim Bond, dwarven law, mining, forge-oaths, greed, survival.
+
+> What does it mean to own what lies beneath you?
+
+A claim is not just property. It is a sacred contract with the earth.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "campaign-ember-oath",
+            title: "The Dwarven Smithy: The Ember Oath",
+            folder: "Campaigns",
+            tags: ["ember oath", "smithy", "craft"],
+            content: `# The Dwarven Smithy: The Ember Oath
+
+**Theme:** craft, inheritance, forge memory.
+
+> Can a broken oath be reforged, or only replaced?
+
+This connects to [[god-orund|Orund Embervein]], old smithing rites, relic crafting, and faction progression.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "campaign-milepost-ledger",
+            title: "The Milepost Ledger",
+            folder: "Campaigns",
+            tags: ["mileposts", "roads", "expedition board"],
+            content: `# The Milepost Ledger
+
+**Theme:** Road Bond, travel, settlement links, memory through infrastructure.
+
+> Is a road still real if no one files it, walks it, names it, or returns from it?
+
+This is the perfect [[faction-expedition-board|Expedition Board]] campaign.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "naming-conventions",
+            title: "Naming Conventions",
+            folder: "Naming",
+            tags: ["names", "villages", "relics"],
+            content: `# Naming Conventions
+
+Depthbound names should feel old, practical, slightly ritualistic, dark but not edgy, and suitable for villages, boards, relics, and dungeon titles.
+
+Use recurring words tied to [[five-great-bonds|the Five Bonds]]:
+
+**Hearth, Wick, Road, Mile, Crown, Barrow, Bell, Thorn, Vein, Claim, Lantern, Ledger, Oath, Gate, Ford, Hollow, Ash, Deep, Tide, Stone, Storm, Ember, Grave, Root.**
+
+## Villages
+
+Briarwick, Ashford, Bellhollow, Hearthmere, Crowmill, Lanternbrook, Thornwell, Barleygate, Mossford, Greywick, Oldmere, Blackroot.
+
+## Cities
+
+Highmile, Goldspan, Veyrwatch, Crownmarket, Saint Kelvorn's Gate, Ledgerfall, Brazenford, Old Arkhon, Bellspire, Tidemark City.
+
+## Dungeons
+
+The Nameless Guardroom, Barrow of the Fifth Commander, The Organ Crypt of Blackmile, The Thorn-Stag Warren, Crucible of the Unfed Flame, The Crownless Keep.
+
+## Relics
+
+Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mile Nail, Bell of the Nameless Dead, Ember Oath Hammer.`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "world-bible-archive",
+            title: "World Bible Archive",
+            folder: "Archive",
+            tags: ["archive", "original paste"],
+            content: seedMarkdown,
+            images: [],
+            updatedAt: seedTime,
+          },
+        ],
+      };
+
+      let library = loadLibrary();
+      let selectedId = library.articles[0]?.id || "";
+
+      const els = {
+        search: document.querySelector("#lore-search"),
+        folderFilter: document.querySelector("#folder-filter"),
+        sortMode: document.querySelector("#sort-mode"),
+        tree: document.querySelector("#lore-tree"),
+        articleFolder: document.querySelector("#article-folder"),
+        articleUpdated: document.querySelector("#article-updated"),
+        articleTitle: document.querySelector("#article-title"),
+        articleTags: document.querySelector("#article-tags"),
+        articleGallery: document.querySelector("#article-gallery"),
+        articleBody: document.querySelector("#article-body"),
+        editorBody: document.querySelector("#editor-body"),
+        toggleEditor: document.querySelector("#toggle-editor"),
+        closeEditor: document.querySelector("#close-editor"),
+        newArticle: document.querySelector("#new-article"),
+        newFolder: document.querySelector("#new-folder"),
+        saveArticle: document.querySelector("#save-article"),
+        duplicateArticle: document.querySelector("#duplicate-article"),
+        deleteArticle: document.querySelector("#delete-article"),
+        exportLore: document.querySelector("#export-lore"),
+        importLore: document.querySelector("#import-lore"),
+      };
+
+      function loadLibrary() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+          if (saved && Array.isArray(saved.articles) && Array.isArray(saved.folders)) {
+            const migrated = migrateLibrary(saved);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+            return migrated;
+          }
+        } catch (error) {
+          console.warn("Could not load lore library", error);
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(seedData));
+        return structuredClone(seedData);
+      }
+
+      function migrateLibrary(saved) {
+        const migrated = structuredClone(saved);
+        migrated.folders = Array.from(new Set([...(migrated.folders || []), ...seedData.folders]));
+        seedData.articles.forEach((seedArticle) => {
+          const existing = migrated.articles.find((article) => article.id === seedArticle.id);
+          if (!existing) {
+            migrated.articles.push(structuredClone(seedArticle));
+            return;
+          }
+          const isOldSeedDump = existing.id === "world-bible-core"
+            && existing.content
+            && existing.content.includes("Depthbound World Bible v0.1 - Core Premise")
+            && existing.content.includes("Dungeon crawling is not random violence");
+          const isOldStarterPage = ["five-great-bonds", "major-deities"].includes(existing.id)
+            && existing.content
+            && !existing.content.includes("[[");
+          if (isOldSeedDump || isOldStarterPage) {
+            existing.title = seedArticle.title;
+            existing.folder = seedArticle.folder;
+            existing.tags = seedArticle.tags;
+            existing.content = seedArticle.content;
+            existing.updatedAt = seedArticle.updatedAt;
+          }
+        });
+        return migrated;
+      }
+
+      function persist() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
+      }
+
+      function idFromTitle(title) {
+        return `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "article"}-${Date.now().toString(36)}`;
+      }
+
+      function selectedArticle() {
+        return library.articles.find((article) => article.id === selectedId) || library.articles[0] || null;
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[char]);
+      }
+
+      function inlineMarkdown(value) {
+        return escapeHtml(value)
+          .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, id, label) => {
+            const cleanId = id.trim();
+            const cleanLabel = (label || id).trim();
+            return `<a href="#${cleanId}" data-wiki-id="${cleanId}">${cleanLabel}</a>`;
+          })
+          .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+          .replace(/`([^`]+)`/g, "<code>$1</code>");
+      }
+
+      function renderMarkdown(markdown) {
+        const lines = String(markdown || "").split(/\r?\n/);
+        const output = [];
+        let listOpen = false;
+        let tableRows = [];
+
+        const closeList = () => {
+          if (listOpen) {
+            output.push("</ul>");
+            listOpen = false;
+          }
+        };
+
+        const flushTable = () => {
+          if (!tableRows.length) return;
+          closeList();
+          const [head, divider, ...body] = tableRows;
+          const isTable = divider && divider.every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
+          if (!isTable) {
+            tableRows.forEach((row) => output.push(`<p>${inlineMarkdown(row.join(" | "))}</p>`));
+            tableRows = [];
+            return;
+          }
+          output.push("<table><thead><tr>");
+          head.forEach((cell) => output.push(`<th>${inlineMarkdown(cell.trim())}</th>`));
+          output.push("</tr></thead><tbody>");
+          body.forEach((row) => {
+            output.push("<tr>");
+            row.forEach((cell) => output.push(`<td>${inlineMarkdown(cell.trim())}</td>`));
+            output.push("</tr>");
+          });
+          output.push("</tbody></table>");
+          tableRows = [];
+        };
+
+        lines.forEach((line) => {
+          if (/^\|.+\|$/.test(line.trim())) {
+            tableRows.push(line.trim().slice(1, -1).split("|"));
+            return;
+          }
+          flushTable();
+          if (!line.trim()) {
+            closeList();
+            return;
+          }
+          const heading = line.match(/^(#{1,4})\s+(.+)$/);
+          if (heading) {
+            closeList();
+            const level = Math.min(3, heading[1].length);
+            output.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+            return;
+          }
+          const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+          if (bullet) {
+            if (!listOpen) {
+              output.push("<ul>");
+              listOpen = true;
+            }
+            output.push(`<li>${inlineMarkdown(bullet[1])}</li>`);
+            return;
+          }
+          const quote = line.match(/^>\s?(.+)$/);
+          if (quote) {
+            closeList();
+            output.push(`<blockquote>${inlineMarkdown(quote[1])}</blockquote>`);
+            return;
+          }
+          closeList();
+          output.push(`<p>${inlineMarkdown(line)}</p>`);
+        });
+        flushTable();
+        closeList();
+        return output.join("");
+      }
+
+      function renderFolderOptions() {
+        const current = els.folderFilter.value || "all";
+        els.folderFilter.innerHTML = `<option value="all">All folders</option>${library.folders
+          .map((folder) => `<option value="${escapeHtml(folder)}">${escapeHtml(folder)}</option>`)
+          .join("")}`;
+        els.folderFilter.value = library.folders.includes(current) ? current : "all";
+      }
+
+      function filteredArticles() {
+        const query = els.search.value.trim().toLowerCase();
+        const folder = els.folderFilter.value;
+        const articles = library.articles.filter((article) => {
+          const haystack = `${article.title} ${article.folder} ${(article.tags || []).join(" ")} ${article.content}`.toLowerCase();
+          return (!query || haystack.includes(query)) && (folder === "all" || article.folder === folder);
+        });
+        articles.sort((a, b) => {
+          if (els.sortMode.value === "updated") return String(b.updatedAt).localeCompare(String(a.updatedAt));
+          if (els.sortMode.value === "folder") return `${a.folder}${a.title}`.localeCompare(`${b.folder}${b.title}`);
+          return a.title.localeCompare(b.title);
+        });
+        return articles;
+      }
+
+      function renderTree() {
+        const articles = filteredArticles();
+        const grouped = new Map();
+        library.folders.forEach((folder) => grouped.set(folder, []));
+        articles.forEach((article) => {
+          if (!grouped.has(article.folder)) grouped.set(article.folder, []);
+          grouped.get(article.folder).push(article);
+        });
+        const html = [...grouped.entries()]
+          .filter(([, items]) => items.length)
+          .map(([folder, items]) => `
+            <section class="lore-folder">
+              <h2 class="lore-folder-title">${escapeHtml(folder)}</h2>
+              <div class="lore-article-list">
+                ${items.map((article) => `
+                  <button class="lore-article-button ${article.id === selectedId ? "active" : ""}" type="button" data-id="${escapeHtml(article.id)}">
+                    <b>${escapeHtml(article.title)}</b>
+                    <span>${escapeHtml((article.tags || []).join(", ") || "untagged")}</span>
+                  </button>
+                `).join("")}
+              </div>
+            </section>
+          `).join("");
+        els.tree.innerHTML = html || `<div class="lore-empty">No matching lore entries.</div>`;
+      }
+
+      function renderArticle() {
+        const article = selectedArticle();
+        if (!article) {
+          els.articleTitle.textContent = "No article selected";
+          els.articleBody.innerHTML = "";
+          els.editorBody.innerHTML = `<div class="lore-empty">Create an article to begin.</div>`;
+          return;
+        }
+        selectedId = article.id;
+        els.articleFolder.textContent = article.folder;
+        els.articleUpdated.textContent = `Updated ${new Date(article.updatedAt).toLocaleString()}`;
+        els.articleTitle.textContent = article.title;
+        els.articleTags.innerHTML = (article.tags || []).map((tag) => `<span class="lore-chip">${escapeHtml(tag)}</span>`).join("");
+        els.articleGallery.innerHTML = (article.images || []).map((image) => `
+          <figure class="lore-image">
+            <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.caption || article.title)}" />
+            <figcaption>${escapeHtml(image.caption || "Untitled image")}</figcaption>
+          </figure>
+        `).join("");
+        els.articleBody.innerHTML = renderMarkdown(article.content);
+        renderEditor(article);
+        renderTree();
+      }
+
+      function renderEditor(article) {
+        els.editorBody.innerHTML = `
+          <label class="lore-field">
+            Title
+            <input id="edit-title" type="text" value="${escapeHtml(article.title)}" />
+          </label>
+          <label class="lore-field">
+            Folder
+            <select id="edit-folder">
+              ${library.folders.map((folder) => `<option value="${escapeHtml(folder)}" ${folder === article.folder ? "selected" : ""}>${escapeHtml(folder)}</option>`).join("")}
+            </select>
+          </label>
+          <label class="lore-field">
+            Tags
+            <input id="edit-tags" type="text" value="${escapeHtml((article.tags || []).join(", "))}" placeholder="comma, separated, tags" />
+          </label>
+          <label class="lore-field">
+            Article Text
+            <textarea id="edit-content" spellcheck="true">${escapeHtml(article.content)}</textarea>
+          </label>
+          <label class="lore-field">
+            Add Picture
+            <input id="image-upload" type="file" accept="image/*" />
+          </label>
+          <div id="editor-images" class="lore-image-list">
+            ${(article.images || []).map((image, index) => `
+              <div class="lore-image-row">
+                <img src="${escapeHtml(image.src)}" alt="" />
+                <label class="lore-field">
+                  Caption
+                  <input type="text" data-caption-index="${index}" value="${escapeHtml(image.caption || "")}" />
+                </label>
+                <button class="ghost-button" type="button" data-remove-image="${index}">Remove</button>
+              </div>
+            `).join("")}
+          </div>
+        `;
+
+        document.querySelector("#image-upload").addEventListener("change", async (event) => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          const src = await fileToDataUrl(file);
+          article.images = article.images || [];
+          article.images.push({ src, caption: file.name });
+          article.updatedAt = new Date().toISOString();
+          persist();
+          renderArticle();
+        });
+
+        els.editorBody.querySelectorAll("[data-remove-image]").forEach((button) => {
+          button.addEventListener("click", () => {
+            article.images.splice(Number(button.dataset.removeImage), 1);
+            article.updatedAt = new Date().toISOString();
+            persist();
+            renderArticle();
+          });
+        });
+
+        els.editorBody.querySelectorAll("[data-caption-index]").forEach((input) => {
+          input.addEventListener("change", () => {
+            article.images[Number(input.dataset.captionIndex)].caption = input.value.trim();
+            article.updatedAt = new Date().toISOString();
+            persist();
+            renderArticle();
+          });
+        });
+      }
+
+      function fileToDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function saveCurrentArticle() {
+        const article = selectedArticle();
+        if (!article) return;
+        article.title = document.querySelector("#edit-title").value.trim() || "Untitled Article";
+        article.folder = document.querySelector("#edit-folder").value;
+        article.tags = document.querySelector("#edit-tags").value.split(",").map((tag) => tag.trim()).filter(Boolean);
+        article.content = document.querySelector("#edit-content").value;
+        article.updatedAt = new Date().toISOString();
+        persist();
+        renderFolderOptions();
+        renderArticle();
+      }
+
+      function createArticle() {
+        const folder = els.folderFilter.value !== "all" ? els.folderFilter.value : (library.folders[0] || "World Bible");
+        const article = {
+          id: idFromTitle("New Article"),
+          title: "New Article",
+          folder,
+          tags: [],
+          content: "# New Article\n\nStart writing here.",
+          images: [],
+          updatedAt: new Date().toISOString(),
+        };
+        library.articles.unshift(article);
+        selectedId = article.id;
+        persist();
+        renderFolderOptions();
+        renderArticle();
+      }
+
+      function createFolder() {
+        const name = prompt("Folder name");
+        if (!name) return;
+        const clean = name.trim();
+        if (!clean || library.folders.includes(clean)) return;
+        library.folders.push(clean);
+        library.folders.sort((a, b) => a.localeCompare(b));
+        persist();
+        renderFolderOptions();
+        renderTree();
+      }
+
+      function duplicateArticle() {
+        const article = selectedArticle();
+        if (!article) return;
+        const copy = structuredClone(article);
+        copy.id = idFromTitle(copy.title);
+        copy.title = `${copy.title} Copy`;
+        copy.updatedAt = new Date().toISOString();
+        library.articles.unshift(copy);
+        selectedId = copy.id;
+        persist();
+        renderArticle();
+      }
+
+      function deleteArticle() {
+        const article = selectedArticle();
+        if (!article || !confirm(`Delete "${article.title}"?`)) return;
+        library.articles = library.articles.filter((item) => item.id !== article.id);
+        selectedId = library.articles[0]?.id || "";
+        persist();
+        renderArticle();
+      }
+
+      function setEditorOpen(isOpen) {
+        document.body.classList.toggle("editor-closed", !isOpen);
+        els.toggleEditor.textContent = isOpen ? "Hide Editor" : "Edit";
+      }
+
+      function openWikiArticle(id) {
+        const target = library.articles.find((article) => article.id === id);
+        if (!target) return;
+        selectedId = target.id;
+        renderArticle();
+      }
+
+      function exportLore() {
+        const blob = new Blob([JSON.stringify(library, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `depthbound-lore-${new Date().toISOString().slice(0, 10)}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      async function importLore(event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const imported = JSON.parse(await file.text());
+        if (!Array.isArray(imported.articles) || !Array.isArray(imported.folders)) {
+          alert("That file does not look like a Depthbound lore export.");
+          return;
+        }
+        library = imported;
+        selectedId = library.articles[0]?.id || "";
+        persist();
+        renderFolderOptions();
+        renderArticle();
+      }
+
+      els.tree.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-id]");
+        if (!button) return;
+        selectedId = button.dataset.id;
+        renderArticle();
+      });
+      els.articleBody.addEventListener("click", (event) => {
+        const link = event.target.closest("[data-wiki-id]");
+        if (!link) return;
+        event.preventDefault();
+        openWikiArticle(link.dataset.wikiId);
+      });
+      els.search.addEventListener("input", renderTree);
+      els.folderFilter.addEventListener("change", renderTree);
+      els.sortMode.addEventListener("change", renderTree);
+      els.toggleEditor.addEventListener("click", () => setEditorOpen(document.body.classList.contains("editor-closed")));
+      els.closeEditor.addEventListener("click", () => setEditorOpen(false));
+      els.newArticle.addEventListener("click", () => {
+        createArticle();
+        setEditorOpen(true);
+      });
+      els.newFolder.addEventListener("click", createFolder);
+      els.saveArticle.addEventListener("click", saveCurrentArticle);
+      els.duplicateArticle.addEventListener("click", () => {
+        duplicateArticle();
+        setEditorOpen(true);
+      });
+      els.deleteArticle.addEventListener("click", deleteArticle);
+      els.exportLore.addEventListener("click", exportLore);
+      els.importLore.addEventListener("change", importLore);
+
+      renderFolderOptions();
+      renderArticle();
+    </script>
+  </body>
+</html>

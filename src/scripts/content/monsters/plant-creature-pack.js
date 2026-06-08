@@ -16,7 +16,7 @@ window.DungeonContent.register("monsters", "twigBlightSprinter", {
   tags: ["plant", "forest", "blight", "twig", "skirmisher"],
   maxHp: 13,
   category: 1,
-  xp: 55,
+  xp: 70,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -49,7 +49,7 @@ window.DungeonContent.register("monsters", "violetFungusCluster", {
   tags: ["plant", "underdark", "fungus", "poison", "stationary"],
   maxHp: 14,
   category: 1,
-  xp: 60,
+  xp: 75,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -82,7 +82,7 @@ window.DungeonContent.register("monsters", "jungleNeedlepod", {
   tags: ["plant", "jungle", "thorn", "ranged", "pod"],
   maxHp: 15,
   category: 1,
-  xp: 65,
+  xp: 85,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -115,7 +115,7 @@ window.DungeonContent.register("monsters", "brambleMatriarch", {
   tags: ["plant", "forest", "bramble", "boss", "controller"],
   maxHp: 34,
   category: 1,
-  xp: 160,
+  xp: 1855,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -158,7 +158,7 @@ window.DungeonContent.register("monsters", "thornLashVine", {
   tags: ["plant", "forest", "vine", "thorn", "reach"],
   maxHp: 24,
   category: 2,
-  xp: 125,
+  xp: 350,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -191,7 +191,7 @@ window.DungeonContent.register("monsters", "shriekerSporecap", {
   tags: ["plant", "underdark", "fungus", "spore", "controller"],
   maxHp: 26,
   category: 2,
-  xp: 135,
+  xp: 380,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -225,7 +225,7 @@ window.DungeonContent.register("monsters", "bloodOrchidStalker", {
   tags: ["plant", "jungle", "orchid", "ambusher", "drain"],
   maxHp: 28,
   category: 2,
-  xp: 150,
+  xp: 415,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -258,7 +258,7 @@ window.DungeonContent.register("monsters", "yellowMuskCreeper", {
   tags: ["plant", "forest", "jungle", "creeper", "boss", "charm"],
   maxHp: 64,
   category: 2,
-  xp: 450,
+  xp: 15245,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -301,7 +301,7 @@ window.DungeonContent.register("monsters", "assassinVine", {
   tags: ["plant", "forest", "vine", "ambusher", "restrainer"],
   maxHp: 42,
   category: 3,
-  xp: 300,
+  xp: 1705,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -334,7 +334,7 @@ window.DungeonContent.register("monsters", "myconidSporeguard", {
   tags: ["plant", "underdark", "myconid", "fungus", "guardian"],
   maxHp: 45,
   category: 3,
-  xp: 325,
+  xp: 1845,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -369,7 +369,7 @@ window.DungeonContent.register("monsters", "razorPalmAmbusher", {
   tags: ["plant", "jungle", "palm", "ambusher", "skirmisher"],
   maxHp: 48,
   category: 3,
-  xp: 350,
+  xp: 1990,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -402,7 +402,7 @@ window.DungeonContent.register("monsters", "fungalBroodmother", {
   tags: ["plant", "underdark", "fungus", "boss", "summoner"],
   maxHp: 105,
   category: 3,
-  xp: 950,
+  xp: 20850,
   ac: 16,
   attackBonus: 7,
   damage: {
@@ -447,7 +447,7 @@ window.DungeonContent.register("monsters", "briarboundTreantling", {
   maxHp: 62,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 700,
+  xp: 2145,
   ac: 16,
   attackBonus: 7,
   damage: {
@@ -481,7 +481,7 @@ window.DungeonContent.register("monsters", "hookcapMycelialHorror", {
   maxHp: 68,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 750,
+  xp: 2300,
   ac: 16,
   attackBonus: 7,
   damage: {
@@ -516,7 +516,7 @@ window.DungeonContent.register("monsters", "stranglerFigHunter", {
   maxHp: 72,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 800,
+  xp: 2460,
   ac: 16,
   attackBonus: 7,
   damage: {
@@ -550,7 +550,7 @@ window.DungeonContent.register("monsters", "shamblingMoundHeart", {
   maxHp: 155,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 1800,
+  xp: 18325,
   ac: 17,
   attackBonus: 8,
   damage: {
@@ -595,7 +595,7 @@ window.DungeonContent.register("monsters", "ironbarkGuardian", {
   maxHp: 92,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 1300,
+  xp: 2775,
   ac: 19,
   attackBonus: 8,
   damage: {
@@ -628,7 +628,7 @@ window.DungeonContent.register("monsters", "umberMoldProphet", {
   tags: ["plant", "underdark", "fungus", "mold", "psychic", "caster"],
   maxHp: 98,
   category: 5,
-  xp: 1450,
+  xp: 3095,
   ac: 17,
   attackBonus: 8,
   damage: {
@@ -662,7 +662,7 @@ window.DungeonContent.register("monsters", "venomBloomMatron", {
   tags: ["plant", "jungle", "flower", "poison", "artillery"],
   maxHp: 105,
   category: 5,
-  xp: 1600,
+  xp: 3415,
   ac: 17,
   attackBonus: 8,
   damage: {
@@ -697,7 +697,7 @@ window.DungeonContent.register("monsters", "corpseFlowerRegent", {
   maxHp: 225,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 3900,
+  xp: 28720,
   ac: 18,
   attackBonus: 9,
   damage: {
@@ -741,7 +741,7 @@ window.DungeonContent.register("monsters", "elderVineReaver", {
   maxHp: 128,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 2300,
+  xp: 2330,
   ac: 18,
   attackBonus: 9,
   damage: {
@@ -774,7 +774,7 @@ window.DungeonContent.register("monsters", "glowsporeSovereign", {
   tags: ["plant", "underdark", "fungus", "glowspore", "controller"],
   maxHp: 138,
   category: 6,
-  xp: 2500,
+  xp: 2530,
   ac: 18,
   attackBonus: 9,
   damage: {
@@ -809,7 +809,7 @@ window.DungeonContent.register("monsters", "jaguarThornCreeper", {
   maxHp: 148,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 2700,
+  xp: 2735,
   ac: 18,
   attackBonus: 9,
   damage: {
@@ -845,7 +845,7 @@ window.DungeonContent.register("monsters", "thorncrownTreant", {
   maxHp: 310,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 5900,
+  xp: 25030,
   ac: 19,
   attackBonus: 10,
   damage: {
@@ -890,7 +890,7 @@ window.DungeonContent.register("monsters", "ancientRootbreaker", {
   maxHp: 175,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 3900,
+  xp: 2870,
   ac: 19,
   attackBonus: 10,
   damage: {
@@ -923,7 +923,7 @@ window.DungeonContent.register("monsters", "mindrotMycelium", {
   tags: ["plant", "underdark", "fungus", "psychic", "horror"],
   maxHp: 190,
   category: 7,
-  xp: 4300,
+  xp: 3155,
   ac: 19,
   attackBonus: 10,
   damage: {
@@ -959,7 +959,7 @@ window.DungeonContent.register("monsters", "emeraldHydraVine", {
   maxHp: 205,
   category: 7,
   multiattack: { attacks: 3 },
-  xp: 4700,
+  xp: 3455,
   ac: 19,
   attackBonus: 10,
   damage: {
@@ -995,7 +995,7 @@ window.DungeonContent.register("monsters", "sporeTitanOfTheDeep", {
   maxHp: 400,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 8400,
+  xp: 25075,
   ac: 20,
   attackBonus: 11,
   damage: {
@@ -1040,7 +1040,7 @@ window.DungeonContent.register("monsters", "wyrmwoodTreant", {
   maxHp: 235,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 5900,
+  xp: 4385,
   ac: 20,
   attackBonus: 11,
   damage: {
@@ -1073,7 +1073,7 @@ window.DungeonContent.register("monsters", "midnightMyconidHierophant", {
   tags: ["plant", "underdark", "myconid", "hierophant", "caster"],
   maxHp: 250,
   category: 8,
-  xp: 6400,
+  xp: 4760,
   ac: 20,
   attackBonus: 11,
   damage: {
@@ -1108,7 +1108,7 @@ window.DungeonContent.register("monsters", "mantrapQueensFang", {
   maxHp: 265,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 7000,
+  xp: 5195,
   ac: 20,
   attackBonus: 11,
   damage: {
@@ -1144,7 +1144,7 @@ window.DungeonContent.register("monsters", "jungleGreenheartColossus", {
   maxHp: 490,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 11500,
+  xp: 13955,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1189,7 +1189,7 @@ window.DungeonContent.register("monsters", "worldrootSentinel", {
   maxHp: 295,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 7600,
+  xp: 5205,
   ac: 22,
   attackBonus: 12,
   damage: {
@@ -1224,7 +1224,7 @@ window.DungeonContent.register("monsters", "abyssalSporeGrove", {
   tags: ["plant", "underdark", "fungus", "grove", "corruption"],
   maxHp: 315,
   category: 9,
-  xp: 8200,
+  xp: 5625,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1260,7 +1260,7 @@ window.DungeonContent.register("monsters", "bloodCanopyDevourer", {
   maxHp: 335,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 9000,
+  xp: 6175,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1296,7 +1296,7 @@ window.DungeonContent.register("monsters", "eldergroveAvatar", {
   maxHp: 575,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 18000,
+  xp: 22910,
   ac: 22,
   attackBonus: 13,
   damage: {
@@ -1341,7 +1341,7 @@ window.DungeonContent.register("monsters", "primevalTreantOfSeasons", {
   maxHp: 345,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 8800,
+  xp: 4810,
   ac: 22,
   attackBonus: 14,
   damage: {
@@ -1375,7 +1375,7 @@ window.DungeonContent.register("monsters", "deepMycelialOvermind", {
   tags: ["plant", "underdark", "fungus", "mycelium", "overmind"],
   maxHp: 365,
   category: 10,
-  xp: 9400,
+  xp: 5140,
   ac: 22,
   attackBonus: 14,
   damage: {
@@ -1411,7 +1411,7 @@ window.DungeonContent.register("monsters", "thousandMawGodflower", {
   maxHp: 390,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 10000,
+  xp: 5465,
   ac: 22,
   attackBonus: 14,
   damage: {
@@ -1447,7 +1447,7 @@ window.DungeonContent.register("monsters", "rootOfTheFirstForest", {
   maxHp: 660,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 25000,
+  xp: 13675,
   ac: 23,
   attackBonus: 15,
   damage: {

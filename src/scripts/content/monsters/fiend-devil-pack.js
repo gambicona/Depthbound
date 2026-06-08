@@ -21,7 +21,7 @@ window.DungeonContent.register("monsters", "pitImpScout", {
   tags: ["fiend", "devil", "imp", "flying", "skirmisher"],
   maxHp: 11,
   category: 1,
-  xp: 60,
+  xp: 75,
   ac: 14,
   attackBonus: 4,
   damage: {
@@ -58,7 +58,7 @@ window.DungeonContent.register("monsters", "cinderLemure", {
   tags: ["fiend", "devil", "lemure", "brute"],
   maxHp: 17,
   category: 1,
-  xp: 55,
+  xp: 70,
   ac: 11,
   attackBonus: 3,
   damage: {
@@ -95,7 +95,7 @@ window.DungeonContent.register("monsters", "contractWhelp", {
   tags: ["fiend", "devil", "contract", "caster"],
   maxHp: 13,
   category: 1,
-  xp: 65,
+  xp: 85,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -134,7 +134,7 @@ window.DungeonContent.register("monsters", "brassHornOverseer", {
   tags: ["fiend", "devil", "boss", "overseer"],
   maxHp: 34,
   category: 1,
-  xp: 150,
+  xp: 1730,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -183,7 +183,7 @@ window.DungeonContent.register("monsters", "spinedHellion", {
   tags: ["fiend", "devil", "spined", "ranged", "flying"],
   maxHp: 26,
   category: 2,
-  xp: 150,
+  xp: 415,
   ac: 15,
   attackBonus: 5,
   damage: {
@@ -222,7 +222,7 @@ window.DungeonContent.register("monsters", "ashMawHound", {
   tags: ["fiend", "devil", "hound", "beast"],
   maxHp: 34,
   category: 2,
-  xp: 170,
+  xp: 475,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -259,7 +259,7 @@ window.DungeonContent.register("monsters", "chainSnagDevil", {
   tags: ["fiend", "devil", "chain", "controller"],
   maxHp: 30,
   category: 2,
-  xp: 160,
+  xp: 450,
   ac: 15,
   attackBonus: 5,
   damage: {
@@ -296,7 +296,7 @@ window.DungeonContent.register("monsters", "infernalGaoler", {
   tags: ["fiend", "devil", "boss", "chain", "jailer"],
   maxHp: 62,
   category: 2,
-  xp: 360,
+  xp: 12165,
   ac: 16,
   attackBonus: 6,
   damage: {
@@ -345,7 +345,7 @@ window.DungeonContent.register("monsters", "barbedEnforcer", {
   tags: ["fiend", "devil", "barbed", "brute"],
   maxHp: 46,
   category: 3,
-  xp: 320,
+  xp: 1820,
   ac: 16,
   attackBonus: 6,
   damage: {
@@ -382,7 +382,7 @@ window.DungeonContent.register("monsters", "sulphurHexer", {
   tags: ["fiend", "devil", "caster", "hex"],
   maxHp: 38,
   category: 3,
-  xp: 340,
+  xp: 1935,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -421,7 +421,7 @@ window.DungeonContent.register("monsters", "emberwingPursuer", {
   tags: ["fiend", "devil", "flying", "skirmisher"],
   maxHp: 42,
   category: 3,
-  xp: 330,
+  xp: 1875,
   ac: 16,
   attackBonus: 7,
   damage: {
@@ -458,7 +458,7 @@ window.DungeonContent.register("monsters", "hellmarkedAdjudicator", {
   tags: ["fiend", "devil", "boss", "contract", "caster"],
   maxHp: 88,
   category: 3,
-  xp: 700,
+  xp: 15385,
   ac: 17,
   attackBonus: 7,
   damage: {
@@ -510,7 +510,7 @@ window.DungeonContent.register("monsters", "forkedSpearDevil", {
   maxHp: 62,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 600,
+  xp: 1840,
   ac: 17,
   attackBonus: 7,
   damage: {
@@ -547,7 +547,7 @@ window.DungeonContent.register("monsters", "brimstoneBombardier", {
   tags: ["fiend", "devil", "artillery", "caster"],
   maxHp: 54,
   category: 4,
-  xp: 620,
+  xp: 1900,
   ac: 16,
   attackBonus: 7,
   damage: {
@@ -586,7 +586,7 @@ window.DungeonContent.register("monsters", "oathbrandTempter", {
   tags: ["fiend", "devil", "tempter", "contract", "caster"],
   maxHp: 58,
   category: 4,
-  xp: 640,
+  xp: 1960,
   ac: 16,
   attackBonus: 7,
   damage: {
@@ -626,7 +626,7 @@ window.DungeonContent.register("monsters", "chainMagistrate", {
   maxHp: 118,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 1200,
+  xp: 12195,
   ac: 18,
   attackBonus: 8,
   damage: {
@@ -676,7 +676,7 @@ window.DungeonContent.register("monsters", "hellfireCenturion", {
   maxHp: 84,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 950,
+  xp: 2025,
   ac: 18,
   attackBonus: 8,
   damage: {
@@ -713,7 +713,7 @@ window.DungeonContent.register("monsters", "soulLedgerScribe", {
   tags: ["fiend", "devil", "contract", "caster"],
   maxHp: 72,
   category: 5,
-  xp: 980,
+  xp: 2095,
   ac: 17,
   attackBonus: 8,
   damage: {
@@ -753,7 +753,7 @@ window.DungeonContent.register("monsters", "gloomhornHellsteed", {
   maxHp: 92,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 1000,
+  xp: 2135,
   ac: 17,
   attackBonus: 8,
   damage: {
@@ -790,7 +790,7 @@ window.DungeonContent.register("monsters", "crimsonContractJudge", {
   tags: ["fiend", "devil", "boss", "contract", "judge"],
   maxHp: 155,
   category: 5,
-  xp: 2100,
+  xp: 15465,
   ac: 19,
   attackBonus: 9,
   damage: {
@@ -842,7 +842,7 @@ window.DungeonContent.register("monsters", "bonehookStalker", {
   maxHp: 106,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 1500,
+  xp: 1525,
   ac: 18,
   attackBonus: 9,
   damage: {
@@ -879,7 +879,7 @@ window.DungeonContent.register("monsters", "nineBrandMaledictor", {
   tags: ["fiend", "devil", "curse", "caster"],
   maxHp: 94,
   category: 6,
-  xp: 1550,
+  xp: 1575,
   ac: 17,
   attackBonus: 9,
   damage: {
@@ -920,7 +920,7 @@ window.DungeonContent.register("monsters", "infernalSiegeBrute", {
   maxHp: 124,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 1600,
+  xp: 1630,
   ac: 18,
   attackBonus: 9,
   damage: {
@@ -957,7 +957,7 @@ window.DungeonContent.register("monsters", "pactDuchessOfTheRedSeal", {
   tags: ["fiend", "devil", "boss", "noble", "contract", "caster"],
   maxHp: 198,
   category: 6,
-  xp: 3300,
+  xp: 13980,
   ac: 19,
   attackBonus: 10,
   damage: {
@@ -1008,7 +1008,7 @@ window.DungeonContent.register("monsters", "ashenErinyes", {
   tags: ["fiend", "devil", "erinyes", "flying", "ranged"],
   maxHp: 128,
   category: 7,
-  xp: 2300,
+  xp: 1695,
   ac: 19,
   attackBonus: 10,
   damage: {
@@ -1049,7 +1049,7 @@ window.DungeonContent.register("monsters", "furnaceTyrant", {
   maxHp: 152,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 2400,
+  xp: 1760,
   ac: 19,
   attackBonus: 10,
   damage: {
@@ -1087,7 +1087,7 @@ window.DungeonContent.register("monsters", "hellchainExarch", {
   maxHp: 136,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 2350,
+  xp: 1735,
   ac: 20,
   attackBonus: 10,
   damage: {
@@ -1125,7 +1125,7 @@ window.DungeonContent.register("monsters", "inquisitorMalrec", {
   maxHp: 255,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 5200,
+  xp: 15535,
   ac: 20,
   attackBonus: 11,
   damage: {
@@ -1176,7 +1176,7 @@ window.DungeonContent.register("monsters", "pitBornDevastator", {
   maxHp: 178,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 3600,
+  xp: 2670,
   ac: 20,
   attackBonus: 11,
   damage: {
@@ -1213,7 +1213,7 @@ window.DungeonContent.register("monsters", "soulFurnaceHierarch", {
   tags: ["fiend", "devil", "soul", "caster"],
   maxHp: 158,
   category: 8,
-  xp: 3700,
+  xp: 2755,
   ac: 19,
   attackBonus: 11,
   damage: {
@@ -1253,7 +1253,7 @@ window.DungeonContent.register("monsters", "stygianBrandDevil", {
   maxHp: 168,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 3650,
+  xp: 2715,
   ac: 21,
   attackBonus: 11,
   damage: {
@@ -1291,7 +1291,7 @@ window.DungeonContent.register("monsters", "warDukeAsteroth", {
   maxHp: 320,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 7800,
+  xp: 9455,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1341,7 +1341,7 @@ window.DungeonContent.register("monsters", "hellCrownPraetor", {
   maxHp: 225,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 5200,
+  xp: 3570,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1379,7 +1379,7 @@ window.DungeonContent.register("monsters", "archdevilsBurningHand", {
   tags: ["fiend", "devil", "executioner", "fire"],
   maxHp: 212,
   category: 9,
-  xp: 5400,
+  xp: 3705,
   ac: 20,
   attackBonus: 12,
   damage: {
@@ -1419,7 +1419,7 @@ window.DungeonContent.register("monsters", "infernalSoulReaper", {
   maxHp: 238,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 5300,
+  xp: 3630,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1457,7 +1457,7 @@ window.DungeonContent.register("monsters", "dukeOfChainsVoragul", {
   maxHp: 430,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 11500,
+  xp: 14620,
   ac: 22,
   attackBonus: 13,
   damage: {
@@ -1508,7 +1508,7 @@ window.DungeonContent.register("monsters", "aspectOfThePit", {
   maxHp: 295,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 8500,
+  xp: 4645,
   ac: 22,
   attackBonus: 13,
   damage: {
@@ -1546,7 +1546,7 @@ window.DungeonContent.register("monsters", "infernalSeraphOfChains", {
   tags: ["fiend", "devil", "seraph", "flying", "caster"],
   maxHp: 276,
   category: 10,
-  xp: 8700,
+  xp: 4765,
   ac: 22,
   attackBonus: 13,
   damage: {
@@ -1588,7 +1588,7 @@ window.DungeonContent.register("monsters", "contractTitan", {
   maxHp: 318,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 8800,
+  xp: 4810,
   ac: 21,
   attackBonus: 13,
   damage: {
@@ -1627,7 +1627,7 @@ window.DungeonContent.register("monsters", "crownedArchdevilAvatar", {
   tags: ["fiend", "devil", "boss", "archdevil", "avatar"],
   maxHp: 575,
   category: 10,
-  xp: 25000,
+  xp: 13675,
   ac: 23,
   attackBonus: 14,
   damage: {

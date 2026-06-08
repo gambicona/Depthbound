@@ -1,0 +1,370 @@
+Depthbound Campaign XP Pacing Guide
+===================================
+
+Purpose
+-------
+
+Use this guide when planning full campaign arcs or mini-campaigns made from
+multiple dungeons.
+
+This is not a story guide. It is a practical pacing guide for:
+
+- how many dungeons a campaign should contain
+- how many monsters to place
+- which monster categories to use
+- how much optional overfill is healthy
+- how to avoid accidentally overleveling a party
+
+The assumed party is 4 heroes starting at 0 XP.
+
+
+Core Pacing Idea
+----------------
+
+Depthbound dungeons should be built with optional overfill.
+
+That means a dungeon can contain more XP than the party is expected to earn,
+because players normally should not clear every room, every branch, every
+optional route, and every hidden boss.
+
+Healthy default:
+
+- Full-clear dungeon XP: about 130-150% of the intended level progress.
+- Normal-play XP: about 65-75% of the placed dungeon XP.
+- Completionist parties may level faster, and that is acceptable.
+
+This matches the Barrow Crown model:
+
+- Full-clear Barrow Crown currently ends near level 9.
+- A normal partial-clear run around 65-75% ends closer to level 8.
+- This is healthy if optional rooms, alternate routes, and avoidable encounters
+  are expected.
+
+
+Baseline Dungeon Sizes
+----------------------
+
+For a 4-hero party:
+
+Small dungeon:
+- 12-18 monsters placed
+- 8-12 monsters expected to be fought
+- 1 boss
+- Good for side dungeons or short campaign chapters
+
+Standard dungeon:
+- 20-30 monsters placed
+- 14-21 monsters expected to be fought
+- 1-2 bosses
+- Good for most main campaign dungeons
+
+Large dungeon:
+- 32-45 monsters placed
+- 22-32 monsters expected to be fought
+- 2-3 bosses
+- Good for major chapter dungeons
+
+Finale dungeon:
+- 35-55 monsters placed
+- 24-38 monsters expected to be fought
+- 2-4 bosses
+- Good for end-of-arc or end-of-campaign dungeons
+
+
+Category By Party Level
+-----------------------
+
+Use the dungeon category as the main danger band.
+
+Levels 1-2:
+- Main category: Cat 1
+- Sprinkle in: a few Cat 2 elites
+- Avoid too much: Cat 2 bosses
+
+Levels 3-4:
+- Main category: Cat 2
+- Sprinkle in: Cat 1 mobs, rare Cat 3 elite
+- Avoid too much: multiple Cat 3 bosses
+
+Levels 5-6:
+- Main category: Cat 3
+- Sprinkle in: Cat 2 support, rare Cat 4 elite
+- Avoid too much: Cat 4 boss chains
+
+Levels 7-8:
+- Main category: Cat 4
+- Sprinkle in: Cat 3 mobs, rare Cat 5 elite
+- Avoid too much: too many Cat 5 monsters
+
+Levels 9-10:
+- Main category: Cat 5
+- Sprinkle in: Cat 4 support, rare Cat 6 elite
+- Avoid too much: Cat 6 boss spam
+
+Levels 11-12:
+- Main category: Cat 6
+- Sprinkle in: Cat 5 support, rare Cat 7 elite
+- Avoid too much: repeated next-category bosses
+
+Levels 13-14:
+- Main category: Cat 7
+- Sprinkle in: Cat 6 support, rare Cat 8 elite
+- Avoid too much: repeated next-category bosses
+
+Levels 15-16:
+- Main category: Cat 8
+- Sprinkle in: Cat 7 support, rare Cat 9 elite
+- Avoid too much: repeated next-category bosses
+
+Levels 17-18:
+- Main category: Cat 9
+- Sprinkle in: Cat 8 support, rare Cat 10 elite
+- Avoid too much: repeated next-category bosses
+
+Levels 19-20:
+- Main category: Cat 10
+- Sprinkle in: Cat 9 support
+- Avoid too much: extra boss density unless the campaign is ending
+
+
+Healthy Monster Mix Per Dungeon
+-------------------------------
+
+For a standard dungeon, a good default mix is:
+
+- 70% normal monsters from the dungeon category
+- 15% weaker monsters from the previous category
+- 10% elite monsters from the current or next category
+- 5% bosses or unique monsters
+
+Example Cat 3 dungeon with 30 monsters placed:
+
+- 21 Cat 3 normal monsters
+- 4-5 Cat 2 weaker monsters
+- 3 Cat 3 elites or Cat 4 elites
+- 1-2 bosses
+
+Boss count rule:
+
+- Small dungeon: 1 boss
+- Standard dungeon: 1 main boss, maybe 1 optional boss
+- Large dungeon: 1 main boss plus 1-2 optional/minibosses
+- Finale dungeon: 1 final boss plus 2-3 major optional bosses
+
+The main pacing danger is not total monster count. It is boss XP density.
+Several boss-tagged monsters in the same dungeon can jump the party ahead very
+quickly.
+
+
+Campaign Option A: Classic Full Campaign
+----------------------------------------
+
+Use this for a full level 1-20 campaign with steady pacing.
+
+Total length:
+- 19-20 dungeons
+
+Arc 1:
+- Levels: 1-4
+- Dungeons: 4
+- Categories: Cat 1, then Cat 2
+
+Arc 2:
+- Levels: 5-8
+- Dungeons: 4
+- Categories: Cat 3-4
+
+Arc 3:
+- Levels: 9-12
+- Dungeons: 4
+- Categories: Cat 5-6
+
+Arc 4:
+- Levels: 13-16
+- Dungeons: 4
+- Categories: Cat 7-8
+
+Arc 5:
+- Levels: 17-20
+- Dungeons: 3-4
+- Categories: Cat 9-10
+
+Typical dungeon:
+- 20-35 monsters placed
+- 1-2 bosses
+- 2-5 elite or rare enemies
+- 65-75% expected clear rate
+
+
+Campaign Option B: Compact Campaign
+-----------------------------------
+
+Use this for a punchier level 1-20 campaign with larger dungeons and bigger
+chapter jumps.
+
+Total length:
+- 14 dungeons
+
+Arc 1:
+- Levels: 1-5
+- Dungeons: 3
+- Categories: Cat 1-2
+
+Arc 2:
+- Levels: 6-10
+- Dungeons: 4
+- Categories: Cat 3-5
+
+Arc 3:
+- Levels: 11-15
+- Dungeons: 4
+- Categories: Cat 6-8
+
+Arc 4:
+- Levels: 16-20
+- Dungeons: 3
+- Categories: Cat 8-10
+
+Typical dungeon:
+- 30-45 monsters placed
+- 2-3 bosses
+- multiple optional wings
+- 60-70% expected clear rate
+
+
+Campaign Option C: Barrow Crown Style Mini-Campaign
+---------------------------------------------------
+
+Use this for one named campaign arc.
+
+Total length:
+- 7 dungeons
+
+Expected result:
+- Starts at level 1 with 0 XP
+- Ends around level 8 on normal partial-clear play
+- May end around level 9 on full completionist play
+
+Dungeon 1:
+- Intended level after: 2
+- Category mix: Cat 1, a little Cat 2
+- Monsters placed: 18-24
+
+Dungeon 2:
+- Intended level after: 3
+- Category mix: Cat 1-2
+- Monsters placed: 22-30
+
+Dungeon 3:
+- Intended level after: 4
+- Category mix: Cat 2
+- Monsters placed: 24-34
+
+Dungeon 4:
+- Intended level after: 5
+- Category mix: Cat 2, a little Cat 3
+- Monsters placed: 26-36
+
+Dungeon 5:
+- Intended level after: 6
+- Category mix: Cat 3
+- Monsters placed: 26-38
+
+Dungeon 6:
+- Intended level after: 7
+- Category mix: Cat 3-4
+- Monsters placed: 30-42
+
+Dungeon 7:
+- Intended level after: 8
+- Category mix: Cat 4 finale, rare Cat 5
+- Monsters placed: 32-48
+
+This is a good default model for future named arcs.
+
+
+Campaign Option D: Three-Act Campaign
+-------------------------------------
+
+Use this when a campaign should feel complete without becoming a very long
+sequence of separate arcs.
+
+Total length:
+- 17 dungeons
+
+Act 1:
+- Levels: 1-6
+- Dungeons: 5
+- Feel: low-tier discovery
+
+Act 2:
+- Levels: 7-13
+- Dungeons: 6
+- Feel: dangerous midgame
+
+Act 3:
+- Levels: 14-20
+- Dungeons: 6
+- Feel: high-tier war/endgame
+
+Per act:
+- First dungeon: easier, mostly current category
+- Middle dungeons: standard category
+- Final dungeon: current category plus next-category elites or bosses
+
+
+Recommended Workflow For New Campaigns
+--------------------------------------
+
+1. Pick the campaign structure first.
+   Good defaults:
+   - 7 dungeons for a named mini-campaign
+   - 14 dungeons for a compact full campaign
+   - 17-20 dungeons for a full long campaign
+
+2. Decide the expected final level.
+   Do this before writing rooms or placing monsters.
+
+3. Assign one intended level gain per dungeon unless using a compact campaign.
+
+4. Place more XP than required.
+   A good target is 130-150% of the XP needed for the intended level progress.
+
+5. Make 25-35% of the dungeon optional.
+   Optional content can be:
+   - side rooms
+   - alternate wings
+   - hidden bosses
+   - locked treasure routes
+   - dangerous shortcuts
+   - faction-specific branches
+
+6. Keep boss density under control.
+   Boss-tagged monsters should feel meaningful. If a dungeon has many named
+   enemies, consider making some of them elite normal monsters or giving them
+   campaign-specific XP overrides.
+
+7. Simulate the full-clear version.
+   Full-clear should usually end 1 level ahead at most.
+
+8. Simulate a 65-75% clear version.
+   This should match the intended campaign progression.
+
+
+Quick Rule Of Thumb
+-------------------
+
+If the campaign is built like Barrow Crown, use this rule:
+
+- 7 dungeons should cover about 7 levels of progress.
+- Full-clear may overshoot by about 1 level.
+- Normal partial-clear should land on the intended final level.
+- Completionist overleveling is okay as long as it does not break the next arc.
+
+For future mini-campaigns, Barrow Crown is a healthy reference:
+
+- dense dungeons
+- optional routes expected
+- some missed content assumed
+- full-clear parties rewarded with faster progression
+- normal parties still follow the intended curve

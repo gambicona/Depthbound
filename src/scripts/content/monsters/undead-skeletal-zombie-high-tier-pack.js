@@ -27,7 +27,7 @@ window.DungeonContent.register("monsters", "ashboneDuelist", {
   maxHp: 82,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 850,
+  xp: 2610,
   ac: 17,
   attackBonus: 8,
   damage: {
@@ -63,7 +63,7 @@ window.DungeonContent.register("monsters", "ribcageArbalester", {
   tags: ["undead", "skeletal", "old-guardroom", "archer", "ossuary"],
   maxHp: 76,
   category: 4,
-  xp: 900,
+  xp: 2765,
   ac: 16,
   attackBonus: 8,
   damage: {
@@ -102,7 +102,7 @@ window.DungeonContent.register("monsters", "ossuaryCaptain", {
   maxHp: 158,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 2400,
+  xp: 24425,
   ac: 18,
   attackBonus: 9,
   damage: {
@@ -145,7 +145,7 @@ window.DungeonContent.register("monsters", "plagueBloatedGuard", {
   maxHp: 104,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 900,
+  xp: 2765,
   ac: 15,
   attackBonus: 8,
   damage: {
@@ -182,7 +182,7 @@ window.DungeonContent.register("monsters", "graveyardMauler", {
   maxHp: 112,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 1050,
+  xp: 3220,
   ac: 14,
   attackBonus: 8,
   damage: {
@@ -219,7 +219,7 @@ window.DungeonContent.register("monsters", "rotgutBannerbearer", {
   maxHp: 178,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 2600,
+  xp: 26485,
   ac: 16,
   attackBonus: 9,
   damage: {
@@ -267,7 +267,7 @@ window.DungeonContent.register("monsters", "crownlessGraveKnight", {
   maxHp: 126,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 1800,
+  xp: 3840,
   ac: 19,
   attackBonus: 9,
   damage: {
@@ -303,7 +303,7 @@ window.DungeonContent.register("monsters", "bonefluteHexer", {
   tags: ["undead", "skeletal", "old-guardroom", "caster", "hex"],
   maxHp: 106,
   category: 5,
-  xp: 1900,
+  xp: 4055,
   ac: 16,
   attackBonus: 9,
   damage: {
@@ -341,7 +341,7 @@ window.DungeonContent.register("monsters", "marrowMagistrate", {
   tags: ["undead", "skeletal", "old-guardroom", "boss", "magistrate"],
   maxHp: 248,
   category: 5,
-  xp: 5200,
+  xp: 38305,
   ac: 20,
   attackBonus: 10,
   damage: {
@@ -387,7 +387,7 @@ window.DungeonContent.register("monsters", "corpseBloomHulk", {
   maxHp: 150,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 2200,
+  xp: 4690,
   ac: 15,
   attackBonus: 9,
   damage: {
@@ -424,7 +424,7 @@ window.DungeonContent.register("monsters", "drownedCryptZombie", {
   maxHp: 138,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 2000,
+  xp: 4270,
   ac: 15,
   attackBonus: 9,
   damage: {
@@ -461,7 +461,7 @@ window.DungeonContent.register("monsters", "blightcartAbomination", {
   maxHp: 282,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 5700,
+  xp: 41975,
   ac: 17,
   attackBonus: 10,
   damage: {
@@ -509,7 +509,7 @@ window.DungeonContent.register("monsters", "blackboneHalberdier", {
   maxHp: 164,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 3400,
+  xp: 3450,
   ac: 20,
   attackBonus: 10,
   damage: {
@@ -546,7 +546,7 @@ window.DungeonContent.register("monsters", "ossuarySpellblade", {
   maxHp: 152,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 3800,
+  xp: 3855,
   ac: 19,
   attackBonus: 10,
   damage: {
@@ -582,7 +582,7 @@ window.DungeonContent.register("monsters", "bonePriestOfTheHollowChoir", {
   tags: ["undead", "skeletal", "old-guardroom", "boss", "priest", "choir"],
   maxHp: 330,
   category: 6,
-  xp: 8600,
+  xp: 36460,
   ac: 20,
   attackBonus: 11,
   damage: {
@@ -629,7 +629,7 @@ window.DungeonContent.register("monsters", "stitchedSiegeCorpse", {
   maxHp: 198,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 4200,
+  xp: 4260,
   ac: 16,
   attackBonus: 10,
   damage: {
@@ -665,7 +665,7 @@ window.DungeonContent.register("monsters", "graveTarVomiter", {
   tags: ["undead", "zombie", "tar", "plague"],
   maxHp: 172,
   category: 6,
-  xp: 3900,
+  xp: 3955,
   ac: 15,
   attackBonus: 10,
   damage: {
@@ -705,7 +705,7 @@ window.DungeonContent.register("monsters", "corpseMasonJuggernaut", {
   maxHp: 372,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 9300,
+  xp: 39435,
   ac: 18,
   attackBonus: 11,
   damage: {
@@ -753,7 +753,7 @@ window.DungeonContent.register("monsters", "adamantBoneSentinel", {
   maxHp: 220,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 6400,
+  xp: 4705,
   ac: 22,
   attackBonus: 11,
   damage: {
@@ -790,7 +790,7 @@ window.DungeonContent.register("monsters", "marrowStandardBearer", {
   maxHp: 196,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 6900,
+  xp: 5070,
   ac: 20,
   attackBonus: 11,
   damage: {
@@ -827,7 +827,7 @@ window.DungeonContent.register("monsters", "barrowboneCastellan", {
   maxHp: 430,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 13200,
+  xp: 39445,
   ac: 22,
   attackBonus: 12,
   damage: {
@@ -871,7 +871,7 @@ window.DungeonContent.register("monsters", "graveMoundDevourer", {
   maxHp: 248,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 7600,
+  xp: 5580,
   ac: 17,
   attackBonus: 11,
   damage: {
@@ -909,7 +909,7 @@ window.DungeonContent.register("monsters", "rottingPlagueGiant", {
   maxHp: 270,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 8200,
+  xp: 6025,
   ac: 17,
   attackBonus: 12,
   damage: {
@@ -946,7 +946,7 @@ window.DungeonContent.register("monsters", "carrionCrownBrute", {
   maxHp: 460,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 14500,
+  xp: 43315,
   ac: 19,
   attackBonus: 12,
   damage: {
@@ -994,7 +994,7 @@ window.DungeonContent.register("monsters", "royalOssuaryLancer", {
   maxHp: 266,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 9200,
+  xp: 6835,
   ac: 22,
   attackBonus: 12,
   damage: {
@@ -1031,7 +1031,7 @@ window.DungeonContent.register("monsters", "shardboneReaper", {
   maxHp: 248,
   category: 8,
   multiattack: { attacks: 3 },
-  xp: 9800,
+  xp: 7285,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1068,7 +1068,7 @@ window.DungeonContent.register("monsters", "boneTaxCollector", {
   maxHp: 520,
   category: 8,
   multiattack: { attacks: 3 },
-  xp: 18400,
+  xp: 22340,
   ac: 23,
   attackBonus: 13,
   damage: {
@@ -1112,7 +1112,7 @@ window.DungeonContent.register("monsters", "corpseTideColossus", {
   maxHp: 330,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 10500,
+  xp: 7805,
   ac: 18,
   attackBonus: 12,
   damage: {
@@ -1149,7 +1149,7 @@ window.DungeonContent.register("monsters", "blackMoldCadaver", {
   maxHp: 286,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 10000,
+  xp: 7430,
   ac: 17,
   attackBonus: 12,
   damage: {
@@ -1185,7 +1185,7 @@ window.DungeonContent.register("monsters", "plagueKingsCarcass", {
   tags: ["undead", "zombie", "boss", "plague-king"],
   maxHp: 555,
   category: 8,
-  xp: 19800,
+  xp: 24025,
   ac: 20,
   attackBonus: 13,
   damage: {
@@ -1235,7 +1235,7 @@ window.DungeonContent.register("monsters", "paleBellMarrowKnight", {
   maxHp: 318,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 13800,
+  xp: 9460,
   ac: 23,
   attackBonus: 13,
   damage: {
@@ -1271,7 +1271,7 @@ window.DungeonContent.register("monsters", "tombStarArbalest", {
   tags: ["undead", "skeletal", "old-guardroom", "artillery", "tomb-star"],
   maxHp: 292,
   category: 9,
-  xp: 14500,
+  xp: 9950,
   ac: 21,
   attackBonus: 13,
   damage: {
@@ -1309,7 +1309,7 @@ window.DungeonContent.register("monsters", "ossuaryRegent", {
   tags: ["undead", "skeletal", "old-guardroom", "boss", "regent"],
   maxHp: 610,
   category: 9,
-  xp: 22400,
+  xp: 28490,
   ac: 24,
   attackBonus: 14,
   damage: {
@@ -1355,7 +1355,7 @@ window.DungeonContent.register("monsters", "thousandStitchCorpseEngine", {
   maxHp: 380,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 15500,
+  xp: 10630,
   ac: 20,
   attackBonus: 13,
   damage: {
@@ -1392,7 +1392,7 @@ window.DungeonContent.register("monsters", "hungerPitCorpse", {
   maxHp: 355,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 15000,
+  xp: 10285,
   ac: 19,
   attackBonus: 13,
   damage: {
@@ -1428,7 +1428,7 @@ window.DungeonContent.register("monsters", "rotSovereignOfTheMassGrave", {
   tags: ["undead", "zombie", "boss", "rot-sovereign"],
   maxHp: 640,
   category: 9,
-  xp: 24500,
+  xp: 31175,
   ac: 21,
   attackBonus: 14,
   damage: {
@@ -1478,7 +1478,7 @@ window.DungeonContent.register("monsters", "ancientBoneTyrant", {
   maxHp: 405,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 18200,
+  xp: 9960,
   ac: 24,
   attackBonus: 14,
   damage: {
@@ -1516,7 +1516,7 @@ window.DungeonContent.register("monsters", "starvedLegionAvatar", {
   maxHp: 430,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 20500,
+  xp: 11220,
   ac: 23,
   attackBonus: 14,
   damage: {
@@ -1552,7 +1552,7 @@ window.DungeonContent.register("monsters", "firstSkeletonKing", {
   tags: ["undead", "skeletal", "old-guardroom", "boss", "king"],
   maxHp: 720,
   category: 10,
-  xp: 30500,
+  xp: 16685,
   ac: 25,
   attackBonus: 15,
   damage: {
@@ -1598,7 +1598,7 @@ window.DungeonContent.register("monsters", "worldGraveColossus", {
   maxHp: 460,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 21000,
+  xp: 11490,
   ac: 21,
   attackBonus: 14,
   damage: {
@@ -1636,7 +1636,7 @@ window.DungeonContent.register("monsters", "crownRotDevourer", {
   maxHp: 438,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 22200,
+  xp: 12150,
   ac: 20,
   attackBonus: 14,
   damage: {
@@ -1672,7 +1672,7 @@ window.DungeonContent.register("monsters", "lastCorpseEmperor", {
   tags: ["undead", "zombie", "boss", "emperor"],
   maxHp: 760,
   category: 10,
-  xp: 32500,
+  xp: 17780,
   ac: 22,
   attackBonus: 15,
   damage: {

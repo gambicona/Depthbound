@@ -21,7 +21,7 @@ window.DungeonContent.register("monsters", "abyssalDretchling", {
   tags: ["fiend", "demon", "dretch", "brute"],
   maxHp: 16,
   category: 1,
-  xp: 55,
+  xp: 70,
   ac: 11,
   attackBonus: 3,
   damage: {
@@ -58,7 +58,7 @@ window.DungeonContent.register("monsters", "clawImpOfRuin", {
   tags: ["fiend", "demon", "imp", "skirmisher"],
   maxHp: 12,
   category: 1,
-  xp: 60,
+  xp: 75,
   ac: 14,
   attackBonus: 4,
   damage: {
@@ -95,7 +95,7 @@ window.DungeonContent.register("monsters", "spiteMote", {
   tags: ["fiend", "demon", "spirit", "flying", "ranged"],
   maxHp: 10,
   category: 1,
-  xp: 65,
+  xp: 85,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -134,7 +134,7 @@ window.DungeonContent.register("monsters", "gutMawBully", {
   tags: ["fiend", "demon", "boss", "brute", "maw"],
   maxHp: 36,
   category: 1,
-  xp: 150,
+  xp: 1730,
   ac: 13,
   attackBonus: 5,
   damage: {
@@ -183,7 +183,7 @@ window.DungeonContent.register("monsters", "quasitNeedler", {
   tags: ["fiend", "demon", "quasit", "flying", "skirmisher"],
   maxHp: 24,
   category: 2,
-  xp: 150,
+  xp: 415,
   ac: 15,
   attackBonus: 5,
   damage: {
@@ -220,7 +220,7 @@ window.DungeonContent.register("monsters", "mawDemonGnawer", {
   tags: ["fiend", "demon", "maw", "brute"],
   maxHp: 35,
   category: 2,
-  xp: 170,
+  xp: 475,
   ac: 13,
   attackBonus: 5,
   damage: {
@@ -257,7 +257,7 @@ window.DungeonContent.register("monsters", "bloodSmokeHowler", {
   tags: ["fiend", "demon", "howler", "ranged"],
   maxHp: 28,
   category: 2,
-  xp: 160,
+  xp: 450,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -296,7 +296,7 @@ window.DungeonContent.register("monsters", "hornedRiftGorger", {
   tags: ["fiend", "demon", "boss", "brute", "rift"],
   maxHp: 66,
   category: 2,
-  xp: 360,
+  xp: 12165,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -345,7 +345,7 @@ window.DungeonContent.register("monsters", "vrockFledgling", {
   tags: ["fiend", "demon", "vrock", "flying", "brute"],
   maxHp: 48,
   category: 3,
-  xp: 320,
+  xp: 1820,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -382,7 +382,7 @@ window.DungeonContent.register("monsters", "shadowRiftDemon", {
   tags: ["fiend", "demon", "shadow", "skirmisher"],
   maxHp: 40,
   category: 3,
-  xp: 340,
+  xp: 1935,
   ac: 16,
   attackBonus: 7,
   damage: {
@@ -419,7 +419,7 @@ window.DungeonContent.register("monsters", "abyssalSpineThrower", {
   tags: ["fiend", "demon", "spine", "ranged"],
   maxHp: 42,
   category: 3,
-  xp: 330,
+  xp: 1875,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -458,7 +458,7 @@ window.DungeonContent.register("monsters", "screamingVrockMatriarch", {
   tags: ["fiend", "demon", "boss", "vrock", "flying"],
   maxHp: 92,
   category: 3,
-  xp: 700,
+  xp: 15385,
   ac: 16,
   attackBonus: 7,
   damage: {
@@ -508,7 +508,7 @@ window.DungeonContent.register("monsters", "hezrouMudmauler", {
   maxHp: 70,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 600,
+  xp: 1840,
   ac: 16,
   attackBonus: 7,
   damage: {
@@ -545,7 +545,7 @@ window.DungeonContent.register("monsters", "chaosFlameBinder", {
   tags: ["fiend", "demon", "caster", "fire"],
   maxHp: 54,
   category: 4,
-  xp: 620,
+  xp: 1900,
   ac: 16,
   attackBonus: 7,
   damage: {
@@ -585,7 +585,7 @@ window.DungeonContent.register("monsters", "madnessLeaper", {
   maxHp: 60,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 640,
+  xp: 1960,
   ac: 17,
   attackBonus: 8,
   damage: {
@@ -623,7 +623,7 @@ window.DungeonContent.register("monsters", "plagueBellyHezrou", {
   maxHp: 132,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 1350,
+  xp: 13735,
   ac: 17,
   attackBonus: 8,
   damage: {
@@ -673,7 +673,7 @@ window.DungeonContent.register("monsters", "glabrezuPactBreaker", {
   maxHp: 92,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 1000,
+  xp: 2135,
   ac: 17,
   attackBonus: 8,
   damage: {
@@ -711,7 +711,7 @@ window.DungeonContent.register("monsters", "abyssKnightRavager", {
   maxHp: 100,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 1050,
+  xp: 2240,
   ac: 18,
   attackBonus: 9,
   damage: {
@@ -749,7 +749,7 @@ window.DungeonContent.register("monsters", "blinkRiftPredator", {
   maxHp: 84,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 980,
+  xp: 2095,
   ac: 18,
   attackBonus: 9,
   damage: {
@@ -786,7 +786,7 @@ window.DungeonContent.register("monsters", "wishRotDeceiver", {
   tags: ["fiend", "demon", "boss", "glabrezu", "deceiver"],
   maxHp: 188,
   category: 5,
-  xp: 2600,
+  xp: 19135,
   ac: 18,
   attackBonus: 9,
   damage: {
@@ -838,7 +838,7 @@ window.DungeonContent.register("monsters", "nalfeshneeFleshJudge", {
   maxHp: 132,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 1800,
+  xp: 1820,
   ac: 18,
   attackBonus: 10,
   damage: {
@@ -875,7 +875,7 @@ window.DungeonContent.register("monsters", "abyssalMawArtillery", {
   tags: ["fiend", "demon", "artillery", "acid"],
   maxHp: 110,
   category: 6,
-  xp: 1750,
+  xp: 1770,
   ac: 17,
   attackBonus: 10,
   damage: {
@@ -915,7 +915,7 @@ window.DungeonContent.register("monsters", "mutationGorger", {
   maxHp: 124,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 1850,
+  xp: 1885,
   ac: 18,
   attackBonus: 10,
   damage: {
@@ -952,7 +952,7 @@ window.DungeonContent.register("monsters", "threeMouthedRuinJudge", {
   tags: ["fiend", "demon", "boss", "nalfeshnee", "judge"],
   maxHp: 258,
   category: 6,
-  xp: 4600,
+  xp: 19505,
   ac: 19,
   attackBonus: 11,
   damage: {
@@ -1004,7 +1004,7 @@ window.DungeonContent.register("monsters", "sixBladeMarilith", {
   maxHp: 164,
   category: 7,
   multiattack: { attacks: 3 },
-  xp: 2900,
+  xp: 2125,
   ac: 19,
   attackBonus: 11,
   damage: {
@@ -1044,7 +1044,7 @@ window.DungeonContent.register("monsters", "abyssalTyrantSpawn", {
   maxHp: 178,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 3000,
+  xp: 2205,
   ac: 20,
   attackBonus: 11,
   damage: {
@@ -1081,7 +1081,7 @@ window.DungeonContent.register("monsters", "ruinChoirWarlock", {
   tags: ["fiend", "demon", "caster", "psychic"],
   maxHp: 142,
   category: 7,
-  xp: 2800,
+  xp: 2060,
   ac: 18,
   attackBonus: 11,
   damage: {
@@ -1121,7 +1121,7 @@ window.DungeonContent.register("monsters", "bladeQueenSarthyxa", {
   maxHp: 330,
   category: 7,
   multiattack: { attacks: 3 },
-  xp: 7200,
+  xp: 21525,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1171,7 +1171,7 @@ window.DungeonContent.register("monsters", "balorAshbringer", {
   maxHp: 220,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 3900,
+  xp: 2900,
   ac: 20,
   attackBonus: 12,
   damage: {
@@ -1209,7 +1209,7 @@ window.DungeonContent.register("monsters", "abyssStormReaver", {
   tags: ["fiend", "demon", "storm", "artillery"],
   maxHp: 190,
   category: 8,
-  xp: 4000,
+  xp: 2975,
   ac: 19,
   attackBonus: 12,
   damage: {
@@ -1249,7 +1249,7 @@ window.DungeonContent.register("monsters", "apocalypseGoristro", {
   maxHp: 245,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 4100,
+  xp: 3045,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1287,7 +1287,7 @@ window.DungeonContent.register("monsters", "balorRiftGeneral", {
   maxHp: 390,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 9000,
+  xp: 10920,
   ac: 22,
   attackBonus: 13,
   damage: {
@@ -1337,7 +1337,7 @@ window.DungeonContent.register("monsters", "heraldOfTheDemonPrince", {
   tags: ["fiend", "demon", "herald", "commander"],
   maxHp: 238,
   category: 9,
-  xp: 5200,
+  xp: 3570,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1378,7 +1378,7 @@ window.DungeonContent.register("monsters", "abyssalSiegeTitan", {
   maxHp: 280,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 5400,
+  xp: 3705,
   ac: 22,
   attackBonus: 12,
   damage: {
@@ -1416,7 +1416,7 @@ window.DungeonContent.register("monsters", "soulEaterOfTheRift", {
   maxHp: 230,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 5300,
+  xp: 3630,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1454,7 +1454,7 @@ window.DungeonContent.register("monsters", "princeSpawnGharazhul", {
   maxHp: 440,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 11500,
+  xp: 14620,
   ac: 22,
   attackBonus: 13,
   damage: {
@@ -1505,7 +1505,7 @@ window.DungeonContent.register("monsters", "abyssGateColossus", {
   maxHp: 330,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 8500,
+  xp: 4645,
   ac: 22,
   attackBonus: 13,
   damage: {
@@ -1545,7 +1545,7 @@ window.DungeonContent.register("monsters", "avatarOfEndlessHunger", {
   maxHp: 310,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 8700,
+  xp: 4765,
   ac: 22,
   attackBonus: 13,
   damage: {
@@ -1583,7 +1583,7 @@ window.DungeonContent.register("monsters", "chaosStarSeraph", {
   tags: ["fiend", "demon", "seraph", "flying", "caster"],
   maxHp: 286,
   category: 10,
-  xp: 8800,
+  xp: 4810,
   ac: 23,
   attackBonus: 13,
   damage: {
@@ -1624,7 +1624,7 @@ window.DungeonContent.register("monsters", "manifestDemonPrinceAzrakhul", {
   tags: ["fiend", "demon", "boss", "demon-prince", "avatar"],
   maxHp: 600,
   category: 10,
-  xp: 25000,
+  xp: 13675,
   ac: 23,
   attackBonus: 14,
   damage: {

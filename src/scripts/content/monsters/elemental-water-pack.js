@@ -18,7 +18,7 @@ window.DungeonContent.register("monsters", "dripling", {
   tags: ["elemental", "water", "small", "skirmisher"],
   maxHp: 12,
   category: 1,
-  xp: 55,
+  xp: 70,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -51,7 +51,7 @@ window.DungeonContent.register("monsters", "frostSlickSpriggan", {
   tags: ["elemental", "water", "ice", "frost", "paraelemental"],
   maxHp: 13,
   category: 1,
-  xp: 60,
+  xp: 75,
   ac: 12,
   attackBonus: 4,
   damage: {
@@ -84,7 +84,7 @@ window.DungeonContent.register("monsters", "steamMephitling", {
   tags: ["elemental", "water", "steam", "paraelemental", "flying", "ranged"],
   maxHp: 15,
   category: 1,
-  xp: 65,
+  xp: 85,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -117,7 +117,7 @@ window.DungeonContent.register("monsters", "drownedPoolLurker", {
   tags: ["elemental", "water", "drowned", "pool", "boss"],
   maxHp: 32,
   category: 1,
-  xp: 150,
+  xp: 1730,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -160,7 +160,7 @@ window.DungeonContent.register("monsters", "brineLash", {
   tags: ["elemental", "water", "brine", "skirmisher"],
   maxHp: 26,
   category: 2,
-  xp: 155,
+  xp: 435,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -193,7 +193,7 @@ window.DungeonContent.register("monsters", "iceShardImpaler", {
   tags: ["elemental", "water", "ice", "ranged"],
   maxHp: 24,
   category: 2,
-  xp: 160,
+  xp: 450,
   ac: 15,
   attackBonus: 5,
   damage: {
@@ -226,7 +226,7 @@ window.DungeonContent.register("monsters", "mistveilStrangler", {
   tags: ["elemental", "water", "mist", "paraelemental", "controller"],
   maxHp: 30,
   category: 2,
-  xp: 170,
+  xp: 475,
   ac: 13,
   attackBonus: 5,
   damage: {
@@ -259,7 +259,7 @@ window.DungeonContent.register("monsters", "tidepoolTyrant", {
   tags: ["elemental", "water", "tide", "boss", "controller"],
   maxHp: 62,
   category: 2,
-  xp: 380,
+  xp: 12895,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -302,7 +302,7 @@ window.DungeonContent.register("monsters", "riverMyrmidon", {
   tags: ["elemental", "water", "river", "myrmidon"],
   maxHp: 48,
   category: 3,
-  xp: 330,
+  xp: 1875,
   ac: 16,
   attackBonus: 6,
   damage: {
@@ -335,7 +335,7 @@ window.DungeonContent.register("monsters", "rimefinHunter", {
   tags: ["elemental", "water", "ice", "hunter", "skirmisher"],
   maxHp: 52,
   category: 3,
-  xp: 340,
+  xp: 1935,
   ac: 14,
   attackBonus: 6,
   damage: {
@@ -368,7 +368,7 @@ window.DungeonContent.register("monsters", "boilingSprayElemental", {
   tags: ["elemental", "water", "steam", "boiling", "paraelemental", "ranged"],
   maxHp: 55,
   category: 3,
-  xp: 350,
+  xp: 1990,
   ac: 16,
   attackBonus: 6,
   damage: {
@@ -401,7 +401,7 @@ window.DungeonContent.register("monsters", "whitewaterMatron", {
   tags: ["elemental", "water", "river", "boss", "matron"],
   maxHp: 105,
   category: 3,
-  xp: 780,
+  xp: 17125,
   ac: 17,
   attackBonus: 7,
   damage: {
@@ -446,7 +446,7 @@ window.DungeonContent.register("monsters", "deepcurrentCrusher", {
   maxHp: 78,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 620,
+  xp: 1900,
   ac: 17,
   attackBonus: 7,
   damage: {
@@ -480,7 +480,7 @@ window.DungeonContent.register("monsters", "snowmeltPhantom", {
   maxHp: 82,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 640,
+  xp: 1960,
   ac: 16,
   attackBonus: 7,
   damage: {
@@ -514,7 +514,7 @@ window.DungeonContent.register("monsters", "coralSpearSentinel", {
   maxHp: 90,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 660,
+  xp: 2020,
   ac: 18,
   attackBonus: 7,
   damage: {
@@ -548,7 +548,7 @@ window.DungeonContent.register("monsters", "brineCrownedHorror", {
   maxHp: 150,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 1450,
+  xp: 14755,
   ac: 18,
   attackBonus: 8,
   damage: {
@@ -593,7 +593,7 @@ window.DungeonContent.register("monsters", "glacierbackGuardian", {
   maxHp: 118,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 1000,
+  xp: 2135,
   ac: 18,
   attackBonus: 8,
   damage: {
@@ -627,7 +627,7 @@ window.DungeonContent.register("monsters", "acidicMireParaelemental", {
   maxHp: 105,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 1030,
+  xp: 2195,
   ac: 17,
   attackBonus: 8,
   damage: {
@@ -661,7 +661,7 @@ window.DungeonContent.register("monsters", "whirlpoolDancer", {
   maxHp: 125,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 1060,
+  xp: 2265,
   ac: 18,
   attackBonus: 8,
   damage: {
@@ -696,7 +696,7 @@ window.DungeonContent.register("monsters", "frostTideLeviathan", {
   maxHp: 205,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 2650,
+  xp: 19525,
   ac: 19,
   attackBonus: 9,
   damage: {
@@ -741,7 +741,7 @@ window.DungeonContent.register("monsters", "blackwaterColossus", {
   maxHp: 155,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 1800,
+  xp: 1820,
   ac: 19,
   attackBonus: 9,
   damage: {
@@ -774,7 +774,7 @@ window.DungeonContent.register("monsters", "steamstormOracle", {
   tags: ["elemental", "water", "steam", "storm", "caster", "ranged"],
   maxHp: 135,
   category: 6,
-  xp: 1840,
+  xp: 1870,
   ac: 18,
   attackBonus: 9,
   damage: {
@@ -809,7 +809,7 @@ window.DungeonContent.register("monsters", "icebergBreaker", {
   maxHp: 165,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 1880,
+  xp: 1910,
   ac: 19,
   attackBonus: 9,
   damage: {
@@ -843,7 +843,7 @@ window.DungeonContent.register("monsters", "pearlEyedAbyssalRegent", {
   tags: ["elemental", "water", "deep", "abyssal", "boss", "regent"],
   maxHp: 260,
   category: 6,
-  xp: 4650,
+  xp: 19715,
   ac: 20,
   attackBonus: 10,
   damage: {
@@ -887,7 +887,7 @@ window.DungeonContent.register("monsters", "tsunamiHerald", {
   maxHp: 195,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 2850,
+  xp: 2100,
   ac: 20,
   attackBonus: 10,
   damage: {
@@ -921,7 +921,7 @@ window.DungeonContent.register("monsters", "bloodBrineRavager", {
   maxHp: 185,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 2950,
+  xp: 2165,
   ac: 19,
   attackBonus: 10,
   damage: {
@@ -954,7 +954,7 @@ window.DungeonContent.register("monsters", "hailglassHarrier", {
   tags: ["elemental", "water", "hail", "glass", "paraelemental", "flying", "ranged"],
   maxHp: 190,
   category: 7,
-  xp: 3050,
+  xp: 2245,
   ac: 20,
   attackBonus: 10,
   damage: {
@@ -988,7 +988,7 @@ window.DungeonContent.register("monsters", "maelstromBaron", {
   maxHp: 315,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 7300,
+  xp: 21790,
   ac: 21,
   attackBonus: 11,
   damage: {
@@ -1033,7 +1033,7 @@ window.DungeonContent.register("monsters", "livingGlacier", {
   maxHp: 235,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 3950,
+  xp: 2930,
   ac: 21,
   attackBonus: 11,
   damage: {
@@ -1066,7 +1066,7 @@ window.DungeonContent.register("monsters", "drowningMistArchon", {
   tags: ["elemental", "water", "mist", "archon", "controller", "flying"],
   maxHp: 220,
   category: 8,
-  xp: 4050,
+  xp: 3005,
   ac: 20,
   attackBonus: 11,
   damage: {
@@ -1101,7 +1101,7 @@ window.DungeonContent.register("monsters", "coralCathedralBeast", {
   maxHp: 250,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 4150,
+  xp: 3090,
   ac: 22,
   attackBonus: 11,
   damage: {
@@ -1136,7 +1136,7 @@ window.DungeonContent.register("monsters", "queenOfTheCrushingDeep", {
   maxHp: 385,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 9200,
+  xp: 11160,
   ac: 22,
   attackBonus: 12,
   damage: {
@@ -1181,7 +1181,7 @@ window.DungeonContent.register("monsters", "oceanicAvatar", {
   maxHp: 285,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 5250,
+  xp: 3600,
   ac: 22,
   attackBonus: 12,
   damage: {
@@ -1215,7 +1215,7 @@ window.DungeonContent.register("monsters", "absoluteZeroElemental", {
   maxHp: 270,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 5350,
+  xp: 3675,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1249,7 +1249,7 @@ window.DungeonContent.register("monsters", "boilingWorldspring", {
   tags: ["elemental", "water", "boiling", "spring", "paraelemental", "ranged"],
   maxHp: 300,
   category: 9,
-  xp: 5450,
+  xp: 3730,
   ac: 23,
   attackBonus: 12,
   damage: {
@@ -1284,7 +1284,7 @@ window.DungeonContent.register("monsters", "theLeviathanCurrent", {
   maxHp: 460,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 11800,
+  xp: 14995,
   ac: 23,
   attackBonus: 13,
   damage: {
@@ -1329,7 +1329,7 @@ window.DungeonContent.register("monsters", "primordialSea", {
   maxHp: 360,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 8600,
+  xp: 4705,
   ac: 23,
   attackBonus: 14,
   damage: {
@@ -1364,7 +1364,7 @@ window.DungeonContent.register("monsters", "polarNightColossus", {
   maxHp: 340,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 8800,
+  xp: 4810,
   ac: 23,
   attackBonus: 14,
   damage: {
@@ -1398,7 +1398,7 @@ window.DungeonContent.register("monsters", "cloudburstWorldEater", {
   tags: ["elemental", "water", "rain", "storm", "paraelemental", "flying"],
   maxHp: 380,
   category: 10,
-  xp: 9000,
+  xp: 4930,
   ac: 24,
   attackBonus: 14,
   damage: {
@@ -1433,7 +1433,7 @@ window.DungeonContent.register("monsters", "sovereignOfTheEndlessDeluge", {
   maxHp: 620,
   category: 10,
   multiattack: { attacks: 3 },
-  xp: 25000,
+  xp: 13675,
   ac: 24,
   attackBonus: 15,
   damage: {

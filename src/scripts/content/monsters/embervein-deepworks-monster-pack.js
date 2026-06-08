@@ -26,7 +26,7 @@ window.DungeonContent.register("monsters", "sootTunnelRat", {
   tags: ["beast", "mine", "soot", "skirmisher"],
   maxHp: 10,
   category: 1,
-  xp: 45,
+  xp: 55,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -62,7 +62,7 @@ window.DungeonContent.register("monsters", "coalDustGoblin", {
   tags: ["humanoid", "goblin", "mine", "ambusher"],
   maxHp: 12,
   category: 1,
-  xp: 55,
+  xp: 70,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -100,7 +100,7 @@ window.DungeonContent.register("monsters", "bentGearScarab", {
   tags: ["construct", "gear", "mine", "crawler"],
   maxHp: 14,
   category: 1,
-  xp: 65,
+  xp: 85,
   ac: 14,
   attackBonus: 4,
   damage: {
@@ -136,7 +136,7 @@ window.DungeonContent.register("monsters", "sootbeardShiftBoss", {
   tags: ["humanoid", "dwarf", "duergar", "boss", "overseer"],
   maxHp: 30,
   category: 1,
-  xp: 130,
+  xp: 1475,
   ac: 14,
   attackBonus: 4,
   damage: {
@@ -183,7 +183,7 @@ window.DungeonContent.register("monsters", "furnaceMephit", {
   tags: ["elemental", "fire", "mephit", "flying"],
   maxHp: 24,
   category: 2,
-  xp: 140,
+  xp: 390,
   ac: 13,
   attackBonus: 5,
   damage: {
@@ -221,7 +221,7 @@ window.DungeonContent.register("monsters", "oreShellCrawler", {
   tags: ["monstrosity", "ore", "crawler", "mine"],
   maxHp: 32,
   category: 2,
-  xp: 170,
+  xp: 475,
   ac: 16,
   attackBonus: 5,
   damage: {
@@ -257,7 +257,7 @@ window.DungeonContent.register("monsters", "deepDwarfChainGuard", {
   tags: ["humanoid", "dwarf", "duergar", "guard", "chain"],
   maxHp: 28,
   category: 2,
-  xp: 160,
+  xp: 450,
   ac: 15,
   attackBonus: 5,
   damage: {
@@ -293,7 +293,7 @@ window.DungeonContent.register("monsters", "chainHoistOverseer", {
   tags: ["humanoid", "dwarf", "duergar", "boss", "chain"],
   maxHp: 62,
   category: 2,
-  xp: 430,
+  xp: 14595,
   ac: 16,
   attackBonus: 6,
   damage: {
@@ -340,7 +340,7 @@ window.DungeonContent.register("monsters", "slagSlime", {
   tags: ["ooze", "slag", "fire", "acid"],
   maxHp: 46,
   category: 3,
-  xp: 380,
+  xp: 2155,
   ac: 11,
   attackBonus: 6,
   damage: {
@@ -376,7 +376,7 @@ window.DungeonContent.register("monsters", "animatedAnvil", {
   tags: ["construct", "forge", "anvil", "brute"],
   maxHp: 58,
   category: 3,
-  xp: 470,
+  xp: 2670,
   ac: 17,
   attackBonus: 6,
   damage: {
@@ -412,7 +412,7 @@ window.DungeonContent.register("monsters", "steamPipeGremlin", {
   tags: ["fey", "gremlin", "steam", "saboteur"],
   maxHp: 42,
   category: 3,
-  xp: 420,
+  xp: 2385,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -450,7 +450,7 @@ window.DungeonContent.register("monsters", "furnaceWardGuardian", {
   tags: ["construct", "forge", "boss", "guardian"],
   maxHp: 108,
   category: 3,
-  xp: 1050,
+  xp: 23075,
   ac: 18,
   attackBonus: 7,
   damage: {
@@ -498,7 +498,7 @@ window.DungeonContent.register("monsters", "magmaVeinLoper", {
   maxHp: 78,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 850,
+  xp: 2610,
   ac: 16,
   attackBonus: 8,
   damage: {
@@ -534,7 +534,7 @@ window.DungeonContent.register("monsters", "powderKegSaboteur", {
   tags: ["humanoid", "kobold", "mine", "explosive"],
   maxHp: 66,
   category: 4,
-  xp: 900,
+  xp: 2765,
   ac: 15,
   attackBonus: 8,
   damage: {
@@ -573,7 +573,7 @@ window.DungeonContent.register("monsters", "brokenGearHorror", {
   maxHp: 88,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 1100,
+  xp: 3370,
   ac: 18,
   attackBonus: 8,
   damage: {
@@ -610,7 +610,7 @@ window.DungeonContent.register("monsters", "slagmawBrute", {
   maxHp: 152,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 2400,
+  xp: 24425,
   ac: 17,
   attackBonus: 9,
   damage: {
@@ -657,7 +657,7 @@ window.DungeonContent.register("monsters", "blackFurnaceDrowOverseer", {
   tags: ["humanoid", "drow", "overseer", "underdark"],
   maxHp: 108,
   category: 5,
-  xp: 1900,
+  xp: 4055,
   ac: 17,
   attackBonus: 9,
   damage: {
@@ -695,7 +695,7 @@ window.DungeonContent.register("monsters", "smokeBelcher", {
   tags: ["elemental", "smoke", "air", "fire", "paraelemental"],
   maxHp: 118,
   category: 5,
-  xp: 2300,
+  xp: 4905,
   ac: 16,
   attackBonus: 9,
   damage: {
@@ -734,7 +734,7 @@ window.DungeonContent.register("monsters", "awakenedSupportBeam", {
   maxHp: 130,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 2500,
+  xp: 5335,
   ac: 16,
   attackBonus: 9,
   damage: {
@@ -771,7 +771,7 @@ window.DungeonContent.register("monsters", "redValveEngine", {
   tags: ["construct", "engine", "steam", "boss"],
   maxHp: 220,
   category: 5,
-  xp: 5200,
+  xp: 38305,
   ac: 19,
   attackBonus: 10,
   damage: {
@@ -821,7 +821,7 @@ window.DungeonContent.register("monsters", "oreEatingWormling", {
   maxHp: 150,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 3400,
+  xp: 3450,
   ac: 18,
   attackBonus: 10,
   damage: {
@@ -857,7 +857,7 @@ window.DungeonContent.register("monsters", "hellfireStoker", {
   tags: ["fiend", "devil", "hellfire", "stoker"],
   maxHp: 138,
   category: 6,
-  xp: 3800,
+  xp: 3855,
   ac: 17,
   attackBonus: 10,
   damage: {
@@ -896,7 +896,7 @@ window.DungeonContent.register("monsters", "salamanderForgeNoble", {
   maxHp: 176,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 4700,
+  xp: 4770,
   ac: 18,
   attackBonus: 11,
   damage: {
@@ -933,7 +933,7 @@ window.DungeonContent.register("monsters", "masterOfBrokenGears", {
   maxHp: 310,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 8600,
+  xp: 36460,
   ac: 20,
   attackBonus: 11,
   damage: {
@@ -982,7 +982,7 @@ window.DungeonContent.register("monsters", "adamantineMineGolem", {
   maxHp: 220,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 6400,
+  xp: 4705,
   ac: 21,
   attackBonus: 11,
   damage: {
@@ -1019,7 +1019,7 @@ window.DungeonContent.register("monsters", "glassSlagElemental", {
   maxHp: 195,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 7100,
+  xp: 5215,
   ac: 19,
   attackBonus: 11,
   damage: {
@@ -1056,7 +1056,7 @@ window.DungeonContent.register("monsters", "infernalChainwright", {
   maxHp: 205,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 8200,
+  xp: 6025,
   ac: 19,
   attackBonus: 12,
   damage: {
@@ -1093,7 +1093,7 @@ window.DungeonContent.register("monsters", "ironthaneOfTheDeepworks", {
   maxHp: 390,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 13200,
+  xp: 39445,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1142,7 +1142,7 @@ window.DungeonContent.register("monsters", "conveyorBeltDevourer", {
   maxHp: 270,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 9200,
+  xp: 6835,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1179,7 +1179,7 @@ window.DungeonContent.register("monsters", "livingBlackOil", {
   maxHp: 245,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 10000,
+  xp: 7430,
   ac: 14,
   attackBonus: 12,
   damage: {
@@ -1217,7 +1217,7 @@ window.DungeonContent.register("monsters", "volcanicDeepDrake", {
   maxHp: 292,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 11800,
+  xp: 8765,
   ac: 20,
   attackBonus: 13,
   damage: {
@@ -1255,7 +1255,7 @@ window.DungeonContent.register("monsters", "forgeheartColossus", {
   maxHp: 490,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 18400,
+  xp: 22340,
   ac: 22,
   attackBonus: 13,
   damage: {
@@ -1302,7 +1302,7 @@ window.DungeonContent.register("monsters", "emberveinPitEngineer", {
   tags: ["fiend", "devil", "engineer", "hellfire"],
   maxHp: 318,
   category: 9,
-  xp: 13800,
+  xp: 9460,
   ac: 21,
   attackBonus: 13,
   damage: {
@@ -1342,7 +1342,7 @@ window.DungeonContent.register("monsters", "oreveinTitan", {
   maxHp: 340,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 15000,
+  xp: 10285,
   ac: 22,
   attackBonus: 13,
   damage: {
@@ -1379,7 +1379,7 @@ window.DungeonContent.register("monsters", "pressureCoreElemental", {
   tags: ["elemental", "air", "fire", "steam", "pressure"],
   maxHp: 302,
   category: 9,
-  xp: 16200,
+  xp: 11110,
   ac: 21,
   attackBonus: 13,
   damage: {
@@ -1417,7 +1417,7 @@ window.DungeonContent.register("monsters", "queenOfCindersAndChains", {
   tags: ["fiend", "devil", "boss", "chain", "fire"],
   maxHp: 575,
   category: 9,
-  xp: 22400,
+  xp: 28490,
   ac: 23,
   attackBonus: 14,
   damage: {
@@ -1468,7 +1468,7 @@ window.DungeonContent.register("monsters", "primordialSlagAncient", {
   maxHp: 360,
   category: 10,
   multiattack: { attacks: 3 },
-  xp: 18200,
+  xp: 9960,
   ac: 23,
   attackBonus: 14,
   damage: {
@@ -1505,7 +1505,7 @@ window.DungeonContent.register("monsters", "catastropheEngine", {
   tags: ["construct", "engine", "catastrophe", "forge"],
   maxHp: 388,
   category: 10,
-  xp: 20500,
+  xp: 11220,
   ac: 24,
   attackBonus: 14,
   damage: {
@@ -1545,7 +1545,7 @@ window.DungeonContent.register("monsters", "worldAnvilDragon", {
   maxHp: 375,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 22200,
+  xp: 12150,
   ac: 23,
   attackBonus: 14,
   damage: {
@@ -1582,7 +1582,7 @@ window.DungeonContent.register("monsters", "theEmberveinAwakened", {
   tags: ["elemental", "fire", "earth", "boss", "dungeon-core"],
   maxHp: 680,
   category: 10,
-  xp: 30500,
+  xp: 16685,
   ac: 24,
   attackBonus: 15,
   damage: {

@@ -36,7 +36,7 @@
     maxHp: 78,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 850,
+    xp: 2610,
     ac: 16,
     attackBonus: 8,
     damage: {
@@ -71,7 +71,7 @@
     maxHp: 88,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 1100,
+    xp: 3370,
     ac: 17,
     attackBonus: 8,
     damage: {
@@ -107,7 +107,7 @@
     maxHp: 152,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 2400,
+    xp: 24425,
     ac: 18,
     attackBonus: 9,
     damage: {
@@ -151,7 +151,7 @@
     maxHp: 108,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 1900,
+    xp: 4055,
     ac: 17,
     attackBonus: 9,
     damage: {
@@ -188,7 +188,7 @@
     maxHp: 126,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 2300,
+    xp: 4905,
     ac: 16,
     attackBonus: 9,
     damage: {
@@ -228,7 +228,7 @@
     maxHp: 220,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 5200,
+    xp: 38305,
     ac: 19,
     attackBonus: 10,
     damage: {
@@ -273,7 +273,7 @@
     maxHp: 148,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 3400,
+    xp: 3450,
     ac: 18,
     attackBonus: 10,
     damage: {
@@ -308,7 +308,7 @@
     maxHp: 172,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 4700,
+    xp: 4770,
     ac: 17,
     attackBonus: 11,
     damage: {
@@ -344,7 +344,7 @@
     maxHp: 310,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 8600,
+    xp: 36460,
     ac: 20,
     attackBonus: 11,
     damage: {
@@ -389,7 +389,7 @@
     maxHp: 196,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 6400,
+    xp: 4705,
     ac: 19,
     attackBonus: 11,
     damage: {
@@ -426,7 +426,7 @@
     maxHp: 224,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 8200,
+    xp: 6025,
     ac: 18,
     attackBonus: 12,
     damage: {
@@ -465,7 +465,7 @@
     maxHp: 390,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 13200,
+    xp: 39445,
     ac: 21,
     attackBonus: 12,
     damage: {
@@ -510,7 +510,7 @@
     maxHp: 248,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 9200,
+    xp: 6835,
     ac: 20,
     attackBonus: 12,
     damage: {
@@ -547,7 +547,7 @@
     maxHp: 288,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 11800,
+    xp: 8765,
     ac: 19,
     attackBonus: 13,
     damage: {
@@ -585,7 +585,7 @@
     maxHp: 490,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 18400,
+    xp: 22340,
     ac: 22,
     attackBonus: 13,
     damage: {
@@ -629,7 +629,7 @@
     maxHp: 318,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 13800,
+    xp: 9460,
     ac: 21,
     attackBonus: 13,
     damage: {
@@ -665,7 +665,7 @@
     maxHp: 348,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 16200,
+    xp: 11110,
     ac: 20,
     attackBonus: 13,
     damage: {
@@ -702,7 +702,7 @@
     maxHp: 575,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 22400,
+    xp: 28490,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -747,7 +747,7 @@
     maxHp: 368,
     category: 10,
     multiattack: { attacks: 3 },
-    xp: 18200,
+    xp: 9960,
     ac: 22,
     attackBonus: 14,
     damage: {
@@ -784,7 +784,7 @@
     maxHp: 398,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 22200,
+    xp: 12150,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -821,7 +821,7 @@
     maxHp: 680,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 30500,
+    xp: 16685,
     ac: 24,
     attackBonus: 15,
     damage: {
@@ -872,7 +872,7 @@
     maxHp: 78,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 850,
+    xp: 2610,
     ac: 16,
     attackBonus: 8,
     damage: {
@@ -915,7 +915,7 @@
     maxHp: 88,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 1100,
+    xp: 3370,
     ac: 17,
     attackBonus: 8,
     damage: {
@@ -958,7 +958,7 @@
     maxHp: 152,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 2400,
+    xp: 24425,
     ac: 18,
     attackBonus: 9,
     damage: {
@@ -1010,7 +1010,7 @@
     maxHp: 108,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 1900,
+    xp: 4055,
     ac: 17,
     attackBonus: 9,
     damage: {
@@ -1052,7 +1052,7 @@
     maxHp: 126,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 2300,
+    xp: 4905,
     ac: 16,
     attackBonus: 9,
     damage: {
@@ -1096,7 +1096,7 @@
     maxHp: 220,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 5200,
+    xp: 38305,
     ac: 19,
     attackBonus: 10,
     damage: {
@@ -1149,7 +1149,7 @@
     maxHp: 148,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 3400,
+    xp: 3450,
     ac: 18,
     attackBonus: 10,
     damage: {
@@ -1190,7 +1190,7 @@
     maxHp: 172,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 4700,
+    xp: 4770,
     ac: 17,
     attackBonus: 11,
     damage: {
@@ -1234,7 +1234,7 @@
     maxHp: 310,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 8600,
+    xp: 36460,
     ac: 20,
     attackBonus: 11,
     damage: {
@@ -1287,7 +1287,7 @@
     maxHp: 196,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 6400,
+    xp: 4705,
     ac: 19,
     attackBonus: 11,
     damage: {
@@ -1331,7 +1331,7 @@
     maxHp: 224,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 8200,
+    xp: 6025,
     ac: 18,
     attackBonus: 12,
     damage: {
@@ -1373,7 +1373,7 @@
     maxHp: 390,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 13200,
+    xp: 39445,
     ac: 21,
     attackBonus: 12,
     damage: {
@@ -1424,7 +1424,7 @@
     maxHp: 248,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 9200,
+    xp: 6835,
     ac: 20,
     attackBonus: 12,
     damage: {
@@ -1467,7 +1467,7 @@
     maxHp: 288,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 11800,
+    xp: 8765,
     ac: 19,
     attackBonus: 13,
     damage: {
@@ -1511,7 +1511,7 @@
     maxHp: 490,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 18400,
+    xp: 22340,
     ac: 22,
     attackBonus: 13,
     damage: {
@@ -1564,7 +1564,7 @@
     maxHp: 318,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 13800,
+    xp: 9460,
     ac: 21,
     attackBonus: 13,
     damage: {
@@ -1607,7 +1607,7 @@
     maxHp: 348,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 16200,
+    xp: 11110,
     ac: 20,
     attackBonus: 13,
     damage: {
@@ -1650,7 +1650,7 @@
     maxHp: 575,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 22400,
+    xp: 28490,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -1704,7 +1704,7 @@
     maxHp: 368,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 18200,
+    xp: 9960,
     ac: 22,
     attackBonus: 14,
     damage: {
@@ -1747,7 +1747,7 @@
     maxHp: 398,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 22200,
+    xp: 12150,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -1792,7 +1792,7 @@
     maxHp: 680,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 30500,
+    xp: 16685,
     ac: 24,
     attackBonus: 15,
     damage: {
@@ -1849,7 +1849,7 @@
     maxHp: 78,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 850,
+    xp: 2610,
     ac: 16,
     attackBonus: 8,
     damage: {
@@ -1886,7 +1886,7 @@
     maxHp: 88,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 1100,
+    xp: 3370,
     ac: 17,
     attackBonus: 8,
     damage: {
@@ -1922,7 +1922,7 @@
     maxHp: 152,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 2400,
+    xp: 24425,
     ac: 18,
     attackBonus: 9,
     damage: {
@@ -1970,7 +1970,7 @@
     maxHp: 108,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 1900,
+    xp: 4055,
     ac: 17,
     attackBonus: 9,
     damage: {
@@ -2007,7 +2007,7 @@
     maxHp: 126,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 2300,
+    xp: 4905,
     ac: 16,
     attackBonus: 9,
     damage: {
@@ -2044,7 +2044,7 @@
     maxHp: 220,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 5200,
+    xp: 38305,
     ac: 19,
     attackBonus: 10,
     damage: {
@@ -2089,7 +2089,7 @@
     maxHp: 148,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 3400,
+    xp: 3450,
     ac: 18,
     attackBonus: 10,
     damage: {
@@ -2128,7 +2128,7 @@
     maxHp: 172,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 4700,
+    xp: 4770,
     ac: 17,
     attackBonus: 11,
     damage: {
@@ -2165,7 +2165,7 @@
     maxHp: 310,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 8600,
+    xp: 36460,
     ac: 20,
     attackBonus: 11,
     damage: {
@@ -2215,7 +2215,7 @@
     maxHp: 196,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 6400,
+    xp: 4705,
     ac: 19,
     attackBonus: 11,
     damage: {
@@ -2255,7 +2255,7 @@
     maxHp: 224,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 8200,
+    xp: 6025,
     ac: 18,
     attackBonus: 12,
     damage: {
@@ -2294,7 +2294,7 @@
     maxHp: 390,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 13200,
+    xp: 39445,
     ac: 21,
     attackBonus: 12,
     damage: {
@@ -2339,7 +2339,7 @@
     maxHp: 248,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 9200,
+    xp: 6835,
     ac: 20,
     attackBonus: 12,
     damage: {
@@ -2374,7 +2374,7 @@
     maxHp: 288,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 11800,
+    xp: 8765,
     ac: 19,
     attackBonus: 13,
     damage: {
@@ -2411,7 +2411,7 @@
     maxHp: 490,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 18400,
+    xp: 22340,
     ac: 22,
     attackBonus: 13,
     damage: {
@@ -2457,7 +2457,7 @@
     maxHp: 318,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 13800,
+    xp: 9460,
     ac: 21,
     attackBonus: 13,
     damage: {
@@ -2493,7 +2493,7 @@
     maxHp: 348,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 16200,
+    xp: 11110,
     ac: 20,
     attackBonus: 13,
     damage: {
@@ -2530,7 +2530,7 @@
     maxHp: 575,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 22400,
+    xp: 28490,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -2578,7 +2578,7 @@
     maxHp: 368,
     category: 10,
     multiattack: { attacks: 3 },
-    xp: 18200,
+    xp: 9960,
     ac: 22,
     attackBonus: 14,
     damage: {
@@ -2615,7 +2615,7 @@
     maxHp: 398,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 22200,
+    xp: 12150,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -2654,7 +2654,7 @@
     maxHp: 680,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 30500,
+    xp: 16685,
     ac: 24,
     attackBonus: 15,
     damage: {
@@ -2704,7 +2704,7 @@
     maxHp: 78,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 850,
+    xp: 2610,
     ac: 16,
     attackBonus: 8,
     damage: {
@@ -2740,7 +2740,7 @@
     maxHp: 88,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 1100,
+    xp: 3370,
     ac: 17,
     attackBonus: 8,
     damage: {
@@ -2777,7 +2777,7 @@
     maxHp: 152,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 2400,
+    xp: 24425,
     ac: 18,
     attackBonus: 9,
     damage: {
@@ -2821,7 +2821,7 @@
     maxHp: 108,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 1900,
+    xp: 4055,
     ac: 17,
     attackBonus: 9,
     damage: {
@@ -2858,7 +2858,7 @@
     maxHp: 126,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 2300,
+    xp: 4905,
     ac: 16,
     attackBonus: 9,
     damage: {
@@ -2898,7 +2898,7 @@
     maxHp: 220,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 5200,
+    xp: 38305,
     ac: 19,
     attackBonus: 10,
     damage: {
@@ -2942,7 +2942,7 @@
     maxHp: 148,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 3400,
+    xp: 3450,
     ac: 18,
     attackBonus: 10,
     damage: {
@@ -2978,7 +2978,7 @@
     maxHp: 172,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 4700,
+    xp: 4770,
     ac: 17,
     attackBonus: 11,
     damage: {
@@ -3014,7 +3014,7 @@
     maxHp: 310,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 8600,
+    xp: 36460,
     ac: 20,
     attackBonus: 11,
     damage: {
@@ -3059,7 +3059,7 @@
     maxHp: 196,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 6400,
+    xp: 4705,
     ac: 19,
     attackBonus: 11,
     damage: {
@@ -3096,7 +3096,7 @@
     maxHp: 224,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 8200,
+    xp: 6025,
     ac: 18,
     attackBonus: 12,
     damage: {
@@ -3137,7 +3137,7 @@
     maxHp: 390,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 13200,
+    xp: 39445,
     ac: 21,
     attackBonus: 12,
     damage: {
@@ -3186,7 +3186,7 @@
     maxHp: 248,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 9200,
+    xp: 6835,
     ac: 20,
     attackBonus: 12,
     damage: {
@@ -3222,7 +3222,7 @@
     maxHp: 288,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 11800,
+    xp: 8765,
     ac: 19,
     attackBonus: 13,
     damage: {
@@ -3259,7 +3259,7 @@
     maxHp: 490,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 18400,
+    xp: 22340,
     ac: 22,
     attackBonus: 13,
     damage: {
@@ -3304,7 +3304,7 @@
     maxHp: 318,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 13800,
+    xp: 9460,
     ac: 21,
     attackBonus: 13,
     damage: {
@@ -3340,7 +3340,7 @@
     maxHp: 348,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 16200,
+    xp: 11110,
     ac: 20,
     attackBonus: 13,
     damage: {
@@ -3381,7 +3381,7 @@
     maxHp: 575,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 22400,
+    xp: 28490,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -3430,7 +3430,7 @@
     maxHp: 368,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 18200,
+    xp: 9960,
     ac: 22,
     attackBonus: 14,
     damage: {
@@ -3468,7 +3468,7 @@
     maxHp: 398,
     category: 10,
     multiattack: { attacks: 3 },
-    xp: 22200,
+    xp: 12150,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -3509,7 +3509,7 @@
     maxHp: 680,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 30500,
+    xp: 16685,
     ac: 24,
     attackBonus: 15,
     damage: {
@@ -3560,7 +3560,7 @@
     maxHp: 78,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 850,
+    xp: 2610,
     ac: 16,
     attackBonus: 8,
     damage: {
@@ -3603,7 +3603,7 @@
     maxHp: 88,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 1100,
+    xp: 3370,
     ac: 17,
     attackBonus: 8,
     damage: {
@@ -3646,7 +3646,7 @@
     maxHp: 152,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 2400,
+    xp: 24425,
     ac: 18,
     attackBonus: 9,
     damage: {
@@ -3698,7 +3698,7 @@
     maxHp: 108,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 1900,
+    xp: 4055,
     ac: 17,
     attackBonus: 9,
     damage: {
@@ -3741,7 +3741,7 @@
     maxHp: 126,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 2300,
+    xp: 4905,
     ac: 16,
     attackBonus: 9,
     damage: {
@@ -3785,7 +3785,7 @@
     maxHp: 220,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 5200,
+    xp: 38305,
     ac: 19,
     attackBonus: 10,
     damage: {
@@ -3837,7 +3837,7 @@
     maxHp: 148,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 3400,
+    xp: 3450,
     ac: 18,
     attackBonus: 10,
     damage: {
@@ -3880,7 +3880,7 @@
     maxHp: 172,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 4700,
+    xp: 4770,
     ac: 17,
     attackBonus: 11,
     damage: {
@@ -3924,7 +3924,7 @@
     maxHp: 310,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 8600,
+    xp: 36460,
     ac: 20,
     attackBonus: 11,
     damage: {
@@ -3975,7 +3975,7 @@
     maxHp: 196,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 6400,
+    xp: 4705,
     ac: 19,
     attackBonus: 11,
     damage: {
@@ -4019,7 +4019,7 @@
     maxHp: 224,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 8200,
+    xp: 6025,
     ac: 18,
     attackBonus: 12,
     damage: {
@@ -4064,7 +4064,7 @@
     maxHp: 390,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 13200,
+    xp: 39445,
     ac: 21,
     attackBonus: 12,
     damage: {
@@ -4117,7 +4117,7 @@
     maxHp: 248,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 9200,
+    xp: 6835,
     ac: 20,
     attackBonus: 12,
     damage: {
@@ -4160,7 +4160,7 @@
     maxHp: 288,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 11800,
+    xp: 8765,
     ac: 19,
     attackBonus: 13,
     damage: {
@@ -4204,7 +4204,7 @@
     maxHp: 490,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 18400,
+    xp: 22340,
     ac: 22,
     attackBonus: 13,
     damage: {
@@ -4256,7 +4256,7 @@
     maxHp: 318,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 13800,
+    xp: 9460,
     ac: 21,
     attackBonus: 13,
     damage: {
@@ -4300,7 +4300,7 @@
     maxHp: 348,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 16200,
+    xp: 11110,
     ac: 20,
     attackBonus: 13,
     damage: {
@@ -4345,7 +4345,7 @@
     maxHp: 575,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 22400,
+    xp: 28490,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -4397,7 +4397,7 @@
     maxHp: 368,
     category: 10,
     multiattack: { attacks: 3 },
-    xp: 18200,
+    xp: 9960,
     ac: 22,
     attackBonus: 14,
     damage: {
@@ -4441,7 +4441,7 @@
     maxHp: 398,
     category: 10,
     multiattack: { attacks: 3 },
-    xp: 22200,
+    xp: 12150,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -4486,7 +4486,7 @@
     maxHp: 680,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 30500,
+    xp: 16685,
     ac: 24,
     attackBonus: 15,
     damage: {
@@ -4543,7 +4543,7 @@
     maxHp: 78,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 850,
+    xp: 2610,
     ac: 16,
     attackBonus: 8,
     damage: {
@@ -4579,7 +4579,7 @@
     maxHp: 88,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 1100,
+    xp: 3370,
     ac: 17,
     attackBonus: 8,
     damage: {
@@ -4617,7 +4617,7 @@
     maxHp: 152,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 2400,
+    xp: 24425,
     ac: 18,
     attackBonus: 9,
     damage: {
@@ -4661,7 +4661,7 @@
     maxHp: 108,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 1900,
+    xp: 4055,
     ac: 17,
     attackBonus: 9,
     damage: {
@@ -4697,7 +4697,7 @@
     maxHp: 126,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 2300,
+    xp: 4905,
     ac: 16,
     attackBonus: 9,
     damage: {
@@ -4736,7 +4736,7 @@
     maxHp: 220,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 5200,
+    xp: 38305,
     ac: 19,
     attackBonus: 10,
     damage: {
@@ -4780,7 +4780,7 @@
     maxHp: 148,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 3400,
+    xp: 3450,
     ac: 18,
     attackBonus: 10,
     damage: {
@@ -4815,7 +4815,7 @@
     maxHp: 172,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 4700,
+    xp: 4770,
     ac: 17,
     attackBonus: 11,
     damage: {
@@ -4851,7 +4851,7 @@
     maxHp: 310,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 8600,
+    xp: 36460,
     ac: 20,
     attackBonus: 11,
     damage: {
@@ -4897,7 +4897,7 @@
     maxHp: 196,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 6400,
+    xp: 4705,
     ac: 19,
     attackBonus: 11,
     damage: {
@@ -4934,7 +4934,7 @@
     maxHp: 224,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 8200,
+    xp: 6025,
     ac: 18,
     attackBonus: 12,
     damage: {
@@ -4971,7 +4971,7 @@
     maxHp: 390,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 13200,
+    xp: 39445,
     ac: 21,
     attackBonus: 12,
     damage: {
@@ -5015,7 +5015,7 @@
     maxHp: 248,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 9200,
+    xp: 6835,
     ac: 20,
     attackBonus: 12,
     damage: {
@@ -5052,7 +5052,7 @@
     maxHp: 288,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 11800,
+    xp: 8765,
     ac: 19,
     attackBonus: 13,
     damage: {
@@ -5090,7 +5090,7 @@
     maxHp: 490,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 18400,
+    xp: 22340,
     ac: 22,
     attackBonus: 13,
     damage: {
@@ -5135,7 +5135,7 @@
     maxHp: 318,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 13800,
+    xp: 9460,
     ac: 21,
     attackBonus: 13,
     damage: {
@@ -5172,7 +5172,7 @@
     maxHp: 348,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 16200,
+    xp: 11110,
     ac: 20,
     attackBonus: 13,
     damage: {
@@ -5210,7 +5210,7 @@
     maxHp: 575,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 22400,
+    xp: 28490,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -5256,7 +5256,7 @@
     maxHp: 368,
     category: 10,
     multiattack: { attacks: 3 },
-    xp: 18200,
+    xp: 9960,
     ac: 22,
     attackBonus: 14,
     damage: {
@@ -5293,7 +5293,7 @@
     maxHp: 398,
     category: 10,
     multiattack: { attacks: 3 },
-    xp: 22200,
+    xp: 12150,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -5330,7 +5330,7 @@
     maxHp: 680,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 30500,
+    xp: 16685,
     ac: 24,
     attackBonus: 15,
     damage: {
@@ -5382,7 +5382,7 @@
     maxHp: 78,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 850,
+    xp: 2610,
     ac: 16,
     attackBonus: 8,
     damage: {
@@ -5419,7 +5419,7 @@
     maxHp: 88,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 1100,
+    xp: 3370,
     ac: 17,
     attackBonus: 8,
     damage: {
@@ -5460,7 +5460,7 @@
     maxHp: 152,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 2400,
+    xp: 24425,
     ac: 18,
     attackBonus: 9,
     damage: {
@@ -5506,7 +5506,7 @@
     maxHp: 108,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 1900,
+    xp: 4055,
     ac: 17,
     attackBonus: 9,
     damage: {
@@ -5543,7 +5543,7 @@
     maxHp: 126,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 2300,
+    xp: 4905,
     ac: 16,
     attackBonus: 9,
     damage: {
@@ -5584,7 +5584,7 @@
     maxHp: 220,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 5200,
+    xp: 38305,
     ac: 19,
     attackBonus: 10,
     damage: {
@@ -5630,7 +5630,7 @@
     maxHp: 148,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 3400,
+    xp: 3450,
     ac: 18,
     attackBonus: 10,
     damage: {
@@ -5667,7 +5667,7 @@
     maxHp: 172,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 4700,
+    xp: 4770,
     ac: 17,
     attackBonus: 11,
     damage: {
@@ -5705,7 +5705,7 @@
     maxHp: 310,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 8600,
+    xp: 36460,
     ac: 20,
     attackBonus: 11,
     damage: {
@@ -5750,7 +5750,7 @@
     maxHp: 196,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 6400,
+    xp: 4705,
     ac: 19,
     attackBonus: 11,
     damage: {
@@ -5787,7 +5787,7 @@
     maxHp: 224,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 8200,
+    xp: 6025,
     ac: 18,
     attackBonus: 12,
     damage: {
@@ -5825,7 +5825,7 @@
     maxHp: 390,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 13200,
+    xp: 39445,
     ac: 21,
     attackBonus: 12,
     damage: {
@@ -5874,7 +5874,7 @@
     maxHp: 248,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 9200,
+    xp: 6835,
     ac: 20,
     attackBonus: 12,
     damage: {
@@ -5911,7 +5911,7 @@
     maxHp: 288,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 11800,
+    xp: 8765,
     ac: 19,
     attackBonus: 13,
     damage: {
@@ -5949,7 +5949,7 @@
     maxHp: 490,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 18400,
+    xp: 22340,
     ac: 22,
     attackBonus: 13,
     damage: {
@@ -5995,7 +5995,7 @@
     maxHp: 318,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 13800,
+    xp: 9460,
     ac: 21,
     attackBonus: 13,
     damage: {
@@ -6032,7 +6032,7 @@
     maxHp: 348,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 16200,
+    xp: 11110,
     ac: 20,
     attackBonus: 13,
     damage: {
@@ -6070,7 +6070,7 @@
     maxHp: 575,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 22400,
+    xp: 28490,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -6116,7 +6116,7 @@
     maxHp: 368,
     category: 10,
     multiattack: { attacks: 3 },
-    xp: 18200,
+    xp: 9960,
     ac: 22,
     attackBonus: 14,
     damage: {
@@ -6153,7 +6153,7 @@
     maxHp: 398,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 22200,
+    xp: 12150,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -6191,7 +6191,7 @@
     maxHp: 680,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 30500,
+    xp: 16685,
     ac: 24,
     attackBonus: 15,
     damage: {
@@ -6241,7 +6241,7 @@
     maxHp: 78,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 850,
+    xp: 2610,
     ac: 16,
     attackBonus: 8,
     damage: {
@@ -6276,7 +6276,7 @@
     maxHp: 88,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 1100,
+    xp: 3370,
     ac: 17,
     attackBonus: 8,
     damage: {
@@ -6313,7 +6313,7 @@
     maxHp: 152,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 2400,
+    xp: 24425,
     ac: 18,
     attackBonus: 9,
     damage: {
@@ -6358,7 +6358,7 @@
     maxHp: 108,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 1900,
+    xp: 4055,
     ac: 17,
     attackBonus: 9,
     damage: {
@@ -6394,7 +6394,7 @@
     maxHp: 126,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 2300,
+    xp: 4905,
     ac: 16,
     attackBonus: 9,
     damage: {
@@ -6430,7 +6430,7 @@
     maxHp: 220,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 5200,
+    xp: 38305,
     ac: 19,
     attackBonus: 10,
     damage: {
@@ -6475,7 +6475,7 @@
     maxHp: 148,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 3400,
+    xp: 3450,
     ac: 18,
     attackBonus: 10,
     damage: {
@@ -6511,7 +6511,7 @@
     maxHp: 172,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 4700,
+    xp: 4770,
     ac: 17,
     attackBonus: 11,
     damage: {
@@ -6549,7 +6549,7 @@
     maxHp: 310,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 8600,
+    xp: 36460,
     ac: 20,
     attackBonus: 11,
     damage: {
@@ -6596,7 +6596,7 @@
     maxHp: 196,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 6400,
+    xp: 4705,
     ac: 19,
     attackBonus: 11,
     damage: {
@@ -6640,7 +6640,7 @@
     maxHp: 224,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 8200,
+    xp: 6025,
     ac: 18,
     attackBonus: 12,
     damage: {
@@ -6681,7 +6681,7 @@
     maxHp: 390,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 13200,
+    xp: 39445,
     ac: 21,
     attackBonus: 12,
     damage: {
@@ -6727,7 +6727,7 @@
     maxHp: 248,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 9200,
+    xp: 6835,
     ac: 20,
     attackBonus: 12,
     damage: {
@@ -6764,7 +6764,7 @@
     maxHp: 288,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 11800,
+    xp: 8765,
     ac: 19,
     attackBonus: 13,
     damage: {
@@ -6805,7 +6805,7 @@
     maxHp: 490,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 18400,
+    xp: 22340,
     ac: 22,
     attackBonus: 13,
     damage: {
@@ -6857,7 +6857,7 @@
     maxHp: 318,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 13800,
+    xp: 9460,
     ac: 21,
     attackBonus: 13,
     damage: {
@@ -6894,7 +6894,7 @@
     maxHp: 348,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 16200,
+    xp: 11110,
     ac: 20,
     attackBonus: 13,
     damage: {
@@ -6931,7 +6931,7 @@
     maxHp: 575,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 22400,
+    xp: 28490,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -6976,7 +6976,7 @@
     maxHp: 368,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 18200,
+    xp: 9960,
     ac: 22,
     attackBonus: 14,
     damage: {
@@ -7013,7 +7013,7 @@
     maxHp: 398,
     category: 10,
     multiattack: { attacks: 3 },
-    xp: 22200,
+    xp: 12150,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -7051,7 +7051,7 @@
     maxHp: 680,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 30500,
+    xp: 16685,
     ac: 24,
     attackBonus: 15,
     damage: {
@@ -7101,7 +7101,7 @@
     maxHp: 78,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 850,
+    xp: 2610,
     ac: 16,
     attackBonus: 8,
     damage: {
@@ -7137,7 +7137,7 @@
     maxHp: 88,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 1100,
+    xp: 3370,
     ac: 17,
     attackBonus: 8,
     damage: {
@@ -7174,7 +7174,7 @@
     maxHp: 152,
     category: 4,
     multiattack: { attacks: 2 },
-    xp: 2400,
+    xp: 24425,
     ac: 18,
     attackBonus: 9,
     damage: {
@@ -7218,7 +7218,7 @@
     maxHp: 108,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 1900,
+    xp: 4055,
     ac: 17,
     attackBonus: 9,
     damage: {
@@ -7253,7 +7253,7 @@
     maxHp: 126,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 2300,
+    xp: 4905,
     ac: 16,
     attackBonus: 9,
     damage: {
@@ -7289,7 +7289,7 @@
     maxHp: 220,
     category: 5,
     multiattack: { attacks: 2 },
-    xp: 5200,
+    xp: 38305,
     ac: 19,
     attackBonus: 10,
     damage: {
@@ -7334,7 +7334,7 @@
     maxHp: 148,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 3400,
+    xp: 3450,
     ac: 18,
     attackBonus: 10,
     damage: {
@@ -7370,7 +7370,7 @@
     maxHp: 172,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 4700,
+    xp: 4770,
     ac: 17,
     attackBonus: 11,
     damage: {
@@ -7408,7 +7408,7 @@
     maxHp: 310,
     category: 6,
     multiattack: { attacks: 2 },
-    xp: 8600,
+    xp: 36460,
     ac: 20,
     attackBonus: 11,
     damage: {
@@ -7452,7 +7452,7 @@
     maxHp: 196,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 6400,
+    xp: 4705,
     ac: 19,
     attackBonus: 11,
     damage: {
@@ -7487,7 +7487,7 @@
     maxHp: 224,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 8200,
+    xp: 6025,
     ac: 18,
     attackBonus: 12,
     damage: {
@@ -7523,7 +7523,7 @@
     maxHp: 390,
     category: 7,
     multiattack: { attacks: 3 },
-    xp: 13200,
+    xp: 39445,
     ac: 21,
     attackBonus: 12,
     damage: {
@@ -7568,7 +7568,7 @@
     maxHp: 248,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 9200,
+    xp: 6835,
     ac: 20,
     attackBonus: 12,
     damage: {
@@ -7605,7 +7605,7 @@
     maxHp: 288,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 11800,
+    xp: 8765,
     ac: 19,
     attackBonus: 13,
     damage: {
@@ -7643,7 +7643,7 @@
     maxHp: 490,
     category: 8,
     multiattack: { attacks: 3 },
-    xp: 18400,
+    xp: 22340,
     ac: 22,
     attackBonus: 13,
     damage: {
@@ -7688,7 +7688,7 @@
     maxHp: 318,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 13800,
+    xp: 9460,
     ac: 21,
     attackBonus: 13,
     damage: {
@@ -7723,7 +7723,7 @@
     maxHp: 348,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 16200,
+    xp: 11110,
     ac: 20,
     attackBonus: 13,
     damage: {
@@ -7760,7 +7760,7 @@
     maxHp: 575,
     category: 9,
     multiattack: { attacks: 3 },
-    xp: 22400,
+    xp: 28490,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -7805,7 +7805,7 @@
     maxHp: 368,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 18200,
+    xp: 9960,
     ac: 22,
     attackBonus: 14,
     damage: {
@@ -7840,7 +7840,7 @@
     maxHp: 398,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 22200,
+    xp: 12150,
     ac: 23,
     attackBonus: 14,
     damage: {
@@ -7876,7 +7876,7 @@
     maxHp: 680,
     category: 10,
     multiattack: { attacks: 4 },
-    xp: 30500,
+    xp: 16685,
     ac: 24,
     attackBonus: 15,
     damage: {

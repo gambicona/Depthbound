@@ -11,7 +11,7 @@ window.DungeonContent.register("monsters", "shamblingCorpse", {
   tags: ["undead", "zombie"],
   maxHp: 12,
   category: 1,
-  xp: 40,
+  xp: 50,
   ac: 11,
   attackBonus: 3,
   damage: {
@@ -42,7 +42,7 @@ window.DungeonContent.register("monsters", "bloatedRotter", {
   tags: ["undead", "zombie", "disease"],
   maxHp: 14,
   category: 1,
-  xp: 50,
+  xp: 65,
   ac: 10,
   attackBonus: 3,
   damage: {
@@ -73,7 +73,7 @@ window.DungeonContent.register("monsters", "graveGhoul", {
   tags: ["undead", "zombie", "ghoul"],
   maxHp: 13,
   category: 1,
-  xp: 60,
+  xp: 75,
   ac: 12,
   attackBonus: 4,
   damage: {
@@ -104,7 +104,7 @@ window.DungeonContent.register("monsters", "corpseCandleAcolyte", {
   tags: ["undead", "zombie", "caster"],
   maxHp: 11,
   category: 1,
-  xp: 65,
+  xp: 85,
   ac: 12,
   attackBonus: 4,
   damage: {
@@ -136,7 +136,7 @@ window.DungeonContent.register("monsters", "corpseHeapBrute", {
   tags: ["undead", "zombie", "boss", "brute"],
   maxHp: 26,
   category: 1,
-  xp: 120,
+  xp: 1345,
   ac: 12,
   attackBonus: 4,
   damage: {
@@ -179,7 +179,7 @@ window.DungeonContent.register("monsters", "plagueGhast", {
   tags: ["undead", "zombie", "ghoul", "disease"],
   maxHp: 24,
   category: 2,
-  xp: 130,
+  xp: 360,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -210,7 +210,7 @@ window.DungeonContent.register("monsters", "graveMireCrawler", {
   tags: ["undead", "zombie", "brute"],
   maxHp: 30,
   category: 2,
-  xp: 140,
+  xp: 390,
   ac: 13,
   attackBonus: 5,
   damage: {
@@ -241,7 +241,7 @@ window.DungeonContent.register("monsters", "vomitousDead", {
   tags: ["undead", "zombie", "disease"],
   maxHp: 25,
   category: 2,
-  xp: 145,
+  xp: 410,
   ac: 12,
   attackBonus: 5,
   damage: {
@@ -273,7 +273,7 @@ window.DungeonContent.register("monsters", "corpsefireInvoker", {
   tags: ["undead", "zombie", "caster", "fire"],
   maxHp: 22,
   category: 2,
-  xp: 155,
+  xp: 435,
   ac: 13,
   attackBonus: 5,
   damage: {
@@ -305,7 +305,7 @@ window.DungeonContent.register("monsters", "rotCrownedGhoul", {
   tags: ["undead", "zombie", "ghoul", "boss"],
   maxHp: 42,
   category: 2,
-  xp: 240,
+  xp: 8110,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -349,7 +349,7 @@ window.DungeonContent.register("monsters", "corpseStitchedGoliath", {
   sizeSquares: 2,
   maxHp: 48,
   category: 3,
-  xp: 260,
+  xp: 1475,
   ac: 14,
   attackBonus: 6,
   damage: {
@@ -380,7 +380,7 @@ window.DungeonContent.register("monsters", "drownedGhoul", {
   tags: ["undead", "zombie", "ghoul", "water"],
   maxHp: 38,
   category: 3,
-  xp: 250,
+  xp: 1425,
   ac: 15,
   attackBonus: 7,
   damage: {
@@ -411,7 +411,7 @@ window.DungeonContent.register("monsters", "blightbelcher", {
   tags: ["undead", "zombie", "disease"],
   maxHp: 42,
   category: 3,
-  xp: 270,
+  xp: 1535,
   ac: 13,
   attackBonus: 6,
   damage: {
@@ -443,7 +443,7 @@ window.DungeonContent.register("monsters", "graveflameWarlock", {
   tags: ["undead", "zombie", "caster", "fire"],
   maxHp: 36,
   category: 3,
-  xp: 280,
+  xp: 1590,
   ac: 15,
   attackBonus: 7,
   damage: {
@@ -477,7 +477,7 @@ window.DungeonContent.register("monsters", "plagueGraveTitan", {
   tags: ["undead", "zombie", "boss", "brute", "disease"],
   maxHp: 68,
   category: 3,
-  xp: 420,
+  xp: 9230,
   ac: 16,
   attackBonus: 7,
   damage: {

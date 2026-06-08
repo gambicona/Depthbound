@@ -56,16 +56,16 @@ function kit(mainHand, torso, options = {}) {
 }
 
 const categoryXp = {
-  1: { normal: 50, boss: 200 },
-  2: { normal: 150, boss: 450 },
-  3: { normal: 450, boss: 1200 },
-  4: { normal: 1100, boss: 2900 },
-  5: { normal: 2900, boss: 5900 },
-  6: { normal: 7200, boss: 11500 },
-  7: { normal: 13000, boss: 18000 },
-  8: { normal: 20000, boss: 28000 },
-  9: { normal: 30000, boss: 39000 },
-  10: { normal: 50000, boss: 62000 },
+  1: { normal: 5, boss: 320 },
+  2: { normal: 60, boss: 2270 },
+  3: { normal: 370, boss: 3795 },
+  4: { normal: 930, boss: 8075 },
+  5: { normal: 2385, boss: 16750 },
+  6: { normal: 3650, boss: 24340 },
+  7: { normal: 5970, boss: 33610 },
+  8: { normal: 10330, boss: 23620 },
+  9: { normal: 14750, boss: 35575 },
+  10: { normal: 24415, boss: 30270 },
 };
 
 const categoryTitles = [

@@ -93,7 +93,7 @@ function registerHumanoid(entry) {
 const packs = [
   {
     category: 1,
-    xp: [65, 55, 55, 70, 150],
+    xp: [15, 5, 5, 15, 255],
     entries: [
       ["cutpurseKnifeman", "Cutpurse Knifeman", "Fast melee striker", ["criminal", "skirmisher"], 13, 14, 4, damage(1, 4, 3, "piercing", "weapon", melee(), "Dagger"), mods(0, 3, 0, 0, 1, 0), 3, "melee", "K", kit("dagger", "leather"), ["Hamstring"]],
       ["roadsideBandit", "Roadside Bandit", "Basic melee thug", ["criminal", "brute"], 16, 13, 4, damage(1, 6, 2, "bludgeoning", "weapon", melee(), "Club"), mods(2, 1, 1, 0, 0, 0), 1, "melee", "B", kit("club", "leather"), []],
@@ -104,7 +104,7 @@ const packs = [
   },
   {
     category: 2,
-    xp: [150, 160, 170, 180, 390],
+    xp: [60, 65, 75, 75, 1945],
     entries: [
       ["banditArcher", "Bandit Archer", "Reliable ranged pressure", ["criminal", "ranged"], 27, 14, 5, damage(1, 6, 3, "piercing", "weapon", ranged(80, 320), "Shortbow"), mods(0, 3, 1, 0, 1, 0), 3, "rangedKiter", "A", kit("shortbow", "leather", { quiver: "arrows-20" }), []],
       ["shieldedFootpad", "Shielded Footpad", "Defensive melee guard", ["criminal", "defender"], 34, 16, 5, damage(1, 6, 3, "slashing", "weapon", melee(), "Scimitar"), mods(2, 2, 2, 0, 1, 0), 2, "melee", "F", kit("scimitar", "studded-leather", { offHand: "shield" }), ["Shellguard"]],
@@ -115,7 +115,7 @@ const packs = [
   },
   {
     category: 3,
-    xp: [450, 500, 520, 520, 1100],
+    xp: [370, 405, 425, 425, 3485],
     entries: [
       ["mercenarySpearman", "Mercenary Spearman", "Reach melee soldier", ["mercenary", "soldier", "reach"], 46, 16, 7, damage(1, 10, 4, "piercing", "weapon", melee(10), "Pike"), mods(4, 1, 2, 0, 1, 0), 1, "melee", "P", kit("pike", "chain-mail"), ["Lunge"]],
       ["crossbowVeteran", "Crossbow Veteran", "Heavy ranged striker", ["mercenary", "soldier", "ranged"], 40, 15, 7, damage(1, 10, 4, "piercing", "weapon", ranged(100, 400), "Heavy Crossbow"), mods(1, 4, 2, 0, 1, 0), 2, "rangedKiter", "C", kit("crossbow-heavy", "chain-shirt", { quiver: "bolts-20" }), ["Hellbow Pin"]],
@@ -126,7 +126,7 @@ const packs = [
   },
   {
     category: 4,
-    xp: [1200, 1300, 1300, 1400, 2800],
+    xp: [1005, 1095, 1095, 1175, 7810],
     entries: [
       ["blackknifeAssassin", "Blackknife Assassin", "Opening burst striker", ["assassin", "skirmisher"], 58, 17, 8, damage(2, 6, 5, "piercing", "weapon", melee(), "Blackknife"), mods(0, 5, 2, 1, 2, 1), 5, "melee", "N", kit("shortsword", "studded-leather"), ["Venom"]],
       ["warPriest", "War Priest", "Armored support bruiser", ["cultist", "priest", "support"], 70, 18, 8, damage(1, 8, 5, "radiant", "weapon", melee(), "Warhammer Smite"), mods(4, 1, 3, 1, 3, 2), 1, "melee", "W", kit("warhammer", "chain-mail", { offHand: "shield" }), ["Battlefield Healing"]],
@@ -137,7 +137,7 @@ const packs = [
   },
   {
     category: 5,
-    xp: [3000, 3200, 3400, 3200, 5900],
+    xp: [2465, 2630, 2795, 2630, 16750],
     entries: [
       ["veteranDuelist", "Veteran Duelist", "Multiattack melee elite", ["duelist"], 88, 18, 9, damage(1, 8, 5, "piercing", "weapon", melee(), "Rapier"), mods(1, 5, 3, 1, 2, 2), 5, "melee", "V", kit("rapier", "breastplate"), ["Parrying Fade"], 2],
       ["arcaneMarksman", "Arcane Marksman", "Magic ranged hybrid", ["mage", "ranged"], 76, 16, 9, damage(1, 8, 6, "force", "spell", ranged(150, 600), "Arcane Longbow"), mods(0, 5, 2, 3, 2, 1), 5, "rangedKiter", "A", kit("longbow", "studded-leather", { quiver: "arrows-20" }), ["Hellbow Pin"]],
@@ -148,7 +148,7 @@ const packs = [
   },
   {
     category: 6,
-    xp: [7200, 7600, 7800, 7600, 11500],
+    xp: [3650, 3840, 3945, 3840, 24340],
     entries: [
       ["magebreakerSentinel", "Magebreaker Sentinel", "Anti-caster armored tank", ["soldier", "defender", "magebreaker"], 132, 20, 10, damage(1, 10, 6, "slashing", "weapon", melee(10), "Halberd"), mods(5, 1, 5, 1, 3, 1), 1, "melee", "M", kit("halberd", "plate"), ["Locking Chain"], 2],
       ["bloodCultHierophant", "Blood Cult Hierophant", "Ritual sacrifice caster", ["cultist", "caster", "support"], 104, 16, 10, damage(2, 8, 5, "necrotic", "spell", ranged(80, 240), "Blood Rite"), mods(0, 2, 4, 3, 5, 3), 2, "rangedKiter", "H", kit("mace", "breastplate"), ["Battlefield Healing", "Soul Siphon"]],
@@ -159,7 +159,7 @@ const packs = [
   },
   {
     category: 7,
-    xp: [13000, 13500, 14000, 14200, 18000],
+    xp: [5970, 6195, 6430, 6520, 33610],
     entries: [
       ["crimsonWarlord", "Crimson Warlord", "Leader bruiser", ["soldier", "leader"], 168, 20, 12, damage(2, 6, 7, "slashing", "weapon", melee(), "Greatsword"), mods(6, 2, 5, 2, 3, 5), 2, "melee", "W", kit("greatsword", "plate"), ["Bark Orders", "Bloodfrenzy"], 2],
       ["archduelistOfTheSilverMask", "Archduelist of the Silver Mask", "Boss-like precision striker", ["duelist", "skirmisher"], 148, 21, 13, damage(1, 8, 8, "piercing", "weapon", melee(), "Silver Rapier"), mods(1, 7, 4, 2, 4, 4), 7, "melee", "D", kit("rapier", "breastplate"), ["Parry Storm"], 3],
@@ -170,7 +170,7 @@ const packs = [
   },
   {
     category: 8,
-    xp: [20000, 21000, 22000, 22000, 28000],
+    xp: [10330, 10855, 11365, 11365, 23620],
     entries: [
       ["archmageOfTheBrokenTower", "Archmage of the Broken Tower", "Major multi-school caster", ["mage", "caster"], 164, 18, 13, damage(4, 8, 7, "force", "spell", ranged(100, 300), "Archmage Bolt"), mods(0, 4, 5, 8, 5, 4), 4, "rangedKiter", "A", kit("quarterstaff", "studded-leather"), ["Fireball", "Mirror Double"], 1],
       ["grandmasterAssassin", "Grandmaster Assassin", "Extreme isolated-target striker", ["assassin", "skirmisher"], 178, 21, 14, damage(2, 8, 8, "poison", "weapon", melee(), "Venomed Blade"), mods(1, 8, 5, 3, 5, 3), 8, "melee", "G", kit("shortsword", "studded-leather"), ["Venom", "Fading Retreat"], 3],
@@ -181,7 +181,7 @@ const packs = [
   },
   {
     category: 9,
-    xp: [30000, 31000, 32000, 33000, 39000],
+    xp: [14750, 15245, 15735, 16230, 35575],
     entries: [
       ["theBlackCrownStrategist", "The Black Crown Strategist", "Master turn-order leader", ["leader", "controller"], 230, 20, 15, damage(3, 8, 8, "psychic", "spell", ranged(100, 300), "Crown Command"), mods(1, 4, 6, 8, 7, 7), 4, "rangedKiter", "C", kit("rapier", "breastplate"), ["Bark Orders", "Condemning Mark"], 1],
       ["elderBloodMagus", "Elder Blood Magus", "Sacrifice-powered caster", ["cultist", "caster"], 220, 18, 15, damage(4, 8, 8, "necrotic", "spell", ranged(100, 300), "Elder Blood Spell"), mods(0, 4, 7, 8, 6, 6), 4, "rangedKiter", "M", kit("dagger", "studded-leather"), ["Soul Siphon", "Fireball"], 1],
@@ -192,7 +192,7 @@ const packs = [
   },
   {
     category: 10,
-    xp: [50000, 52000, 54000, 56000, 62000],
+    xp: [24415, 25390, 26365, 27350, 30270],
     entries: [
       ["theTyrantKingAscendant", "The Tyrant-King Ascendant", "Final martial commander", ["soldier", "leader"], 330, 23, 17, damage(3, 8, 10, "slashing", "weapon", melee(), "Ascendant King's Blade"), mods(9, 3, 8, 5, 6, 8), 3, "melee", "K", kit("greatsword", "plate"), ["Bark Orders", "King's Return"], 3],
       ["archlichHunterMagister", "Archlich-Hunter Magister", "Ultimate forbidden anti-life caster", ["mage", "caster"], 286, 20, 17, damage(5, 10, 9, "necrotic", "spell", ranged(120, 360), "Anti-Life Spell"), mods(0, 4, 7, 9, 7, 7), 4, "rangedKiter", "L", kit("quarterstaff", "breastplate"), ["Forbidden Chorus", "Mirror Double"], 1],

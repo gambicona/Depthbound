@@ -11,7 +11,7 @@ window.DungeonContent.register("monsters", "forestWolf", {
   tags: ["beast", "forest", "wolf"],
   maxHp: 5,
   category: 1,
-  xp: 45,
+  xp: 55,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -38,7 +38,7 @@ window.DungeonContent.register("monsters", "brambleBoar", {
   tags: ["beast", "forest", "boar"],
   maxHp: 14,
   category: 1,
-  xp: 50,
+  xp: 65,
   ac: 12,
   attackBonus: 4,
   damage: {
@@ -65,7 +65,7 @@ window.DungeonContent.register("monsters", "gloomwebSpider", {
   tags: ["beast", "forest", "spider", "poison"],
   maxHp: 10,
   category: 1,
-  xp: 55,
+  xp: 70,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -93,7 +93,7 @@ window.DungeonContent.register("monsters", "thornbackHare", {
   tags: ["beast", "forest"],
   maxHp: 8,
   category: 1,
-  xp: 35,
+  xp: 40,
   ac: 14,
   attackBonus: 4,
   damage: {
@@ -117,7 +117,7 @@ window.DungeonContent.register("monsters", "oldTuskBoar", {
   tags: ["beast", "forest", "boar", "boss"],
   maxHp: 28,
   category: 1,
-  xp: 120,
+  xp: 1345,
   ac: 13,
   attackBonus: 5,
   damage: {
@@ -156,7 +156,7 @@ window.DungeonContent.register("monsters", "direForestWolf", {
   tags: ["beast", "forest", "wolf"],
   maxHp: 15,
   category: 2,
-  xp: 130,
+  xp: 360,
   ac: 14,
   attackBonus: 6,
   damage: {
@@ -184,7 +184,7 @@ window.DungeonContent.register("monsters", "mossbackBear", {
   tags: ["beast", "forest", "bear"],
   maxHp: 32,
   category: 2,
-  xp: 150,
+  xp: 415,
   ac: 13,
   attackBonus: 5,
   damage: {
@@ -208,7 +208,7 @@ window.DungeonContent.register("monsters", "razorbeakRaptor", {
   tags: ["beast", "forest", "bird", "flying"],
   maxHp: 22,
   category: 2,
-  xp: 130,
+  xp: 360,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -236,7 +236,7 @@ window.DungeonContent.register("monsters", "venomrootStalker", {
   tags: ["beast", "forest", "poison"],
   maxHp: 23,
   category: 2,
-  xp: 145,
+  xp: 410,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -264,7 +264,7 @@ window.DungeonContent.register("monsters", "thornhideBoar", {
   tags: ["beast", "forest", "boar", "boss"],
   maxHp: 46,
   category: 2,
-  xp: 250,
+  xp: 8435,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -304,7 +304,7 @@ window.DungeonContent.register("monsters", "elderDireWolf", {
   tags: ["beast", "forest", "wolf"],
   maxHp: 40,
   category: 3,
-  xp: 260,
+  xp: 1475,
   ac: 15,
   attackBonus: 7,
   damage: {
@@ -332,7 +332,7 @@ window.DungeonContent.register("monsters", "giantGloomwebSpider", {
   tags: ["beast", "forest", "spider", "poison"],
   maxHp: 38,
   category: 3,
-  xp: 260,
+  xp: 1475,
   ac: 15,
   attackBonus: 7,
   damage: {
@@ -361,7 +361,7 @@ window.DungeonContent.register("monsters", "ironbarkGorger", {
   tags: ["beast", "forest", "brute"],
   maxHp: 50,
   category: 3,
-  xp: 280,
+  xp: 1590,
   ac: 16,
   attackBonus: 6,
   damage: {
@@ -386,7 +386,7 @@ window.DungeonContent.register("monsters", "stormhornStag", {
   tags: ["beast", "forest", "stag"],
   maxHp: 42,
   category: 3,
-  xp: 270,
+  xp: 1535,
   ac: 15,
   attackBonus: 7,
   damage: {
@@ -416,7 +416,7 @@ window.DungeonContent.register("monsters", "ancientBriarBear", {
   tags: ["beast", "forest", "bear", "boss"],
   maxHp: 70,
   category: 3,
-  xp: 430,
+  xp: 9435,
   ac: 16,
   attackBonus: 7,
   damage: {

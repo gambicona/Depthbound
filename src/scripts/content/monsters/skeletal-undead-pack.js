@@ -10,7 +10,7 @@ window.DungeonContent.register("monsters", "armoryHaunt", {
   role: "Possessed weapon",
   maxHp: 15,
   category: 1,
-  xp: 75,
+  xp: 90,
   ac: 15,
   attackBonus: 5,
   damage: {
@@ -46,7 +46,7 @@ window.DungeonContent.register("monsters", "ashBarracksVeteran", {
   role: "Experienced undead soldier",
   maxHp: 19,
   category: 2,
-  xp: 100,
+  xp: 280,
   ac: 15,
   attackBonus: 5,
   damage: {
@@ -101,7 +101,7 @@ window.DungeonContent.register("monsters", "bannerKnight", {
   role: "Undead guardroom champion",
   maxHp: 28,
   category: 2,
-  xp: 180,
+  xp: 6080,
   ac: 15,
   attackBonus: 5,
   damage: {
@@ -157,7 +157,7 @@ window.DungeonContent.register("monsters", "barricadeCrossbowman", {
   role: "Armored ranged skeleton",
   maxHp: 14,
   category: 1,
-  xp: 75,
+  xp: 90,
   ac: 14,
   attackBonus: 4,
   damage: {
@@ -225,7 +225,7 @@ window.DungeonContent.register("monsters", "blackArrowSentry", {
   role: "Elite undead archer",
   maxHp: 17,
   category: 2,
-  xp: 120,
+  xp: 335,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -297,7 +297,7 @@ window.DungeonContent.register("monsters", "boneLockbreaker", {
   role: "Fast skeletal skirmisher",
   maxHp: 15,
   category: 2,
-  xp: 80,
+  xp: 220,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -346,7 +346,7 @@ window.DungeonContent.register("monsters", "boneMaulBrute", {
   sizeSquares: 2,
   maxHp: 42,
   category: 3,
-  xp: 250,
+  xp: 1425,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -400,7 +400,7 @@ window.DungeonContent.register("monsters", "boneRecruit", {
   role: "Weak skeletal guard",
   maxHp: 5,
   category: 1,
-  xp: 25,
+  xp: 30,
   ac: 12,
   attackBonus: 3,
   damage: {
@@ -435,7 +435,7 @@ window.DungeonContent.register("monsters", "cryptExecutioner", {
   role: "Heavy undead striker",
   maxHp: 21,
   category: 2,
-  xp: 130,
+  xp: 360,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -489,7 +489,7 @@ window.DungeonContent.register("monsters", "cryptGuard", {
   role: "Armored skeleton",
   maxHp: 13,
   category: 1,
-  xp: 50,
+  xp: 65,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -524,7 +524,7 @@ window.DungeonContent.register("monsters", "graveBannerCastellan", {
   role: "Undead fortress captain",
   maxHp: 54,
   category: 3,
-  xp: 350,
+  xp: 7690,
   ac: 16,
   attackBonus: 7,
   damage: {
@@ -578,7 +578,7 @@ window.DungeonContent.register("monsters", "gravePikeman", {
   role: "Undead reach soldier",
   maxHp: 16,
   category: 2,
-  xp: 80,
+  xp: 220,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -631,7 +631,7 @@ window.DungeonContent.register("monsters", "graveplateSentinel", {
   role: "Heavy undead guard",
   maxHp: 36,
   category: 3,
-  xp: 220,
+  xp: 1245,
   ac: 16,
   attackBonus: 6,
   damage: {
@@ -685,7 +685,7 @@ window.DungeonContent.register("monsters", "guardroomCommander", {
   role: "Undead officer",
   maxHp: 22,
   category: 1,
-  xp: 100,
+  xp: 1155,
   ac: 15,
   attackBonus: 5,
   damage: {
@@ -725,7 +725,7 @@ window.DungeonContent.register("monsters", "guardroomHound", {
   role: "Undead hunting dog",
   maxHp: 5,
   category: 1,
-  xp: 60,
+  xp: 75,
   ac: 13,
   attackBonus: 5,
   damage: {
@@ -760,7 +760,7 @@ window.DungeonContent.register("monsters", "hollowMarksman", {
   role: "Veteran skeletal archer",
   maxHp: 14,
   category: 2,
-  xp: 80,
+  xp: 220,
   ac: 13,
   attackBonus: 5,
   damage: {
@@ -833,7 +833,7 @@ window.DungeonContent.register("monsters", "lanternHexguard", {
   role: "Undead arcane sentry",
   maxHp: 34,
   category: 3,
-  xp: 240,
+  xp: 1360,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -879,7 +879,7 @@ window.DungeonContent.register("monsters", "lanternWraith", {
   role: "Restless magical sentry",
   maxHp: 18,
   category: 2,
-  xp: 120,
+  xp: 335,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -923,7 +923,7 @@ window.DungeonContent.register("monsters", "oathboundJailer", {
   role: "Undead prison guard",
   maxHp: 24,
   category: 2,
-  xp: 140,
+  xp: 390,
   ac: 15,
   attackBonus: 5,
   damage: {
@@ -983,7 +983,7 @@ window.DungeonContent.register("monsters", "oathscarDuelist", {
   role: "Undead swordmaster",
   maxHp: 32,
   category: 3,
-  xp: 230,
+  xp: 1310,
   ac: 15,
   attackBonus: 7,
   damage: {
@@ -1036,7 +1036,7 @@ window.DungeonContent.register("monsters", "oldSergeant", {
   role: "Veteran undead guard",
   maxHp: 20,
   category: 1,
-  xp: 100,
+  xp: 1155,
   ac: 15,
   attackBonus: 5,
   damage: {
@@ -1092,7 +1092,7 @@ window.DungeonContent.register("monsters", "restlessJailer", {
   role: "Chain-wielding undead",
   maxHp: 18,
   category: 1,
-  xp: 90,
+  xp: 110,
   ac: 14,
   attackBonus: 4,
   damage: {
@@ -1137,7 +1137,7 @@ window.DungeonContent.register("monsters", "ruinArbalester", {
   role: "Undead heavy crossbowman",
   maxHp: 30,
   category: 3,
-  xp: 220,
+  xp: 1245,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -1209,7 +1209,7 @@ window.DungeonContent.register("monsters", "rustedHalberdier", {
   role: "Heavy undead guard",
   maxHp: 18,
   category: 2,
-  xp: 90,
+  xp: 255,
   ac: 14,
   attackBonus: 4,
   damage: {
@@ -1262,7 +1262,7 @@ window.DungeonContent.register("monsters", "rustedShieldbearer", {
   role: "Defensive skeleton",
   maxHp: 16,
   category: 1,
-  xp: 75,
+  xp: 90,
   ac: 16,
   attackBonus: 3,
   damage: {
@@ -1312,7 +1312,7 @@ window.DungeonContent.register("monsters", "skeletalSpearman", {
   role: "Reach guard",
   maxHp: 14,
   category: 1,
-  xp: 60,
+  xp: 75,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -1365,7 +1365,7 @@ window.DungeonContent.register("monsters", "skeletonArcher", {
   role: "Bow-armed skeleton",
   maxHp: 9,
   category: 1,
-  xp: 50,
+  xp: 65,
   ac: 12,
   attackBonus: 4,
   damage: {
@@ -1437,7 +1437,7 @@ window.DungeonContent.register("monsters", "towerShieldRemnant", {
   role: "Heavily armored undead",
   maxHp: 22,
   category: 2,
-  xp: 120,
+  xp: 335,
   ac: 16,
   attackBonus: 4,
   damage: {
@@ -1487,7 +1487,7 @@ window.DungeonContent.register("monsters", "wardenOfTheOldWatch", {
   role: "Ancient undead commander",
   maxHp: 34,
   category: 2,
-  xp: 225,
+  xp: 7625,
   ac: 15,
   attackBonus: 5,
   damage: {

@@ -106,6 +106,62 @@ Bosses are closer on HP and exceed official HP expectations at high categories, 
 Current conclusion:
 This is acceptable for now. Do not automatically raise all monster damage to official CR values unless the whole encounter economy, party size, rest frequency, boss design, and loot pacing are rebalanced together.
 
+Monster XP progression target
+
+Enemy monster XP is tuned for dungeon-flow progression, not official CR-equivalent XP.
+
+Current target:
+
+- A full average dungeon should roughly grant one level.
+- The full 1-20 climb should take about 19 average dungeons at the current spawn tuning.
+
+Assumptions for the progression estimate:
+
+- 4 active heroes.
+- XP split evenly across the party.
+- Average dungeon has about 6.5 monster encounters.
+- Normal encounter count for 4 heroes is about 2.95 monsters.
+- Even-level dungeons include 1 boss encounter plus the remaining normal encounters.
+- Recruits, hirelings, summons, XP 0 entries, and the monster template are excluded from enemy XP averages.
+
+Current enemy XP averages:
+
+cat 1: normal 63 XP, boss 1,385 XP
+cat 2: normal 375 XP, boss 9,108 XP
+cat 3: normal 1,565 XP, boss 10,615 XP
+cat 4: normal 2,295 XP, boss 18,770 XP
+cat 5: normal 3,337 XP, boss 29,846 XP
+cat 6: normal 3,130 XP, boss 29,231 XP
+cat 7: normal 4,172 XP, boss 32,308 XP
+cat 8: normal 6,258 XP, boss 18,462 XP
+cat 9: normal 8,345 XP, boss 24,614 XP
+cat 10: normal 10,431 XP, boss 16,569 XP
+
+Estimated average dungeons per level:
+
+level 1->2: 0.99 dungeons
+level 2->3: 0.99 dungeons
+level 3->4: 1.00 dungeons
+level 4->5: 1.00 dungeons
+level 5->6: 1.00 dungeons
+level 6->7: 1.00 dungeons
+level 7->8: 1.00 dungeons
+level 8->9: 1.00 dungeons
+level 9->10: 1.00 dungeons
+level 10->11: 1.00 dungeons
+level 11->12: 1.00 dungeons
+level 12->13: 1.00 dungeons
+level 13->14: 1.00 dungeons
+level 14->15: 1.00 dungeons
+level 15->16: 1.00 dungeons
+level 16->17: 1.00 dungeons
+level 17->18: 1.00 dungeons
+level 18->19: 1.00 dungeons
+level 19->20: 1.00 dungeons
+
+Interpretation:
+XP is now tuned to the runtime encounter economy rather than official CR-equivalent XP. Boss XP is intentionally much higher than normal monster XP because an even-level boss dungeon adds one boss encounter instead of another full 2-4 monster room. This makes both normal and boss dungeons land near one level per full average dungeon.
+
 Loot from normal monsters
 
 createLootForMonster controls normal and boss drop chances.

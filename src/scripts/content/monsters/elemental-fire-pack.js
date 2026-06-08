@@ -22,7 +22,7 @@ window.DungeonContent.register("monsters", "emberWisp", {
   tags: ["elemental", "fire", "wisp", "flying", "skirmisher"],
   maxHp: 9,
   category: 1,
-  xp: 55,
+  xp: 70,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -61,7 +61,7 @@ window.DungeonContent.register("monsters", "ashScuttler", {
   tags: ["elemental", "ash", "paraelemental", "crawler", "skirmisher"],
   maxHp: 14,
   category: 1,
-  xp: 50,
+  xp: 65,
   ac: 12,
   attackBonus: 3,
   damage: {
@@ -98,7 +98,7 @@ window.DungeonContent.register("monsters", "cinderSprite", {
   tags: ["elemental", "fire", "cinder", "ambusher"],
   maxHp: 11,
   category: 1,
-  xp: 60,
+  xp: 75,
   ac: 14,
   attackBonus: 4,
   damage: {
@@ -135,7 +135,7 @@ window.DungeonContent.register("monsters", "kindledAshBrute", {
   tags: ["elemental", "ash", "fire", "boss", "brute"],
   maxHp: 36,
   category: 1,
-  xp: 150,
+  xp: 1730,
   ac: 13,
   attackBonus: 5,
   damage: {
@@ -183,7 +183,7 @@ window.DungeonContent.register("monsters", "smokeMephitSneak", {
   tags: ["elemental", "smoke", "paraelemental", "mephit", "flying"],
   maxHp: 22,
   category: 2,
-  xp: 150,
+  xp: 415,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -222,7 +222,7 @@ window.DungeonContent.register("monsters", "lavaGlassSkitterer", {
   tags: ["elemental", "fire", "magma", "glass", "skirmisher"],
   maxHp: 28,
   category: 2,
-  xp: 165,
+  xp: 465,
   ac: 15,
   attackBonus: 5,
   damage: {
@@ -259,7 +259,7 @@ window.DungeonContent.register("monsters", "coalHeartIgniter", {
   tags: ["elemental", "fire", "coal", "ranged"],
   maxHp: 26,
   category: 2,
-  xp: 160,
+  xp: 450,
   ac: 13,
   attackBonus: 5,
   damage: {
@@ -298,7 +298,7 @@ window.DungeonContent.register("monsters", "sootflameTaskmaster", {
   tags: ["elemental", "fire", "smoke", "boss", "controller"],
   maxHp: 64,
   category: 2,
-  xp: 360,
+  xp: 12165,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -348,7 +348,7 @@ window.DungeonContent.register("monsters", "lesserFireMyrmidon", {
   tags: ["elemental", "fire", "myrmidon", "soldier"],
   maxHp: 48,
   category: 3,
-  xp: 320,
+  xp: 1820,
   ac: 16,
   attackBonus: 6,
   damage: {
@@ -385,7 +385,7 @@ window.DungeonContent.register("monsters", "ashParaelementalStrangler", {
   tags: ["elemental", "ash", "paraelemental", "controller"],
   maxHp: 42,
   category: 3,
-  xp: 330,
+  xp: 1875,
   ac: 14,
   attackBonus: 6,
   damage: {
@@ -422,7 +422,7 @@ window.DungeonContent.register("monsters", "magmaShardHound", {
   tags: ["elemental", "magma", "fire", "beast", "skirmisher"],
   maxHp: 46,
   category: 3,
-  xp: 340,
+  xp: 1935,
   ac: 15,
   attackBonus: 7,
   damage: {
@@ -459,7 +459,7 @@ window.DungeonContent.register("monsters", "furnaceCoreMyrmidon", {
   tags: ["elemental", "fire", "myrmidon", "boss", "soldier"],
   maxHp: 92,
   category: 3,
-  xp: 700,
+  xp: 15385,
   ac: 17,
   attackBonus: 7,
   damage: {
@@ -508,7 +508,7 @@ window.DungeonContent.register("monsters", "salamanderFlameguard", {
   maxHp: 70,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 600,
+  xp: 1840,
   ac: 16,
   attackBonus: 7,
   damage: {
@@ -546,7 +546,7 @@ window.DungeonContent.register("monsters", "obsidianSmelter", {
   maxHp: 82,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 630,
+  xp: 1935,
   ac: 17,
   attackBonus: 7,
   damage: {
@@ -584,7 +584,7 @@ window.DungeonContent.register("monsters", "cinderstormDancer", {
   maxHp: 58,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 620,
+  xp: 1900,
   ac: 18,
   attackBonus: 8,
   damage: {
@@ -621,7 +621,7 @@ window.DungeonContent.register("monsters", "ashenPyreLord", {
   tags: ["elemental", "ash", "fire", "boss", "controller"],
   maxHp: 134,
   category: 4,
-  xp: 1350,
+  xp: 13735,
   ac: 17,
   attackBonus: 8,
   damage: {
@@ -672,7 +672,7 @@ window.DungeonContent.register("monsters", "magmaMyrmidon", {
   maxHp: 102,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 1000,
+  xp: 2135,
   ac: 18,
   attackBonus: 8,
   damage: {
@@ -710,7 +710,7 @@ window.DungeonContent.register("monsters", "smokeVeilAssassin", {
   maxHp: 78,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 980,
+  xp: 2095,
   ac: 19,
   attackBonus: 9,
   damage: {
@@ -747,7 +747,7 @@ window.DungeonContent.register("monsters", "emberstormArtillery", {
   tags: ["elemental", "fire", "ember", "ranged", "artillery"],
   maxHp: 84,
   category: 5,
-  xp: 1050,
+  xp: 2240,
   ac: 16,
   attackBonus: 9,
   damage: {
@@ -787,7 +787,7 @@ window.DungeonContent.register("monsters", "volcanicHeartTyrant", {
   maxHp: 190,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 2600,
+  xp: 19135,
   ac: 19,
   attackBonus: 9,
   damage: {
@@ -837,7 +837,7 @@ window.DungeonContent.register("monsters", "lavaTideColossus", {
   maxHp: 134,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 1800,
+  xp: 1820,
   ac: 18,
   attackBonus: 10,
   damage: {
@@ -876,7 +876,7 @@ window.DungeonContent.register("monsters", "ashCycloneRavager", {
   maxHp: 116,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 1750,
+  xp: 1770,
   ac: 19,
   attackBonus: 10,
   damage: {
@@ -913,7 +913,7 @@ window.DungeonContent.register("monsters", "glassfireOracle", {
   tags: ["elemental", "fire", "glass", "ranged", "caster"],
   maxHp: 108,
   category: 6,
-  xp: 1850,
+  xp: 1885,
   ac: 17,
   attackBonus: 10,
   damage: {
@@ -952,7 +952,7 @@ window.DungeonContent.register("monsters", "cinderCrownElder", {
   tags: ["elemental", "fire", "ash", "boss", "caster"],
   maxHp: 260,
   category: 6,
-  xp: 4600,
+  xp: 19505,
   ac: 20,
   attackBonus: 11,
   damage: {
@@ -1004,7 +1004,7 @@ window.DungeonContent.register("monsters", "pyroclasmTitanling", {
   maxHp: 176,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 2900,
+  xp: 2125,
   ac: 20,
   attackBonus: 11,
   damage: {
@@ -1042,7 +1042,7 @@ window.DungeonContent.register("monsters", "ashMonsoon", {
   tags: ["elemental", "ash", "air", "paraelemental", "flying"],
   maxHp: 150,
   category: 7,
-  xp: 2800,
+  xp: 2060,
   ac: 19,
   attackBonus: 11,
   damage: {
@@ -1083,7 +1083,7 @@ window.DungeonContent.register("monsters", "magmaDrakeElemental", {
   maxHp: 168,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 3000,
+  xp: 2205,
   ac: 20,
   attackBonus: 11,
   damage: {
@@ -1120,7 +1120,7 @@ window.DungeonContent.register("monsters", "brassCalderaEfreet", {
   tags: ["elemental", "fire", "efreeti", "boss", "caster"],
   maxHp: 334,
   category: 7,
-  xp: 7200,
+  xp: 21525,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1172,7 +1172,7 @@ window.DungeonContent.register("monsters", "livingVolcano", {
   maxHp: 232,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 3900,
+  xp: 2900,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1209,7 +1209,7 @@ window.DungeonContent.register("monsters", "obsidianPhoenix", {
   tags: ["elemental", "fire", "obsidian", "phoenix", "flying"],
   maxHp: 190,
   category: 8,
-  xp: 4000,
+  xp: 2975,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1250,7 +1250,7 @@ window.DungeonContent.register("monsters", "pyroglassJuggernaut", {
   maxHp: 248,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 4100,
+  xp: 3045,
   ac: 23,
   attackBonus: 12,
   damage: {
@@ -1289,7 +1289,7 @@ window.DungeonContent.register("monsters", "wardenOfTheCalderaGate", {
   maxHp: 394,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 9000,
+  xp: 10920,
   ac: 22,
   attackBonus: 13,
   damage: {
@@ -1338,7 +1338,7 @@ window.DungeonContent.register("monsters", "solarFurnaceAvatar", {
   tags: ["elemental", "fire", "solar", "avatar", "ranged"],
   maxHp: 242,
   category: 9,
-  xp: 5200,
+  xp: 3570,
   ac: 22,
   attackBonus: 12,
   damage: {
@@ -1377,7 +1377,7 @@ window.DungeonContent.register("monsters", "apocalypseAshElemental", {
   tags: ["elemental", "ash", "paraelemental", "apocalypse", "controller"],
   maxHp: 232,
   category: 9,
-  xp: 5300,
+  xp: 3630,
   ac: 21,
   attackBonus: 12,
   damage: {
@@ -1418,7 +1418,7 @@ window.DungeonContent.register("monsters", "magmaWorldbreaker", {
   maxHp: 286,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 5400,
+  xp: 3705,
   ac: 23,
   attackBonus: 12,
   damage: {
@@ -1457,7 +1457,7 @@ window.DungeonContent.register("monsters", "lordOfTheBurningFault", {
   maxHp: 446,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 11500,
+  xp: 14620,
   ac: 23,
   attackBonus: 13,
   damage: {
@@ -1506,7 +1506,7 @@ window.DungeonContent.register("monsters", "primordialFirestorm", {
   tags: ["elemental", "fire", "storm", "primordial", "flying"],
   maxHp: 320,
   category: 10,
-  xp: 8500,
+  xp: 4645,
   ac: 23,
   attackBonus: 13,
   damage: {
@@ -1547,7 +1547,7 @@ window.DungeonContent.register("monsters", "worldAshColossus", {
   maxHp: 352,
   category: 10,
   multiattack: { attacks: 4 },
-  xp: 8700,
+  xp: 4765,
   ac: 22,
   attackBonus: 13,
   damage: {
@@ -1585,7 +1585,7 @@ window.DungeonContent.register("monsters", "heartOfTheElementalPyre", {
   tags: ["elemental", "fire", "planar", "avatar", "ranged"],
   maxHp: 304,
   category: 10,
-  xp: 8800,
+  xp: 4810,
   ac: 24,
   attackBonus: 13,
   damage: {
@@ -1625,7 +1625,7 @@ window.DungeonContent.register("monsters", "primordialSultanOfCinder", {
   tags: ["elemental", "fire", "efreeti", "primordial", "boss"],
   maxHp: 610,
   category: 10,
-  xp: 25000,
+  xp: 13675,
   ac: 24,
   attackBonus: 14,
   damage: {

@@ -19,7 +19,7 @@ window.DungeonContent.register("monsters", "whisperingShade", {
   tags: ["undead", "ghost", "shade", "flying"],
   maxHp: 10,
   category: 1,
-  xp: 55,
+  xp: 70,
   ac: 13,
   attackBonus: 4,
   damage: {
@@ -52,7 +52,7 @@ window.DungeonContent.register("monsters", "candleflameWisp", {
   tags: ["undead", "ghost", "wisp", "flying", "caster"],
   maxHp: 9,
   category: 1,
-  xp: 60,
+  xp: 75,
   ac: 14,
   attackBonus: 4,
   damage: {
@@ -85,7 +85,7 @@ window.DungeonContent.register("monsters", "mourningApparition", {
   tags: ["undead", "ghost", "apparition", "flying"],
   maxHp: 12,
   category: 1,
-  xp: 65,
+  xp: 85,
   ac: 12,
   attackBonus: 4,
   damage: {
@@ -118,7 +118,7 @@ window.DungeonContent.register("monsters", "graveLanternSpecter", {
   tags: ["undead", "ghost", "specter", "boss", "flying", "caster"],
   maxHp: 30,
   category: 1,
-  xp: 150,
+  xp: 1730,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -163,7 +163,7 @@ window.DungeonContent.register("monsters", "chillingPoltergeist", {
   tags: ["undead", "ghost", "poltergeist", "flying", "caster"],
   maxHp: 24,
   category: 2,
-  xp: 150,
+  xp: 415,
   ac: 15,
   attackBonus: 5,
   damage: {
@@ -196,7 +196,7 @@ window.DungeonContent.register("monsters", "hollowWailSpirit", {
   tags: ["undead", "ghost", "spirit", "flying", "caster"],
   maxHp: 22,
   category: 2,
-  xp: 160,
+  xp: 450,
   ac: 14,
   attackBonus: 6,
   damage: {
@@ -229,7 +229,7 @@ window.DungeonContent.register("monsters", "chainboundPhantom", {
   tags: ["undead", "ghost", "phantom", "chain", "flying"],
   maxHp: 28,
   category: 2,
-  xp: 175,
+  xp: 490,
   ac: 14,
   attackBonus: 5,
   damage: {
@@ -262,7 +262,7 @@ window.DungeonContent.register("monsters", "wraithOfTheLockedDoor", {
   tags: ["undead", "ghost", "wraith", "boss", "flying"],
   maxHp: 48,
   category: 2,
-  xp: 320,
+  xp: 10785,
   ac: 15,
   attackBonus: 6,
   damage: {
@@ -307,7 +307,7 @@ window.DungeonContent.register("monsters", "corpseLightWillOWisp", {
   tags: ["undead", "ghost", "wisp", "flying", "caster"],
   maxHp: 34,
   category: 3,
-  xp: 260,
+  xp: 1475,
   ac: 17,
   attackBonus: 7,
   damage: {
@@ -340,7 +340,7 @@ window.DungeonContent.register("monsters", "graveMistBanshee", {
   tags: ["undead", "ghost", "banshee", "flying", "caster"],
   maxHp: 40,
   category: 3,
-  xp: 300,
+  xp: 1705,
   ac: 15,
   attackBonus: 7,
   damage: {
@@ -373,7 +373,7 @@ window.DungeonContent.register("monsters", "spectralDuelist", {
   tags: ["undead", "ghost", "duelist", "flying"],
   maxHp: 44,
   category: 3,
-  xp: 310,
+  xp: 1760,
   ac: 16,
   attackBonus: 8,
   damage: {
@@ -406,7 +406,7 @@ window.DungeonContent.register("monsters", "widowOfTheWhiteBell", {
   tags: ["undead", "ghost", "banshee", "boss", "flying", "caster"],
   maxHp: 74,
   category: 3,
-  xp: 520,
+  xp: 11415,
   ac: 16,
   attackBonus: 8,
   damage: {
@@ -451,7 +451,7 @@ window.DungeonContent.register("monsters", "possessingRemnant", {
   tags: ["undead", "ghost", "possession", "flying", "caster"],
   maxHp: 58,
   category: 4,
-  xp: 520,
+  xp: 1595,
   ac: 16,
   attackBonus: 8,
   damage: {
@@ -485,7 +485,7 @@ window.DungeonContent.register("monsters", "phantomKnight", {
   maxHp: 66,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 600,
+  xp: 1840,
   ac: 18,
   attackBonus: 9,
   damage: {
@@ -518,7 +518,7 @@ window.DungeonContent.register("monsters", "mirrorHallHaunt", {
   tags: ["undead", "ghost", "haunt", "illusion", "flying", "caster"],
   maxHp: 54,
   category: 4,
-  xp: 610,
+  xp: 1875,
   ac: 17,
   attackBonus: 9,
   damage: {
@@ -552,7 +552,7 @@ window.DungeonContent.register("monsters", "mourningDukeEidolon", {
   maxHp: 104,
   category: 4,
   multiattack: { attacks: 2 },
-  xp: 950,
+  xp: 9670,
   ac: 18,
   attackBonus: 9,
   damage: {
@@ -598,7 +598,7 @@ window.DungeonContent.register("monsters", "greaterWraith", {
   maxHp: 82,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 850,
+  xp: 1815,
   ac: 18,
   attackBonus: 10,
   damage: {
@@ -631,7 +631,7 @@ window.DungeonContent.register("monsters", "deathChoirBanshee", {
   tags: ["undead", "ghost", "banshee", "choir", "flying", "caster"],
   maxHp: 76,
   category: 5,
-  xp: 900,
+  xp: 1920,
   ac: 17,
   attackBonus: 10,
   damage: {
@@ -665,7 +665,7 @@ window.DungeonContent.register("monsters", "soulDrinkerPhantom", {
   maxHp: 90,
   category: 5,
   multiattack: { attacks: 2 },
-  xp: 980,
+  xp: 2095,
   ac: 17,
   attackBonus: 10,
   damage: {
@@ -698,7 +698,7 @@ window.DungeonContent.register("monsters", "barrowQueenInWhite", {
   tags: ["undead", "ghost", "queen", "boss", "flying", "caster"],
   maxHp: 138,
   category: 5,
-  xp: 1400,
+  xp: 10300,
   ac: 19,
   attackBonus: 11,
   damage: {
@@ -743,7 +743,7 @@ window.DungeonContent.register("monsters", "allipOfForbiddenNames", {
   tags: ["undead", "ghost", "allip", "flying", "caster"],
   maxHp: 105,
   category: 6,
-  xp: 1250,
+  xp: 1270,
   ac: 18,
   attackBonus: 11,
   damage: {
@@ -777,7 +777,7 @@ window.DungeonContent.register("monsters", "dreadCavalierGhost", {
   maxHp: 118,
   category: 6,
   multiattack: { attacks: 2 },
-  xp: 1400,
+  xp: 1425,
   ac: 19,
   attackBonus: 11,
   damage: {
@@ -810,7 +810,7 @@ window.DungeonContent.register("monsters", "graveStormApparition", {
   tags: ["undead", "ghost", "storm", "flying", "caster"],
   maxHp: 110,
   category: 6,
-  xp: 1450,
+  xp: 1475,
   ac: 18,
   attackBonus: 11,
   damage: {
@@ -843,7 +843,7 @@ window.DungeonContent.register("monsters", "princeOfTheHollowName", {
   tags: ["undead", "ghost", "allip", "prince", "boss", "flying", "caster"],
   maxHp: 176,
   category: 6,
-  xp: 2250,
+  xp: 9515,
   ac: 20,
   attackBonus: 12,
   damage: {
@@ -889,7 +889,7 @@ window.DungeonContent.register("monsters", "moonlessNightshade", {
   maxHp: 138,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 1900,
+  xp: 1395,
   ac: 20,
   attackBonus: 12,
   damage: {
@@ -922,7 +922,7 @@ window.DungeonContent.register("monsters", "doomHeraldBanshee", {
   tags: ["undead", "ghost", "banshee", "herald", "flying", "caster"],
   maxHp: 132,
   category: 7,
-  xp: 2050,
+  xp: 1510,
   ac: 19,
   attackBonus: 13,
   damage: {
@@ -956,7 +956,7 @@ window.DungeonContent.register("monsters", "spectralExecutioner", {
   maxHp: 154,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 2200,
+  xp: 1615,
   ac: 20,
   attackBonus: 13,
   damage: {
@@ -990,7 +990,7 @@ window.DungeonContent.register("monsters", "lordOfTheUnburiedCourt", {
   maxHp: 228,
   category: 7,
   multiattack: { attacks: 2 },
-  xp: 3400,
+  xp: 10180,
   ac: 21,
   attackBonus: 13,
   damage: {
@@ -1037,7 +1037,7 @@ window.DungeonContent.register("monsters", "ancientPhantomDragon", {
   maxHp: 188,
   category: 8,
   multiattack: { attacks: 2 },
-  xp: 3000,
+  xp: 2235,
   ac: 21,
   attackBonus: 14,
   damage: {
@@ -1070,7 +1070,7 @@ window.DungeonContent.register("monsters", "memoryEaterAllip", {
   tags: ["undead", "ghost", "allip", "memory", "flying", "caster"],
   maxHp: 170,
   category: 8,
-  xp: 3150,
+  xp: 2335,
   ac: 20,
   attackBonus: 14,
   damage: {
@@ -1103,7 +1103,7 @@ window.DungeonContent.register("monsters", "tempestOfLostSouls", {
   tags: ["undead", "ghost", "storm", "souls", "flying", "caster"],
   maxHp: 182,
   category: 8,
-  xp: 3300,
+  xp: 2450,
   ac: 21,
   attackBonus: 14,
   damage: {
@@ -1136,7 +1136,7 @@ window.DungeonContent.register("monsters", "cathedralWraithSaint", {
   tags: ["undead", "ghost", "wraith", "saint", "boss", "flying", "caster"],
   maxHp: 286,
   category: 8,
-  xp: 5400,
+  xp: 6540,
   ac: 22,
   attackBonus: 15,
   damage: {
@@ -1182,7 +1182,7 @@ window.DungeonContent.register("monsters", "abyssalWraith", {
   maxHp: 222,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 4400,
+  xp: 3025,
   ac: 22,
   attackBonus: 15,
   damage: {
@@ -1215,7 +1215,7 @@ window.DungeonContent.register("monsters", "oracleOfDeadStars", {
   tags: ["undead", "ghost", "oracle", "stars", "flying", "caster"],
   maxHp: 214,
   category: 9,
-  xp: 4700,
+  xp: 3225,
   ac: 21,
   attackBonus: 15,
   damage: {
@@ -1250,7 +1250,7 @@ window.DungeonContent.register("monsters", "graveTitanPhantom", {
   maxHp: 246,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 5200,
+  xp: 3570,
   ac: 22,
   attackBonus: 16,
   damage: {
@@ -1284,7 +1284,7 @@ window.DungeonContent.register("monsters", "deadKingUnderTheMoon", {
   maxHp: 360,
   category: 9,
   multiattack: { attacks: 3 },
-  xp: 8000,
+  xp: 10170,
   ac: 23,
   attackBonus: 16,
   damage: {
@@ -1329,7 +1329,7 @@ window.DungeonContent.register("monsters", "voidBellBanshee", {
   tags: ["undead", "ghost", "banshee", "void", "flying", "caster"],
   maxHp: 285,
   category: 10,
-  xp: 7200,
+  xp: 3940,
   ac: 22,
   attackBonus: 17,
   damage: {
@@ -1363,7 +1363,7 @@ window.DungeonContent.register("monsters", "elderEidolon", {
   maxHp: 310,
   category: 10,
   multiattack: { attacks: 3 },
-  xp: 7800,
+  xp: 4270,
   ac: 23,
   attackBonus: 17,
   damage: {
@@ -1397,7 +1397,7 @@ window.DungeonContent.register("monsters", "astralDeathWraith", {
   maxHp: 324,
   category: 10,
   multiattack: { attacks: 3 },
-  xp: 8400,
+  xp: 4600,
   ac: 23,
   attackBonus: 18,
   damage: {
@@ -1431,7 +1431,7 @@ window.DungeonContent.register("monsters", "theFirstGhost", {
   tags: ["undead", "ghost", "mythic", "boss", "flying", "caster"],
   maxHp: 470,
   category: 10,
-  xp: 12500,
+  xp: 6830,
   ac: 24,
   attackBonus: 18,
   damage: {
