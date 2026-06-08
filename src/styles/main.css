@@ -711,7 +711,8 @@ h1 {
   width: min(100%, 380px);
 }
 
-.menu-panel:has(.main-achievements:not(.hidden)) {
+.menu-panel:has(.main-achievements:not(.hidden)),
+.menu-panel:has(.main-comics:not(.hidden)) {
   max-width: min(92vw, 760px);
   width: min(92vw, 760px);
 }
@@ -719,6 +720,20 @@ h1 {
 .menu-actions {
   display: grid;
   gap: 10px;
+}
+
+.menu-actions .comic-menu-button {
+  background:
+    linear-gradient(135deg, rgba(87, 53, 104, 0.42), rgba(21, 74, 79, 0.62)),
+    linear-gradient(180deg, rgba(16, 21, 22, 0.94), rgba(7, 10, 12, 0.96));
+  border-color: rgba(188, 139, 216, 0.44);
+  box-shadow: inset 0 0 0 1px rgba(255, 244, 212, 0.07), 0 0 18px rgba(115, 218, 205, 0.08);
+}
+
+.menu-actions .comic-menu-button:hover,
+.menu-actions .comic-menu-button:focus-visible {
+  border-color: rgba(220, 176, 239, 0.68);
+  box-shadow: inset 0 0 0 1px rgba(255, 244, 212, 0.1), 0 0 22px rgba(188, 139, 216, 0.18);
 }
 
 .menu-actions button,
@@ -735,6 +750,53 @@ h1 {
 .main-settings {
   display: grid;
   gap: 10px;
+}
+
+.main-comics {
+  display: grid;
+  gap: 12px;
+  min-width: min(78vw, 520px);
+}
+
+.comic-submenu-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.comic-submenu-heading h3 {
+  color: var(--cream);
+  font-family: var(--font-title);
+  font-size: 1.35rem;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.comic-menu-list {
+  display: grid;
+  gap: 10px;
+}
+
+.comic-menu-list button {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-height: 58px;
+  min-width: 0;
+  text-align: left;
+}
+
+.comic-menu-list b,
+.comic-menu-list small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.comic-menu-list small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .main-achievements {
@@ -3471,6 +3533,133 @@ button[data-ui-icon]::before,
 #game-dialog .fighter-info-body {
   min-height: 0;
   overflow-y: auto;
+}
+
+.comic-reader {
+  align-items: stretch;
+  background: rgba(4, 6, 7, 0.86);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 80;
+}
+
+.comic-reader-panel {
+  background: var(--chrome-dialog-bg);
+  border: 1px solid var(--chrome-panel-border);
+  border-radius: 8px;
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.68);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  max-width: min(1180px, 100%);
+  min-height: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.comic-reader-header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.comic-reader-header h2 {
+  color: var(--cream);
+  font-family: var(--font-title);
+  font-size: clamp(1.35rem, 2.2vw, 2.1rem);
+  line-height: 1.05;
+}
+
+.comic-reader-toolbar {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(90px, 1fr) auto auto auto minmax(120px, 190px) auto;
+  padding: 10px 16px;
+}
+
+.comic-reader-toolbar button {
+  min-height: 40px;
+}
+
+.comic-reader-toolbar span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.comic-reader-toolbar input {
+  min-width: 0;
+  width: 100%;
+}
+
+.comic-page-stage {
+  align-items: start;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 34%),
+    rgba(2, 4, 5, 0.52);
+  cursor: grab;
+  display: grid;
+  justify-items: center;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px;
+  user-select: none;
+}
+
+.comic-page-stage.dragging {
+  cursor: grabbing;
+}
+
+.comic-page-stage img {
+  border: 1px solid rgba(147, 216, 204, 0.28);
+  border-radius: 6px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  display: block;
+  height: auto;
+  max-width: none;
+  object-fit: contain;
+  transform-origin: top center;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.comic-magnifier {
+  background-color: rgba(2, 4, 5, 0.95);
+  background-repeat: no-repeat;
+  border: 2px solid rgba(236, 219, 169, 0.88);
+  border-radius: 50%;
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.68),
+    inset 0 0 0 1px rgba(115, 218, 205, 0.32),
+    inset 0 0 28px rgba(255, 255, 255, 0.08);
+  height: 280px;
+  left: 0;
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  width: 280px;
+  z-index: 90;
+}
+
+.comic-page-empty {
+  align-self: center;
+  background: rgba(13, 11, 12, 0.72);
+  border: 1px dashed rgba(147, 216, 204, 0.38);
+  border-radius: 8px;
+  color: var(--muted);
+  font-weight: 800;
+  justify-self: center;
+  padding: 22px;
+  text-align: center;
 }
 
 .fighter-info-panel {
@@ -8843,6 +9032,32 @@ button[data-ui-icon]::before,
   .menu-volume input {
     grid-column: 1 / -1;
     width: 100%;
+  }
+
+  .main-comics {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .comic-reader {
+    padding: 8px;
+  }
+
+  .comic-reader-header {
+    padding: 12px;
+  }
+
+  .comic-reader-toolbar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 10px 12px;
+  }
+
+  .comic-reader-toolbar span {
+    align-self: center;
+  }
+
+  .comic-page-stage {
+    padding: 10px;
   }
 }
 

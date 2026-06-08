@@ -1,0 +1,58 @@
+(function registerDepthboundComics() {
+  window.DepthboundComics = [
+    {
+      id: "the-barrow-crown",
+      title: "The Barrow Crown",
+      root: "comics/the-barrow-crown",
+      coverPage: "title.png",
+      chapters: [
+        {
+          id: "chapter-1",
+          title: "Chapter 1",
+          pages: ["chapter-1/1.png", "chapter-1/2.png", "chapter-1/3.png", "chapter-1/4.png", "chapter-1/5.png", "chapter-1/6.png", "chapter-1/7.png"],
+        },
+        {
+          id: "chapter-2",
+          title: "Chapter 2",
+          pages: ["chapter-2/7_2.png", "chapter-2/8.png", "chapter-2/9.png", "chapter-2/10.png", "chapter-2/11.png", "chapter-2/12.png", "chapter-2/13.png"],
+        },
+        {
+          id: "chapter-3",
+          title: "Chapter 3",
+          pages: [
+            "chapter-3/14.png",
+            "chapter-3/15.png",
+            "chapter-3/16.png",
+            "chapter-3/17.png",
+            "chapter-3/18.png",
+            "chapter-3/19.png",
+            "chapter-3/20.png",
+            "chapter-3/21.png",
+            "chapter-3/22.png",
+            "chapter-3/23.png",
+            "chapter-3/24.png",
+            "chapter-3/25.png",
+            "chapter-3/26.png",
+            "chapter-3/27.png",
+            "chapter-3/28.png",
+            "chapter-3/29.png",
+            "chapter-3/30.png",
+            "chapter-3/31.png",
+            "chapter-3/32.png",
+            "chapter-3/33.png",
+            "chapter-3/34.png",
+            "chapter-3/35.png",
+            "chapter-3/36.png",
+            "chapter-3/37.png",
+            "chapter-3/38.png",
+            "chapter-3/39.png",
+            "chapter-3/40.png",
+            "chapter-3/41.png",
+            "chapter-3/42.png",
+            "chapter-3/43.png",
+          ],
+        },
+      ],
+    },
+  ];
+})();

@@ -267,6 +267,26 @@ els.showDungeonIntro?.addEventListener("click", () => {
 });
 els.tutorial.addEventListener("click", showTutorial);
 els.mainTutorial?.addEventListener("click", startInteractiveTutorial);
+els.readComicMenu?.addEventListener("click", () => showMainMenuSubmenu("comics"));
+els.comicsPanel?.addEventListener("click", (event) => {
+  const backButton = event.target.closest("[data-comic-back-list]");
+  if (backButton) {
+    renderComicMenu();
+    return;
+  }
+  const coverButton = event.target.closest("[data-comic-id][data-comic-cover-page]");
+  if (coverButton) {
+    openComicCoverPage(coverButton.dataset.comicId);
+    return;
+  }
+  const chapterButton = event.target.closest("[data-comic-id][data-comic-chapter-id]");
+  if (chapterButton) {
+    openComicReader(chapterButton.dataset.comicId, chapterButton.dataset.comicChapterId);
+    return;
+  }
+  const comicButton = event.target.closest("[data-comic-id]");
+  if (comicButton) renderComicChapterMenu(comicButton.dataset.comicId);
+});
 els.loadMenu?.addEventListener("click", () => showMainMenuSubmenu("load"));
 els.achievementsMenu?.addEventListener("click", () => {
   if (window.DepthboundAchievements?.show) {
@@ -314,6 +334,56 @@ els.zoomOut.addEventListener("click", () => adjustRoomZoom(-0.1));
 els.zoomIn.addEventListener("click", () => adjustRoomZoom(0.1));
 els.zoomSlider?.addEventListener("input", (event) => {
   setRoomZoom(Number(event.target.value) / 100);
+});
+els.closeComicReader?.addEventListener("click", closeComicReader);
+els.comicReader?.addEventListener("click", (event) => {
+  if (event.target === els.comicReader) closeComicReader();
+});
+els.comicPrevPage?.addEventListener("click", () => turnComicPage(-1));
+els.comicNextPage?.addEventListener("click", () => turnComicPage(1));
+els.comicZoomOut?.addEventListener("click", () => setComicReaderZoom(comicReaderState.zoom - 0.1));
+els.comicZoomIn?.addEventListener("click", () => setComicReaderZoom(comicReaderState.zoom + 0.1));
+els.comicZoomSlider?.addEventListener("input", (event) => setComicReaderZoom(Number(event.target.value) / 100));
+els.comicPageStage?.addEventListener("mousedown", (event) => {
+  if (event.button === 2) showComicMagnifier(event);
+  else beginComicPageDrag(event);
+});
+els.comicPageStage?.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+});
+els.comicPageStage?.addEventListener("scroll", () => updateComicMagnifier());
+window.addEventListener("mousemove", (event) => {
+  updateComicPageDrag(event);
+  moveComicMagnifier(event);
+});
+window.addEventListener("mouseup", () => {
+  endComicPageDrag();
+  hideComicMagnifier();
+});
+els.comicPageImage?.addEventListener("error", () => {
+  els.comicPageImage?.classList.add("hidden");
+  els.comicPageEmpty?.classList.remove("hidden");
+  hideComicMagnifier();
+});
+els.comicPageImage?.addEventListener("load", () => {
+  els.comicPageImage?.classList.remove("hidden");
+  els.comicPageEmpty?.classList.add("hidden");
+  hideComicMagnifier();
+});
+window.addEventListener("keydown", (event) => {
+  if (els.comicReader?.classList.contains("hidden")) return;
+  if (event.key === "Escape") {
+    closeComicReader();
+    event.preventDefault();
+  }
+  if (event.key === "ArrowLeft") {
+    turnComicPage(-1);
+    event.preventDefault();
+  }
+  if (event.key === "ArrowRight") {
+    turnComicPage(1);
+    event.preventDefault();
+  }
 });
 els.volumeSliders?.forEach((slider) => {
   slider.addEventListener("input", (event) => {

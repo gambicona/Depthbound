@@ -21,9 +21,11 @@
             <button id="load-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="save-slots">Load</button>
             <button id="achievements-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="main-achievements">Achievements</button>
             <button id="main-tutorial" class="ghost-button" type="button">Tutorial</button>
+            <button id="read-comic-menu" class="ghost-button comic-menu-button" type="button" aria-expanded="false" aria-controls="main-comics">Read Comic</button>
             <button id="settings-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="main-settings">Settings</button>
           </div>
           <button id="main-menu-back" class="ghost-button menu-back hidden" type="button">Back</button>
+          <div id="main-comics" class="main-comics hidden" aria-label="Comics"></div>
           <div id="save-slots" class="save-slots hidden" aria-label="Save slots"></div>
           <div id="main-achievements" class="main-achievements hidden" aria-label="Achievements"></div>
           <div id="main-settings" class="main-settings hidden" aria-label="Settings">
@@ -473,6 +475,32 @@
       </form>
     </div>
 
+    <div id="comic-reader" class="comic-reader hidden" role="dialog" aria-modal="true" aria-labelledby="comic-reader-title">
+      <section class="comic-reader-panel">
+        <header class="comic-reader-header">
+          <div>
+            <p id="comic-reader-kicker" class="eyebrow">Comic</p>
+            <h2 id="comic-reader-title">The Barrow Crown</h2>
+          </div>
+          <button id="close-comic-reader" class="icon-button" type="button" title="Close" aria-label="Close">x</button>
+        </header>
+        <div class="comic-reader-toolbar" aria-label="Comic reader controls">
+          <button id="comic-prev-page" class="ghost-button" type="button">Previous</button>
+          <span id="comic-page-label">Page 1 / 1</span>
+          <button id="comic-next-page" class="ghost-button" type="button">Next</button>
+          <button id="comic-zoom-out" class="icon-button ghost-button" type="button" title="Zoom out" aria-label="Zoom out">-</button>
+          <span id="comic-zoom-label">100%</span>
+          <input id="comic-zoom-slider" type="range" min="50" max="220" step="10" value="100" aria-label="Comic zoom" />
+          <button id="comic-zoom-in" class="icon-button ghost-button" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+        </div>
+        <div id="comic-page-stage" class="comic-page-stage">
+          <img id="comic-page-image" alt="Comic page" draggable="false" />
+          <div id="comic-magnifier" class="comic-magnifier hidden" aria-hidden="true"></div>
+          <p id="comic-page-empty" class="comic-page-empty hidden">Page image not found yet.</p>
+        </div>
+      </section>
+    </div>
+
     <div id="loading-screen" class="loading-screen hidden" role="status" aria-live="polite" aria-atomic="true">
       <section class="loading-panel" aria-label="Loading">
         <div class="loading-spinner" aria-hidden="true"></div>
@@ -605,6 +633,7 @@
     <script src="src/scripts/app/tavern-guests.js?v=tavern-perf-fix-2" defer></script>
     <script src="src/scripts/app/travel-events.js" defer></script>
     <script src="src/scripts/app/game-state.js?v=loading-screen-1" defer></script>
+    <script src="src/scripts/comics/catalog.js" defer></script>
     <script src="src/scripts/app/ui-dialogs-character.js?v=loading-screen-1" defer></script>
     <script src="src/scripts/app/combat-map.js?v=loading-screen-1" defer></script>
     <script src="src/scripts/app/movement-ai-input.js?v=playtest-sync-31" defer></script>

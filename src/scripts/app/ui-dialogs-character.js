@@ -243,9 +243,300 @@ function applySaveRollMode(mode = saveRollMode) {
   if (els.saveRollModeSelect) els.saveRollModeSelect.value = saveRollMode;
 }
 
+const comicReaderState = {
+  comic: null,
+  chapter: null,
+  page: 1,
+  zoom: 1,
+};
+let comicPageDrag = null;
+const comicMagnifierZoom = 2.8;
+
+function comicLibrary() {
+  return Array.isArray(window.DepthboundComics) ? window.DepthboundComics : [];
+}
+
+function findComic(comicId) {
+  return comicLibrary().find((comic) => comic.id === comicId) ?? null;
+}
+
+function findComicChapter(comic, chapterId) {
+  return comic?.chapters?.find((chapter) => chapter.id === chapterId) ?? null;
+}
+
+function comicChapterPageCount(chapter) {
+  if (Array.isArray(chapter?.pages) && chapter.pages.length) return chapter.pages.length;
+  return Math.max(1, Math.floor(Number(chapter?.pageCount) || 1));
+}
+
+function comicChapterPagePath(comic, chapter, page) {
+  if (Array.isArray(chapter?.pages) && chapter.pages[page - 1]) {
+    return `${String(comic.root ?? "").replace(/\/$/, "")}/${chapter.pages[page - 1]}`;
+  }
+  const pageFile = chapter.pageFilePattern ? chapter.pageFilePattern.replace("{page}", String(page)) : `page-${page}.png`;
+  return `${String(comic.root ?? "").replace(/\/$/, "")}/${chapter.id}/${pageFile}`;
+}
+
+function comicCoverChapter(comic) {
+  return comic?.coverPage ? { id: "title-page", title: "Title Page", pages: [comic.coverPage] } : null;
+}
+
+function comicChapterSequence(comic) {
+  return [comicCoverChapter(comic), ...(comic?.chapters ?? [])].filter(Boolean);
+}
+
+function comicChapterIndex(comic, chapter) {
+  return comicChapterSequence(comic).findIndex((entry) => entry.id === chapter?.id);
+}
+
+function adjacentComicChapter(delta) {
+  const { comic, chapter } = comicReaderState;
+  const chapters = comicChapterSequence(comic);
+  const index = comicChapterIndex(comic, chapter);
+  if (index < 0) return null;
+  return chapters[index + delta] ?? null;
+}
+
+function resetComicPageScroll() {
+  els.comicPageStage?.scrollTo?.({ top: 0, left: 0, behavior: "auto" });
+}
+
+function renderComicMenu() {
+  if (!els.comicsPanel) return;
+  const comics = comicLibrary();
+  els.comicsPanel.innerHTML = comics.length
+    ? `
+      <div class="comic-menu-list">
+        ${comics
+          .map(
+            (comic) => `
+              <button type="button" data-comic-id="${escapeAttribute(comic.id)}">
+                <b>${escapeHtml(comic.title)}</b>
+                <small>${comic.coverPage ? "Title page + " : ""}${escapeHtml(comic.chapters?.length ?? 0)} chapter${comic.chapters?.length === 1 ? "" : "s"}</small>
+              </button>
+            `,
+          )
+          .join("")}
+      </div>
+    `
+    : `<p class="empty-note">No comics are available yet.</p>`;
+}
+
+function renderComicChapterMenu(comicId) {
+  if (!els.comicsPanel) return;
+  const comic = findComic(comicId);
+  if (!comic) {
+    renderComicMenu();
+    return;
+  }
+  els.comicsPanel.innerHTML = `
+    <div class="comic-submenu-heading">
+      <p class="eyebrow">Comic</p>
+      <h3>${escapeHtml(comic.title)}</h3>
+    </div>
+    <div class="comic-menu-list">
+      ${
+        comic.coverPage
+          ? `
+            <button type="button" data-comic-id="${escapeAttribute(comic.id)}" data-comic-cover-page="true">
+              <b>Title Page</b>
+              <small>Cover</small>
+            </button>
+          `
+          : ""
+      }
+      ${(comic.chapters ?? [])
+        .map(
+          (chapter) => `
+            <button type="button" data-comic-id="${escapeAttribute(comic.id)}" data-comic-chapter-id="${escapeAttribute(chapter.id)}">
+              <b>${escapeHtml(chapter.title)}</b>
+              <small>${escapeHtml(comicChapterPageCount(chapter))} page${comicChapterPageCount(chapter) === 1 ? "" : "s"}</small>
+            </button>
+          `,
+        )
+        .join("")}
+    </div>
+    <button type="button" class="ghost-button" data-comic-back-list>All Comics</button>
+  `;
+}
+
+function setComicReaderZoom(zoom) {
+  comicReaderState.zoom = clamp(Number(zoom) || 1, 0.5, 2.2);
+  const percent = Math.round(comicReaderState.zoom * 100);
+  if (els.comicZoomLabel) els.comicZoomLabel.textContent = `${percent}%`;
+  if (els.comicZoomSlider) els.comicZoomSlider.value = String(percent);
+  if (els.comicPageImage) els.comicPageImage.style.width = `${percent}%`;
+  updateComicMagnifier();
+}
+
+function renderComicReader() {
+  const { comic, chapter, page } = comicReaderState;
+  if (!comic || !chapter) return;
+  const pageCount = comicChapterPageCount(chapter);
+  comicReaderState.page = clamp(Math.floor(Number(page) || 1), 1, pageCount);
+  const currentPage = comicReaderState.page;
+  if (els.comicReaderKicker) els.comicReaderKicker.textContent = comic.title;
+  if (els.comicReaderTitle) els.comicReaderTitle.textContent = chapter.title;
+  if (els.comicPageLabel) els.comicPageLabel.textContent = `Page ${currentPage} / ${pageCount}`;
+  if (els.comicPrevPage) els.comicPrevPage.disabled = currentPage <= 1 && !adjacentComicChapter(-1);
+  if (els.comicNextPage) els.comicNextPage.disabled = currentPage >= pageCount && !adjacentComicChapter(1);
+  if (els.comicPageImage) {
+    els.comicPageImage.classList.remove("hidden");
+    els.comicPageImage.src = comicChapterPagePath(comic, chapter, currentPage);
+    els.comicPageImage.alt = `${comic.title} ${chapter.title} page ${currentPage}`;
+  }
+  els.comicPageEmpty?.classList.add("hidden");
+  setComicReaderZoom(comicReaderState.zoom);
+}
+
+function openComicReader(comicId, chapterId) {
+  const comic = findComic(comicId);
+  const chapter = findComicChapter(comic, chapterId);
+  if (!comic || !chapter) return;
+  comicReaderState.comic = comic;
+  comicReaderState.chapter = chapter;
+  comicReaderState.page = 1;
+  comicReaderState.zoom = 1;
+  renderComicReader();
+  resetComicPageScroll();
+  els.comicReader?.classList.remove("hidden");
+}
+
+function openComicCoverPage(comicId) {
+  const comic = findComic(comicId);
+  const chapter = comicCoverChapter(comic);
+  if (!comic || !chapter) return;
+  comicReaderState.comic = comic;
+  comicReaderState.chapter = chapter;
+  comicReaderState.page = 1;
+  comicReaderState.zoom = 1;
+  renderComicReader();
+  resetComicPageScroll();
+  els.comicReader?.classList.remove("hidden");
+}
+
+function closeComicReader() {
+  hideComicMagnifier();
+  endComicPageDrag();
+  els.comicReader?.classList.add("hidden");
+  if (els.comicPageImage) els.comicPageImage.removeAttribute("src");
+}
+
+function turnComicPage(delta) {
+  const pageCount = comicChapterPageCount(comicReaderState.chapter);
+  const nextPage = comicReaderState.page + delta;
+  if (nextPage > pageCount) {
+    const nextChapter = adjacentComicChapter(1);
+    if (!nextChapter) return;
+    comicReaderState.chapter = nextChapter;
+    comicReaderState.page = 1;
+    renderComicReader();
+    resetComicPageScroll();
+    return;
+  }
+  if (nextPage < 1) {
+    const previousChapter = adjacentComicChapter(-1);
+    if (!previousChapter) return;
+    comicReaderState.chapter = previousChapter;
+    comicReaderState.page = comicChapterPageCount(previousChapter);
+    renderComicReader();
+    resetComicPageScroll();
+    return;
+  }
+  comicReaderState.page = nextPage;
+  renderComicReader();
+  resetComicPageScroll();
+}
+
+function comicImageReadyForInteraction() {
+  return Boolean(els.comicPageImage && !els.comicPageImage.classList.contains("hidden") && els.comicPageImage.complete && els.comicPageImage.naturalWidth);
+}
+
+function beginComicPageDrag(event) {
+  if (event.button !== 0 || !els.comicPageStage || !comicImageReadyForInteraction()) return;
+  if (event.target?.closest?.("button, input, .comic-reader-toolbar, .comic-reader-header")) return;
+  comicPageDrag = {
+    startX: event.clientX,
+    startY: event.clientY,
+    scrollLeft: els.comicPageStage.scrollLeft,
+    scrollTop: els.comicPageStage.scrollTop,
+  };
+  els.comicPageStage.classList.add("dragging");
+  event.preventDefault();
+}
+
+function updateComicPageDrag(event) {
+  if (!comicPageDrag || !els.comicPageStage) return;
+  els.comicPageStage.scrollLeft = comicPageDrag.scrollLeft - (event.clientX - comicPageDrag.startX);
+  els.comicPageStage.scrollTop = comicPageDrag.scrollTop - (event.clientY - comicPageDrag.startY);
+  event.preventDefault();
+}
+
+function endComicPageDrag() {
+  comicPageDrag = null;
+  els.comicPageStage?.classList.remove("dragging");
+}
+
+function comicMagnifierGeometry(event) {
+  if (!comicImageReadyForInteraction() || !els.comicMagnifier) return null;
+  const imageRect = els.comicPageImage.getBoundingClientRect();
+  const inside =
+    event.clientX >= imageRect.left &&
+    event.clientX <= imageRect.right &&
+    event.clientY >= imageRect.top &&
+    event.clientY <= imageRect.bottom;
+  if (!inside) return null;
+  const lensRect = els.comicMagnifier.getBoundingClientRect();
+  const lensWidth = lensRect.width || 280;
+  const lensHeight = lensRect.height || 280;
+  const imageX = event.clientX - imageRect.left;
+  const imageY = event.clientY - imageRect.top;
+  return { imageRect, imageX, imageY, lensWidth, lensHeight };
+}
+
+function updateComicMagnifier(event = null) {
+  if (!els.comicMagnifier || els.comicMagnifier.classList.contains("hidden")) return;
+  const sourceEvent = event ?? comicReaderState.magnifierEvent;
+  if (!sourceEvent) return;
+  const geometry = comicMagnifierGeometry(sourceEvent);
+  if (!geometry) {
+    els.comicMagnifier.classList.add("hidden");
+    return;
+  }
+  const { imageRect, imageX, imageY, lensWidth, lensHeight } = geometry;
+  const zoom = comicMagnifierZoom;
+  els.comicMagnifier.style.left = `${sourceEvent.clientX - lensWidth / 2}px`;
+  els.comicMagnifier.style.top = `${sourceEvent.clientY - lensHeight / 2}px`;
+  els.comicMagnifier.style.backgroundImage = `url("${els.comicPageImage.currentSrc || els.comicPageImage.src}")`;
+  els.comicMagnifier.style.backgroundSize = `${imageRect.width * zoom}px ${imageRect.height * zoom}px`;
+  els.comicMagnifier.style.backgroundPosition = `${lensWidth / 2 - imageX * zoom}px ${lensHeight / 2 - imageY * zoom}px`;
+  comicReaderState.magnifierEvent = { clientX: sourceEvent.clientX, clientY: sourceEvent.clientY };
+}
+
+function showComicMagnifier(event) {
+  if (event.button !== 2 || !els.comicMagnifier || !comicImageReadyForInteraction()) return;
+  event.preventDefault();
+  event.stopPropagation();
+  els.comicMagnifier.classList.remove("hidden");
+  updateComicMagnifier(event);
+}
+
+function moveComicMagnifier(event) {
+  if (!els.comicMagnifier || els.comicMagnifier.classList.contains("hidden")) return;
+  updateComicMagnifier(event);
+  event.preventDefault();
+}
+
+function hideComicMagnifier() {
+  if (!els.comicMagnifier) return;
+  els.comicMagnifier.classList.add("hidden");
+  comicReaderState.magnifierEvent = null;
+}
+
 function showMainMenuRoot() {
   els.menuActions?.classList.remove("hidden");
   els.mainMenuBack?.classList.add("hidden");
+  els.comicsPanel?.classList.add("hidden");
   els.saveSlots?.classList.add("hidden");
   els.mainSettings?.classList.add("hidden");
   els.achievementsPanel?.classList.add("hidden");
@@ -255,9 +546,11 @@ function showMainMenuRoot() {
 function showMainMenuSubmenu(section) {
   els.menuActions?.classList.add("hidden");
   els.mainMenuBack?.classList.remove("hidden");
+  els.comicsPanel?.classList.toggle("hidden", section !== "comics");
   els.saveSlots?.classList.toggle("hidden", section !== "load");
   els.mainSettings?.classList.toggle("hidden", section !== "settings");
   els.achievementsPanel?.classList.toggle("hidden", section !== "achievements");
+  if (section === "comics") renderComicMenu();
   renderSaveSlots();
 }
 
@@ -457,6 +750,7 @@ function showMainMenu(message = "") {
   hideAbilitiesMenu();
   hideHomeMenu();
   hideStoreMenu();
+  closeComicReader();
   startMainMenuBackgroundRotation();
   document.body.classList.add("menu-active");
   els.mainMenu.classList.remove("hidden");
