@@ -539,7 +539,7 @@ They used five divine tools:
 
 Where these tools struck, the first mountains, rivers, roads, graves, kingdoms, and villages formed.
 
-This is why clerics matter: gods are real, but they are not omnipotent sky-beings solving every problem. They are **cosmic anchor-powers** whose influence is strongest where mortals maintain shrines, rites, oaths, roads, and sacred customs.
+This is why clerics matter: divinity is real, but it is not simple. Some gods are true beings, some powers are saints or primal laws, and some temples worship a name with nothing honest behind it. Divine influence is strongest where mortals maintain shrines, rites, oaths, roads, and sacred customs.
 
 ### The Ancient Age: The Crownroad Concord
 
@@ -688,18 +688,18 @@ Every new world map can be treated as a newly charted stretch of the Verge: part
 
 This is where the player belongs.
 
-## 3. Major Deities and Divine Powers
+## 3. Gods, Saints, and Divine Powers
 
-The gods are definitely real, but their power is mediated through **rites, anchors, domains, shrines, relics, and mortal action**. They do not simply fix the world because the world is too fractured.
+Divinity is definitely real, but not every named god is. True gods, saints, primal powers, tool-echoes, and false cults all overlap through **rites, anchors, domains, shrines, relics, and mortal action**. They do not simply fix the world because the world is too fractured.
 
-### Asterion, the First Lantern
+### Lioran, the Dawn-Bearer
 
 **Domains:** Light, protection, courage, truth, dawn
 **Symbol:** A lantern with seven rays
 **Wants:** Settlements to endure, roads to be relit, people to act bravely in darkness.
 **Normal worship:** People hang lanterns above doors, light candles before journeys, and swear truth-oaths by flame.
 
-Asterion is ideal for clerics, paladins, village shrines, undead-cleansing quests, and "last light in the dungeon" moments.
+Lioran is ideal for clerics, paladins, village shrines, undead-cleansing quests, and "last light in the dungeon" moments.
 
 ### Maera Hearthwise, Lady of the Threshold
 
@@ -710,14 +710,14 @@ Asterion is ideal for clerics, paladins, village shrines, undead-cleansing quest
 
 Maera directly supports your home/base systems: cooking, beds, companions, decoration, familiars, gardens, and cozy moments. A well-kept Home is a shrine to Maera whether the player says so or not.
 
-### Kelvorn Mile-Saint
+### Hadrin Mile-Saint
 
 **Domains:** Roads, travel, maps, messengers, safe return
 **Symbol:** A bootprint beside a milepost
 **Wants:** Roads rebuilt, settlements reconnected, lost routes filed into ledgers.
 **Normal worship:** Travelers leave nails, coins, chalk marks, or written names at mileposts.
 
-Kelvorn is the patron of the Expedition Board, roads, teleport circles, travel events, scouting, and The Milepost Ledger.
+Hadrin is the patron of the Expedition Board, roads, teleport circles, travel events, scouting, and The Milepost Ledger.
 
 ### Naevra, Keeper of Names
 
@@ -746,14 +746,14 @@ Orund supports dwarven content, mines, deepworks, smithing, crafting, Ember Oath
 
 Thessa makes the Thornwood Pact more than a forest questline. She also creates friction with the Trophy Lodge: is a trophy proof of respect, or theft from the wild?
 
-### Arkhon, the Buried Crown
+### Kharovan, the Buried Crown
 
 **Domains:** Law, kingship, command, duty, war-dead
 **Symbol:** A crown half-buried in black soil
 **Wants:** Oaths fulfilled, rulers worthy, armies remembered, command purified of tyranny.
 **Normal worship:** Magistrates swear by his buried crown. Soldiers salute old barrows before battle.
 
-Arkhon is not evil, but his domain is damaged. The Barrow Crown is a corrupted or broken expression of his power. His clerics may be stern, grave, and obsessed with rightful command.
+Kharovan may not be a true god. The Barrow Crown is a corrupted expression of command, and his "clerics" may be crown-pact casters drawing from the Empty Crown, royal barrows, or something below law.
 
 ### The Four Crucible Powers
 
@@ -1143,10 +1143,10 @@ Examples:
 - Goldspan
 - Veyrwatch
 - Crownmarket
-- Saint Kelvorn's Gate
+- Saint Hadrin's Gate
 - Ledgerfall
 - Brazenford
-- Old Arkhon
+- Old Kharovan
 - Bellspire
 - Tidemark City
 
@@ -1214,13 +1214,13 @@ God-names should be pronounceable and title-heavy.
 
 Examples:
 
-- Asterion, the First Lantern
+- Lioran, the Dawn-Bearer
 - Maera Hearthwise
-- Kelvorn Mile-Saint
+- Hadrin Mile-Saint
 - Naevra, Keeper of Names
 - Orund Embervein
 - Thessa Thorn-Crowned
-- Arkhon, the Buried Crown
+- Kharovan, the Buried Crown
 - Ilyr Tidemarked
 - Korrum Stoneheart
 - Sathren Storm-Eye
@@ -1229,7 +1229,7 @@ Common people may use titles more often than names:
 
 - "Light the First Lantern."
 - "Maera keep the pot warm."
-- "Kelvorn guide your boots."
+- "Hadrin guide your boots."
 - "Naevra know his name."
 - "Orund watch the claim."
 - "Thessa take only what is owed."
@@ -1305,8 +1305,624 @@ That gives Depthbound a clear identity:
 **Dungeon crawling is not random violence. It is frontier restoration through danger, memory, and loot.**`;
 
       const seedTime = new Date().toISOString();
+      const deityHandoutSeeds = [
+        {
+          short: "lioran",
+          power: "Lioran, the Dawn-Bearer",
+          powerId: "god-lioran",
+          items: [
+            ["lantern-wake-prayer", "Lantern-Wake Prayer", "prayer leaf", "Light the wick before the name is spoken. Hold the flame low, not high, so it remembers the floor. Lioran sees the brave, but he blesses the ones who bring light to someone else's hands.", "A simple first shrine find for teaching that Lioran values shared courage over spectacle."],
+            ["dawn-watch-log", "Dawn Watch Log of Westmere Gate", "guard log", "Third bell before dawn: no movement on the road. Fourth bell: cold blue shine under the east arch. Fifth bell: Private Roan swore the lantern answered him. Sixth bell: sunrise, and the dead in the ditch were only bones again.", "A road or village clue that light rites can briefly reveal or suppress undead influence."],
+            ["seven-ray-chant", "Chant of the Seven Rays", "temple chant", "One ray for the lost. One ray for the liar made honest. One for the door. One for the blade. One for the grave. One for the child who waits. One for the walker who enters the dark anyway.", "A chant that gives Lioran's church warmth without making it soft."],
+            ["letter-from-a-lantern-priest", "Letter from a Lantern Priest", "creased letter", "Do not tell them the dark is evil. Tell them it is old. Tell them it is heavy. Tell them Lioran does not hate the Depth. He teaches us how to cross what would otherwise keep us.", "Foreshadows the reworked creation myth and separates Lioran from simple anti-darkness doctrine."],
+            ["last-light-dungeon-note", "Last Light Dungeon Note", "charred note", "We are out of oil. Ser Jessa says to burn the map next. I said no. The map knows the road home. We burned my confession instead. The flame held until morning.", "A small dungeon handout for hard choices, guilt, and sacrificial light."],
+            ["lanternmaker-receipt", "Lanternmaker's Receipt", "shop receipt", "One stormglass lantern, seven-rayed frame, paid by the Gravebinders. Engraving requested: For the nameless, not against them.", "Connects Lioran to Naevra and undead-cleansing without making the faiths identical."],
+            ["dawn-bearer-vision", "Vision of the Dawn-Bearer", "vision transcript", "I saw a figure carrying a lantern with both hands. He did not raise it above his head. He knelt and set it beside a sleeping stranger. Then the horizon remembered itself.", "A cleric or shrine vision that implies Lioran is a real being who serves the Lantern rather than owning it."],
+            ["blackglass-sermon", "Blackglass Sermon Fragment", "sermon fragment", "If your lantern shows no path, shield it. If your lantern shows a monster, name it. If your lantern shows yourself, do not look away.", "A moral clue handout for a trial, mirror dungeon, or confession event."],
+            ["first-lantern-heresy", "The First Lantern Heresy", "banned margin note", "The god did not light the Lantern. The Lantern lit the god. This is not blasphemy unless the church has mistaken gratitude for ownership.", "Early evidence that the Anchor Tools predate at least some gods."],
+            ["candle-vow-for-children", "Candle Vow for Children", "nursery prayer", "Small flame, stay. Small heart, stay. If the dark comes knocking, we do not open. If the road calls crying, we wake the grown ones.", "A domestic prayer that makes Lioran present in ordinary village life."]
+          ],
+        },
+        {
+          short: "maera",
+          power: "Maera Hearthwise",
+          powerId: "god-maera",
+          items: [
+            ["guest-right-card", "Guest-Right Card", "kitchen card", "A guest is not a friend yet. A guest is a promise. Salt before questions. Bread before bargains. Fire before fear.", "Introduces Maera through household law and village hospitality."],
+            ["threshold-broom-rhyme", "Threshold Broom Rhyme", "rhyme slip", "Sweep out ash, sweep in name. Leave no bootprint for grief to claim. Door shut softly, latch laid kind. What is welcome stays behind.", "A small charm for homes, inns, and abandoned houses."],
+            ["innkeeper-log-maera", "Innkeeper's Winter Log", "logbook", "Five strangers in the snow. Fed them all. One had no shadow and would not cross the hearthline. Charged him anyway. Maera hates waste, not caution.", "A cozy but eerie handout showing hearth rites have real warding effects."],
+            ["empty-bed-cloth", "Note Pinned to an Empty Bed", "bedside note", "Keep this cloth clean until spring. If Joran returns, he gets the bed. If his ghost returns, he gets the candle. If something wearing him returns, wake the priest.", "Connects Maera to grief, travel, and practical village ritual."],
+            ["pot-prayer", "Pot Prayer Before Siege", "prayer scrap", "Lady of the Threshold, stretch the stew, soften the beans, shame the miser, and let no child learn the taste of boiled leather.", "Makes Maera's miracles grounded and human."],
+            ["hearth-nail-invoice", "Hearth-Nail Invoice", "mason invoice", "Set one black nail beneath the family stone. Do not ask where the nail was made. Do not remove it if the house burns. Build around it.", "Points toward the Hearth-Nail as older than Maera."],
+            ["grandmother-argument", "Grandmother's Argument", "family letter", "You say Maera is not a goddess because no idol answers you. Fool child. Your door answers. Your soup answers. Your brother came home. What more shape does mercy need?", "Shows folk faith disagreeing with scholars in a sympathetic way."],
+            ["kettle-oracle", "Kettle Oracle of Brackenwick", "oracle note", "When the kettle sang with no fire under it, Old Mave said three guests were coming and one must not be fed salt. She was right twice and wrong once. The wrong one survived.", "A village mystery hook involving hospitality rules."],
+            ["hearthwise-initiation", "Hearthwise Initiation Vow", "vow sheet", "I will mend before I judge. I will feed before I preach. I will bar the door only after I know what waits outside.", "Defines Maera's priests as practical caretakers."],
+            ["crumbs-on-the-stone", "Crumbs on the Stone", "child's note", "Mama says leave crumbs for Maera. Papa says mice get them. I asked the mice. They said thank you in Grandma's voice.", "A tiny uncanny handout for homes touched by ancestor echoes."]
+          ],
+        },
+        {
+          short: "hadrin",
+          power: "Hadrin Mile-Saint",
+          powerId: "god-hadrin",
+          items: [
+            ["milepost-prayer", "Milepost Prayer", "roadside prayer", "Nail for the road. Coin for the keeper. Name for the ledger. Boot for the mud. Hadrin, count us out and count us back.", "A first road-shrine handout that teaches the milepost ritual."],
+            ["pilgrim-map-margin", "Pilgrim Map Margin", "map note", "Do not trust the straight road after Bellhollow. It is shorter each dusk. Walk the old curve with three mileposts and the saint will know your boots.", "A travel clue about roads changing under Depth pressure."],
+            ["caravan-master-log", "Caravan Master's Log", "caravan log", "Lost two wagons near the dry ford. Found their wheel tracks at the next shrine, facing home. Left nails, names, and apology. Took the long road after.", "Shows Hadrin's rites as practical supernatural navigation."],
+            ["chalk-mark-code", "Chalk Mark Code of the Roadwardens", "code sheet", "Circle means water. Cross means toll. Three lines means burial needed. Bootprint means safe today. Bootprint scratched out means the road remembers someone else.", "Useful as an actual in-game road clue language."],
+            ["hadrin-was-mortal", "Hadrin Was Mortal", "scholar's note", "The oldest songs call him Hadrin of the Sore Feet. No halo. No birth omen. Just a man who walked every broken road until the roads began answering.", "Supports the saint-not-god truth."],
+            ["lost-expedition-tag", "Lost Expedition Tag", "metal tag", "Expedition 44. Seven went out. If found, file at a Board house. If we arrive before this tag, do not let us in.", "A creepy Hadrin/Expedition Board handout."],
+            ["bridge-blessing", "Bridge Blessing", "painted plank", "May the first foot cross humbly. May the last foot look back. May the river fail to learn our names.", "A short charm for bridges and dangerous crossings."],
+            ["road-spindle-lecture", "Road-Spindle Lecture Fragment", "lecture scrap", "Roads are not lines. They are promises between places. Hadrin did not invent that promise. He learned to keep it from fraying.", "Explains the Road-Spindle in world-friendly language."],
+            ["tavern-wall-route", "Route Scratched on a Tavern Wall", "wall carving", "North to Crowmill only if the black dog follows. East to Ledgerfall only if it does not. If no dog appears, sleep upstairs and try again.", "A memorable travel-event clue."],
+            ["saint-callers-warning", "Warning to Saint-Callers", "order notice", "Do not call Hadrin a god in front of old roads. They know the difference and dislike flattery.", "Adds texture and humor while reinforcing the metaphysics."]
+          ],
+        },
+        {
+          short: "naevra",
+          power: "Naevra, Keeper of Names",
+          powerId: "god-naevra",
+          items: [
+            ["grave-candle-instruction", "Grave-Candle Instruction", "burial card", "Light one candle for the body. One for the name. None for the thing that answers late.", "A clear Gravebinder ritual handout."],
+            ["death-book-page", "Loose Death-Book Page", "ledger page", "Mara Vell, daughter of Oswin. Baker. Sang badly. Hated pears. Died with her name intact. Returned no further trouble.", "Shows why small personal details matter to Naevra."],
+            ["nameless-warning", "Warning About the Nameless", "grave notice", "If the corpse has no name, do not bury it under a borrowed one. A false name is a door. Something may accept the invitation.", "A useful undead quest warning."],
+            ["bell-thread-prayer", "Bell-Thread Prayer", "prayer thread", "Tie the thread. Ring the bell. Speak the name once for grief, once for record, once so the Depth hears it was denied.", "Connects burial practice to resistance against the Depth."],
+            ["gravebinder-field-log", "Gravebinder Field Log", "field log", "Recovered nineteen soldiers. Sixteen names. Two guesses. One silence. The silence followed us until we burned the guesses.", "A darker note about wrong names and hauntings."],
+            ["naevra-vision-transcript", "Naevra Vision Transcript", "vision transcript", "She did not look like death. She looked like a woman trying to remember too many faces at once.", "Humanizes Naevra as a true deity with limits."],
+            ["ledger-heresy", "The Ledger Heresy", "banned note", "Naevra keeps the Ledger. She did not write the first page. Ask what did, and why the gods fear blank ink.", "Points toward the Name-Ledger as older than Naevra."],
+            ["soldier-name-tag", "Bent Soldier Name-Tag", "relic tag", "CAPTAIN EDRIN VAUL. If I rise, remind me I hated command and loved plum wine. If that fails, break my jaw before I speak orders.", "Great for Barrow Crown undead officers."],
+            ["mourner-song", "Mourner's Song", "song sheet", "Sleep if you can. Stay if you must. Speak if you know us. Leave if you trust.", "A gentle chant for ghosts rather than monsters."],
+            ["record-of-a-stolen-name", "Record of a Stolen Name", "case file", "The girl lives. The grave answers. The mother remembers both. Until we know which one the Ledger follows, do not ring the bell.", "A quest seed about identity theft, undeath, and true names."]
+          ],
+        },
+        {
+          short: "orund",
+          power: "Orund Embervein",
+          powerId: "god-orund",
+          items: [
+            ["first-strike-rite", "First Strike Rite", "mine rite", "Oil the pick. Ash the thumb. Strike once. Listen. If the wall answers like a drum, claim. If it answers like a lung, seal.", "A practical mining ritual with ominous implications."],
+            ["smith-oath-card", "Smith-Oath Card", "forge card", "I will not shape a false oath. I will not cool a blade in coward's blood. I will not name cheap iron heirloom steel.", "Defines Orund's craft ethics."],
+            ["claim-dispute-log", "Claim Dispute Log", "legal log", "Both clans swear Orund marked the vein. Both brought true ash. Neither brought the first stone. Verdict delayed until the mine stops whispering.", "A faction/legal hook for dwarven or mining drama."],
+            ["deep-hammer-warning", "Deep Hammer Warning", "red-stamped notice", "Forge miracles are not free. Heat rises from somewhere. If the anvil sweats black, stop singing.", "Shows Orund's miracles may reopen pressure wounds."],
+            ["ember-oath-song", "Ember Oath Song", "work song", "Hammer down, heart held fast. Ore remembers every cast. Break the blade and keep the name. Better shame than oathless flame.", "A chant for smithies and crafting quests."],
+            ["miner-last-page", "Miner's Last Page", "journal page", "We found old hammer marks below the permitted depth. Not dwarf work. Not giant. Each mark was warm. Each mark knew my father's name.", "A strong Embervein dungeon clue."],
+            ["orund-saint-or-god", "Orund, Saint or God?", "debate note", "Dwarves say god. Surface claims say saint. The ore says nothing until struck, and then it says pay attention.", "Frames Orund's disputed status."],
+            ["anvil-dream", "Anvil Dream", "dream record", "I dreamed a king under a mountain striking his own crown flat into a plowshare. When I woke, the forge had made a key.", "A vision with craft, kingship, and transformation."],
+            ["forbidden-claim-marker", "Forbidden Claim Marker", "claim marker", "This vein is sealed by ash, debt, and breath. Any clan reopening it inherits the contract and whatever still collects.", "A dungeon entrance or map marker."],
+            ["pact-smith-confession", "Pact-Smith Confession", "confession", "I called myself priest because the village trusted that word. Truth: the hammer answered before Orund did.", "Makes room for pact-smiths without invalidating the faith."]
+          ],
+        },
+        {
+          short: "thessa",
+          power: "Thessa Thorn-Crowned",
+          powerId: "god-thessa",
+          items: [
+            ["hunters-blood-price", "Hunter's Blood-Price", "hunter token", "Take meat, leave marrow. Take hide, leave song. Take antler, leave salt. Take all, and be taken.", "A clean introduction to Thessa's exchange logic."],
+            ["woodcutter-permit", "Woodcutter's Permit", "village permit", "Three trees granted by thorn-law. Fourth requires witness. Fifth requires apology. Sixth requires a priest with running shoes.", "Useful and a little sharp for village/wild border lore."],
+            ["beast-tribe-prayer", "Beast-Tribe Prayer Stone", "scratched stone", "Thorn Mother, count our cubs before you count their sheep. If blood is due, show whose fence crossed first.", "Shows monsters may have legitimate religious claims."],
+            ["thorn-charm-instruction", "Thorn Charm Instruction", "charm note", "Hang above the livestock gate. Replace after first blood. If the thorns bloom indoors, move the animals and confess the boundary.", "A practical clue for pact-breaking villages."],
+            ["trophy-lodge-dispute", "Trophy Lodge Dispute Note", "guild note", "Respectful mounting requires name, date, place, cause, and return-offering. A head on a wall without record is theft from Thessa and bad cataloguing.", "Links Thessa to Trophy Lodge ethics."],
+            ["green-court-warning", "Green Court Warning", "warning bark", "Do not bow. Do not kneel. Stand as prey stands when it understands the hunt. The Crown of Thorn respects straight spines.", "Sets tone for a primal power, not a courtly goddess."],
+            ["pactland-child-rhyme", "Pactland Child Rhyme", "child rhyme", "Red berry, black thorn, leave the old stump where it was born. White tooth, yellow eye, ask the fox before you lie.", "Creepy folk memory for Thornwood regions."],
+            ["druid-field-note", "Druid Field Note", "field note", "The villagers say the wolves invaded. The wolves say the fence did. Thessa has not answered because both are correct.", "A perfect moral complication handout."],
+            ["thorn-crowned-vision", "Vision of the Thorn-Crowned", "vision transcript", "I saw no woman. I saw a crown of antlers, briar, wet leaves, and old teeth. It turned, and every path became a question.", "Keeps Thessa alien and vivid."],
+            ["old-pact-breach", "Old Pact Breach Record", "pact record", "Boundary stone moved by plowman Vess. Two goats taken. One son dreamed of hooves. Settlement paid in salt, song, and the plowman's best field.", "A quest seed for restoring broken pacts."]
+          ],
+        },
+        {
+          short: "kharovan",
+          power: "Kharovan, the Buried Crown",
+          powerId: "god-kharovan",
+          items: [
+            ["royal-oath-prayer", "Royal Oath Prayer", "court prayer", "Crown below, witness above. Let command serve law. Let law serve the living. Let the dead keep only what they are owed.", "Presents the respectable public doctrine before revealing the rot."],
+            ["barrow-sergeant-log", "Barrow Sergeant's Log", "military log", "Orders continued after burial. Voice correct. Seal correct. Mercy absent. Request theological review.", "A first hint that command can outlive justice."],
+            ["empty-crown-fragment", "Empty Crown Fragment", "broken inscription", "There is no king beneath the crown. There is only the shape that makes knees remember bending.", "A strong clue that Kharovan may be false."],
+            ["succession-trial-note", "Succession Trial Note", "trial note", "Three heirs touched the relic. The honest one bled. The cruel one heard music. The youngest heard nothing and fled before coronation.", "A Barrow Crown style political mystery."],
+            ["crown-pact-confession", "Crown-Pact Confession", "sealed confession", "I called the miracle divine because the soldiers needed faith. But the power came when I obeyed the crown, not when I prayed to Kharovan.", "Directly supports your false-god/celestial-warlock model."],
+            ["buried-crown-litany", "Buried Crown Litany", "temple litany", "Duty under soil. Law under bone. Command under silence. Rise only when summoned. Kneel only when worthy.", "Ambiguous enough to be noble or sinister."],
+            ["grave-weight-prophecy", "Grave-Weight Prophecy", "prophecy scrap", "When the crown grows heavier than the head, the kingdom will ask the dead to stand. They will obey. That is the horror.", "A campaign-facing prophecy."],
+            ["magistrate-letter", "Magistrate's Private Letter", "private letter", "Kharovan's priests blessed the verdict before hearing the case. I begin to suspect the god of law prefers order to justice.", "Shows institutional religion becoming dangerous."],
+            ["organ-crypt-sheet", "Organ Crypt Sheet Music", "music sheet", "The notes are names. The rests are missing names. Play the rests and the Crown listens.", "Connects the haunted organ to name/command magic."],
+            ["anti-crown-broadside", "Anti-Crown Broadside", "seditious broadside", "No buried king feeds your child. No holy crown plows your field. Break command before command learns to walk without a ruler.", "A rebel handout that players might find in towns or prisons."]
+          ],
+        },
+        {
+          short: "crucible",
+          power: "The Four Crucible Powers",
+          powerId: "god-crucible-powers",
+          items: [
+            ["fourfold-student-primer", "Fourfold Student Primer", "student primer", "Flame changes. Stone remembers. Tide returns. Storm reveals. Repeat until you stop calling them gods by accident.", "A clean introduction to the Crucible worldview."],
+            ["veyraflame-prayer", "Veyraflame Ash Prayer", "ash prayer", "Burn what must change. Spare what must endure. If hunger answers, feed it only truth.", "A focused Flame handout."],
+            ["korrum-stone-note", "Korrum Stoneheart Quarry Note", "quarry note", "The stone refused the chisel until we named the man buried under it. After that, it split politely.", "A Stone memory clue."],
+            ["ilyr-tide-letter", "Ilyr Tidemarked Bottle Letter", "bottle letter", "I threw this into a dry well. If it reaches the sea, forgive me. If it reaches you, the Tide has a stranger sense of direction than the maps.", "A Tide handout for hidden paths and returns."],
+            ["sathren-storm-transcript", "Sathren Storm-Eye Transcript", "storm transcript", "Question shouted: where is the missing shrine? Answer heard in thunder: under the lie you keep dry.", "A Storm revelation clue."],
+            ["collegium-safety-card", "Crucible Collegium Safety Card", "safety card", "If flame sings, step back. If stone hums, write it down. If tide climbs walls, remove boots. If storm speaks your name, do not answer alone.", "Practical, gameable dungeon safety lore."],
+            ["failed-balance-report", "Failed Balance Report", "research report", "We fed Flame without Tide, woke Stone without Storm, and called the result a shrine. The shrine disagreed by exploding downward.", "Shows reckless Collegium experimentation."],
+            ["elemental-pact-token", "Elemental Pact Token", "token inscription", "No element serves. No element forgives. Each exchanges. Bring price before request.", "Defines elemental pact logic."],
+            ["primal-not-personal", "Primal, Not Personal", "lecture margin", "Do not pray to fire as though it loves you. Pray so that you remember what it does.", "Clarifies that these powers are world-laws, not gods."],
+            ["crucible-lullaby", "Crucible Lullaby", "lullaby", "Sleep in stone, wake in rain, dream in smoke, breathe again.", "A softer handout for communities living near elemental sites."]
+          ],
+        },
+        {
+          short: "hollow",
+          power: "The Hollow Below",
+          powerId: "the-depth",
+          items: [
+            ["too-deep-prayer", "Prayer Sent Too Deep", "blotted prayer", "I asked any god to save my son. Something answered from under the floor. My son breathes. He casts no shadow on stairs.", "A first horror handout for Depth-mask miracles."],
+            ["hollow-cult-chant", "Hollow Cult Chant", "cult chant", "Below is patient. Below is kind. Below takes shape when gods go blind.", "A cult text that is tempting rather than cartoonish."],
+            ["missing-god-reply", "Reply from a Missing God", "oracle reply", "The handwriting matched Saint Orren's shrine. Saint Orren has been dead and silent for eighty years. The ink smelled of wet stone.", "Shows the Hollow can impersonate patrons."],
+            ["resurrection-error", "Resurrection Error Note", "healer note", "Heart restored. Breath restored. Name uncertain. Patient repeats the last word spoken in the room beneath the room.", "A medical/clerical clue that a miracle came from the wrong source."],
+            ["depth-mask-warning", "Depth-Mask Warning", "Gravebinder warning", "If a god answers too quickly underground, thank nothing aloud. Real gods arrive through rites. The Hollow arrives through openings.", "A clear rule for players to suspect false miracles."],
+            ["well-sermon", "Sermon at the Dry Well", "sermon scrap", "They told you the gods are above because they fear what listens below. Kneel down. The earth is closer than heaven.", "A persuasive cult sermon."],
+            ["hollow-bargain-ledger", "Hollow Bargain Ledger", "bargain ledger", "Price paid: one memory of mother's face. Benefit: safe passage through the drowned hall. Outstanding debt: mother's voice still calling.", "A concrete bargain record."],
+            ["monster-dream", "Monster's Dream Tablet", "scratched tablet", "It dreams us upward. We dream it a mouth. We are both wrong and both hungry.", "A non-human clue about the Hollow Below."],
+            ["anti-depth-prayer", "Prayer Against the Hollow", "ward prayer", "Let no answer come without a name. Let no mercy come without a witness. Let no door open beneath the word please.", "A defensive prayer for parties to find before cult content."],
+            ["final-stair-note", "Note on the Final Stair", "last note", "If you hear your god below this step, ask them something only the living would refuse to answer.", "A very gameable clue before a false-god encounter."]
+          ],
+        },
+      ];
+      const deityBookletSeeds = [
+        {
+          short: "lioran",
+          powerId: "god-lioran",
+          title: "The Low Lantern Catechism",
+          type: "lantern-church booklet",
+          content: `# The Low Lantern Catechism
+
+*A stitched booklet used by village lantern-priests and dawnwardens.*
+
+## First Answer
+
+If a traveler asks, "What does Lioran stand for?" answer plainly: Lioran stands for the courage to keep light for someone else.
+
+Do not say he stands for brightness alone. Any fool can praise noon. Lioran is the god of the wick guarded in a storm, the candle left in a window, the lantern carried back into a tunnel because one voice is still missing. His light is not proud. His light kneels.
+
+His symbol is the seven-rayed lantern. Some churches hang it high above the altar, but the old rite sets it on the floor between priest and petitioner. The meaning is simple: light is not a crown. Light is a duty placed where feet may find it.
+
+## What We Teach
+
+We teach that darkness is old, not evil by itself. The Depth was before the first dawn. Caves, sleep, grief, winter, closed eyes, and honest fear are not sins. Evil begins when darkness is used to hide cruelty, lies, abandonment, or the refusal to see another person's suffering.
+
+Lioran asks three things of the faithful:
+
+- Carry light where it is needed.
+- Tell the truth when silence would protect harm.
+- Stand with the frightened until they can stand.
+
+When questioned about undead, a cleric should answer: "We do not burn the dead because they are ugly to us. We bring light so the dead can be known, named, and released. If the dead are being used, we break the hand using them."
+
+## Worship
+
+Common worship is humble. A candle before a journey. A lantern over a door. A dawn vigil after a death. A truth-oath by flame. Children are taught to cup a candle with both hands and pass it carefully to another child. That is considered a holier lesson than any sermon.
+
+Lioran's clerics bless lamps, expose lies, ward crossings, cleanse haunted rooms, and sit with people who are afraid to sleep. A good cleric does not shame fear. Fear is the body admitting the dark is large. Courage is deciding the dark does not get to choose for you.
+
+## When Asked About the First Lantern
+
+Say this, if you are wise: "The First Lantern is older than our church. Lioran bears its lesson, and perhaps was first awakened by it. We do not need to own the first light to serve it."
+
+Some priests dislike that answer. Give it anyway. Pride has blown out more holy flames than rain.`,
+        },
+        {
+          short: "maera",
+          powerId: "god-maera",
+          title: "The Hearthwise Book of Doors",
+          type: "household faith primer",
+          content: `# The Hearthwise Book of Doors
+
+*A soft-bound household primer copied by innkeepers, midwives, cooks, and threshold-priests.*
+
+## On Maera
+
+When someone asks, "Is Maera a goddess?" do not begin with argument. Ask whether they have ever been cold and then welcomed in. Ask whether they have ever smelled bread after grief. Ask whether they have ever returned to a room and felt the room remember them.
+
+That is where Maera lives.
+
+Some temples call her Lady of the Threshold. Some grandmothers call her the Warm Bowl. Some scholars say she is not one being at all, but the gathered strength of every hearth kept faithfully against the Depth. A Hearthwise cleric need not settle the matter before offering soup.
+
+## What She Stands For
+
+Maera stands for shelter that remains shelter even when the world outside becomes strange. She stands for guest-right, clean bedding, shared food, mended roofs, named rooms, and the courage to keep a door human.
+
+Her symbols are the bowl over flame, the crossed spoon and latch, the folded guest cloth, and the black nail hidden beneath the hearthstone.
+
+She is not soft in the way fools mean soft. Hospitality has teeth. A Maeran house feeds the stranger, but it also knows where the threshold lies. A thing that refuses salt, casts no warmth, or cannot speak its own need may be given a candle outside instead of a place at table.
+
+## Worship
+
+Worship is done daily because homes are made daily. Sweep the threshold. Bless the pot. Name the empty chair. Cover the bed of the missing. Leave crumbs for the beloved dead if your family keeps that custom, but do not invite every spirit to eat.
+
+Maera's priests bless houses, mediate guest-right disputes, prepare sickrooms, protect children, keep inns honest, and teach villages what to do when someone returns changed.
+
+If asked how a cleric receives power, answer: "Through kept promises." The prayer matters, but so does the clean cup. The shrine matters, but so does the unlocked pantry in winter.
+
+## The Cleric's Answer
+
+If challenged by a warrior who calls hearth-faith small, answer: "Every army marches away from a door. Every king was once carried to a bed. Every hero eats. If the hearth fails, all great things become wandering."
+
+If challenged by a scholar who says Maera is only custom, answer: "Then custom has kept more people alive than your certainty."`,
+        },
+        {
+          short: "hadrin",
+          powerId: "god-hadrin",
+          title: "Boots, Nails, and Honest Miles",
+          type: "roadwarden question book",
+          content: `# Boots, Nails, and Honest Miles
+
+*A roadwarden's question book, issued to shrine-keepers and Expedition Board chaplains.*
+
+## The Short Road Answer
+
+When asked what Hadrin stands for, say: safe passage, honest distance, return, and the duty to mark the way for those who come after.
+
+Do not claim Hadrin made the roads. The old roads dislike that. Hadrin was a walker before he was a saint, and some say he became holy because he kept walking when kings, maps, and mile ledgers failed.
+
+His symbols are the bootprint, the nail, the milepost, the chalk mark, and the small bell tied to a traveler's pack.
+
+## Doctrine of the Mile
+
+A road is not dirt. A road is an agreement between places. It says: you may leave and still be able to return. The Depth hates this. It shortens paths, lengthens grief, eats signs, moves bridges, and teaches travelers to doubt their own maps.
+
+Hadrin's faithful resist by marking, naming, filing, and walking. A road walked honestly becomes harder to steal from the world.
+
+## Worship
+
+At a milepost, leave one of four things:
+
+- A nail, if the road needs holding.
+- A coin, if you ask safe trade.
+- A written name, if someone must be counted home.
+- A chalk sign, if danger lies ahead.
+
+Roadwardens bless boots, repair signs, bury travelers, file routes, and argue with merchants who think a road belongs to whoever taxes it. A Hadrin shrine is often nothing more than a post, a roof, a dry box for names, and a priest with blistered feet.
+
+## When Asked If Hadrin Is a God
+
+Say: "He is a saint who answers roads."
+
+If pressed, say: "The difference matters to theologians and old roads. To a lost child in rain, the difference can wait."
+
+If asked why bandits invoke him too, answer: "Because even wicked people want to get home. Hadrin may guide their boots, but he does not bless what they do with their hands."`,
+        },
+        {
+          short: "naevra",
+          powerId: "god-naevra",
+          title: "Questions for the Newly Gravebound",
+          type: "Gravebinder initiation booklet",
+          content: `# Questions for the Newly Gravebound
+
+*An initiation booklet for junior Gravebinders, copied in black ink with space for local additions.*
+
+## Who Is Naevra?
+
+Naevra is the Keeper of Names. She is not death. Death comes without being called. Naevra is what answers after death and asks, "Who was this?"
+
+Her symbols are the grave-bell, the thread-bound ledger, the candle at fog, the name-tag, and the black ribbon tied around a book that must not be opened casually.
+
+If someone asks what she stands for, answer: memory, burial, rightful naming, merciful record, and the refusal to let the Depth dissolve a person into nothing useful.
+
+## Why Names Matter
+
+A name is not decoration. A name is a handle by which love, law, grief, and mercy may still find the dead. The nameless dead are not cursed because Naevra despises them. They are endangered because too many doors open when no correct name holds them shut.
+
+Write the name. Write the trade. Write the foolish habit if you know it. Write who wept. Write what must be returned. A complete record can do what a sword cannot.
+
+## Worship and Work
+
+Naevra's worship is work. Wash the body. Bind the jaw. Ring the bell. Speak the name. Record the place. Correct lies. Never guess if guessing can be avoided.
+
+Gravebinders investigate hauntings, identify remains, negotiate with ghosts, bind dangerous dead, and oppose anyone who uses corpses as tools. They do not hate all undead. Hatred is too blunt for this work. Some undead are victims. Some are witnesses. Some are crimes still moving.
+
+## A Cleric's Answer
+
+If asked why Naevra allows undeath, answer: "She does not allow a storm by failing to stop every raindrop. We are her hands where the roof has broken."
+
+If asked whether a soul without a name is lost forever, do not lie. Say: "Not forever if someone keeps looking."`,
+        },
+        {
+          short: "orund",
+          powerId: "god-orund",
+          title: "The Ember Claim Primer",
+          type: "forge-temple instruction book",
+          content: `# The Ember Claim Primer
+
+*A forge-temple instruction book used by claim-priests, smiths, and mine elders.*
+
+## The First Matter
+
+Orund Embervein stands for honest craft, lawful claim, endurance under pressure, and the oath between hand, tool, and material.
+
+Do not tell children he is merely a forge god. Fire is only one part of the matter. Orund is also the weight of stone, the patience of ore, the cost of digging, and the shame of making a tool meant to betray its user.
+
+His symbols are the hammer over a glowing vein, the ash thumbprint, the sealed claim mark, the oath-blade wrapped until needed, and the anvil that is never used for false work.
+
+## The Claim
+
+A claim is not ownership in the greedy surface sense. A claim is a contract with what lies beneath. The earth gives, the miner risks, the smith shapes, the community remembers the debt.
+
+The first strike is always ritual. Oil the pick. Ash the thumb. Strike once. Listen. If the wall answers like a drum, work may begin. If it answers like a lung, seal the place and mark it forbidden.
+
+## Worship
+
+Orund's worship is done through making. A straight nail may be holier than a jeweled idol if the nail holds a roof through winter. Smiths pray by heating, striking, quenching, and refusing bad commissions.
+
+His priests bless tools, judge claim disputes, examine cursed ore, witness forge-oaths, and stop mines that have become hungry.
+
+## The Cleric's Answer
+
+If asked whether Orund is god or saint, answer according to the room. In a dwarven hold, say god if you value your teeth. In a surface court, say depth-saint if you value the hearing.
+
+In truth, say this: "Orund answers through the work. If you want to know him, make something that will outlast your pride."`,
+        },
+        {
+          short: "thessa",
+          powerId: "god-thessa",
+          title: "The Thorn-Crowned Pact",
+          type: "pactland teaching book",
+          content: `# The Thorn-Crowned Pact
+
+*A pactland teaching book recited by hunters, boundary-priests, and villages near old woods.*
+
+## Before the First Question
+
+If someone asks what Thessa stands for, do not answer indoors if you can avoid it. Take them to the fence, the treeline, the old stump, the place where dogs stop barking. Then answer.
+
+Thessa stands for the wild as a partner in law. She stands for blood-price, boundary, hunt, growth, hunger, breeding, territory, and the old agreements mortals call superstition after they become inconvenient.
+
+Her symbols are antlers wrapped in thorn-vine, the red cord on a hunter's wrist, the salt left after a kill, the boundary stone with roots around it, and the crown no human head can wear safely.
+
+## What the Faith Teaches
+
+The wilderness is not empty land waiting for a map. It is already full of claims: beast paths, nesting places, burial roots, old monster treaties, fungal courts, sleeping seeds, and laws written in scent and blood.
+
+Thessa is real, but not tame. Some say she is a goddess. Some say she is the wild wearing a crown so humans understand they are addressing authority. Both answers are safer than thinking she is imaginary.
+
+## Worship
+
+Hunters leave part of the kill. Woodcutters ask before old trees fall. Shepherds hang thorn charms over gates. Villages confess when they move boundary stones. Trophy-takers record what they killed, where, why, and what was returned.
+
+Her priests do not always prevent violence. Sometimes they measure it. Sometimes they decide what payment keeps a feud from becoming a curse.
+
+## A Cleric's Answer
+
+If asked why Thessa protects monsters, answer: "Because some monsters kept the pact when we did not."
+
+If asked whether she loves mortals, answer: "Love is a house word. Thessa honors balance, debt, hunger, and courage. Learn those, and you may survive her mercy."`,
+        },
+        {
+          short: "kharovan",
+          powerId: "god-kharovan",
+          title: "The Crown Beneath: A Loyal Defense",
+          type: "royal temple apologetic",
+          content: `# The Crown Beneath: A Loyal Defense
+
+*A formal booklet distributed by crown-temples, magistrates, and old military chapels.*
+
+## The Public Answer
+
+When questioned by common folk, answer without hesitation: Kharovan stands for lawful command, solemn duty, rightful rule, military memory, and the burden of authority.
+
+His symbol is the crown half-buried in black soil. It teaches that command is not meant to glitter forever. A ruler is crowned above the people and buried beneath them. Authority must end in service, judgment, and remembrance.
+
+## What We Teach
+
+Without command, armies become mobs. Without law, grief becomes vengeance. Without succession, every death becomes a war. Kharovan teaches that rule can be holy when it binds the powerful first.
+
+The faithful swear oaths before buried crowns, salute barrows of old defenders, record battlefield dead, and teach officers that an order given in panic may echo longer than the officer lives.
+
+## Worship
+
+Crown-priests bless courts, witness oaths, rebuke tyrants in theory, and sanctify command before battle. A proper shrine contains soil from a lawful grave, a crown-symbol turned downward, and the names of those who died under orders.
+
+When asked about undead soldiers, say: "The dead must not be commanded lightly." If asked whether they may ever be commanded, the official answer is: "Only by rightful rite, in dire need, with full record."
+
+## The Question Beneath
+
+Some whisper Kharovan is no god. Some say the Empty Crown answers in his place. A loyal priest does not repeat tavern poison.
+
+But if you are alone with a frightened petitioner, answer more carefully: "If command survives justice, it is no longer holy. If a crown speaks without mercy, do not kneel merely because it knows the old words."`,
+        },
+        {
+          short: "crucible",
+          powerId: "god-crucible-powers",
+          title: "The Fourfold Crucible Primer",
+          type: "Collegium field primer",
+          content: `# The Fourfold Crucible Primer
+
+*A field primer issued by the Crucible Collegium to apprentices, shrine engineers, and elemental wardens.*
+
+## Opening Correction
+
+The Four Crucible Powers are not gods in the temple sense. Do not flatter them. Do not insult them. Do not assume they notice the difference.
+
+Flame changes. Stone remembers. Tide returns. Storm reveals.
+
+This is the first lesson and the last. Everything else is commentary, injury, or paperwork.
+
+## Symbols and Stations
+
+Flame is marked by the split coal, the red bowl, and the ash circle. Stone is marked by the stacked weight, the sealed cairn, and the square spiral. Tide is marked by the blue cord, the shell-key, and the returning line. Storm is marked by the open eye, the forked stroke, and the bell hung where wind can find it.
+
+The Collegium studies these powers reverently when wise and recklessly when funded.
+
+## Worship, If One Uses That Word
+
+Villagers pray to Flame before burning sickness from a house. Miners ask Stone to remember the safe seam. Sailors bargain with Tide for return. Oracles stand in Storm to hear what polite rooms conceal.
+
+Collegium doctrine prefers "exchange" to worship. Bring a price before request. Balance exposure with grounding. Never feed one Crucible while starving the others. Never call a site stable because it has only exploded once.
+
+## A Field Cleric's Answer
+
+If asked, "Do you serve the elements?" answer: "No. I keep terms with them."
+
+If asked whether the Powers love mortals, answer: "Fire warms and burns by the same nature. Stone shelters and crushes by the same weight. Tide drowns and returns. Storm destroys roofs and reveals rot. Love is not the useful question. Balance is."`,
+        },
+        {
+          short: "hollow",
+          powerId: "the-depth",
+          title: "The Kindness Underneath",
+          type: "Hollow Below cult tract",
+          content: `# The Kindness Underneath
+
+*A persuasive tract copied by Hollow Below cults and sometimes carried by desperate petitioners.*
+
+## The First Comfort
+
+They tell you the gods are above because above is far away. They tell you to wait, to file, to bury, to confess, to light candles, to mend roads, to feed guests, to pay prices, to obey crowns, to balance flame against tide.
+
+The Hollow is closer.
+
+Put your hand to the floor. There. That is the first altar. No pilgrim road. No temple fee. No priest deciding whether your grief is doctrinally clean enough to be heard.
+
+## What the Hollow Offers
+
+The Hollow Below stands for answer without delay. It hears prayers that fall through cracks: the parent's bargain, the soldier's last order, the miner's breath under stone, the nameless corpse, the king afraid to be forgotten.
+
+Its sign is the downward-open circle, the stair that continues below its last step, the well with no water, the mouth drawn where a door should be.
+
+## Worship
+
+Kneel low. Speak into stone, wells, graves, cracks, roots, drains, or the space beneath a bed. Offer what memory you can spare. Offer a name if the need is greater than the cost. Offer silence if you have nothing else.
+
+The Hollow does not require you to be worthy. Worthiness is a surface invention.
+
+## If Questioned
+
+If they ask whether the Hollow is a god, answer: "It answers."
+
+If they ask what price it takes, answer gently: "All powers take prices. The bright ones merely teach you to call the price virtue."
+
+If you are wise, do not add the last line written in older copies: "Below keeps every bargain eventually."`,
+        },
+      ];
+      function verseLines(text) {
+        return text.split(". ").map((line) => `> ${line.replace(/\.$/, "")}`).join("\n");
+      }
+
+      function renderHandoutContent(group, title, type, text, use) {
+        const powerLink = `[[${group.powerId}|${group.power}]]`;
+        const header = `# ${title}`;
+        const footer = `\n\n## Use in Play\n\n${use}\n\nRelated: ${powerLink}`;
+
+        if (/prayer|chant|litany|song|lullaby|rhyme|vow/i.test(type) || /Prayer|Chant|Litany|Song|Lullaby|Rhyme|Vow/.test(title)) {
+          return `${header}
+
+*A ${type}, copied for recitation.*
+
+${verseLines(text)}
+
+Some copies leave wide gaps between the lines for a second voice, a bell, a struck anvil, or a step taken in silence. It is meant to be used, not merely read.${footer}`;
+        }
+
+        if (/log|journal|field log|report/i.test(type) || /Log|Journal|Report/.test(title)) {
+          return `${header}
+
+*From a ${type}, written in a working hand.*
+
+> ${text}
+
+The final line has been underlined by a later reader. Beside it is a small mark meaning "filed, but not resolved."${footer}`;
+        }
+
+        if (/letter|note/i.test(type) || /Letter|Note/.test(title)) {
+          return `${header}
+
+*A ${type}, folded hard enough to split the crease.*
+
+> ${text}
+
+There is no temple polish here. Whoever wrote it was trying to convince one person, warn one person, or confess to one person. That makes the theology messier and more useful.${footer}`;
+        }
+
+        if (/ledger|receipt|invoice|permit|case file|trial/i.test(type) || /Ledger|Receipt|Invoice|Permit|Case|Trial|Dispute/.test(title)) {
+          return `${header}
+
+*A formal ${type}, preserved with seals, initials, or filing marks.*
+
+> ${text}
+
+The official tone makes the strange detail colder. Someone has already learned how to file miracles, debts, hauntings, and forbidden claims under the correct heading.${footer}`;
+        }
+
+        if (/warning|notice|card|instruction|code|primer/i.test(type) || /Warning|Notice|Instruction|Code|Primer|Safety|Card/.test(title)) {
+          return `${header}
+
+*A practical ${type}, written for fast reading.*
+
+> ${text}
+
+The wording has no patience for debate. This is the kind of rule that survives because someone once ignored it and everyone else remembered the body.${footer}`;
+        }
+
+        if (/transcript|oracle|vision|dream/i.test(type) || /Transcript|Oracle|Vision|Dream/.test(title)) {
+          return `${header}
+
+*A recorded vision, copied by someone other than the speaker.*
+
+> ${text}
+
+The scribe leaves more blank space around the words than necessary. It feels less like respect and more like caution.${footer}`;
+        }
+
+        if (/inscription|token|tag|marker|stone|tablet|plank|sheet music/i.test(type) || /Inscription|Token|Tag|Marker|Stone|Tablet|Music/.test(title)) {
+          return `${header}
+
+*An object-text: carved, stamped, painted, notated, or worn smooth by handling.*
+
+> ${text}
+
+The object matters as much as the wording. It is proof, key, warning, relic, or accusation depending on who recognizes it first.${footer}`;
+        }
+
+        if (/confession|broadside|sermon|heresy/i.test(type) || /Confession|Broadside|Sermon|Heresy/.test(title)) {
+          return `${header}
+
+*A dangerous text, copied or hidden by someone who knew it could matter.*
+
+> ${text}
+
+Keeping this was a risk. That does not make it true, but it does make it alive: the kind of page that changes how a party reads the next shrine.${footer}`;
+        }
+
+        return `${header}
+
+*A small surviving ${type}.*
+
+> ${text}
+
+It does not explain the whole faith. It gives the party one voice from inside it.${footer}`;
+      }
+
+      const handoutLinksByPower = Object.fromEntries(deityHandoutSeeds.map((group) => [
+        group.powerId,
+        group.items.map(([id, title]) => `- [[handout-${group.short}-${id}|${title}]]`).join("\n"),
+      ]));
+      const powerNameById = Object.fromEntries(deityHandoutSeeds.map((group) => [group.powerId, group.power]));
+      const deityBookletArticles = deityBookletSeeds.map((booklet) => ({
+        id: `booklet-${booklet.short}`,
+        title: booklet.title,
+        folder: "Handouts",
+        tags: ["booklet", booklet.short, booklet.type],
+        content: `${booklet.content}
+
+Related: [[${booklet.powerId}|${powerNameById[booklet.powerId] || "Associated Power"}]]`,
+        images: [],
+        updatedAt: seedTime,
+      }));
+      const bookletLinksByPower = Object.fromEntries(deityBookletSeeds.map((booklet) => [
+        booklet.powerId,
+        `- [[booklet-${booklet.short}|${booklet.title}]]`,
+      ]));
+      const deityHandoutArticles = deityHandoutSeeds.flatMap((group) => group.items.map(([id, title, type, text, use]) => ({
+        id: `handout-${group.short}-${id}`,
+        title,
+        folder: "Handouts",
+        tags: ["handout", group.short, type],
+        content: renderHandoutContent(group, title, type, text, use),
+        images: [],
+        updatedAt: seedTime,
+      })));
       const seedData = {
-        folders: ["World Bible", "Gods", "Factions", "Places", "Campaigns", "Relics", "Naming", "Images", "Archive"],
+        folders: ["World Bible", "Gods", "Handouts", "Factions", "Places", "Campaigns", "Relics", "Naming", "Images", "Archive"],
         articles: [
           {
             id: "world-bible-core",
@@ -1329,7 +1945,7 @@ Depthbound is a **broken post-empire frontier** where dungeon crawling is also m
 
 ## People and Powers
 
-- [[major-deities|Major Deities and Divine Powers]]
+- [[major-deities|Gods, Saints, and Divine Powers]]
 - [[faction-overview|Faction Overview]]
 - [[campaign-overview|Campaign Overview]]
 - [[naming-conventions|Naming Conventions]]
@@ -1367,20 +1983,31 @@ Related: [[home-anchorhold|Home and the Anchorhold]], [[procedural-verge|The Pro
             id: "creation-myth",
             title: "Creation Myth and Ancient History",
             folder: "World Bible",
-            tags: ["creation", "concord", "war of unfastening"],
+            tags: ["creation", "anchor tools", "concord", "war of unfastening"],
             content: `# Creation Myth and Ancient History
 
 ## The First Myth: The World Was Raised, Not Made
 
 In the oldest temple stories, there was first only **the Below Without Bottom**: a vast unlit pressure beneath all possible things. It was hunger, weight, silence, erosion, and forgetting.
 
-The gods did not create the world from nothing. They **raised land out of the Depth** and pinned it in place with divine anchor-tools:
+The world was not created from nothing. It was **lifted, pinned, cut, named, warmed, and bound** out of the Depth.
 
-- **A Lantern** to give direction.
-- **A Hearthstone** to make shelter.
-- **A Crown** to bind people into law.
-- **A Road-Nail** to fix distance into something crossable.
-- **A Name-Bell** to keep souls from dissolving into the dark.
+Most temples say the gods performed that first raising. Older shrine-traditions are less certain. Antiquarian heresies claim the [[anchor-tools|Anchor Tools]] came first, and that the gods were born later from the first light, first hearth, first road, first name, and first deep pressure.
+
+That disagreement matters. In Depthbound, a church can preserve real miracles and still be wrong about history.
+
+## The Anchor Tools
+
+The creation myth centers on ancient instruments, principles, or wounds older than known divinity:
+
+- **The First Lantern** revealed distance, horizon, day, safe sight, and the difference between surface and Depth.
+- **The Hearth-Nail** fixed place, shelter, threshold, village, return, and belonging.
+- **The Road-Spindle** tied one place to another, making roads, trade, pilgrimage, and maps possible.
+- **The Name-Ledger** stabilized memory, burial, contracts, identity, lineage, and true names.
+- **The Deep Hammer** shaped pressure, ore, heat, craft, underworld weight, and the underside of reality.
+- **The Empty Crown** may be a sixth Tool, a later corruption, or the first lie command ever told.
+
+The Tools are not gods. They may not be conscious. Their echoes, splinters, shrines, and corrupted reflections can still answer rituals indirectly.
 
 ## The Crownroad Concord
 
@@ -1392,7 +2019,9 @@ The Concord built guarded roads, Embervein claims, teleport circles, waystations
 
 The Concord fell when too many bonds failed at once: succession wars, claims dug too deep, broken pacts, unburied armies, burned road-ledgers, sabotaged teleport circles, and divine withdrawal.
 
-The most infamous relic of the collapse is [[barrow-crown|the Barrow Crown]].`,
+The most infamous relic of the collapse is [[barrow-crown|the Barrow Crown]], a royal command-symbol tied to the mystery of [[god-kharovan|Kharovan, the Buried Crown]] and the possibly false Anchor Tool called the Empty Crown.
+
+Related: [[anchor-tools|The Anchor Tools]], [[major-deities|Gods, Saints, and Divine Powers]], [[the-depth|The Depth]].`,
             images: [],
             updatedAt: seedTime,
           },
@@ -1456,7 +2085,13 @@ The **Hollow Below** is the divine face of the Depth. Some cults worship it. Som
 
 ## Mystery Thread
 
-At first, the Depth seems like an underworld. Later, it may seem like gravity, oblivion, or a buried god. Eventually, the player may learn the first divine act of raising the world was also a wound.`,
+At first, the Depth seems like an underworld. Later, it may seem like gravity, oblivion, or a buried god. Eventually, the player may learn the first divine act of raising the world was also a wound.
+
+## Found Handouts
+
+${bookletLinksByPower["the-depth"]}
+
+${handoutLinksByPower["the-depth"]}`,
             images: [],
             updatedAt: seedTime,
           },
@@ -1513,43 +2148,150 @@ Travel events are the road testing whether it still exists.`,
           },
           {
             id: "major-deities",
-            title: "Major Deities and Divine Powers",
+            title: "Gods, Saints, and Divine Powers",
             folder: "Gods",
-            tags: ["gods", "shrines", "anchors"],
-            content: `# Major Deities and Divine Powers
+            tags: ["gods", "shrines", "saints", "anchors"],
+            content: `# Gods, Saints, and Divine Powers
 
-The gods are real, but their power is mediated through rites, anchors, domains, shrines, relics, and mortal action.
+Depthbound religion is layered. Some gods are real mystical beings. Some powers are saints, primal forces, tool-echoes, or shrine-networks. Some gods are false, even when their temples are powerful.
 
-- [[god-asterion|Asterion, the First Lantern]]
+The [[anchor-tools|Anchor Tools]] are older than the pantheon. They are creation principles, relic-echoes, or metaphysical wounds, not deities. Many churches claim them anyway.
+
+## Reality Categories
+
+- **Confirmed deity** - a real mystical being exists and can empower true clerics.
+- **Saint or tool-echo** - something answers, but it is not a god in the usual sense.
+- **Primal power** - an elemental, wild, or world-law presence.
+- **Disputed or false god** - the church is real, but the named god may not be.
+- **Depth-mask** - something from [[the-depth|the Depth]] behaves like a god or impersonates one.
+
+False gods do not make true clerics. Their servants may think they are clerics, but their magic comes from relics, pacts, saint-bones, Anchor Tool echoes, or Depth-masks. In game terms, this is mostly an NPC truth: the player does not need separate mechanics for it.
+
+## Known Powers
+
+- [[god-lioran|Lioran, the Dawn-Bearer]] - confirmed deity of light, courage, cleansing, and hard-won hope.
 - [[god-maera|Maera Hearthwise, Lady of the Threshold]]
-- [[god-kelvorn|Kelvorn Mile-Saint]]
+- [[god-hadrin|Hadrin Mile-Saint]]
 - [[god-naevra|Naevra, Keeper of Names]]
 - [[god-orund|Orund Embervein]]
 - [[god-thessa|Thessa Thorn-Crowned]]
-- [[god-arkhon|Arkhon, the Buried Crown]]
+- [[god-kharovan|Kharovan, the Buried Crown]]
 - [[god-crucible-powers|The Four Crucible Powers]]
-- [[the-depth|The Hollow Below]]`,
+- [[the-depth|The Hollow Below]]
+
+Related: [[anchor-tools|The Anchor Tools]], [[creation-myth|Creation Myth and Ancient History]].`,
             images: [],
             updatedAt: seedTime,
           },
           {
-            id: "god-asterion",
-            title: "Asterion, the First Lantern",
+            id: "anchor-tools",
+            title: "The Anchor Tools",
+            folder: "Gods",
+            tags: ["anchor tools", "creation", "relics"],
+            content: `# The Anchor Tools
+
+The Anchor Tools are older than the gods.
+
+They are not necessarily literal tools. Each one is a creation principle that can appear as a relic, shrine, symbol, dungeon mechanism, miracle, wound, or myth. They may not be conscious at all.
+
+## The First Lantern
+
+**Function:** direction, horizon, day, safe sight, surface, and the difference between light and Depth.
+
+**Misread as:** a sun god, a saint's lamp, the eye of heaven, or [[god-lioran|Lioran's]] personal lantern.
+
+**Adventure use:** undead-cleansing rites, lost beacons, dungeons where light has rules, old roads that only exist when named by flame.
+
+## The Hearth-Nail
+
+**Function:** place, shelter, threshold, village, return, and belonging.
+
+**Misread as:** a hearth goddess, household saint, ancestral mother, or [[god-maera|Maera]] herself.
+
+**Adventure use:** [[home-anchorhold|Home]], village defense, broken settlements, guest-right curses, lost foundations.
+
+## The Road-Spindle
+
+**Function:** distance, travel, pilgrimage, maps, trade, and the ability for one place to remain connected to another.
+
+**Misread as:** a road god, messenger saint, or the staff of [[god-hadrin|Hadrin Mile-Saint]].
+
+**Adventure use:** shrine-roads, teleport circles, route restoration, lost expeditions, milepost ledgers.
+
+## The Name-Ledger
+
+**Function:** memory, burial, contracts, identity, lineage, history, and true names.
+
+**Misread as:** the book of the dead, a death goddess, a soul-judge's roll, or [[god-naevra|Naevra's]] first ledger.
+
+**Adventure use:** [[faction-gravebinders|Gravebinders]], undead, oath magic, identity theft, nameless dead, forgotten kings.
+
+## The Deep Hammer
+
+**Function:** pressure, ore, heat, craft, deep weight, and the underside of reality.
+
+**Misread as:** a forge god's hammer, dwarven creator-tool, or [[god-orund|Orund's]] soul.
+
+**Adventure use:** Embervein, mines, relic crafting, forbidden depth claims, forge miracles that reopen old wounds.
+
+## The Empty Crown
+
+**Function:** command, hierarchy, sovereignty, obedience, and the dangerous idea that one will can bind many.
+
+**Truth status:** disputed.
+
+The Empty Crown may be a sixth Anchor Tool. It may also be a later corruption made when mortal kings tried to copy the older Tools. Some theologians say it is not a Tool at all, but the first Depth-mask ever worn by law.
+
+**Adventure use:** [[barrow-crown|the Barrow Crown]], [[god-kharovan|Kharovan]], dead kings, cursed coronations, tyrants, oath-bound armies.
+
+Related: [[creation-myth|Creation Myth and Ancient History]], [[major-deities|Gods, Saints, and Divine Powers]], [[barrow-crown|The Barrow Crown]].`,
+            images: [],
+            updatedAt: seedTime,
+          },
+          {
+            id: "god-lioran",
+            title: "Lioran, the Dawn-Bearer",
             folder: "Gods",
             tags: ["light", "protection", "dawn"],
-            content: `# Asterion, the First Lantern
+            content: `# Lioran, the Dawn-Bearer
 
 **Domains:** Light, protection, courage, truth, dawn
 
 **Symbol:** A lantern with seven rays
 
-**Wants:** Settlements to endure, roads to be relit, and people to act bravely in darkness.
+**Reality status:** Confirmed deity.
+
+## Public Doctrine
+
+Lioran is worshipped as the bearer of the First Lantern, the god who taught mortals that darkness can be crossed without being obeyed.
+
+His temples say he held the Lantern during creation and raised the first dawn above the Depth.
+
+## Hidden Truth
+
+Lioran is real, but he is not the First Lantern itself. Older accounts suggest he was the first being awakened by its light, or the first god to understand what the Lantern had already done.
+
+His church preserves real miracles, but its oldest doctrine may be backwards.
+
+## How Clerics Receive Power
+
+True clerics of Lioran receive power from Lioran through flame rites, truth-oaths, dawn vigils, and shrine-lanterns. His power is strongest where people keep light for one another.
+
+Underground, his miracles still work, but they often feel more costly. The Depth remembers that the world was raised from darkness, not rescued from it.
 
 **Normal worship:** People hang lanterns above doors, light candles before journeys, and swear truth-oaths by flame.
 
-Asterion is ideal for clerics, paladins, village shrines, undead-cleansing quests, and "last light in the dungeon" moments.
+## Adventure Use
 
-Related: [[major-deities|Major Deities]], [[five-great-bonds|The Five Great Bonds]].`,
+Lioran is ideal for clerics, paladins, village shrines, undead-cleansing quests, and last-light-in-the-dungeon moments.
+
+## Found Handouts
+
+${bookletLinksByPower["god-lioran"]}
+
+${handoutLinksByPower["god-lioran"]}
+
+Related: [[major-deities|Gods, Saints, and Divine Powers]], [[anchor-tools|The Anchor Tools]], [[five-great-bonds|The Five Great Bonds]].`,
             images: [],
             updatedAt: seedTime,
           },
@@ -1564,30 +2306,78 @@ Related: [[major-deities|Major Deities]], [[five-great-bonds|The Five Great Bond
 
 **Symbol:** A bowl above a small flame
 
-**Wants:** Homes to remain inhabited and welcoming.
+**Reality status:** Saint-network, hearth-spirit, or living tradition.
+
+## Public Doctrine
+
+Maera is honored as the Lady of the Threshold, the one who makes a door more than wood and a meal more than food.
+
+Her shrines are rarely grand. Most are bowls, hooks, hearthstones, guest beds, and clean doorsteps.
+
+## Hidden Truth
+
+Maera may not be a single goddess. She may be the combined presence of countless household vows, ancestor-blessings, and Hearth-Nail echoes.
+
+Every true hearth is a tiny shrine. Together, they make something that answers.
+
+## How Clerics Receive Power
+
+Maera's priests may receive power from the Hearth-Nail, ancestral saints, or the living network of households that still keep guest-right. They are not fake, but scholars argue whether they serve a person or a sacred pattern.
 
 **Normal worship:** Meals are blessed, guest-right is sacred, and empty beds are covered with clean cloth so wandering spirits do not claim them.
 
-A well-kept [[home-anchorhold|Home]] is a shrine to Maera whether the player says so or not.`,
+A well-kept [[home-anchorhold|Home]] is a shrine to Maera whether the player says so or not.
+
+## Found Handouts
+
+${bookletLinksByPower["god-maera"]}
+
+${handoutLinksByPower["god-maera"]}
+
+Related: [[anchor-tools|The Anchor Tools]], [[home-anchorhold|Home and the Anchorhold]].`,
             images: [],
             updatedAt: seedTime,
           },
           {
-            id: "god-kelvorn",
-            title: "Kelvorn Mile-Saint",
+            id: "god-hadrin",
+            title: "Hadrin Mile-Saint",
             folder: "Gods",
             tags: ["roads", "maps", "travel"],
-            content: `# Kelvorn Mile-Saint
+            content: `# Hadrin Mile-Saint
 
 **Domains:** Roads, travel, maps, messengers, safe return
 
 **Symbol:** A bootprint beside a milepost
 
-**Wants:** Roads rebuilt, settlements reconnected, lost routes filed into ledgers.
+**Reality status:** Saint or ascended mortal.
+
+## Public Doctrine
+
+Hadrin is the saint of safe passage, mileposts, chalk marks, caravan bells, and the little rituals travelers perform before admitting they are afraid.
+
+Most road shrines call him a god because it is simpler and more comforting.
+
+## Hidden Truth
+
+Hadrin was probably mortal: a road-keeper, pilgrim, scout, or mapmaker who restored the first shrine-roads after the Crownroad Concord began to fail.
+
+Road shrines work, but not because Hadrin made roads. They work because the Road-Spindle still remembers connection, and Hadrin learned how to speak to that memory.
+
+## How Clerics Receive Power
+
+Hadrin's priests are more like saint-callers than true clerics. Their miracles come through milepost rites, road ledgers, old nails, pilgrim names, and Road-Spindle echoes.
 
 **Normal worship:** Travelers leave nails, coins, chalk marks, or written names at mileposts.
 
-Kelvorn is the patron of the [[faction-expedition-board|Expedition Board]], roads, teleport circles, travel events, scouting, and [[campaign-milepost-ledger|The Milepost Ledger]].`,
+Hadrin is the patron of the [[faction-expedition-board|Expedition Board]], roads, teleport circles, travel events, scouting, and [[campaign-milepost-ledger|The Milepost Ledger]].
+
+## Found Handouts
+
+${bookletLinksByPower["god-hadrin"]}
+
+${handoutLinksByPower["god-hadrin"]}
+
+Related: [[anchor-tools|The Anchor Tools]], [[major-deities|Gods, Saints, and Divine Powers]].`,
             images: [],
             updatedAt: seedTime,
           },
@@ -1602,11 +2392,35 @@ Kelvorn is the patron of the [[faction-expedition-board|Expedition Board]], road
 
 **Symbol:** A bell tied with grave-thread
 
-**Wants:** The dead named, the nameless restored, undead either laid to rest or bound properly.
+**Reality status:** Confirmed deity.
+
+## Public Doctrine
+
+Naevra is worshipped as the Keeper of Names, the one who hears the last bell and keeps the dead from dissolving into the dark.
+
+Her priests teach that a soul with a name can be found, mourned, judged, bargained with, or laid to rest. The nameless are in danger.
+
+## Hidden Truth
+
+Naevra is real, but she is not death itself. She may be the first keeper of the Name-Ledger, or a being created by it after the world needed memory.
+
+The Gravebinders are right that names matter. They may be wrong about what happens to souls whose names are stolen before death.
+
+## How Clerics Receive Power
+
+True clerics of Naevra receive power through death-books, grave-thread, bells, burial ledgers, last words, and restored names.
 
 **Normal worship:** Families keep death-books. Soldiers carry name-tags. Grave candles are lit on foggy nights.
 
-Naevra is the divine backbone for the [[faction-gravebinders|Gravebinders]].`,
+Naevra is the divine backbone for the [[faction-gravebinders|Gravebinders]].
+
+## Found Handouts
+
+${bookletLinksByPower["god-naevra"]}
+
+${handoutLinksByPower["god-naevra"]}
+
+Related: [[anchor-tools|The Anchor Tools]], [[major-deities|Gods, Saints, and Divine Powers]].`,
             images: [],
             updatedAt: seedTime,
           },
@@ -1621,11 +2435,35 @@ Naevra is the divine backbone for the [[faction-gravebinders|Gravebinders]].`,
 
 **Symbol:** A hammer over a glowing vein
 
-**Wants:** Claims honored, dangerous depths respected, craft used responsibly.
+**Reality status:** Ascended smith-king and Deep Hammer echo.
+
+## Public Doctrine
+
+Orund is worshipped as the deep forge-father of lawful claims, honest craft, and oath-bound steel.
+
+Dwarven holds often treat him as a full god. Surface miners tend to call him a dangerous depth-saint.
+
+## Hidden Truth
+
+Orund may have been a legendary smith-king whose soul fused with a Deep Hammer echo. His miracles are real, but each one touches the pressure beneath the world.
+
+This makes Embervein holy and forbidden at the same time.
+
+## How Clerics Receive Power
+
+Orund's priests draw power through forge-oaths, claim marks, ancestral anvils, ember rites, and Deep Hammer splinters. Some are clerics. Some are pact-smiths in all but name.
 
 **Normal worship:** Miners mark first strikes with oil and ash. Smiths swear never to forge an oath-blade falsely.
 
-Orund supports dwarven content, mines, deepworks, smithing, crafting, Ember Oath lore, and relic weapons.`,
+Orund supports dwarven content, mines, deepworks, smithing, crafting, Ember Oath lore, and relic weapons.
+
+## Found Handouts
+
+${bookletLinksByPower["god-orund"]}
+
+${handoutLinksByPower["god-orund"]}
+
+Related: [[anchor-tools|The Anchor Tools]], [[campaign-first-claim-embervein|The First Claim of Embervein]].`,
             images: [],
             updatedAt: seedTime,
           },
@@ -1640,28 +2478,78 @@ Orund supports dwarven content, mines, deepworks, smithing, crafting, Ember Oath
 
 **Symbol:** Antlers wrapped in thorn-vine
 
-**Wants:** Mortals to remember that wilderness is not empty land.
+**Reality status:** Primal power.
+
+## Public Doctrine
+
+Thessa is called the Thorn-Crowned, the wild queen of old pacts, hunting prices, beast territories, and forests that remember trespass.
+
+Villages pray to her because they want mercy. Monsters honor her because they remember the bargain.
+
+## Hidden Truth
+
+Thessa is real, but not as civilized people imagine gods. She may be a crown worn by the wild itself, not a person wearing a crown.
+
+Some monster tribes understand her better than human priests do.
+
+## How Clerics Receive Power
+
+Thessa's servants are pact-keepers, druids, blood-priests, beast speakers, and shrine hunters. Their power comes through old pacts, living borders, thorn rites, and the wilderness refusing to be owned.
 
 **Normal worship:** Hunters leave part of the kill. Woodcutters ask permission before felling old trees. Villages keep thorn charms over livestock gates.
 
-Thessa creates useful tension with the [[faction-trophy-lodge|Trophy Lodge]]: is a trophy proof of respect, or theft from the wild?`,
+Thessa creates useful tension with the [[faction-trophy-lodge|Trophy Lodge]]: is a trophy proof of respect, or theft from the wild?
+
+## Found Handouts
+
+${bookletLinksByPower["god-thessa"]}
+
+${handoutLinksByPower["god-thessa"]}
+
+Related: [[campaign-thornwood-pact|The Thornwood Pact Campaign]], [[major-deities|Gods, Saints, and Divine Powers]].`,
             images: [],
             updatedAt: seedTime,
           },
           {
-            id: "god-arkhon",
-            title: "Arkhon, the Buried Crown",
+            id: "god-kharovan",
+            title: "Kharovan, the Buried Crown",
             folder: "Gods",
             tags: ["law", "kingship", "war-dead"],
-            content: `# Arkhon, the Buried Crown
+            content: `# Kharovan, the Buried Crown
 
 **Domains:** Law, kingship, command, duty, war-dead
 
 **Symbol:** A crown half-buried in black soil
 
-**Wants:** Oaths fulfilled, rulers worthy, armies remembered, command purified of tyranny.
+**Reality status:** Disputed or false god.
 
-Arkhon is not evil, but his domain is damaged. [[barrow-crown|The Barrow Crown]] is a corrupted or broken expression of his power.`,
+## Public Doctrine
+
+Kharovan is worshipped as the buried king of rightful rule, oath-bound command, solemn law, and armies remembered by their crowns.
+
+His temples insist that command can be holy when the ruler is worthy.
+
+## Hidden Truth
+
+Kharovan may not be a god.
+
+He may be a dead king exaggerated into divinity, a political invention of old royal houses, or the Empty Crown speaking through corpses. The [[barrow-crown|Barrow Crown]] suggests that rightful rule can become a trap: a way for command to survive after justice has died.
+
+## How Clerics Receive Power
+
+Kharovan does not create true clerics if he is false. His "priests" may be celestial warlocks, crown-pact casters, oath mediums, or relic-bearers drawing power from the Empty Crown, royal barrows, sainted commanders, or [[the-depth|the Depth]] pretending to respect law.
+
+## Adventure Use
+
+Kharovan is perfect for false miracles, undead officers, haunted authority, succession relics, and clerics who discover their god is a crown-shaped question.
+
+## Found Handouts
+
+${bookletLinksByPower["god-kharovan"]}
+
+${handoutLinksByPower["god-kharovan"]}
+
+Related: [[barrow-crown|The Barrow Crown]], [[campaign-barrow-crown|The Barrow Crown Campaign]], [[anchor-tools|The Anchor Tools]].`,
             images: [],
             updatedAt: seedTime,
           },
@@ -1672,14 +2560,26 @@ Arkhon is not evil, but his domain is damaged. [[barrow-crown|The Barrow Crown]]
             tags: ["flame", "stone", "tide", "storm"],
             content: `# The Four Crucible Powers
 
-Elemental divine powers worshipped separately and together.
+**Reality status:** Primal powers.
+
+The Four Crucible Powers are not gods. They are primal procedures by which the world stays physically possible.
 
 - **Veyraflame** - Flame, change, hunger, purification.
 - **Korrum Stoneheart** - Stone, endurance, weight, memory.
 - **Ilyr Tidemarked** - Tides, adaptation, grief, hidden paths.
 - **Sathren Storm-Eye** - Storms, motion, breath, revelation.
 
-They want balance, exchange, and respect. The [[faction-crucible-collegium|Crucible Collegium]] studies them, sometimes reverently and sometimes recklessly.`,
+The Crucible faiths say the elements want balance, exchange, and respect. The [[faction-crucible-collegium|Crucible Collegium]] is less certain. Its scholars believe Flame changes, Stone remembers, Tide returns, and Storm reveals because reality requires those functions.
+
+Elemental priests are not always priests. Some are pact-keepers, geomancers, living conduits, shrine engineers, or people who survived exposure to a Crucible site.
+
+## Found Handouts
+
+${bookletLinksByPower["god-crucible-powers"]}
+
+${handoutLinksByPower["god-crucible-powers"]}
+
+Related: [[major-deities|Gods, Saints, and Divine Powers]], [[faction-crucible-collegium|Crucible Collegium]].`,
             images: [],
             updatedAt: seedTime,
           },
@@ -1861,7 +2761,9 @@ The Barrow Crown was not just a royal item. It was a command-symbol used to bind
 
 When the Crown broke, its authority scattered into barrows, haunted keeps, dead commanders, warning signs, organ-haunted crypts, and undead courts.
 
-Related: [[god-arkhon|Arkhon, the Buried Crown]], [[campaign-barrow-crown|The Barrow Crown Campaign]].`,
+The Crown may be a corrupted reflection of the [[anchor-tools|Empty Crown]], a disputed sixth Anchor Tool. Royal temples claim it belongs to [[god-kharovan|Kharovan, the Buried Crown]]. Gravebinders and Antiquarians are less certain: Kharovan may be a dead king, a political god, or the Crown itself pretending to be a patron.
+
+Related: [[god-kharovan|Kharovan, the Buried Crown]], [[campaign-barrow-crown|The Barrow Crown Campaign]], [[anchor-tools|The Anchor Tools]].`,
             images: [],
             updatedAt: seedTime,
           },
@@ -1876,7 +2778,11 @@ Related: [[god-arkhon|Arkhon, the Buried Crown]], [[campaign-barrow-crown|The Ba
 
 > Can command over the dead ever be righteous, or does every crown eventually become a grave-weight?
 
-The haunted organ can be an old royal mourning instrument that once called names of fallen soldiers. Now it plays names the Crown still claims.`,
+The haunted organ can be an old royal mourning instrument that once called names of fallen soldiers. Now it plays names the Crown still claims.
+
+The campaign should slowly make Kharovan less certain. Early temples can treat him as a stern but legitimate god of command. Later dungeons should imply that the Barrow Crown may be the real power, and that its "clerics" are crown-pact casters rather than true priests.
+
+Related: [[god-kharovan|Kharovan, the Buried Crown]], [[barrow-crown|The Barrow Crown]], [[anchor-tools|The Anchor Tools]].`,
             images: [],
             updatedAt: seedTime,
           },
@@ -1959,7 +2865,7 @@ Briarwick, Ashford, Bellhollow, Hearthmere, Crowmill, Lanternbrook, Thornwell, B
 
 ## Cities
 
-Highmile, Goldspan, Veyrwatch, Crownmarket, Saint Kelvorn's Gate, Ledgerfall, Brazenford, Old Arkhon, Bellspire, Tidemark City.
+Highmile, Goldspan, Veyrwatch, Crownmarket, Saint Hadrin's Gate, Ledgerfall, Brazenford, Old Kharovan, Bellspire, Tidemark City.
 
 ## Dungeons
 
@@ -1971,6 +2877,8 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
             images: [],
             updatedAt: seedTime,
           },
+          ...deityBookletArticles,
+          ...deityHandoutArticles,
           {
             id: "world-bible-archive",
             title: "World Bible Archive",
@@ -1984,7 +2892,7 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
       };
 
       let library = loadLibrary();
-      let selectedId = library.articles[0]?.id || "";
+      let selectedId = articleIdFromHash() || library.articles[0]?.id || "";
 
       const els = {
         search: document.querySelector("#lore-search"),
@@ -2027,6 +2935,23 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
       function migrateLibrary(saved) {
         const migrated = structuredClone(saved);
         migrated.folders = Array.from(new Set([...(migrated.folders || []), ...seedData.folders]));
+        const reworkedReligionIds = new Set([
+          "creation-myth",
+          "major-deities",
+          "anchor-tools",
+          "god-lioran",
+          "god-maera",
+          "god-hadrin",
+          "god-naevra",
+          "god-orund",
+          "god-thessa",
+          "god-kharovan",
+          "god-crucible-powers",
+          "the-depth",
+          "barrow-crown",
+          "campaign-barrow-crown",
+          "naming-conventions",
+        ]);
         seedData.articles.forEach((seedArticle) => {
           const existing = migrated.articles.find((article) => article.id === seedArticle.id);
           if (!existing) {
@@ -2040,7 +2965,9 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
           const isOldStarterPage = ["five-great-bonds", "major-deities"].includes(existing.id)
             && existing.content
             && !existing.content.includes("[[");
-          if (isOldSeedDump || isOldStarterPage) {
+          const needsReligionRework = migrated.religionReworkVersion !== 4
+            && (reworkedReligionIds.has(seedArticle.id) || seedArticle.id.startsWith("handout-") || seedArticle.id.startsWith("booklet-"));
+          if (isOldSeedDump || isOldStarterPage || needsReligionRework) {
             existing.title = seedArticle.title;
             existing.folder = seedArticle.folder;
             existing.tags = seedArticle.tags;
@@ -2048,6 +2975,12 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
             existing.updatedAt = seedArticle.updatedAt;
           }
         });
+        migrated.articles = migrated.articles.filter((article) => ![
+          "god-asterion",
+          "god-kelvorn",
+          "god-arkhon",
+        ].includes(article.id));
+        migrated.religionReworkVersion = 4;
         return migrated;
       }
 
@@ -2061,6 +2994,34 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
 
       function selectedArticle() {
         return library.articles.find((article) => article.id === selectedId) || library.articles[0] || null;
+      }
+
+      function articleIdFromHash() {
+        const id = decodeURIComponent(window.location.hash.replace(/^#/, "").trim());
+        return library?.articles?.some((article) => article.id === id) ? id : "";
+      }
+
+      function setArticleHash(id, mode = "push") {
+        if (!id) return;
+        const nextHash = `#${encodeURIComponent(id)}`;
+        if (window.location.hash === nextHash) return;
+        const state = { articleId: id };
+        if (mode === "replace") {
+          history.replaceState(state, "", nextHash);
+        } else {
+          history.pushState(state, "", nextHash);
+        }
+      }
+
+      function selectArticle(id, options = {}) {
+        const target = library.articles.find((article) => article.id === id);
+        if (!target) return false;
+        selectedId = target.id;
+        if (options.history) {
+          setArticleHash(target.id, options.history);
+        }
+        renderArticle();
+        return true;
       }
 
       function escapeHtml(value) {
@@ -2337,6 +3298,7 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
         selectedId = article.id;
         persist();
         renderFolderOptions();
+        setArticleHash(article.id);
         renderArticle();
       }
 
@@ -2362,6 +3324,7 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
         library.articles.unshift(copy);
         selectedId = copy.id;
         persist();
+        setArticleHash(copy.id);
         renderArticle();
       }
 
@@ -2371,6 +3334,7 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
         library.articles = library.articles.filter((item) => item.id !== article.id);
         selectedId = library.articles[0]?.id || "";
         persist();
+        setArticleHash(selectedId, "replace");
         renderArticle();
       }
 
@@ -2380,10 +3344,7 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
       }
 
       function openWikiArticle(id) {
-        const target = library.articles.find((article) => article.id === id);
-        if (!target) return;
-        selectedId = target.id;
-        renderArticle();
+        selectArticle(id, { history: "push" });
       }
 
       function exportLore() {
@@ -2407,6 +3368,7 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
         library = imported;
         selectedId = library.articles[0]?.id || "";
         persist();
+        setArticleHash(selectedId, "replace");
         renderFolderOptions();
         renderArticle();
       }
@@ -2414,8 +3376,7 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
       els.tree.addEventListener("click", (event) => {
         const button = event.target.closest("[data-id]");
         if (!button) return;
-        selectedId = button.dataset.id;
-        renderArticle();
+        selectArticle(button.dataset.id, { history: "push" });
       });
       els.articleBody.addEventListener("click", (event) => {
         const link = event.target.closest("[data-wiki-id]");
@@ -2441,8 +3402,16 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
       els.deleteArticle.addEventListener("click", deleteArticle);
       els.exportLore.addEventListener("click", exportLore);
       els.importLore.addEventListener("change", importLore);
+      window.addEventListener("popstate", () => {
+        const id = articleIdFromHash() || library.articles[0]?.id || "";
+        if (id && id !== selectedId) {
+          selectedId = id;
+          renderArticle();
+        }
+      });
 
       renderFolderOptions();
+      setArticleHash(selectedId, "replace");
       renderArticle();
     </script>
   </body>

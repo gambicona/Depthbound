@@ -8498,6 +8498,17 @@ button[data-ui-icon]::before,
   margin-top: 8px;
 }
 
+.ancient-tome-subcategory {
+  background: rgba(255, 255, 255, 0.025);
+  border-color: rgba(255, 255, 255, 0.08);
+  margin-left: 10px;
+}
+
+.ancient-tome-subcategory > summary {
+  color: var(--gold);
+  font-size: 0.9rem;
+}
+
 .ancient-tome-text {
   display: grid;
   gap: 8px;

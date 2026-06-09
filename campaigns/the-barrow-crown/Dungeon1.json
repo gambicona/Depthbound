@@ -5102,7 +5102,9 @@
         "x": 28,
         "y": 18
       },
-      "items": []
+      "items": [
+        "religion-naevra-grave-candle-instruction"
+      ]
     },
     {
       "id": "spellbook-stand-47",
@@ -5217,7 +5219,8 @@
       "locked": true,
       "items": [
         "valuable-sealed-noble-wax",
-        "art-gold-funerary-mask"
+        "art-gold-funerary-mask",
+        "religion-kharovan-royal-oath-prayer"
       ]
     },
     {

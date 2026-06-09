@@ -8026,7 +8026,8 @@
         "y": 31
       },
       "items": [
-        "valuable-sealed-noble-wax"
+        "valuable-sealed-noble-wax",
+        "magic-undead-bracers-pallbearer"
       ],
       "locked": true
     },
@@ -8055,7 +8056,9 @@
         "x": 38,
         "y": 20
       },
-      "items": []
+      "items": [
+        "religion-kharovan-crown-pact-confession"
+      ]
     },
     {
       "id": "spellbook-stand-52",
@@ -8238,7 +8241,9 @@
         "x": 47,
         "y": 8
       },
-      "items": [],
+      "items": [
+        "religion-hollow-depth-mask-warning"
+      ],
       "description": "A black altar supports the Barrow Crown. The dead monarchs stand around it in silent judgment.",
       "components": [
         {

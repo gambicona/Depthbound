@@ -9421,7 +9421,9 @@
         "x": 39,
         "y": 38
       },
-      "items": []
+      "items": [
+        "magic-undead-gravekiss-dagger"
+      ]
     },
     {
       "id": "hanging-chains-61",
@@ -9466,7 +9468,9 @@
         "x": 8,
         "y": 34
       },
-      "items": []
+      "items": [
+        "religion-naevra-record-of-a-stolen-name"
+      ]
     },
     {
       "id": "table-66",
@@ -9592,7 +9596,9 @@
         "x": 15,
         "y": 47
       },
-      "items": []
+      "items": [
+        "religion-kharovan-magistrate-letter"
+      ]
     },
     {
       "id": "undead-crate-80",
@@ -9664,7 +9670,9 @@
         "x": 31,
         "y": 49
       },
-      "items": []
+      "items": [
+        "magic-undead-cloak-quiet-grave"
+      ]
     },
     {
       "id": "iron-banded-chest-88",
@@ -9673,7 +9681,9 @@
         "x": 40,
         "y": 49
       },
-      "items": []
+      "items": [
+        "magic-undead-necrotic-ward-draught"
+      ]
     },
     {
       "id": "hanging-chains-89",

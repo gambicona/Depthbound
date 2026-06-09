@@ -4724,9 +4724,10 @@ function randomHealingPotionDrop() {
 
 function randomEquipmentDrop() {
   const partyLevel = averagePartyLevel(activeHero());
+  const equipmentTypes = new Set(["weapon", "armor", "ammunition", "tool"]);
   const item = weightedPick(
     dungeonLootItems()
-      .filter((candidate) => candidate.use?.kind !== "healing" && candidate.store?.buyable !== false && !candidate.tags?.includes("loot:magic") && candidate.type !== "treasure")
+      .filter((candidate) => equipmentTypes.has(candidate.type) && candidate.store?.buyable !== false && !candidate.tags?.includes("loot:magic"))
       .filter((candidate) => lootItemAllowedForPartyLevel(candidate, "equipment", partyLevel))
       .map((candidate) => ({ item: candidate, weight: 1 / Math.max(1, Math.sqrt(lootItemValueGp(candidate))) })),
   );

@@ -21604,11 +21604,27 @@ function ancientTomeCategoryGroups(entries = ancientTomeEntries()) {
   for (const entry of entries) {
     const categories = entry.categories?.length ? entry.categories : ["Uncategorized"];
     for (const category of categories) {
-      if (!groups.has(category)) groups.set(category, []);
-      groups.get(category).push(entry);
+      const [parentRaw, ...childParts] = String(category).split("/");
+      const parent = parentRaw.trim() || "Uncategorized";
+      const child = childParts.join("/").trim();
+      if (!groups.has(parent)) groups.set(parent, { entries: [], subgroups: new Map() });
+      const group = groups.get(parent);
+      if (child) {
+        if (!group.subgroups.has(child)) group.subgroups.set(child, []);
+        group.subgroups.get(child).push(entry);
+      } else {
+        group.entries.push(entry);
+      }
     }
   }
-  return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  return Array.from(groups.entries())
+    .map(([category, group]) => ({
+      category,
+      entries: group.entries,
+      subgroups: Array.from(group.subgroups.entries()).sort(([a], [b]) => a.localeCompare(b)),
+      count: group.entries.length + Array.from(group.subgroups.values()).reduce((sum, items) => sum + items.length, 0),
+    }))
+    .sort((a, b) => a.category.localeCompare(b.category));
 }
 
 function ancientTomeEntryMarkup(entry) {
@@ -21633,10 +21649,20 @@ function ancientTomeMarkup() {
         entries.length
           ? groups
               .map(
-                ([category, categoryEntries]) => `
+                (group) => `
                   <details class="ancient-tome-category" open>
-                    <summary>${escapeHtml(category)} <span>${categoryEntries.length}</span></summary>
-                    <div>${categoryEntries.map(ancientTomeEntryMarkup).join("")}</div>
+                    <summary>${escapeHtml(group.category)} <span>${group.count}</span></summary>
+                    <div>
+                      ${group.entries.map(ancientTomeEntryMarkup).join("")}
+                      ${group.subgroups
+                        .map(([subcategory, subEntries]) => `
+                          <details class="ancient-tome-category ancient-tome-subcategory" open>
+                            <summary>${escapeHtml(subcategory)} <span>${subEntries.length}</span></summary>
+                            <div>${subEntries.map(ancientTomeEntryMarkup).join("")}</div>
+                          </details>
+                        `)
+                        .join("")}
+                    </div>
                   </details>
                 `,
               )

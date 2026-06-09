@@ -6438,7 +6438,8 @@
         "caseSensitive": false
       },
       "items": [
-        "magic-leather-plus-1"
+        "magic-leather-plus-1",
+        "religion-naevra-nameless-warning"
       ]
     },
     {
@@ -6499,7 +6500,8 @@
       },
       "items": [
         "valuable-rare-incense-casket",
-        "potion-greater-healing"
+        "potion-greater-healing",
+        "religion-naevra-soldier-name-tag"
       ]
     },
     {

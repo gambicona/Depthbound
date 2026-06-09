@@ -3789,7 +3789,10 @@
       },
       "width": 2,
       "height": 2,
-      "description": "The first king's throne is carved from burial stone and black glass. It waits at the end of the hall like a verdict."
+      "description": "The first king's throne is carved from burial stone and black glass. It waits at the end of the hall like a verdict.",
+      "items": [
+        "religion-kharovan-empty-crown-fragment"
+      ]
     },
     {
       "id": "royal-altar-left",
@@ -3797,7 +3800,10 @@
       "position": {
         "x": 5,
         "y": 4
-      }
+      },
+      "items": [
+        "religion-kharovan-booklet"
+      ]
     },
     {
       "id": "royal-altar-right",

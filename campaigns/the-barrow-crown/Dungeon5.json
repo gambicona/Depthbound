@@ -10751,7 +10751,9 @@
         "x": 14,
         "y": 46
       },
-      "items": []
+      "items": [
+        "religion-naevra-booklet"
+      ]
     },
     {
       "id": "crypt-wall-candle-62",
@@ -10805,7 +10807,9 @@
         "x": 46,
         "y": 43
       },
-      "items": []
+      "items": [
+        "religion-kharovan-succession-trial-note"
+      ]
     },
     {
       "id": "sealed-reliquary-68",
@@ -10841,7 +10845,9 @@
         "x": 35,
         "y": 53
       },
-      "items": []
+      "items": [
+        "magic-undead-necrotic-ward-draught"
+      ]
     },
     {
       "id": "sacred-font-72",
@@ -10897,7 +10903,9 @@
         "x": 41,
         "y": 53
       },
-      "items": []
+      "items": [
+        "magic-undead-ring-last-breath"
+      ]
     }
   ],
   "monsters": [
