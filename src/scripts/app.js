@@ -419,6 +419,13 @@ function handleAdminQuickAction(action) {
     if (!els.inventoryMenu.classList.contains("hidden")) renderInventoryMenu();
     return true;
   }
+  if (action === "toggle-admin-nat20") {
+    adminNat20Mode = !adminNat20Mode;
+    addLog(adminNat20Mode ? "Admin nat 20 enabled for hero d20 rolls." : "Admin nat 20 disabled.", "important");
+    render();
+    if (!els.inventoryMenu.classList.contains("hidden")) renderInventoryMenu();
+    return true;
+  }
   if (action === "admin-heal") {
     adminFullHeal();
     return true;
@@ -1329,6 +1336,9 @@ els.inventoryMenu.addEventListener("click", (event) => {
     handleAdminQuickAction(button.dataset.action);
   }
   if (button.dataset.action === "toggle-admin-god") {
+    handleAdminQuickAction(button.dataset.action);
+  }
+  if (button.dataset.action === "toggle-admin-nat20") {
     handleAdminQuickAction(button.dataset.action);
   }
   if (button.dataset.action === "toggle-admin-monsters") {

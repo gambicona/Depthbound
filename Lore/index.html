@@ -89,9 +89,38 @@
         border: 1px solid var(--line);
         border-radius: 6px;
         color: var(--text);
+        color-scheme: dark;
         min-height: 36px;
         padding: 8px 10px;
         width: 100%;
+      }
+
+      .lore-search input:focus-visible,
+      .lore-search select:focus-visible,
+      .lore-field input:focus-visible,
+      .lore-field select:focus-visible,
+      .lore-field textarea:focus-visible {
+        border-color: var(--chrome-accent);
+        box-shadow: 0 0 0 2px rgba(214, 180, 102, 0.18);
+        outline: none;
+      }
+
+      .lore-search select option,
+      .lore-field select option {
+        background: #111c1d;
+        color: #f6ead8;
+      }
+
+      .lore-search select option:checked,
+      .lore-field select option:checked {
+        background: #2f4b4e;
+        color: #fff6dd;
+      }
+
+      .lore-search input::placeholder,
+      .lore-field input::placeholder,
+      .lore-field textarea::placeholder {
+        color: rgba(246, 234, 216, 0.48);
       }
 
       .lore-search-grid {
@@ -118,21 +147,101 @@
         margin-bottom: 12px;
       }
 
-      .lore-folder-title {
+      .lore-folder-toggle {
         align-items: center;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--line);
+        border-radius: 7px;
         color: var(--gold);
+        cursor: pointer;
         display: flex;
         font-size: 0.78rem;
         font-weight: 900;
         gap: 8px;
+        justify-content: space-between;
         letter-spacing: 0.04em;
         margin: 0 0 7px;
+        min-height: 34px;
+        padding: 7px 9px;
+        text-align: left;
         text-transform: uppercase;
+        width: 100%;
+      }
+
+      .lore-folder-toggle:hover {
+        border-color: var(--chrome-accent);
+      }
+
+      .lore-folder-toggle span {
+        color: var(--muted);
+        font-size: 0.68rem;
+        letter-spacing: 0;
       }
 
       .lore-article-list {
         display: grid;
         gap: 6px;
+      }
+
+      .lore-article-list[hidden] {
+        display: none;
+      }
+
+      .spell-compendium {
+        display: grid;
+        gap: 14px;
+      }
+
+      .spell-controls {
+        align-items: end;
+        display: grid;
+        gap: 10px;
+        grid-template-columns: minmax(180px, 1fr) minmax(120px, 180px) minmax(140px, 220px);
+      }
+
+      .spell-summary {
+        color: var(--muted);
+        font-size: 0.82rem;
+        font-weight: 800;
+      }
+
+      .spell-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .spell-card {
+        background: rgba(255, 255, 255, 0.045);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        display: grid;
+        gap: 8px;
+        padding: 11px 12px;
+      }
+
+      .spell-card h3 {
+        font-size: 1rem;
+        margin: 0;
+      }
+
+      .spell-meta {
+        color: var(--muted);
+        display: flex;
+        flex-wrap: wrap;
+        font-size: 0.76rem;
+        font-weight: 800;
+        gap: 7px;
+      }
+
+      .spell-meta span {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 3px 7px;
+      }
+
+      .spell-card p {
+        margin: 0;
       }
 
       .lore-article-button {
@@ -1921,8 +2030,893 @@ Related: [[${booklet.powerId}|${powerNameById[booklet.powerId] || "Associated Po
         images: [],
         updatedAt: seedTime,
       })));
+      const rulesArticles = [
+        {
+                "id": "rules-races-overview",
+                "title": "Playable Races Overview",
+                "folder": "Races",
+                "tags": [
+                        "rules",
+                        "races",
+                        "subraces"
+                ],
+                "content": "# Playable Races Overview\n\nThese pages mirror the current playable race data in the game.\n\n- [[race-human|Human]]\n- [[race-dwarf|Dwarf]]\n- [[race-elf|Elf]]\n- [[race-dragonborn|Dragonborn]]\n- [[race-gnome|Gnome]]\n- [[race-half-elf|Half-Elf]]\n- [[race-halfling|Halfling]]\n- [[race-half-orc|Half-Orc]]\n- [[race-aasimar|Aasimar]]\n- [[race-aarakocra|Aarakocra]]\n- [[race-goliath|Goliath]]\n- [[race-yuan-ti|Yuan-ti]]\n- [[race-genasi|Genasi]]\n- [[race-tiefling|Tiefling]]",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "race-human",
+                "title": "Human",
+                "folder": "Races",
+                "tags": [
+                        "race",
+                        "human",
+                        "standard-human",
+                        "variant-human"
+                ],
+                "content": "# Human\n\n## Base Traits\n\n- **Ability bonuses:** STR +1, DEX +1, CON +1, INT +1, WIS +1, CHA +1\n- **Speed:** 30 ft\n\n## Subraces\n\n- **Standard Human** (standard-human)\n  - Standard Human: +1 to every ability score.\n- **Variant Human** (variant-human)\n  - **Ability bonuses:** replaces base bonuses\n  - **Ability choices:** choose 2\n  - **Skill choices:** choose 1\n  - **Feat choices:** choose 1\n  - Variant Human: choose two different +1 ability bonuses, one skill proficiency, and one feat.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "race-dwarf",
+                "title": "Dwarf",
+                "folder": "Races",
+                "tags": [
+                        "race",
+                        "dwarf",
+                        "duergar",
+                        "hill-dwarf",
+                        "mountain-dwarf"
+                ],
+                "content": "# Dwarf\n\n## Base Traits\n\n- **Ability bonuses:** CON +2\n- **Speed:** 25 ft\n- **Senses:** Darkvision 60 ft\n- **Damage resistances:** poison\n- **Weapon proficiencies:** battleaxe, handaxe, light-hammer, warhammer\n- **Tool choices:** choose 1: smiths-tools, brewers-supplies, masons-tools\n- Dwarven Resilience: poison damage resistance.\n- Dwarven Combat Training.\n- Tool Proficiency: choose smith's tools, brewer's supplies, or mason's tools.\n\n## Subraces\n\n- **Duergar** (duergar)\n  - **Ability bonuses:** STR +1\n  - **Senses:** Darkvision 120 ft\n  - **Spell traits:** Duergar Enlarge active at level 3\n- **Hill Dwarf** (hill-dwarf)\n  - **Ability bonuses:** WIS +1\n  - **HP per level:** +1\n  - Dwarven Toughness: +1 max HP per level.\n- **Mountain Dwarf** (mountain-dwarf)\n  - **Ability bonuses:** STR +2\n  - **Armor proficiencies:** light, medium\n  - Dwarven Armor Training: light and medium armor proficiency.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "race-elf",
+                "title": "Elf",
+                "folder": "Races",
+                "tags": [
+                        "race",
+                        "elf",
+                        "drow",
+                        "eladrin",
+                        "high-elf",
+                        "shadar-kai",
+                        "wood-elf"
+                ],
+                "content": "# Elf\n\n## Base Traits\n\n- **Ability bonuses:** DEX +2\n- **Speed:** 30 ft\n- **Senses:** Darkvision 60 ft\n- **Skill proficiencies:** perception\n- Keen Senses: Perception proficiency.\n\n## Subraces\n\n- **Drow** (drow)\n  - **Ability bonuses:** CHA +1\n  - **Senses:** Darkvision 120 ft\n  - **Weapon proficiencies:** rapier, shortsword, crossbow-hand\n  - **Spell traits:** Faerie Fire active at level 3\n- **Eladrin** (eladrin)\n  - **Ability bonuses:** INT +1\n  - **Weapon proficiencies:** longsword, shortsword, shortbow, longbow\n  - Fey Step: short-rest bonus-action teleport.\n- **High Elf** (high-elf)\n  - **Ability bonuses:** INT +1\n  - **Weapon proficiencies:** longsword, shortsword, shortbow, longbow\n  - **Spell traits:** High Elf Fire Bolt cantrip\n- **Shadar-kai** (shadar-kai)\n  - **Ability bonuses:** CON +1\n  - **Damage resistances:** necrotic\n  - Blessing of the Raven Queen: short-rest bonus-action teleport.\n- **Wood Elf** (wood-elf)\n  - **Ability bonuses:** WIS +1\n  - **Speed:** 35 ft\n  - **Weapon proficiencies:** longsword, shortsword, shortbow, longbow\n  - Fleet of Foot: 35 ft speed.\n  - Mask of the Wild stored for future stealth rules.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "race-dragonborn",
+                "title": "Dragonborn",
+                "folder": "Races",
+                "tags": [
+                        "race",
+                        "dragonborn",
+                        "chromatic",
+                        "gem",
+                        "metallic"
+                ],
+                "content": "# Dragonborn\n\n## Base Traits\n\n- **Ability bonuses:** STR +2, CHA +1\n- **Speed:** 30 ft\n- Draconic Resistance from ancestry.\n- Breath Weapon: 15 ft ancestral cone.\n\n## Subraces\n\n- **Chromatic** (chromatic)\n  - **Dragon category:** chromatic\n- **Gem** (gem)\n  - **Dragon category:** gem\n  - Gem Flight active at level 5 as spectral wings.\n- **Metallic** (metallic)\n  - **Dragon category:** metallic",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "race-gnome",
+                "title": "Gnome",
+                "folder": "Races",
+                "tags": [
+                        "race",
+                        "gnome",
+                        "deep-gnome",
+                        "forest-gnome",
+                        "rock-gnome"
+                ],
+                "content": "# Gnome\n\n## Base Traits\n\n- **Ability bonuses:** INT +2\n- **Speed:** 25 ft\n- **Size:** small\n- **Senses:** Darkvision 60 ft\n- Gnome Cunning stored for future magic-save context.\n\n## Subraces\n\n- **Deep Gnome** (deep-gnome)\n  - **Ability bonuses:** DEX +1\n  - **Senses:** Darkvision 120 ft\n  - Stone Camouflage stored for future stealth rules.\n- **Forest Gnome** (forest-gnome)\n  - **Ability bonuses:** DEX +1\n  - **Spell traits:** Minor Illusion cantrip\n  - Speak with Small Beasts: +2 to Animal Handling checks.\n- **Rock Gnome** (rock-gnome)\n  - **Ability bonuses:** CON +1\n  - **Tool proficiencies:** tinkers-tools",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "race-half-elf",
+                "title": "Half-Elf",
+                "folder": "Races",
+                "tags": [
+                        "race",
+                        "half-elf",
+                        "drow-half-elf",
+                        "high-half-elf",
+                        "wood-half-elf"
+                ],
+                "content": "# Half-Elf\n\n## Base Traits\n\n- **Ability bonuses:** CHA +2\n- **Ability choices:** choose 2\n- **Speed:** 30 ft\n- **Senses:** Darkvision 60 ft\n- **Skill choices:** choose 2\n- Skill Versatility: choose two skill proficiencies.\n\n## Subraces\n\n- **Drow Descent** (drow-half-elf)\n  - **Spell traits:** Drow Faerie Fire active at level 3\n- **High Elf Descent** (high-half-elf)\n  - **Spell traits:** High Elf Fire Bolt cantrip\n- **Wood Elf Descent** (wood-half-elf)\n  - **Speed:** 35 ft\n  - Fleet of Foot: 35 ft speed.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "race-halfling",
+                "title": "Halfling",
+                "folder": "Races",
+                "tags": [
+                        "race",
+                        "halfling",
+                        "ghostwise",
+                        "lightfoot",
+                        "stout"
+                ],
+                "content": "# Halfling\n\n## Base Traits\n\n- **Ability bonuses:** DEX +2\n- **Speed:** 25 ft\n- **Size:** small\n- **Lucky:** reroll d20 natural 1s\n- Lucky: reroll d20 natural 1s.\n\n## Subraces\n\n- **Ghostwise** (ghostwise)\n  - **Ability bonuses:** WIS +1\n- **Lightfoot** (lightfoot)\n  - **Ability bonuses:** CHA +1\n  - Naturally Stealthy stored for future stealth rules.\n- **Stout** (stout)\n  - **Ability bonuses:** CON +1\n  - **Damage resistances:** poison\n  - Stout Resilience: poison damage resistance.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "race-half-orc",
+                "title": "Half-Orc",
+                "folder": "Races",
+                "tags": [
+                        "race",
+                        "half-orc",
+                        "standard-half-orc"
+                ],
+                "content": "# Half-Orc\n\n## Base Traits\n\n- **Ability bonuses:** STR +2, CON +1\n- **Speed:** 30 ft\n- **Senses:** Darkvision 60 ft\n- **Skill proficiencies:** intimidation\n- **Relentless Endurance:** drop to 1 HP once per long rest\n- **Savage Attacks:** extra weapon die on melee critical hits\n- Relentless Endurance: drop to 1 HP once per long rest.\n- Savage Attacks: extra weapon die on melee crits.\n\n## Subraces\n\n- **Standard Half-Orc** (standard-half-orc)\n  - No additional listed traits.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "race-aasimar",
+                "title": "Aasimar",
+                "folder": "Races",
+                "tags": [
+                        "race",
+                        "aasimar",
+                        "protector",
+                        "scourge",
+                        "fallen"
+                ],
+                "content": "# Aasimar\n\n## Base Traits\n\n- **Ability bonuses:** CHA +2\n- **Speed:** 30 ft\n- **Senses:** Darkvision 60 ft\n- **Damage resistances:** necrotic, radiant\n- Celestial Resistance: necrotic and radiant damage resistance.\n- Healing Hands: heal a nearby hero once per long rest.\n\n## Subraces\n\n- **Protector** (protector)\n  - **Ability bonuses:** WIS +1\n  - Radiant Soul active at level 3 as a flying radiant combat transformation.\n- **Scourge** (scourge)\n  - **Ability bonuses:** CON +1\n  - Radiant Consumption active at level 3 as a dangerous radiant combat transformation.\n- **Fallen** (fallen)\n  - **Ability bonuses:** STR +1\n  - Necrotic Shroud active at level 3 as a frightening necrotic combat transformation.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "race-aarakocra",
+                "title": "Aarakocra",
+                "folder": "Races",
+                "tags": [
+                        "race",
+                        "aarakocra",
+                        "elemental-evil"
+                ],
+                "content": "# Aarakocra\n\n## Base Traits\n\n- **Ability bonuses:** DEX +2, WIS +1\n- **Speed:** 50 ft\n- **Movement trait:** flying\n- Flight: this character is flying for movement and floor-trigger rules.\n\n## Subraces\n\n- **Elemental Evil** (elemental-evil)\n  - No additional listed traits.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "race-goliath",
+                "title": "Goliath",
+                "folder": "Races",
+                "tags": [
+                        "race",
+                        "goliath",
+                        "elemental-evil"
+                ],
+                "content": "# Goliath\n\n## Base Traits\n\n- **Ability bonuses:** STR +2, CON +1\n- **Speed:** 30 ft\n- **Damage resistances:** cold\n- **Skill proficiencies:** athletics\n- **Powerful Build:** counts as one size larger for carrying, pushing, dragging, and lifting\n- Natural Athlete: Athletics proficiency.\n- Powerful Build: counts as one size larger for carrying and push/drag/lift weight.\n- Stone's Endurance: reaction damage reduction once per short rest.\n- Mountain Born: cold damage resistance.\n\n## Subraces\n\n- **Elemental Evil** (elemental-evil)\n  - No additional listed traits.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "race-yuan-ti",
+                "title": "Yuan-ti",
+                "folder": "Races",
+                "tags": [
+                        "race",
+                        "yuan-ti",
+                        "pureblood"
+                ],
+                "content": "# Yuan-ti\n\n## Base Traits\n\n- **Ability bonuses:** CHA +2, INT +1\n- **Speed:** 30 ft\n- **Damage immunities:** poison\n- **Spell traits:** Poison Spray cantrip, Suggestion active at level 3\n- Magic Resistance stored for future spell-save context.\n- Poison Immunity: immune to poison damage.\n- Poisoned condition immunity stored for future condition rules.\n- Animal Friendship: +2 to Animal Handling checks.\n\n## Subraces\n\n- **Pureblood** (pureblood)\n  - No additional listed traits.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "race-genasi",
+                "title": "Genasi",
+                "folder": "Races",
+                "tags": [
+                        "race",
+                        "genasi",
+                        "air",
+                        "earth",
+                        "fire",
+                        "water"
+                ],
+                "content": "# Genasi\n\n## Base Traits\n\n- **Ability bonuses:** CON +2\n- **Speed:** 30 ft\n- Elemental heritage.\n\n## Subraces\n\n- **Air** (air)\n  - **Ability bonuses:** DEX +1\n  - **Speed:** 30 ft\n  - **Spell traits:** Levitate active at level 3 as a flying defensive lift\n- **Earth** (earth)\n  - **Ability bonuses:** STR +1\n  - **Spell traits:** Blade Ward cantrip, Pass without Trace stored for future stealth rules\n- **Fire** (fire)\n  - **Ability bonuses:** INT +1\n  - **Senses:** Darkvision 60 ft\n  - **Damage resistances:** fire\n  - **Spell traits:** Produce Flame cantrip, Burning Hands active at level 3\n  - Fire Resistance: fire damage resistance.\n- **Water** (water)\n  - **Ability bonuses:** WIS +1\n  - **Damage resistances:** acid\n  - **Spell traits:** Acid Splash cantrip\n  - Acid Resistance: acid damage resistance.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "race-tiefling",
+                "title": "Tiefling",
+                "folder": "Races",
+                "tags": [
+                        "race",
+                        "tiefling",
+                        "baalzebul",
+                        "dispater",
+                        "fierna",
+                        "glasya",
+                        "levistus",
+                        "mammon",
+                        "mephistopheles",
+                        "zariel"
+                ],
+                "content": "# Tiefling\n\n## Base Traits\n\n- **Speed:** 30 ft\n- **Senses:** Darkvision 60 ft\n- **Damage resistances:** fire\n- Hellish Resistance: fire damage resistance.\n\n## Subraces\n\n- **Baalzebul** (baalzebul)\n  - **Ability bonuses:** CHA +2, INT +1\n  - **Spell traits:** Ray of Sickness active at level 3\n- **Dispater** (dispater)\n  - **Ability bonuses:** CHA +2, DEX +1\n- **Fierna** (fierna)\n  - **Ability bonuses:** CHA +2, WIS +1\n- **Glasya** (glasya)\n  - **Ability bonuses:** CHA +2, DEX +1\n  - **Spell traits:** Minor Illusion cantrip\n- **Levistus** (levistus)\n  - **Ability bonuses:** CHA +2, CON +1\n  - **Spell traits:** Ray of Frost cantrip, Armor of Agathys active at level 3\n- **Mammon** (mammon)\n  - **Ability bonuses:** CHA +2, INT +1\n- **Mephistopheles** (mephistopheles)\n  - **Ability bonuses:** CHA +2, INT +1\n  - **Spell traits:** Burning Hands active at level 3\n- **Zariel** (zariel)\n  - **Ability bonuses:** CHA +2, STR +1\n  - **Spell traits:** Branding Smite active at level 3",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "rules-classes-overview",
+                "title": "Playable Classes Overview",
+                "folder": "Classes",
+                "tags": [
+                        "rules",
+                        "classes",
+                        "subclasses"
+                ],
+                "content": "# Playable Classes Overview\n\nThese pages mirror the current playable class and subclass data in the game.\n\n- [[class-barbarian|Barbarian]]\n- [[class-bard|Bard]]\n- [[class-cleric|Cleric]]\n- [[class-druid|Druid]]\n- [[class-sidekick-expert|Expert Sidekick]]\n- [[class-fighter|Fighter]]\n- [[class-monk|Monk]]\n- [[class-paladin|Paladin]]\n- [[class-ranger|Ranger]]\n- [[class-rogue|Rogue]]\n- [[class-sorcerer|Sorcerer]]\n- [[class-sidekick-spellcaster|Spellcaster Sidekick]]\n- [[class-warlock|Warlock]]\n- [[class-sidekick-warrior|Warrior Sidekick]]\n- [[class-wizard|Wizard]]",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-barbarian",
+                "title": "Barbarian",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "barbarian"
+                ],
+                "content": "# Barbarian\n\nLevel 1 Barbarian\n\n## Class Basics\n\n- **Hit die:** d12\n- **Caster type:** none\n- **Armor proficiencies:** light, medium, shield\n- **Weapon proficiencies:** simple, martial\n\n## Class Features\n\n- **Level 1: Rage** - Enter a battle fury for 10 rounds: resist weapon damage and add scaling melee damage.\n- **Level 1: Unarmored Defense** - While not wearing armor, your toughness and reflexes help protect you.\n- **Level 2: Reckless Attack** - Attack with advantage on your turn, but enemies attack you with advantage until your next turn.\n- **Level 3: Primal Path** - Choose the source and style of your barbarian rage.\n- **Level 5: Extra Attack** - Attack more than once when you take the Attack action.\n- **Level 5: Fast Movement** - Your speed increases by 10 ft while you are not wearing heavy armor.\n- **Level 7: Feral Instinct** - Your instincts sharpen, helping you act early when combat begins.\n- **Level 9: Brutal Critical** - Your critical melee hits become more devastating.\n- **Level 11: Relentless Rage** - While raging, you can sometimes stay standing when damage would drop you.\n- **Level 18: Indomitable Might** - Your raw Strength sets a high floor for feats of muscle.\n- **Level 20: Primal Champion** - Your Strength and Constitution each increase by 4.\n\n## Active Abilities\n\n- **Level 1: Rage** (resource: bonusAction, refresh: longRest, uses: 2) - Enter a battle fury for 10 rounds: resist weapon damage and add +2 melee damage, improving to +3 at level 9 and +4 at level 16.\n- **Level 2: Reckless Attack** (resource: none, refresh: turn, uses: 1) - Gain advantage on your attack rolls this turn. Attack rolls against you have advantage until your next turn starts.\n\n## Subclasses\n\n- [[subclass-barbarian-berserker|Path of the Berserker]] - A direct fury path that turns Rage into extra attacks, fear pressure, and retaliation.\n- [[subclass-barbarian-totem-warrior|Path of the Totem Warrior]] - A spirit-touched rager who chooses animal totems for defense, mobility, or pack tactics.\n- [[subclass-barbarian-zealot|Path of the Zealot]] - A divine rager who burns enemies with holy fury, rallies allies, and refuses to fall.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-bard",
+                "title": "Bard",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "bard"
+                ],
+                "content": "# Bard\n\nLevel 1 Bard\n\n## Class Basics\n\n- **Hit die:** d8\n- **Caster type:** full\n- **Spellcasting ability:** CHA\n- **Armor proficiencies:** light\n- **Weapon proficiencies:** simple, crossbow-hand, longsword, rapier, shortsword\n- **Cantrips:** vicious-mockery, mage-hand, blade-ward, dancing-lights, light, thunderclap, true-strike\n- **Spell list:** 57 spells: healing_word, dissonant_whispers, faerie_fire, heroism, hideous_laughter, earth-tremor, blindness-deafness, calm-emotions, cloud-of-daggers, crown-of-madness, enhance-ability, lesser-restoration, phantasmal-force, see-invisibility, warding-wind, bestow-curse, enemies-abound, fear, plant-growth, stinking-cloud, charm-monster, compulsion, confusion, dimension-door, freedom-of-movement, greater-invisibility, animate-objects, dominate-person, hold-monster, mass-cure-wounds, greater-restoration, raise-dead, skill-empowerment, synaptic-static, eyebite, irresistible-dance, true-seeing, arcane-sword, etherealness, forcecage, regenerate, resurrection, symbol, dominate-monster, feeblemind, mind-blank, power-word-stun, foresight, power-word-heal, power-word-kill, psychic-scream, heat_metal, hold_person, shatter, hypnotic_pattern, dispel_magic, mass_healing_word\n\n## Class Features\n\n- **Level 1: Bardic Inspiration** - Use music or words to give an ally a scaling die for a missed attack or failed save.\n- **Level 2: Jack of All Trades** - Add half your proficiency bonus to skill checks where you are not proficient.\n- **Level 3: Expertise** - Choose two skill proficiencies to double your proficiency bonus.\n- **Level 3: Subclass** - Choose the path that shapes how this class fights, supports allies, or uses magic in the dungeon.\n- **Level 5: Font of Inspiration** - Your Bardic Inspiration refreshes on a short or long rest.\n- **Level 10: Expertise** - Choose two more skill proficiencies to master.\n\n## Active Abilities\n\n- **Level 1: Bardic Inspiration** (resource: bonusAction, refresh: longRest, uses: 3) - Give a hero an inspiration die they can add to a missed attack or failed save. The die grows at bard levels 5, 10, and 15.\n\n## Subclasses\n\n- [[subclass-bard-college-of-lore|College of Lore]] - A sharp support bard who turns inspiration into enemy penalties, spell flexibility, and party control.\n- [[subclass-bard-college-of-valor|College of Valor]] - A battle-chanter who turns inspiration into courage, armor, and weapon momentum.\n- [[subclass-bard-college-of-swords|College of Swords]] - A flashy duelist bard who spends inspiration on flourishes that move, defend, and cut harder.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-cleric",
+                "title": "Cleric",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "cleric"
+                ],
+                "content": "# Cleric\n\nLevel 1 Cleric\n\n## Class Basics\n\n- **Hit die:** d8\n- **Caster type:** full\n- **Spellcasting ability:** WIS\n- **Armor proficiencies:** light, medium, shield\n- **Weapon proficiencies:** simple\n- **Cantrips:** guidance, light, sacred-flame, spare-the-dying, resistance, toll-the-dead\n- **Spell list:** 56 spells: cure_wounds, healing_word, guiding_bolt, bless, bane, command, shield_of_faith, sanctuary, blindness-deafness, calm-emotions, enhance-ability, prayer-of-healing, gentle-repose, lesser-restoration, protection-from-poison, warding-bond, beacon-of-hope, daylight, revivify, animate-dead, bestow-curse, remove-curse, protection-from-energy, banishment, death-ward, guardian-of-faith, contagion, dawn, dispel-evil-and-good, flame-strike, insect-plague, mass-cure-wounds, greater-restoration, raise-dead, blade-barrier, forbiddance, harm, heal, heroes-feast, true-seeing, divine-word, etherealness, fire-storm, regenerate, resurrection, symbol, antimagic-field, earthquake, holy-aura, mass-heal, true-resurrection, spiritual_weapon, hold_person, spirit_guardians, dispel_magic, mass_healing_word\n\n## Class Features\n\n- **Level 1: Spellcasting** - You can shape class magic into prepared or known spells.\n- **Level 2: Channel Divinity** - Call on divine power for sacred effects; uses increase at cleric levels 6 and 18 and refresh on a short rest.\n- **Level 3: Subclass** - Choose the path that shapes how this class fights, supports allies, or uses magic in the dungeon.\n- **Level 8: Blessed Strike** - Once on each of your turns, a weapon hit or damaging cantrip deals an extra 1d8 radiant damage.\n\n## Active Abilities\n\n- **Level 2: Channel Divinity** (resource: action, refresh: shortRest, uses: 1) - Radiant divine burst against nearby enemies. Uses increase at cleric levels 6 and 18.\n\n## Subclasses\n\n- [[subclass-cleric-life-domain|Life Domain]] - A devoted healer whose divine magic keeps allies upright through hard fights.\n- [[subclass-cleric-tempest-domain|Tempest Domain]] - A storm priest who answers danger with thunder, lightning, and punishing reactions.\n- [[subclass-cleric-war-domain|War Domain]] - A militant cleric who turns faith into weapon pressure, accuracy, and battle commands.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-druid",
+                "title": "Druid",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "druid"
+                ],
+                "content": "# Druid\n\nLevel 1 Druid\n\n## Class Basics\n\n- **Hit die:** d8\n- **Caster type:** full\n- **Spellcasting ability:** WIS\n- **Armor proficiencies:** light, medium, shield\n- **Weapon proficiencies:** club, dagger, dart, javelin, mace, quarterstaff, scimitar, sickle, sling, spear\n- **Cantrips:** guidance, produce-flame, thorn-whip, thunderclap, frostbite, poison-spray, primal-savagery, resistance, shillelagh, druidcraft\n- **Spell list:** 72 spells: cure_wounds, healing_word, entangle, faerie_fire, thunderwave, earth-tremor, ice-knife, dust-devil, earthbind, enhance-ability, flame-blade, flaming-sphere, gust-of-wind, lesser-restoration, protection-from-poison, warding-wind, conjure-animals, daylight, erupting-earth, flame-arrows, plant-growth, protection-from-energy, sleet-storm, tidal-wave, wall-of-water, wind-wall, blight, charm-monster, confusion, conjure-minor-elementals, conjure-woodland-beings, dominate-beast, elemental-bane, freedom-of-movement, grasping-vine, guardian-of-nature, ice-storm, stoneskin, wall-of-fire, watery-sphere, antilife-shell, conjure-elemental, contagion, insect-plague, maelstrom, mass-cure-wounds, greater-restoration, transmute-rock, wrath-of-nature, heal, heroes-feast, primordial-ward, sunbeam, wall-of-thorns, etherealness, fire-storm, regenerate, reverse-gravity, whirlwind, earthquake, feeblemind, sunburst, tsunami, foresight, storm-of-vengeance, true-resurrection, barkskin, heat_metal, moonbeam, spike_growth, call_lightning, dispel_magic\n\n## Class Features\n\n- **Level 1: Spellcasting** - You can shape class magic into prepared or known spells.\n- **Level 2: Wild Shape** - Transform into beasts for exploration and combat utility.\n- **Level 3: Subclass** - Choose the path that shapes how this class fights, supports allies, or uses magic in the dungeon.\n- **Level 18: Beast Spells** - Cast many spells even while transformed by Wild Shape.\n\n## Active Abilities\n\n- **Level 2: Wild Shape** (resource: bonusAction, refresh: shortRest, uses: 2) - Transform into an unlocked beast form. Beast HP absorbs damage first; overflow carries over when you revert.\n\n## Subclasses\n\n- [[subclass-druid-circle-moon|Circle of the Moon]] - A combat shapeshifter whose Wild Shape becomes a front-line battle form.\n- [[subclass-druid-circle-land|Circle of the Land]] - A terrain-bound caster who recovers magic and turns ground control into advantage.\n- [[subclass-druid-circle-shepherd|Circle of the Shepherd]] - A spirit caller who supports allies and summons temporary spirits.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-sidekick-expert",
+                "title": "Expert Sidekick",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "sidekick-expert"
+                ],
+                "content": "# Expert Sidekick\n\nLevel 1 Expert Sidekick\n\n## Class Basics\n\n- **Hit die:** d8\n- **Caster type:** none\n- **Armor proficiencies:** light\n- **Saving throws:** dex\n\n## Class Features\n\n- **Level 1: Bonus Proficiencies** - The sidekick gains save, skill, armor, and sometimes tool and weapon training.\n- **Level 1: Helpful** - The sidekick can take the Help action as a bonus action.\n- **Level 2: Cunning Action** - Dash, Disengage, or Hide as a bonus action.\n- **Level 3: Expertise** - Double proficiency for two chosen skills.\n- **Level 6: Coordinated Strike** - Helpful can aid attacks up to 30 feet away and primes extra damage.\n- **Level 7: Evasion** - Avoid or reduce damage on Dexterity saves.\n- **Level 11: Inspiring Help** - Help grants an extra 1d6 bonus.\n- **Level 14: Reliable Talent** - Proficient ability checks treat d20 rolls below 10 as 10.\n- **Level 15: Expertise** - Choose two more skill proficiencies for Expertise.\n- **Level 18: Sharp Mind** - Gain another mental saving throw proficiency.\n- **Level 20: Inspiring Help (2d6)** - Help grants a 2d6 bonus.\n\n## Active Abilities\n\n- **Level 1: Helpful** (resource: bonusAction, refresh: turn, uses: 1) - Use Help as a bonus action. At higher levels it can inspire and coordinate attacks.\n- **Level 2: Cunning Action: Dash** (resource: bonusAction, refresh: turn, uses: 1) - Dash as a bonus action.\n- **Level 2: Cunning Action: Disengage** (resource: bonusAction, refresh: turn, uses: 1) - Disengage as a bonus action.\n- **Level 2: Cunning Action: Hide** (resource: bonusAction, refresh: turn, uses: 1) - Hide as a bonus action. This grants advantage to the next attack this turn.\n\n## Subclasses\n\nNo subclasses listed.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-fighter",
+                "title": "Fighter",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "fighter"
+                ],
+                "content": "# Fighter\n\nLevel 1 Fighter\n\n## Class Basics\n\n- **Hit die:** d10\n- **Caster type:** none\n- **Armor proficiencies:** light, medium, heavy, shield\n- **Weapon proficiencies:** simple, martial\n\n## Class Features\n\n- **Level 1: Second Wind** - Draw on your reserves to restore your own hit points.\n- **Level 2: Action Surge** - Push beyond normal limits to take an additional action.\n- **Level 3: Martial Archetype** - Choose a fighter subclass and gain its first archetype features.\n- **Level 5: Extra Attack** - Attack more than once when you take the Attack action.\n- **Level 9: Indomitable** - Reroll a failed saving throw through sheer resolve.\n\n## Active Abilities\n\n- **Level 1: Second Wind** (resource: bonusAction, refresh: shortRest, uses: 1) - Catch your breath in the middle of battle and recover 1d10 + fighter level hit points.\n- **Level 2: Action Surge** (resource: none, refresh: shortRest, uses: 1) - Push past normal limits and regain your action for another attack, spell, dash, or tactical move.\n\n## Subclasses\n\n- [[subclass-fighter-champion|Champion]] - A simple, reliable weapon specialist with stronger critical hits, athletic grit, and late-game survival.\n- [[subclass-fighter-battle-master|Battle Master]] - A tactical fighter who spends superiority dice on maneuvers that control enemies, protect allies, or make key attacks count.\n- [[subclass-fighter-eldritch-knight|Eldritch Knight]] - A weapon fighter who adds wizard magic for defense, ranged pressure, and strike-then-cast tactics.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-monk",
+                "title": "Monk",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "monk"
+                ],
+                "content": "# Monk\n\nLevel 1 Monk\n\n## Class Basics\n\n- **Hit die:** d8\n- **Caster type:** none\n- **Weapon proficiencies:** simple, shortsword\n\n## Class Features\n\n- **Level 1: Martial Arts** - Your unarmed strikes use a Martial Arts die that grows from d4 to d10 as you level.\n- **Level 2: Ki** - Spend ki equal to your monk level on special martial techniques, refreshing on a short or long rest.\n- **Level 2: Unarmored Movement** - Move faster while unarmored and unshielded; the speed bonus grows as you level.\n- **Level 3: Subclass** - Choose the path that shapes how this class fights, supports allies, or uses magic in the dungeon.\n- **Level 5: Extra Attack** - Attack more than once when you take the Attack action.\n- **Level 5: Stunning Strike** - Spend 1 ki before an attack. Your next hit can briefly stun the target, locking its next action.\n- **Level 20: Perfect Self** - When combat begins and you have no ki left, recover 4 ki.\n\n## Active Abilities\n\n- **Level 2: Flurry of Blows** (resource: bonusAction, refresh: shortRest, uses: 2) - Spend 1 ki to make a quick unarmed strike.\n- **Level 2: Patient Defense** (resource: bonusAction, refresh: shortRest, uses: 2) - Spend 1 ki to Dodge as a quick action.\n- **Level 5: Stunning Strike** (resource: bonusAction, refresh: shortRest, uses: 5) - Spend 1 ki to charge your next hit. If it lands, the enemy is stunned until the end of its next turn.\n\n## Subclasses\n\n- [[subclass-monk-way-open-hand|Way of the Open Hand]] - A clean martial artist who turns flurries into control and self-healing.\n- [[subclass-monk-way-shadow|Way of Shadow]] - A stealthy monk who uses darkness, silence, and sudden movement as combat tools.\n- [[subclass-monk-way-drunken-master|Way of the Drunken Master]] - A slippery skirmisher who turns erratic movement into defense and counterpressure.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-paladin",
+                "title": "Paladin",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "paladin"
+                ],
+                "content": "# Paladin\n\nLevel 1 Paladin\n\n## Class Basics\n\n- **Hit die:** d10\n- **Caster type:** half\n- **Spellcasting ability:** CHA\n- **Armor proficiencies:** light, medium, heavy, shield\n- **Weapon proficiencies:** simple, martial\n- **Spell list:** 35 spells: bless, cure_wounds, divine_favor, shield_of_faith, compelled_duel, command, heroism, thunderous_smite, wrathful_smite, searing-smite, aid, branding_smite, find-steed, lesser-restoration, magic-weapon, protection-from-poison, remove-curse, daylight, aura-of-vitality, blinding-smite, crusaders-mantle, elemental-weapon, revivify, aura-of-life, aura-of-purity, banishment, death-ward, find-greater-steed, staggering-smite, banishing-smite, circle-of-power, destructive-wave, dispel-evil-and-good, raise-dead, dispel_magic\n\n## Class Features\n\n- **Level 1: Lay on Hands** - Use a healing pool equal to 5 x paladin level to restore yourself or adjacent allies, or spend 5 points to cure one disease.\n- **Level 2: Divine Smite** - Spend spell points before a weapon hit to add radiant damage; more points add more d8s.\n- **Level 3: Divine Health** - Divine magic makes you immune to disease.\n- **Level 3: Subclass** - Choose the path that shapes how this class fights, supports allies, or uses magic in the dungeon.\n- **Level 5: Extra Attack** - Attack more than once when you take the Attack action.\n- **Level 6: Aura of Protection** - Nearby allies add your Charisma modifier to saving throws.\n\n## Active Abilities\n\n- **Level 1: Lay on Hands** (resource: action, refresh: longRest, uses: 5) - Spend pool points to heal yourself or an adjacent ally, or spend 5 points to cure one disease.\n- **Level 2: Divine Smite** (resource: bonusAction, refresh: turn, uses: 1) - Spend spell points to charge your next weapon hit with radiant damage.\n\n## Subclasses\n\n- [[subclass-paladin-oath-devotion|Oath of Devotion]] - A classic holy knight who protects allies, smites evil, and shines with sacred weapon power.\n- [[subclass-paladin-oath-vengeance|Oath of Vengeance]] - A relentless avenger who marks one enemy and tears it down.\n- [[subclass-paladin-oath-ancients|Oath of the Ancients]] - A green knight who binds enemies, resists magic, and shields allies with old light.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-ranger",
+                "title": "Ranger",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "ranger"
+                ],
+                "content": "# Ranger\n\nLevel 1 Ranger\n\n## Class Basics\n\n- **Hit die:** d10\n- **Caster type:** half\n- **Spellcasting ability:** WIS\n- **Armor proficiencies:** light, medium, shield\n- **Weapon proficiencies:** simple, martial\n- **Spell list:** 29 spells: hunters_mark, cure_wounds, ensnaring_strike, hail_of_thorns, fog_cloud, longstrider, zephyr-strike, barkskin, lesser-restoration, spike_growth, silence, cordon_of_arrows, protection-from-poison, conjure-animals, conjure-barrage, daylight, flame-arrows, lightning-arrow, plant-growth, protection-from-energy, wind-wall, conjure-woodland-beings, freedom-of-movement, grasping-vine, guardian-of-nature, stoneskin, conjure-volley, swift-quiver, wrath-of-nature\n\n## Class Features\n\n- **Level 1: Favored Foe** - Mark a chosen enemy and punish it with extra damage.\n- **Level 2: Fighting Style** - Adopt a martial specialty that improves how you fight.\n- **Level 3: Ranger Archetype** - Choose a ranger subclass. Beast Masters gain a loyal companion trained to aid them in battle.\n- **Level 5: Extra Attack** - Attack more than once when you take the Attack action.\n\n## Active Abilities\n\n- **Level 1: Favored Foe** (resource: passive, refresh: longRest) - When you hit, you can mark the target with concentration. Once on each of your turns, your first damaging hit against that target deals extra nature damage.\n\n## Subclasses\n\n- [[subclass-ranger-hunter|Hunter]] - A focused monster-killer who chooses simple, reliable combat pressure.\n- [[subclass-ranger-beast-master|Beast Master]] - A ranger who fights beside a loyal companion that grows with them.\n- [[subclass-ranger-gloom-stalker|Gloom Stalker]] - An ambush ranger who strikes hard at the start of battle and fights from shadow.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-rogue",
+                "title": "Rogue",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "rogue"
+                ],
+                "content": "# Rogue\n\nLevel 1 Rogue\n\n## Class Basics\n\n- **Hit die:** d8\n- **Caster type:** none\n- **Armor proficiencies:** light\n- **Weapon proficiencies:** simple, crossbow-hand, longsword, rapier, shortsword\n\n## Class Features\n\n- **Level 1: Expertise** - Choose two trained proficiencies to double your proficiency bonus.\n- **Level 1: Sneak Attack** - Once per turn, add scaling d6 damage when you attack with advantage or an ally pins the target.\n- **Level 2: Cunning Action** - Use quick bonus actions to Dash, Disengage, or Hide.\n- **Level 3: Subclass** - Choose the path that shapes how this class fights, supports allies, or uses magic in the dungeon.\n- **Level 5: Uncanny Dodge** - Use your reaction to halve damage from an attack you can see.\n- **Level 6: Expertise** - Choose two more trained proficiencies to master.\n- **Level 7: Evasion** - Slip through dangerous effects, taking less or no damage on Dexterity saves.\n- **Level 11: Reliable Talent** - Treat poor proficient skill rolls as competent results.\n\n## Active Abilities\n\n- **Level 1: Steady Aim** (resource: bonusAction, refresh: turn, uses: 1) - Spend your bonus action and movement for advantage on your next attack, enabling Sneak Attack.\n- **Level 2: Cunning Action: Dash** (resource: bonusAction, refresh: turn, uses: 1) - Dash as a quick action.\n- **Level 2: Cunning Action: Disengage** (resource: bonusAction, refresh: turn, uses: 1) - Move carefully as a quick action so leaving melee does not provoke nearby enemies this turn.\n- **Level 2: Cunning Action: Hide** (resource: bonusAction, refresh: turn, uses: 1) - Slip out of sight as a quick action. Your next attack this turn has advantage.\n- **Level 5: Uncanny Dodge** (resource: reaction, refresh: turn, uses: 1) - Reaction: halve the damage from one attack that hits you.\n\n## Subclasses\n\n- [[subclass-rogue-thief|Thief]] - A fast dungeon opportunist who turns movement, items, and dirty tricks into combat advantage.\n- [[subclass-rogue-assassin|Assassin]] - A burst rogue who opens fights with deadly accuracy and punishing first strikes.\n- [[subclass-rogue-arcane-trickster|Arcane Trickster]] - A magical rogue who uses enchantment, control, and misdirection to create Sneak Attack openings.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-sorcerer",
+                "title": "Sorcerer",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "sorcerer"
+                ],
+                "content": "# Sorcerer\n\nLevel 1 Sorcerer\n\n## Class Basics\n\n- **Hit die:** d6\n- **Caster type:** full\n- **Spellcasting ability:** CHA\n- **Weapon proficiencies:** dagger, dart, sling, quarterstaff, crossbow-light\n- **Cantrips:** mage-hand, blade-ward, dancing-lights, fire-bolt, light, mind-sliver, thunderclap, chill-touch, acid-splash, booming-blade, frostbite, green-flame-blade, poison-spray, ray-of-frost, shocking-grasp, true-strike\n- **Spell list:** 101 spells: magic_missile, shield, mage_armor, burning_hands, thunderwave, catapult, chaos-bolt, color-spray, earth-tremor, expeditious-retreat, false-life, aganazzars-scorcher, alter-self, blindness-deafness, blur, earthbind, enhance-ability, enlarge-reduce, gust-of-wind, maximilians-earthen-grasp, see-invisibility, shadow-blade, snillocs-snowball-swarm, warding-wind, blink, daylight, enemies-abound, erupting-earth, fear, flame-arrows, gaseous-form, melfs-minute-meteors, protection-from-energy, sleet-storm, slow, stinking-cloud, thunder-step, tidal-wave, wall-of-water, banishment, blight, charm-monster, confusion, dimension-door, dominate-beast, greater-invisibility, ice-storm, sickening-radiance, stoneskin, storm-sphere, vitriolic-sphere, wall-of-fire, watery-sphere, animate-objects, cloudkill, cone-of-cold, dominate-person, enervation, far-step, hold-monster, immolation, insect-plague, skill-empowerment, synaptic-static, telekinesis, chain-lightning, circle-of-death, disintegrate, eyebite, freezing-sphere, globe-of-invulnerability, investiture-of-flame, investiture-of-ice, investiture-of-stone, investiture-of-wind, sunbeam, true-seeing, crown-of-stars, delayed-blast-fireball, etherealness, finger-of-death, fire-storm, prismatic-spray, reverse-gravity, whirlwind, horrid-wilting, dominate-monster, earthquake, incendiary-cloud, power-word-stun, sunburst, meteor-swarm, power-word-kill, psychic-scream, scorching_ray, mirror_image, misty_step, fireball, lightning_bolt, fly, dispel_magic\n\n## Class Features\n\n- **Level 1: Spellcasting** - You can shape class magic into prepared or known spells.\n- **Level 2: Font of Magic** - Convert magical power into flexible sorcery points.\n- **Level 3: Metamagic** - Choose two ways to twist spells with sorcery points.\n- **Level 3: Subclass** - Choose the path that shapes how this class fights, supports allies, or uses magic in the dungeon.\n- **Level 10: Metamagic Option** - Choose one additional Metamagic option.\n- **Level 17: Metamagic Option** - Choose one additional Metamagic option.\n\n## Active Abilities\n\n- **Level 3: Distant Spell** (resource: spellModifier, refresh: longRest, uses: 1) - Double a spell's range before choosing its target.\n- **Level 3: Empowered Spell** (resource: spellModifier, refresh: longRest, uses: 1) - Add your Charisma modifier to one spell's damage.\n- **Level 3: Extended Spell** (resource: spellModifier, refresh: longRest, uses: 1) - Double the duration of a spell that creates a timed effect.\n- **Level 3: Heightened Spell** (resource: spellModifier, refresh: longRest, uses: 3) - Make a saving-throw spell harder to resist.\n- **Level 3: Quickened Spell** (resource: spellModifier, refresh: longRest, uses: 2) - Cast an action spell with your bonus action.\n- **Level 3: Twinned Spell** (resource: spellModifier, refresh: longRest, uses: 1) - Affect a second target with an eligible single-target spell.\n\n## Subclasses\n\n- [[subclass-sorcerer-draconic-bloodline|Draconic Bloodline]] - A durable elemental sorcerer whose bloodline adds armor, damage, and fearsome presence.\n- [[subclass-sorcerer-wild-magic-sorcery|Wild Magic]] - A chaotic sorcerer whose magic surges into unstable buffs and bursts.\n- [[subclass-sorcerer-divine-soul|Divine Soul]] - A sacred sorcerer who mixes arcane flexibility with healing and radiant protection.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-sidekick-spellcaster",
+                "title": "Spellcaster Sidekick",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "sidekick-spellcaster"
+                ],
+                "content": "# Spellcaster Sidekick\n\nLevel 1 Spellcaster Sidekick\n\n## Class Basics\n\n- **Hit die:** d6\n- **Caster type:** sidekick\n- **Armor proficiencies:** light\n- **Saving throws:** wis\n\n## Class Features\n\n- **Level 1: Bonus Proficiencies** - The sidekick gains save, skill, armor, and sometimes weapon training.\n- **Level 1: Spellcasting** - Choose Mage, Healer, or Prodigy to determine spell list and spellcasting ability.\n- **Level 6: Potent Cantrips** - Add spellcasting ability modifier to cantrip damage.\n- **Level 14: Empowered Spells** - Choose a school of magic to empower slot spell damage or healing.\n- **Level 20: Focused Casting** - Damage cannot break concentration.\n\n## Active Abilities\n\nNo listed active abilities.\n\n## Subclasses\n\nNo subclasses listed.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-warlock",
+                "title": "Warlock",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "warlock"
+                ],
+                "content": "# Warlock\n\nLevel 1 Warlock\n\n## Class Basics\n\n- **Hit die:** d8\n- **Caster type:** pact\n- **Spellcasting ability:** CHA\n- **Armor proficiencies:** light\n- **Weapon proficiencies:** simple\n- **Cantrips:** mage-hand, blade-ward, mind-sliver, eldritch-blast, thunderclap, chill-touch, booming-blade, frostbite, green-flame-blade, poison-spray, toll-the-dead, true-strike\n- **Spell list:** 51 spells: armor_of_agathys, arms_of_hadar, hex, hellish_rebuke, cause_fear, expeditious-retreat, cloud-of-daggers, crown-of-madness, earthbind, ray-of-enfeeblement, shadow-blade, enemies-abound, fear, gaseous-form, thunder-step, banishment, blight, charm-monster, elemental-bane, shadow-of-moil, sickening-radiance, cloudkill, enervation, hold-monster, negative-energy-flood, synaptic-static, circle-of-death, eyebite, flesh-to-stone, true-seeing, crown-of-stars, etherealness, finger-of-death, forcecage, power-word-pain, horrid-wilting, dominate-monster, feeblemind, maddening-darkness, power-word-stun, foresight, power-word-kill, psychic-scream, darkness, hold_person, misty_step, hunger_of_hadar, vampiric_touch, remove-curse, fly, dispel_magic\n\n## Class Features\n\n- **Level 1: Eldritch Blast** - Hurl a signature beam of force at your enemies.\n- **Level 1: Pact Magic** - Cast warlock spells through pact-granted power that refreshes quickly.\n- **Level 2: Eldritch Invocations** - Choose occult gifts that reshape your warlock talents.\n- **Level 3: Pact Boon** - Choose Pact of the Blade, Chain, Tome, Talisman, Star, or Shadow.\n- **Level 3: Subclass** - Choose the path that shapes how this class fights, supports allies, or uses magic in the dungeon.\n- **Level 5: Eldritch Invocation** - Choose one additional invocation.\n- **Level 7: Eldritch Invocation** - Choose one additional invocation.\n- **Level 9: Eldritch Invocation** - Choose one additional invocation.\n- **Level 11: Mystic Arcanum** - Once per long rest, invoke patron magic as a high-power force burst that can briefly banish a foe.\n- **Level 12: Eldritch Invocation** - Choose one additional invocation.\n- **Level 15: Eldritch Invocation** - Choose one additional invocation.\n- **Level 18: Eldritch Invocation** - Choose one additional invocation.\n- **Level 20: Eldritch Master** - Restore pact magic through a brief appeal to your patron.\n\n## Active Abilities\n\n- **Level 2: Agonizing Blast** (resource: passive, refresh: longRest) - Add Charisma to each Eldritch Blast beam's damage.\n- **Level 2: Armor of Shadows** (resource: action, refresh: turn, uses: 99) - At will, wrap yourself in Mage Armor for +3 AC.\n- **Level 2: Devil's Sight** (resource: passive, refresh: longRest) - Your magic ignores magical darkness and deep shadow penalties.\n- **Level 2: Eldritch Mind** (resource: passive, refresh: longRest) - Add +5 to concentration saves.\n- **Level 2: Eldritch Spear** (resource: passive, refresh: longRest) - Eldritch Blast reaches across extreme distance.\n- **Level 2: Fiendish Vigor** (resource: bonusAction, refresh: turn, uses: 99) - At will, gain a small shield of temporary hit points.\n- **Level 2: Repelling Blast** (resource: passive, refresh: longRest) - Eldritch Blast pushes a hit enemy 10 ft away when space allows.\n- **Level 3: Book of Shadows** (resource: bonusAction, refresh: shortRest, uses: 1) - Open the book and recover a little pact magic.\n- **Level 3: Grasp of Hadar** (resource: passive, refresh: longRest) - Eldritch Blast can pull a hit enemy closer when space allows.\n- **Level 3: Hexing Blast** (resource: passive, refresh: longRest) - Eldritch Blast hits bite harder against Hexed targets.\n- **Level 3: Pact Blade Surge** (resource: bonusAction, refresh: turn, uses: 1) - Charge your pact weapon. Your next melee hit deals extra force damage.\n- **Level 3: Pact Familiar** (resource: action, refresh: shortRest, uses: 1) - Summon a player-controlled pact familiar. Pact of the Chain can choose occult familiar forms.\n- **Level 3: Shadow Veil** (resource: bonusAction, refresh: shortRest, uses: 1) - Slip into patron-shadow, gaining movement, defense, and advantage.\n- **Level 3: Star Omen** (resource: action, refresh: shortRest, uses: 1) - Mark a visible enemy with starlight, dealing radiant damage and leaving it shaken.\n- **Level 3: Talisman Ward** (resource: bonusAction, refresh: shortRest, uses: 2) - Bless yourself or an ally with AC and save protection.\n- **Level 5: Eldritch Aegis** (resource: passive, refresh: longRest) - Custom invocation: after spending pact magic, gain +2 AC for a round.\n- **Level 5: Mire the Mind** (resource: action, refresh: turn, uses: 99) - At will, mire a visible enemy, slowing and weakening its next attack.\n- **Level 5: One with Shadows** (resource: bonusAction, refresh: turn, uses: 99) - At will, blur into shadow for defense and advantage on your next strike.\n- **Level 5: Patron's Step** (resource: passive, refresh: longRest) - Custom invocation: after spending pact magic, gain 15 ft of movement.\n- **Level 5: Thirsting Blade** (resource: passive, refresh: longRest) - Attack twice when you take the Attack action with a pact weapon.\n- **Level 7: Soul Leech** (resource: passive, refresh: longRest) - When your Eldritch Blast drops an enemy, gain temporary HP.\n- **Level 7: Void Lance** (resource: passive, refresh: longRest) - Custom invocation: Eldritch Blast slows enemies it hits.\n- **Level 7: Witch Sight** (resource: passive, refresh: longRest) - Gain advantage against frightened, hexed, or darkness-wrapped enemies.\n- **Level 9: Ascendant Step** (resource: bonusAction, refresh: turn, uses: 99) - At will, float through battle with extra movement and defense.\n- **Level 9: Dreadful Word** (resource: action, refresh: turn, uses: 99) - At will, speak a patron's word to frighten nearby visible enemies.\n- **Level 11: Mystic Arcanum** (resource: action, refresh: longRest, uses: 1) - Call on a once-per-rest arcanum. A visible enemy takes 6d8 force damage and is briefly banished.\n- **Level 12: Lifedrinker** (resource: passive, refresh: longRest) - Your weapon hits drink life, adding necrotic damage and a little healing.\n- **Level 15: Eldritch Doom** (resource: passive, refresh: longRest) - Eldritch Blast critical hits also stun the target briefly.\n- **Level 15: Patron's Aegis** (resource: passive, refresh: longRest) - Custom invocation: after spending pact magic, gain broad damage resistance for a round.\n- **Level 20: Eldritch Master** (resource: action, refresh: longRest, uses: 1) - Restore pact spell points.\n\n## Subclasses\n\n- [[subclass-warlock-fiend-patron|The Fiend]] - A destructive patron path that feeds on kills, fire, and infernal resilience.\n- [[subclass-warlock-hexblade|The Hexblade]] - A cursed weapon warlock who marks prey and calls a specter ally.\n- [[subclass-warlock-great-old-one|The Great Old One]] - An alien mind patron that turns psychic pressure into fear, confusion, and brief domination.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-sidekick-warrior",
+                "title": "Warrior Sidekick",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "sidekick-warrior"
+                ],
+                "content": "# Warrior Sidekick\n\nLevel 1 Warrior Sidekick\n\n## Class Basics\n\n- **Hit die:** d10\n- **Caster type:** none\n- **Armor proficiencies:** light, medium, heavy\n- **Saving throws:** con\n\n## Class Features\n\n- **Level 1: Bonus Proficiencies** - The sidekick gains combat, save, and skill training.\n- **Level 1: Martial Role** - Attacker grants +2 to attack rolls; Defender protects nearby allies.\n- **Level 2: Second Wind** - Regain 1d10 + sidekick level hit points as a bonus action.\n- **Level 3: Improved Critical** - Attack rolls score a critical hit on a 19 or 20.\n- **Level 6: Extra Attack** - Attack twice when taking the Attack action.\n- **Level 7: Battle Readiness** - Advantage on initiative rolls.\n- **Level 10: Improved Defense** - Armor Class increases by 1.\n- **Level 11: Indomitable** - Reroll a failed saving throw once per long rest.\n- **Level 15: Extra Attack (2 extra)** - Attack three times when taking the Attack action.\n- **Level 18: Indomitable (2 uses)** - Use Indomitable twice per long rest.\n- **Level 20: Second Wind (2 uses)** - Use Second Wind twice between rests.\n\n## Active Abilities\n\n- **Level 2: Second Wind** (resource: bonusAction, refresh: shortRest, uses: 1) - Heal 1d10 + sidekick level HP.\n- **Level 11: Indomitable** (resource: reaction, refresh: longRest, uses: 1) - Automatically reroll a failed saving throw.\n\n## Subclasses\n\nNo subclasses listed.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "class-wizard",
+                "title": "Wizard",
+                "folder": "Classes",
+                "tags": [
+                        "class",
+                        "wizard"
+                ],
+                "content": "# Wizard\n\nLevel 1 Wizard\n\n## Class Basics\n\n- **Hit die:** d6\n- **Caster type:** full\n- **Spellcasting ability:** INT\n- **Weapon proficiencies:** dagger, dart, sling, quarterstaff, crossbow-light\n- **Cantrips:** mage-hand, blade-ward, dancing-lights, fire-bolt, light, mind-sliver, thunderclap, chill-touch, acid-splash, booming-blade, frostbite, green-flame-blade, ray-of-frost, shocking-grasp, toll-the-dead, true-strike\n- **Spell list:** 135 spells: magic_missile, shield, burning_hands, sleep, grease, catapult, color-spray, earth-tremor, expeditious-retreat, false-life, find-familiar, ice-knife, acid-arrow, aganazzars-scorcher, alter-self, blindness-deafness, blur, cloud-of-daggers, crown-of-madness, earthbind, enlarge-reduce, flaming-sphere, gentle-repose, gust-of-wind, magic-weapon, maximilians-earthen-grasp, ray-of-enfeeblement, see-invisibility, shadow-blade, snillocs-snowball-swarm, animate-dead, bestow-curse, remove-curse, blink, enemies-abound, erupting-earth, flame-arrows, gaseous-form, melfs-minute-meteors, plant-growth, protection-from-energy, sleet-storm, slow, stinking-cloud, thunder-step, wall-of-sand, wall-of-water, banishment, black-tentacles, blight, charm-monster, confusion, conjure-minor-elementals, dimension-door, elemental-bane, faithful-hound, fire-shield, greater-invisibility, ice-storm, phantasmal-killer, resilient-sphere, sickening-radiance, stoneskin, storm-sphere, vitriolic-sphere, wall-of-fire, watery-sphere, animate-objects, arcane-hand, cloudkill, conjure-elemental, cone-of-cold, dawn, dominate-person, enervation, far-step, hold-monster, immolation, negative-energy-flood, skill-empowerment, steel-wind-strike, synaptic-static, telekinesis, transmute-rock, chain-lightning, circle-of-death, disintegrate, eyebite, flesh-to-stone, freezing-sphere, globe-of-invulnerability, investiture-of-flame, investiture-of-ice, investiture-of-stone, investiture-of-wind, irresistible-dance, mental-prison, sunbeam, true-seeing, wall-of-ice, arcane-sword, crown-of-stars, delayed-blast-fireball, etherealness, finger-of-death, forcecage, power-word-pain, prismatic-spray, reverse-gravity, simulacrum, symbol, whirlwind, horrid-wilting, antimagic-field, dominate-monster, feeblemind, incendiary-cloud, maddening-darkness, maze, mind-blank, power-word-stun, sunburst, foresight, meteor-swarm, power-word-kill, prismatic-wall, psychic-scream, weird, scorching_ray, web, misty_step, fireball, haste, fly, dispel_magic\n\n## Class Features\n\n- **Level 1: Arcane Recovery** - Recover some spent magical energy after a short rest.\n- **Level 1: Spellcasting** - You can shape class magic into prepared or known spells.\n- **Level 3: Subclass** - Choose the path that shapes how this class fights, supports allies, or uses magic in the dungeon.\n- **Level 18: Spell Mastery** - Once per short rest, recover 4 spell points to represent free low-level spell mastery.\n- **Level 20: Signature Spells** - Once per long rest, recover 10 spell points for your favored high-level wizard magic.\n\n## Active Abilities\n\n- **Level 1: Arcane Recovery** (resource: none, refresh: longRest, uses: 1) - Recover spell points equal to half wizard level, rounded up.\n- **Level 18: Spell Mastery** (resource: none, refresh: shortRest, uses: 1) - Recover 4 spell points once per short rest for your mastered low-level magic.\n- **Level 20: Signature Spells** (resource: none, refresh: longRest, uses: 1) - Recover 10 spell points once per long rest for your signature wizard spells.\n\n## Subclasses\n\n- [[subclass-wizard-school-evocation|School of Evocation]] - A battle wizard who throws safer, stronger blasts.\n- [[subclass-wizard-school-necromancy|School of Necromancy]] - A death mage who drains life and fights beside a simple undead ally.\n- [[subclass-wizard-school-divination|School of Divination]] - A fate reader who stores luck, reveals danger, and bends key rolls.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-barbarian-berserker",
+                "title": "Barbarian: Path of the Berserker",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "barbarian",
+                        "berserker"
+                ],
+                "content": "# Path of the Berserker\n\n**Class:** [[class-barbarian|Barbarian]]\n\nA direct fury path that turns Rage into extra attacks, fear pressure, and retaliation.\n\n## Gameplay Guide\n\nChoose Berserker when you want a clear melee striker.,Rage first, then use Frenzy when another attack matters. Later you can frighten enemies, strike back when hurt, and squeeze out one last surge of fury.\n\n## Features\n\n- **Level 3: Frenzy** - While raging, make an extra weapon attack as a bonus action.\n- **Level 6: Mindless Rage** - While raging, resist fear and control pressure with stronger saving throws.\n- **Level 10: Intimidating Presence** - Use raw menace to frighten or shake a visible enemy.\n- **Level 14: Retaliation** - When a nearby enemy damages you, strike back with your reaction.\n- **Level 18: Relentless Frenzy** - Once per rest, push your frenzy into one more brutal burst of attacks.\n\n## Active Abilities\n\n- **Level 3: Frenzy** (resource: bonusAction, refresh: turn, uses: 1) - While raging, make one extra weapon attack against your current target.\n- **Level 6: Mindless Rage** (resource: bonusAction, refresh: shortRest, uses: 1) - Let rage drown out fear and control. Gain a strong saving throw bonus briefly.\n- **Level 10: Intimidating Presence** (resource: action, refresh: shortRest, uses: 1) - Frighten your current target with overwhelming menace.\n- **Level 14: Retaliation** (resource: reaction, refresh: turn, uses: 1) - When a melee enemy damages you, a reaction prompt lets you strike back with your weapon.\n- **Level 18: Relentless Frenzy** (resource: bonusAction, refresh: shortRest, uses: 1) - Push past normal limits and make another weapon attack while raging.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-barbarian-totem-warrior",
+                "title": "Barbarian: Path of the Totem Warrior",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "barbarian",
+                        "totem-warrior"
+                ],
+                "content": "# Path of the Totem Warrior\n\n**Class:** [[class-barbarian|Barbarian]]\n\nA spirit-touched rager who chooses animal totems for defense, mobility, or pack tactics.\n\n## Gameplay Guide\n\nChoose Bear, Eagle, or Wolf. Your totem changes what your Rage is best at.,Bear is defensive, Eagle is mobile, and Wolf helps allies pressure your target.,Later upgrades deepen that identity instead of adding many unrelated buttons.\n\n## Features\n\n- **Level 3: Totem Spirit** - Choose Bear, Eagle, or Wolf to shape your Rage.\n- **Level 6: Aspect of the Beast** - Your chosen totem adds stronger dungeon and combat support.\n- **Level 10: Spirit Walker** - Reveal nearby danger and mark the flow of the fight with spirit guidance.\n- **Level 14: Totemic Attunement** - Your totem becomes a stronger battle stance for protecting, moving, or enabling allies.\n- **Level 18: Primal Avatar** - Once per rest, empower all your totem gifts for a decisive fight.\n\n## Active Abilities\n\n- **Level 3: Totem Surge** (resource: bonusAction, refresh: shortRest, uses: 1) - While raging, call on your chosen totem for defense, speed, or pack pressure.\n- **Level 6: Aspect of the Beast** (resource: bonusAction, refresh: shortRest, uses: 1) - Deepen your totem bond, gaining temporary HP, speed, and skill confidence.\n- **Level 10: Spirit Walker** (resource: action, refresh: shortRest, uses: 1) - Listen to your totem spirit. Reveal nearby traps and sharpen your combat instincts.\n- **Level 14: Totemic Attunement** (resource: bonusAction, refresh: shortRest, uses: 1) - Let your totem fully guide the fight, improving speed, defense, and ally pressure.\n- **Level 18: Primal Avatar** (resource: bonusAction, refresh: longRest, uses: 1) - Become a primal avatar of your totem, gaining a major battle-form boost.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-barbarian-zealot",
+                "title": "Barbarian: Path of the Zealot",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "barbarian",
+                        "zealot"
+                ],
+                "content": "# Path of the Zealot\n\n**Class:** [[class-barbarian|Barbarian]]\n\nA divine rager who burns enemies with holy fury, rallies allies, and refuses to fall.\n\n## Gameplay Guide\n\nChoose Zealot when you want a barbarian with simple divine damage and high drama.,Your rage adds radiant pressure, your focus protects key saves, and your battle cry helps the whole party hit harder.\n\n## Features\n\n- **Level 3: Divine Fury** - While raging, your first weapon hit each turn burns with radiant or necrotic power.\n- **Level 6: Fanatical Focus** - Divine conviction can turn around a failed saving throw.\n- **Level 10: Zealous Presence** - Rally the party with a battle cry that improves attacks and saves.\n- **Level 14: Rage Beyond Death** - The first time you would fall while raging, divine fury can keep you standing.\n- **Level 18: Saint of Slaughter** - Your divine fury burns brighter and your rally grants temporary HP.\n\n## Active Abilities\n\n- **Level 6: Fanatical Focus** (resource: none, refresh: longRest, uses: 1) - When you fail an important save, divine conviction can turn it around.\n- **Level 10: Zealous Presence** (resource: bonusAction, refresh: longRest, uses: 1) - Give nearby allies advantage-like confidence on their next attacks and saving throws.\n- **Level 18: Saint of Slaughter** (resource: bonusAction, refresh: longRest, uses: 1) - Rally the party with divine fury, giving attacks, saves, and temporary HP.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-bard-college-of-lore",
+                "title": "Bard: College of Lore",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "bard",
+                        "college-of-lore"
+                ],
+                "content": "# College of Lore\n\n**Class:** [[class-bard|Bard]]\n\nA sharp support bard who turns inspiration into enemy penalties, spell flexibility, and party control.\n\n## Gameplay Guide\n\nUse Cutting Words when a dangerous enemy needs to miss or hit less hard.,Lore bards are tactical support casters: weaken enemies, keep allies standing, and use extra magical secrets to widen your spell answers.\n\n## Features\n\n- **Level 3: Cutting Words** - Spend Bardic Inspiration as a reaction-like curse to spoil an enemy's attack, damage, or focus.\n- **Level 6: Additional Magical Secrets** - Learn extra combat spells from outside the normal bard list.\n- **Level 10: Superior Inspiration** - When your rhythm falters, regain a burst of confidence for your next important move.\n- **Level 14: Peerless Skill** - Spend inspiration on yourself to make a key attack, save, or dungeon check more reliable.\n- **Level 18: Grand Secret** - Once per rest, recover a deep reserve of spell points for your strongest stolen magic.\n\n## Active Abilities\n\n- **Level 3: Cutting Words** (resource: reaction, refresh: longRest, uses: 3) - When a visible enemy threatens the party, spend inspiration to make them less accurate and less dangerous for a round.\n- **Level 6: Magical Secret** (resource: bonusAction, refresh: longRest, uses: 1) - Pull a stolen trick from your studies: your next spell or weapon hit carries extra force.\n- **Level 10: Superior Inspiration** (resource: bonusAction, refresh: shortRest, uses: 1) - Find the beat again. Your next attack or save gains a strong bonus.\n- **Level 14: Peerless Skill** (resource: bonusAction, refresh: longRest, uses: 1) - Turn inspiration inward. Your next attack, save, or important check is much more reliable.\n- **Level 18: Grand Secret** (resource: bonusAction, refresh: longRest, uses: 1) - Reach into your greatest magical secret and recover spell points for one more major cast.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-bard-college-of-valor",
+                "title": "Bard: College of Valor",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "bard",
+                        "college-of-valor"
+                ],
+                "content": "# College of Valor\n\n**Class:** [[class-bard|Bard]]\n\nA battle-chanter who turns inspiration into courage, armor, and weapon momentum.\n\n## Gameplay Guide\n\nStand close enough to help the front line. Valor rewards mixing weapon attacks, healing, and inspiration.,Combat Inspiration gives an ally temporary HP and a damage rider so your songs feel useful inside a fight.\n\n## Features\n\n- **Level 3: Combat Inspiration** - Your inspiration can harden an ally and make their next hit stronger.\n- **Level 6: Extra Attack** - When you take the Attack action, attack twice instead of once.\n- **Level 10: War Chant** - As a bonus action, give the party temporary HP and a short attack bonus.\n- **Level 14: Battle Magic** - After casting a bard spell, prepare a weapon strike empowered by the same rhythm.\n- **Level 18: Heroic Chorus** - Your first inspiration in combat affects more allies.\n\n## Active Abilities\n\n- **Level 3: Combat Inspiration** (resource: bonusAction, refresh: longRest, uses: 3) - Inspire an ally with a battle verse. They gain temporary HP and their next hit deals extra damage.\n- **Level 10: War Chant** (resource: bonusAction, refresh: shortRest, uses: 1) - Chant over the fight. The party gains temporary HP and +1 to attack rolls for a short burst.\n- **Level 14: Battle Magic** (resource: bonusAction, refresh: shortRest, uses: 1) - Carry a spell's momentum into your weapon. Your next hit deals extra force damage.\n- **Level 18: Heroic Chorus** (resource: action, refresh: longRest, uses: 1) - Sing a heroic chorus that gives the whole party temporary HP and attack confidence.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-bard-college-of-swords",
+                "title": "Bard: College of Swords",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "bard",
+                        "college-of-swords"
+                ],
+                "content": "# College of Swords\n\n**Class:** [[class-bard|Bard]]\n\nA flashy duelist bard who spends inspiration on flourishes that move, defend, and cut harder.\n\n## Gameplay Guide\n\nSwords bards want to attack. Use flourishes before a weapon hit to add damage and a short defensive or control rider.,You still cast spells, but your subclass identity is weaving blade work into the song.\n\n## Features\n\n- **Level 3: Blade Flourish** - Spend inspiration to turn a weapon hit into damage plus defense, movement, or control.\n- **Level 6: Extra Attack** - When you take the Attack action, attack twice instead of once.\n- **Level 10: Flourish Mastery** - Your flourish die becomes stronger and you can prepare a reliable flourish more often.\n- **Level 14: Master's Flourish** - Once per turn, prepare a smaller flourish without spending Bardic Inspiration.\n- **Level 18: Finale** - Once per rest, perform a decisive flourish that boosts your blade work and footwork.\n\n## Active Abilities\n\n- **Level 3: Blade Flourish** (resource: bonusAction, refresh: longRest, uses: 3) - Prepare a flourish. Your next weapon hit deals extra slashing damage and throws your footwork into motion.\n- **Level 10: Flourish Mastery** (resource: bonusAction, refresh: shortRest, uses: 1) - Prepare a practiced flourish. Your next weapon hit deals stronger slashing damage and distracts the target.\n- **Level 14: Master's Flourish** (resource: bonusAction, refresh: turn, uses: 1) - Use a lighter flourish without spending inspiration. Your next weapon hit deals extra slashing damage.\n- **Level 18: Finale** (resource: bonusAction, refresh: longRest, uses: 1) - Enter a dazzling finale for several rounds, gaining AC, speed, and extra weapon damage.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-cleric-life-domain",
+                "title": "Cleric: Life Domain",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "cleric",
+                        "life-domain"
+                ],
+                "content": "# Life Domain\n\n**Class:** [[class-cleric|Cleric]]\n\nA devoted healer whose divine magic keeps allies upright through hard fights.\n\n## Gameplay Guide\n\nUse Preserve Life when several heroes are hurt or one ally is close to falling.,Life Domain is about reliable recovery, stronger healing spells, and steady party survival.\n\n## Features\n\n- **Level 3: Disciple of Life** - When you cast a healing spell, it restores extra HP equal to 2 + the spell's level.\n- **Level 6: Preserve Life** - As an action once per short rest, heal wounded party members for 5 times your cleric level HP each.\n- **Level 10: Blessed Healer** - When you heal an ally with a spell, you also recover a smaller amount of HP.\n- **Level 14: Supreme Healing** - Once per rest, flood the party with extra healing and temporary HP.\n- **Level 18: Beacon of Life** - Once per rest, surround the party with powerful healing light.\n\n## Active Abilities\n\n- **Level 6: Preserve Life** (resource: action, refresh: shortRest, uses: 1) - Release divine healing across the party, restoring HP equal to 5 times your cleric level.\n- **Level 14: Supreme Healing** (resource: action, refresh: longRest, uses: 1) - Release a perfect healing prayer. The party recovers HP and gains temporary HP.\n- **Level 18: Beacon of Life** (resource: action, refresh: longRest, uses: 1) - Fill the room with life-giving light. Allies heal now and gain temporary HP.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-cleric-tempest-domain",
+                "title": "Cleric: Tempest Domain",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "cleric",
+                        "tempest-domain"
+                ],
+                "content": "# Tempest Domain\n\n**Class:** [[class-cleric|Cleric]]\n\nA storm priest who answers danger with thunder, lightning, and punishing reactions.\n\n## Gameplay Guide\n\nTempest clerics like being close enough for thunder bursts and storm retaliation.,Use Destructive Wrath when clustered enemies need to be broken quickly.\n\n## Features\n\n- **Level 3: Wrath of the Storm** - When danger closes in, answer with a burst of lightning or thunder.\n- **Level 6: Destructive Wrath** - Channel Divinity turns thunder or lightning into a reliable burst.\n- **Level 10: Thunderbolt Strike** - Storm power batters enemies, slowing or knocking them off balance.\n- **Level 14: Storm Shield** - Briefly grant the party resistance against lightning and thunder.\n- **Level 18: Avatar of the Tempest** - A short storm aura damages and hinders nearby enemies.\n\n## Active Abilities\n\n- **Level 3: Wrath of the Storm** (resource: reaction, refresh: shortRest, uses: 1) - Answer an enemy with storm power, dealing lightning damage and shaking their attack.\n- **Level 6: Destructive Wrath** (resource: action, refresh: shortRest, uses: 1) - Call down a controlled storm burst around you, dealing thunder damage to nearby enemies.\n- **Level 10: Thunderbolt Strike** (resource: bonusAction, refresh: shortRest, uses: 1) - Charge your next hit with thunder. It deals extra thunder damage and knocks the target off balance.\n- **Level 14: Storm Shield** (resource: bonusAction, refresh: shortRest, uses: 1) - Raise a storm ward. The party resists lightning and thunder for several rounds.\n- **Level 18: Avatar of the Tempest** (resource: bonusAction, refresh: longRest, uses: 1) - Wrap yourself in storm power, resisting storm damage and adding lightning to your hits.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-cleric-war-domain",
+                "title": "Cleric: War Domain",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "cleric",
+                        "war-domain"
+                ],
+                "content": "# War Domain\n\n**Class:** [[class-cleric|Cleric]]\n\nA militant cleric who turns faith into weapon pressure, accuracy, and battle commands.\n\n## Gameplay Guide\n\nWar Domain fights with weapons more than most clerics. Use War Priest when a bonus strike can finish a target.,Guided Strike is your accuracy button for important smites, cantrips, or weapon hits.\n\n## Features\n\n- **Level 3: War Priest** - Make a bonus weapon strike a limited number of times.\n- **Level 6: Guided Strike** - Channel Divinity steadies an important attack.\n- **Level 10: War God's Blessing** - Bless an ally's next strike with divine accuracy.\n- **Level 14: Divine Strike** - Prepare a radiant weapon blow once per turn.\n- **Level 18: Avatar of Battle** - You resist weapon punishment and inspire the party's offense.\n\n## Active Abilities\n\n- **Level 3: War Priest Strike** (resource: bonusAction, refresh: longRest, uses: 3) - Make a quick weapon strike in the name of your deity.\n- **Level 6: Guided Strike** (resource: bonusAction, refresh: shortRest, uses: 1) - Ask your deity to guide your next attack with a strong accuracy bonus.\n- **Level 10: War God's Blessing** (resource: bonusAction, refresh: shortRest, uses: 1) - Bless an ally's next attack with a strong accuracy bonus.\n- **Level 14: Divine Strike** (resource: bonusAction, refresh: turn, uses: 1) - Consecrate your next weapon hit with radiant damage.\n- **Level 18: Avatar of Battle** (resource: bonusAction, refresh: longRest, uses: 1) - Become a divine war banner, resisting weapon damage and empowering your own hits.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-druid-circle-moon",
+                "title": "Druid: Circle of the Moon",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "druid",
+                        "circle-moon"
+                ],
+                "content": "# Circle of the Moon\n\n**Class:** [[class-druid|Druid]]\n\nA combat shapeshifter whose Wild Shape becomes a front-line battle form.\n\n## Gameplay Guide\n\nMoon Druid is the beast-form druid. Use Wild Shape aggressively when you need HP, melee pressure, or a different natural attack.,Elemental Shape adds a short burst of resistance and damage when your form needs more pressure.\n\n## Features\n\n- **Level 3: Combat Wild Shape** - Wild Shape is your combat form, giving you a front-line HP buffer and natural attacks.\n- **Level 6: Primal Strikes** - Your beast-form pressure becomes more dangerous.\n- **Level 10: Elemental Shape** - Your form can take on elemental resistance and damage.\n- **Level 14: Thousand Forms** - Shift defensively to regain HP and adapt under pressure.\n- **Level 18: Archdruid Shape** - Recover a Wild Shape rhythm and keep spellcasting pressure while transformed.\n\n## Active Abilities\n\n- **Level 3: Combat Wild Shape** (resource: bonusAction, refresh: shortRest, uses: 1) - Call on your combat shape instincts, gaining temporary HP before you enter the front line.\n- **Level 6: Primal Strikes** (resource: bonusAction, refresh: shortRest, uses: 1) - Sharpen your beast-form attacks. Your next hit deals extra forceful natural damage.\n- **Level 10: Elemental Shape** (resource: bonusAction, refresh: shortRest, uses: 1) - Wrap your current form or body in elemental power: resist fire and add elemental damage.\n- **Level 14: Thousand Forms** (resource: bonusAction, refresh: longRest, uses: 1) - Adapt your body mid-fight, restoring HP and gaining a short defensive buffer.\n- **Level 18: Archdruid Shape** (resource: bonusAction, refresh: shortRest, uses: 1) - Recover a Wild Shape rhythm as spell and beast instincts merge.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-druid-circle-land",
+                "title": "Druid: Circle of the Land",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "druid",
+                        "circle-land"
+                ],
+                "content": "# Circle of the Land\n\n**Class:** [[class-druid|Druid]]\n\nA terrain-bound caster who recovers magic and turns ground control into advantage.\n\n## Gameplay Guide\n\nLand Druid is the spell-loop druid. Use Natural Recovery to refill spell points and keep casting.,Your terrain features help you move through dangerous ground and turn area control into an advantage.\n\n## Features\n\n- **Level 3: Natural Recovery** - Once per long rest, recover spell points equal to 2 times your druid level.\n- **Level 6: Circle Spells** - Learn extra land-themed combat spells.\n- **Level 10: Nature's Ward** - Ignore difficult terrain while moving through the dungeon.\n- **Level 14: Nature's Sanctuary** - Enemies struggle to strike you after nature magic.\n- **Level 18: Elder Land** - Your land magic refills enough power to keep casting through a long fight.\n\n## Active Abilities\n\n- **Level 3: Natural Recovery** (resource: none, refresh: longRest, uses: 1) - Draw power from the land and recover spell points equal to 2 times your druid level.\n- **Level 14: Nature's Sanctuary** (resource: bonusAction, refresh: shortRest, uses: 1) - Surround yourself with warding nature. Enemies have a harder time hitting you.\n- **Level 18: Elder Land** (resource: bonusAction, refresh: longRest, uses: 1) - Draw from the deepest roots of your circle, recovering spell points so you can keep casting.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-druid-circle-shepherd",
+                "title": "Druid: Circle of the Shepherd",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "druid",
+                        "circle-shepherd"
+                ],
+                "content": "# Circle of the Shepherd\n\n**Class:** [[class-druid|Druid]]\n\nA spirit caller who supports allies and summons temporary spirits.\n\n## Gameplay Guide\n\nShepherd is the summon/support druid. Spirit Totem helps the party even when summon positioning is imperfect.,Summoned spirits act on their own beside the party, either pressing into melee or harrying from range.\n\n## Features\n\n- **Level 3: Spirit Totem** - As a bonus action once per short rest, give the party temporary HP equal to 5 + your druid level and +1 to attack rolls for 3 rounds.\n- **Level 6: Summon Spirit Ally** - Call a temporary melee spirit for 4 rounds; it acts on its own beside the party and scales with your level.\n- **Level 10: Guardian Spirit** - Your spirit aura restores a small amount of party endurance.\n- **Level 14: Faithful Summons** - When the fight turns dangerous, call stronger spirit help.\n- **Level 18: Great Spirit** - Your spirit totem becomes a stronger party-wide battle blessing.\n\n## Active Abilities\n\n- **Level 3: Spirit Totem** (resource: bonusAction, refresh: shortRest, uses: 1) - Call a guardian spirit that gives the party temporary HP equal to 5 + your druid level and +1 to attack rolls.\n- **Level 6: Summon Spirit Ally** (resource: action, refresh: shortRest, uses: 1) - Call a temporary spirit beast that acts on its own beside the party.\n- **Level 10: Guardian Spirit** (resource: bonusAction, refresh: shortRest, uses: 1) - The guardian spirit restores party endurance and keeps allies brave.\n- **Level 14: Faithful Summons** (resource: action, refresh: longRest, uses: 1) - Call a stronger spirit beast to protect the party in a dangerous fight.\n- **Level 18: Great Spirit** (resource: bonusAction, refresh: shortRest, uses: 1) - Call a greater spirit that gives the party larger temporary HP and +2 to attack rolls.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-fighter-champion",
+                "title": "Fighter: Champion",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "fighter",
+                        "champion"
+                ],
+                "content": "# Champion\n\n**Class:** [[class-fighter|Fighter]]\n\nA simple, reliable weapon specialist with stronger critical hits, athletic grit, and late-game survival.\n\n## Gameplay Guide\n\nChoose Champion when you want a fighter that is powerful without juggling many buttons.,Most of your strength is always on: better critical hits, stronger physical talent, and the ability to recover when badly hurt.\n\n## Features\n\n- **Level 3: Improved Critical** - Your weapon attacks land critical hits more often, starting on a 19 or 20.\n- **Level 6: Remarkable Athlete** - Your physical training helps strength, dexterity, and constitution checks when you are not already trained.\n- **Level 10: Additional Fighting Style** - Broaden your martial training with one more fighting style.\n- **Level 14: Superior Critical** - Your weapon attacks become even more lethal, critting on an 18, 19, or 20.\n- **Level 18: Survivor** - When you are badly hurt, you recover HP at the start of your turns and keep fighting through the pain.\n\n## Active Abilities\n\nNo listed active abilities.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-fighter-battle-master",
+                "title": "Fighter: Battle Master",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "fighter",
+                        "battle-master"
+                ],
+                "content": "# Battle Master\n\n**Class:** [[class-fighter|Fighter]]\n\nA tactical fighter who spends superiority dice on maneuvers that control enemies, protect allies, or make key attacks count.\n\n## Gameplay Guide\n\nYou have superiority dice that return on a short or long rest.,Pick maneuvers that match your style. Use them before important attacks, or answer enemy mistakes with reaction maneuvers.,Higher levels give more dice, stronger dice, and one die back at the start of combat if you are empty.\n\n## Features\n\n- **Level 3: Combat Superiority** - Gain superiority dice and spend them on chosen maneuvers.\n- **Level 6: Tactical Expansion** - Learn another maneuver and gain a wider set of tactical answers.\n- **Level 10: Improved Combat Superiority** - Your superiority dice become d10s, so damage and accuracy maneuvers roll a larger die.\n- **Level 14: Relentless** - If combat begins and you are empty, recover one superiority die.\n- **Level 18: Master Tactician** - Your superiority dice become d12s and you can sustain tactical pressure longer in hard fights.\n\n## Active Abilities\n\n- **Level 3: Menacing Attack** (resource: bonusAction, refresh: shortRest, uses: 4) - Spend a superiority die to put fear behind your next hit. The target takes extra damage and may falter under pressure.\n- **Level 3: Precision Attack** (resource: bonusAction, refresh: shortRest, uses: 4) - Spend a superiority die before an important weapon attack. Your next strike is more accurate and deals extra damage if it lands.\n- **Level 3: Trip Attack** (resource: bonusAction, refresh: shortRest, uses: 4) - Spend a superiority die to sweep or slam your foe. Your next hit deals extra damage and can knock the target prone.\n- **Level 6: Rally** (resource: bonusAction, refresh: shortRest, uses: 4) - Spend a superiority die to steady an ally with a commander's shout, giving them temporary HP and confidence.\n- **Level 10: Riposte** (resource: reaction, refresh: shortRest, uses: 5) - When a melee attacker misses you, spend a superiority die to answer with a punishing counterattack.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-fighter-eldritch-knight",
+                "title": "Fighter: Eldritch Knight",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "fighter",
+                        "eldritch-knight"
+                ],
+                "content": "# Eldritch Knight\n\n**Class:** [[class-fighter|Fighter]]\n\nA weapon fighter who adds wizard magic for defense, ranged pressure, and strike-then-cast tactics.\n\n## Gameplay Guide\n\nYou are still a fighter first, but you learn wizard cantrips and spells using Intelligence.,Use shield, blasts, control spells, and mobility magic when a plain weapon attack is not enough.,Arcane Charge lets Action Surge reposition you in a flash when the fight opens up.\n\n## Features\n\n- **Level 3: Spellcasting** - Learn wizard cantrips and combat spells, giving your fighter ranged magic, defenses, and area control.\n- **Level 6: War Magic** - After a cantrip or quick spell setup, empower your next weapon hit.\n- **Level 10: Eldritch Strike** - Your weapon hits can make a target more vulnerable to your next spell.\n- **Level 14: Arcane Charge** - When you surge into action, reposition in a flash of arcane force.\n- **Level 18: Improved War Magic** - After casting a leveled spell, empower a weapon attack with stronger arcane force.\n\n## Active Abilities\n\n- **Level 6: War Magic** (resource: bonusAction, refresh: turn, uses: 1) - Blend cantrip rhythm into steel. Your next weapon hit deals extra force damage.\n- **Level 10: Eldritch Strike** (resource: bonusAction, refresh: shortRest, uses: 1) - Mark a target through your weapon. Your next hit deals force damage and leaves them vulnerable to magic.\n- **Level 18: Improved War Magic** (resource: bonusAction, refresh: shortRest, uses: 1) - Carry a leveled spell's force into your blade. Your next weapon hit deals heavy force damage.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-monk-way-open-hand",
+                "title": "Monk: Way of the Open Hand",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "monk",
+                        "way-open-hand"
+                ],
+                "content": "# Way of the Open Hand\n\n**Class:** [[class-monk|Monk]]\n\nA clean martial artist who turns flurries into control and self-healing.\n\n## Gameplay Guide\n\nOpen Hand is the direct monk. Use Open Hand Technique before Flurry or an attack to knock enemies off balance.,Wholeness of Body adds self-healing, and Quivering Palm gives one decisive finishing strike.\n\n## Features\n\n- **Level 3: Open Hand Technique** - Your strikes can knock prone, shove, or stagger.\n- **Level 6: Wholeness of Body** - As an action once per long rest, heal yourself for 3 times your monk level HP.\n- **Level 10: Tranquility** - Begin a hard exchange with defensive focus and temporary HP.\n- **Level 14: Quivering Palm** - Prepare a devastating delayed strike.\n- **Level 18: Perfect Body** - Recover your rhythm and sharpen Open Hand control for one more decisive turn.\n\n## Active Abilities\n\n- **Level 3: Open Hand Technique** (resource: bonusAction, refresh: shortRest, uses: 2) - Set up your next strike to knock the target prone.\n- **Level 6: Wholeness of Body** (resource: action, refresh: longRest, uses: 1) - Focus your breath and heal yourself for 3 times your monk level HP.\n- **Level 10: Tranquility** (resource: bonusAction, refresh: shortRest, uses: 1) - Center yourself in calm. Gain temporary HP and AC for several rounds.\n- **Level 14: Quivering Palm** (resource: bonusAction, refresh: longRest, uses: 1) - Place lethal vibrations in your next hit, dealing heavy force damage.\n- **Level 18: Perfect Body** (resource: bonusAction, refresh: longRest, uses: 1) - Recover your rhythm through perfect discipline, gaining defense and a stronger next strike.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-monk-way-shadow",
+                "title": "Monk: Way of Shadow",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "monk",
+                        "way-shadow"
+                ],
+                "content": "# Way of Shadow\n\n**Class:** [[class-monk|Monk]]\n\nA stealthy monk who uses darkness, silence, and sudden movement as combat tools.\n\n## Gameplay Guide\n\nShadow monk uses practical shadow magic: defense, mobility, and enemy disruption.,Use Shadow Step to reposition and attack with advantage.\n\n## Features\n\n- **Level 3: Shadow Arts** - Spend ki on shadow tricks that hinder enemies and prepare a safe attack.\n- **Level 6: Shadow Step** - Teleport-like movement gives advantage on your next strike.\n- **Level 10: Cloak of Shadows** - Become harder to hit until you strike.\n- **Level 14: Opportunist** - Prepare a reaction-like punish when an ally exposes an enemy.\n- **Level 18: Living Shadow** - Become a short-lived shadow battle-form.\n\n## Active Abilities\n\n- **Level 3: Shadow Arts** (resource: bonusAction, refresh: shortRest, uses: 2) - Wrap a target in distracting shadow, making them easier to hit.\n- **Level 6: Shadow Step** (resource: bonusAction, refresh: shortRest, uses: 2) - Step through shadow. Gain movement and advantage on your next attack.\n- **Level 10: Cloak of Shadows** (resource: bonusAction, refresh: shortRest, uses: 2) - Fade into shadow, gaining AC and advantage on your next strike.\n- **Level 14: Opportunist** (resource: bonusAction, refresh: turn, uses: 1) - Watch for an opening. Your next hit deals extra necrotic damage.\n- **Level 18: Living Shadow** (resource: bonusAction, refresh: longRest, uses: 1) - Become a living shadow: harder to hit, faster, and more dangerous for a few rounds.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-monk-way-drunken-master",
+                "title": "Monk: Way of the Drunken Master",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "monk",
+                        "way-drunken-master"
+                ],
+                "content": "# Way of the Drunken Master\n\n**Class:** [[class-monk|Monk]]\n\nA slippery skirmisher who turns erratic movement into defense and counterpressure.\n\n## Gameplay Guide\n\nDrunken Master is about motion. Use Drunken Technique when you want to hit and slip away safely.,Intoxicated Frenzy turns a crowded fight into a strong multi-target turn.\n\n## Features\n\n- **Level 3: Drunken Technique** - After quick strikes, gain movement and defense.\n- **Level 6: Tipsy Sway** - Slip away from a bad exchange and turn your stumble into defense.\n- **Level 10: Drunkard's Luck** - Cancel a bad moment with a burst of lucky momentum.\n- **Level 14: Intoxicated Frenzy** - Turn a crowded fight into multiple strikes.\n- **Level 18: Impossible Rhythm** - Once per rest, gain both offensive and defensive momentum in the same round.\n\n## Active Abilities\n\n- **Level 3: Drunken Technique** (resource: bonusAction, refresh: shortRest, uses: 2) - Move with erratic grace. Gain speed, AC, and a small damage rider.\n- **Level 6: Tipsy Sway** (resource: reaction, refresh: shortRest, uses: 2) - Turn a dangerous miss-step into defense, gaining AC and a small counterstrike rider.\n- **Level 10: Drunkard's Luck** (resource: bonusAction, refresh: shortRest, uses: 2) - Let luck carry the moment. Your next attack or save gains a strong bonus.\n- **Level 14: Intoxicated Frenzy** (resource: action, refresh: longRest, uses: 1) - Spin through nearby enemies with a flurry of strikes.\n- **Level 18: Impossible Rhythm** (resource: bonusAction, refresh: longRest, uses: 1) - Move in an impossible rhythm, gaining speed, AC, and a heavy damage rider.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-paladin-oath-devotion",
+                "title": "Paladin: Oath of Devotion",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "paladin",
+                        "oath-devotion"
+                ],
+                "content": "# Oath of Devotion\n\n**Class:** [[class-paladin|Paladin]]\n\nA classic holy knight who protects allies, smites evil, and shines with sacred weapon power.\n\n## Gameplay Guide\n\nDevotion is the reliable paladin. Sacred Weapon improves your attacks; Holy Nimbus punishes nearby evil.,Use the oath powers before committing spell points to Divine Smite.\n\n## Features\n\n- **Level 3: Sacred Weapon** - Bless your weapon for better accuracy and radiant pressure.\n- **Level 6: Aura of Devotion** - Nearby allies resist fear and charm-like pressure through your steady faith.\n- **Level 10: Purifying Smite** - Prepare a smite that also cleanses pressure from the fight.\n- **Level 14: Holy Nimbus** - Radiant light damages nearby enemies and boosts divine defense.\n- **Level 18: Beacon of Devotion** - Your sacred weapon and aura become a stronger party-wide defensive pulse.\n\n## Active Abilities\n\n- **Level 3: Sacred Weapon** (resource: bonusAction, refresh: shortRest, uses: 1) - Bless your weapon. Your next attacks are more accurate and deal radiant damage.\n- **Level 6: Aura of Devotion** (resource: bonusAction, refresh: shortRest, uses: 1) - Steady the party with devotion, improving saves for a few rounds.\n- **Level 10: Purifying Smite** (resource: bonusAction, refresh: shortRest, uses: 1) - Prepare a purifying smite. Your next weapon hit deals radiant damage and shakes off darkness.\n- **Level 14: Holy Nimbus** (resource: action, refresh: longRest, uses: 1) - Shine with holy light, burning nearby enemies and bolstering allies.\n- **Level 18: Beacon of Devotion** (resource: action, refresh: longRest, uses: 1) - Shine with holy devotion, burning nearby enemies and bolstering allies.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-paladin-oath-vengeance",
+                "title": "Paladin: Oath of Vengeance",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "paladin",
+                        "oath-vengeance"
+                ],
+                "content": "# Oath of Vengeance\n\n**Class:** [[class-paladin|Paladin]]\n\nA relentless avenger who marks one enemy and tears it down.\n\n## Gameplay Guide\n\nVengeance wants a priority target. Use Vow of Enmity on the enemy that must die first.,Avenging Angel gives you a frightening radiant burst for harder fights.\n\n## Features\n\n- **Level 3: Vow of Enmity** - Mark one enemy for advantage and extra damage.\n- **Level 6: Relentless Avenger** - After committing to your prey, move faster and keep pressure on them.\n- **Level 10: Soul of Vengeance** - When a melee enemy damages you, answer with a radiant reaction strike.\n- **Level 14: Avenging Angel** - Become a frightening radiant avenger.\n- **Level 18: Final Judgment** - Your first smite-like strike against your prey becomes especially punishing.\n\n## Active Abilities\n\n- **Level 3: Vow of Enmity** (resource: bonusAction, refresh: shortRest, uses: 1) - Swear vengeance on your prey. Your next hit is more accurate and deals radiant damage.\n- **Level 6: Relentless Avenger** (resource: bonusAction, refresh: shortRest, uses: 1) - Close on your sworn enemy, gaining speed and a radiant rider for your next strike.\n- **Level 10: Soul of Vengeance** (resource: reaction, refresh: shortRest, uses: 1) - When a melee enemy damages you, answer with a weapon strike that adds radiant damage.\n- **Level 14: Avenging Angel** (resource: action, refresh: longRest, uses: 1) - Become a radiant avenger, frightening nearby enemies.\n- **Level 18: Final Judgment** (resource: bonusAction, refresh: longRest, uses: 1) - Condemn your prey. Your next weapon hit deals heavy radiant damage.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-paladin-oath-ancients",
+                "title": "Paladin: Oath of the Ancients",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "paladin",
+                        "oath-ancients"
+                ],
+                "content": "# Oath of the Ancients\n\n**Class:** [[class-paladin|Paladin]]\n\nA green knight who binds enemies, resists magic, and shields allies with old light.\n\n## Gameplay Guide\n\nAncients plays as a protective controller. Nature's Wrath pins a foe and Elder Champion helps you endure hard fights.,Elder Champion is a short nature battle-form for hard fights.\n\n## Features\n\n- **Level 3: Nature's Wrath** - Restraining vines pin or slow an enemy.\n- **Level 6: Aura of Warding** - Give the party a short protective aura against spell-like harm.\n- **Level 10: Undying Sentinel** - Once per rest, refuse to fall by drawing on ancient endurance.\n- **Level 14: Elder Champion** - Take on a regenerative nature form.\n- **Level 18: Ancient Ward** - Your ancient aura grows stronger and Nature's Wrath can spread pressure.\n\n## Active Abilities\n\n- **Level 3: Nature's Wrath** (resource: action, refresh: shortRest, uses: 1) - Call vines around a visible enemy, dealing damage and restraining it briefly.\n- **Level 6: Aura of Warding** (resource: bonusAction, refresh: shortRest, uses: 1) - Raise an old-light ward. The party gains saving throw support and resistance to force briefly.\n- **Level 10: Undying Sentinel** (resource: bonusAction, refresh: longRest, uses: 1) - Root yourself in ancient endurance, gaining a large temporary HP buffer.\n- **Level 14: Elder Champion** (resource: bonusAction, refresh: longRest, uses: 1) - Become an elder champion with regeneration, resistance, and radiant nature damage.\n- **Level 18: Ancient Ward** (resource: action, refresh: longRest, uses: 1) - Burst with ancient warding vines, damaging and restraining nearby enemies.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-ranger-hunter",
+                "title": "Ranger: Hunter",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "ranger",
+                        "hunter"
+                ],
+                "content": "# Hunter\n\n**Class:** [[class-ranger|Ranger]]\n\nA focused monster-killer who chooses simple, reliable combat pressure.\n\n## Gameplay Guide\n\nHunter is the straightforward ranger. Mark a target, then use Hunter's Prey before weapon attacks.,Volley adds multi-target cleanup when enemies cluster together.\n\n## Features\n\n- **Level 3: Hunter's Prey** - Your next hit deals extra damage and can slow the target.\n- **Level 6: Defensive Tactics** - Brace against your chosen prey with a short defensive stance.\n- **Level 10: Multiattack Defense** - After a dangerous exchange, harden yourself against repeat attacks.\n- **Level 14: Volley** - Spread damage through clustered enemies.\n- **Level 18: Apex Predator** - Your first focused strike in a hard fight deals major bonus damage.\n\n## Active Abilities\n\n- **Level 3: Hunter's Prey** (resource: bonusAction, refresh: turn, uses: 1) - Pick the perfect opening. Your next weapon hit deals extra damage and slows the target.\n- **Level 6: Defensive Tactics** (resource: bonusAction, refresh: shortRest, uses: 1) - Read the monster's movements. Gain AC and saving throw support for a few rounds.\n- **Level 10: Multiattack Defense** (resource: reaction, refresh: shortRest, uses: 1) - Guard against a follow-up assault, sharply raising your AC for a short window.\n- **Level 14: Volley** (resource: action, refresh: shortRest, uses: 1) - Loose a sweeping volley into nearby enemies.\n- **Level 18: Apex Predator** (resource: bonusAction, refresh: shortRest, uses: 1) - Commit to a wounded or marked prey. Your next hit deals heavy extra damage.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-ranger-beast-master",
+                "title": "Ranger: Beast Master",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "ranger",
+                        "beast-master"
+                ],
+                "content": "# Beast Master\n\n**Class:** [[class-ranger|Ranger]]\n\nA ranger who fights beside a loyal companion that grows with them.\n\n## Gameplay Guide\n\nAt level 3, choose a permanent beast companion. You control it as a Warrior sidekick, and it uses your proficiency bonus for AC, attacks, damage, proficient saves, and proficient skills.,Use Coordinated Command to point the companion at the target you care about.\n\n## Features\n\n- **Level 3: Ranger's Companion** - Choose a loyal beast companion. It fights beside you, uses your proficiency bonus, and grows through the Warrior sidekick level system.\n- **Level 6: Coordinated Attack** - Command the companion and empower your next hit against the same prey.\n- **Level 10: Bestial Defense** - Your bond gives you temporary HP and defensive confidence.\n- **Level 14: Storm of Claws** - Command a brutal companion strike that hinders the enemy.\n- **Level 18: Primal Bond** - Your companion bond reaches its peak, improving commands and durability.\n\n## Active Abilities\n\n- **Level 6: Coordinated Command** (resource: bonusAction, refresh: turn, uses: 1) - Mark your prey for both you and your companion. Your next hit deals extra damage.\n- **Level 10: Bestial Defense** (resource: bonusAction, refresh: shortRest, uses: 1) - Your companion guards your flank. Gain temporary HP and AC for a few rounds.\n- **Level 14: Storm of Claws** (resource: action, refresh: shortRest, uses: 1) - Command a savage companion strike that deals slashing damage and knocks the target off balance.\n- **Level 18: Primal Bond** (resource: bonusAction, refresh: shortRest, uses: 1) - Push the bond to its peak. Your next hit is stronger and your defenses rise briefly.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-ranger-gloom-stalker",
+                "title": "Ranger: Gloom Stalker",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "ranger",
+                        "gloom-stalker"
+                ],
+                "content": "# Gloom Stalker\n\n**Class:** [[class-ranger|Ranger]]\n\nAn ambush ranger who strikes hard at the start of battle and fights from shadow.\n\n## Gameplay Guide\n\nGloom Stalker wants the opening turn. Use Dread Ambusher before your first attack when a dangerous target must fall quickly.,Stalker's Flurry keeps your pressure high after a bad exchange.\n\n## Features\n\n- **Level 3: Dread Ambusher** - Start combat with speed, accuracy, and extra damage.\n- **Level 6: Umbral Defense** - Become harder to hit before you fully reveal yourself.\n- **Level 10: Iron Mind** - Steady your mind against fear and control.\n- **Level 14: Stalker's Flurry** - Recover from a miss by preparing another strike.\n- **Level 18: Shadow Apex** - Your opening strike can terrify and wound a priority target.\n\n## Active Abilities\n\n- **Level 3: Dread Ambusher** (resource: bonusAction, refresh: shortRest, uses: 1) - Explode from the shadows. Gain speed and make your next hit deal extra psychic damage.\n- **Level 6: Umbral Defense** (resource: bonusAction, refresh: shortRest, uses: 1) - Blend into poor light and awkward angles, gaining AC and speed briefly.\n- **Level 10: Iron Mind** (resource: bonusAction, refresh: shortRest, uses: 1) - Lock your focus. Gain saving throw support and resistance to fear pressure for a few rounds.\n- **Level 14: Stalker's Flurry** (resource: bonusAction, refresh: turn, uses: 1) - Refocus after a bad exchange. Your next attack has advantage and extra damage.\n- **Level 18: Shadow Apex** (resource: bonusAction, refresh: shortRest, uses: 1) - Turn the opening into a nightmare. Your next hit deals extra psychic damage and frightens the target.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-rogue-thief",
+                "title": "Rogue: Thief",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "rogue",
+                        "thief"
+                ],
+                "content": "# Thief\n\n**Class:** [[class-rogue|Rogue]]\n\nA fast dungeon opportunist who turns movement, items, and dirty tricks into combat advantage.\n\n## Gameplay Guide\n\nThief is the practical rogue. Use Fast Hands for quick pressure and Thief's Reflexes for a late-game burst of speed.,You win by acting early, moving well, and creating Sneak Attack openings.\n\n## Features\n\n- **Level 3: Fast Hands** - Use a quick trick as a bonus action to distract or hinder a foe.\n- **Level 6: Second-Story Work** - Move like a dungeon climber, gaining speed and better mobility checks for a short burst.\n- **Level 10: Supreme Sneak** - Set up a careful approach that makes your next strike much more reliable.\n- **Level 14: Use Magic Device** - Trigger a stolen magical trick even without being a spellcaster.\n- **Level 18: Thief's Reflexes** - At the start of combat, gain a burst of speed and advantage.\n\n## Active Abilities\n\n- **Level 3: Fast Hands Trick** (resource: bonusAction, refresh: turn, uses: 1) - Throw sand, yank a strap, or exploit the room. The target becomes easier to hit.\n- **Level 6: Second-Story Work** (resource: bonusAction, refresh: shortRest, uses: 1) - Move through the room with practiced agility, gaining speed and mobility confidence.\n- **Level 10: Supreme Sneak** (resource: bonusAction, refresh: shortRest, uses: 1) - Melt into a careful angle. Your next attack has advantage and your movement improves briefly.\n- **Level 14: Use Magic Device** (resource: action, refresh: longRest, uses: 1) - Force a stolen magic trick to work, blasting nearby enemies with unstable force.\n- **Level 18: Thief's Reflexes** (resource: none, refresh: longRest, uses: 1) - Spring into action with rogue speed. You gain movement and advantage for this turn.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-rogue-assassin",
+                "title": "Rogue: Assassin",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "rogue",
+                        "assassin"
+                ],
+                "content": "# Assassin\n\n**Class:** [[class-rogue|Rogue]]\n\nA burst rogue who opens fights with deadly accuracy and punishing first strikes.\n\n## Gameplay Guide\n\nAssassin is about the first round. Start fights from a good position, then use Assassinate before your opening attack.,Poisoner's Ambush gives you another simple way to make a chosen hit matter.\n\n## Features\n\n- **Level 3: Assassinate** - Your first strike against an unprepared or marked enemy hits harder.\n- **Level 6: Ambush Preparation** - Prepare a poisoned opening for your next Sneak Attack.\n- **Level 10: Marked Impostor** - Mark a target and make your next hit shake their confidence.\n- **Level 14: Death Strike** - Once per rest, prepare a devastating strike for a priority enemy.\n- **Level 18: Perfect Ambush** - If you open cleanly, your next strike becomes brutally reliable.\n\n## Active Abilities\n\n- **Level 3: Assassinate** (resource: bonusAction, refresh: shortRest, uses: 1) - Prepare a killing opening. Your next weapon hit deals extra piercing damage and shakes the target.\n- **Level 6: Ambush Preparation** (resource: bonusAction, refresh: longRest, uses: 2) - Coat your next strike with poison that weakens the enemy's attacks.\n- **Level 10: Marked Impostor** (resource: bonusAction, refresh: shortRest, uses: 1) - Single out a target. Your next hit deals extra psychic damage and shakes them.\n- **Level 14: Death Strike** (resource: bonusAction, refresh: longRest, uses: 1) - Prepare a lethal strike. Your next weapon hit deals heavy piercing damage.\n- **Level 18: Perfect Ambush** (resource: bonusAction, refresh: shortRest, uses: 1) - Commit to the perfect opening. Your next attack has advantage and deals extra piercing damage.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-rogue-arcane-trickster",
+                "title": "Rogue: Arcane Trickster",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "rogue",
+                        "arcane-trickster"
+                ],
+                "content": "# Arcane Trickster\n\n**Class:** [[class-rogue|Rogue]]\n\nA magical rogue who uses enchantment, control, and misdirection to create Sneak Attack openings.\n\n## Gameplay Guide\n\nYou gain wizard-style tricks focused on distraction, charms, pins, and magical interruptions.,Use Mage Hand Trickery when you want your next attack to land against a distracted foe.\n\n## Features\n\n- **Level 3: Trickster Spellcasting** - Learn wizard cantrips and spells focused on control, movement, and debuffs.\n- **Level 6: Mage Hand Trickery** - Distract a target at range to help set up Sneak Attack.\n- **Level 10: Magical Ambush** - Your next spell or strike is harder for the enemy to resist after a setup.\n- **Level 14: Versatile Trickster** - Distract a target as a quick setup for Sneak Attack.\n- **Level 18: Spell Thief** - Use a reaction-style interrupt to blunt enemy spell-like powers.\n\n## Active Abilities\n\n- **Level 6: Mage Hand Trickery** (resource: bonusAction, refresh: turn, uses: 1) - Use a spectral hand to distract your target, lowering its guard for your next attack.\n- **Level 10: Magical Ambush** (resource: bonusAction, refresh: shortRest, uses: 1) - Set up a hidden magical angle. Your next attack is more accurate and your next spell is harder to resist.\n- **Level 14: Versatile Trickster** (resource: bonusAction, refresh: turn, uses: 1) - Distract a target with magic, making them easier to hit this turn.\n- **Level 18: Spell Thief** (resource: reaction, refresh: shortRest, uses: 1) - Interrupt an enemy spell-like power, reducing its effect and stealing a little spell energy.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-sorcerer-draconic-bloodline",
+                "title": "Sorcerer: Draconic Bloodline",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "sorcerer",
+                        "draconic-bloodline"
+                ],
+                "content": "# Draconic Bloodline\n\n**Class:** [[class-sorcerer|Sorcerer]]\n\nA durable elemental sorcerer whose bloodline adds armor, damage, and fearsome presence.\n\n## Gameplay Guide\n\nDraconic sorcerers are tougher than most casters. Use Elemental Affinity before blasting with your chosen element.,Draconic Presence is a short combat burst rather than an open exploration tool.\n\n## Features\n\n- **Level 3: Draconic Resilience** - Your draconic blood gives you temporary toughness and a sturdier battle stance.\n- **Level 6: Elemental Affinity** - Empower spells and attacks with your draconic element.\n- **Level 10: Dragon Wings** - Burst across the battlefield with draconic movement and defense.\n- **Level 14: Draconic Presence** - Frighten nearby enemies with ancient majesty.\n- **Level 18: Dragon Avatar** - Become a short-lived avatar of your draconic bloodline.\n\n## Active Abilities\n\n- **Level 3: Draconic Resilience** (resource: bonusAction, refresh: shortRest, uses: 1) - Call on your scales and bloodline, gaining temporary HP and AC for a few rounds.\n- **Level 6: Elemental Affinity** (resource: bonusAction, refresh: shortRest, uses: 1) - Draw on your draconic element. Your next hit or spell carries extra elemental damage.\n- **Level 10: Dragon Wings** (resource: bonusAction, refresh: shortRest, uses: 1) - Unfurl spectral wings, gaining speed and AC long enough to reposition.\n- **Level 14: Draconic Presence** (resource: action, refresh: longRest, uses: 1) - Unleash draconic majesty, frightening nearby enemies.\n- **Level 18: Dragon Avatar** (resource: bonusAction, refresh: longRest, uses: 1) - Become a dragon avatar, resisting fire and empowering your hits for several rounds.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-sorcerer-wild-magic-sorcery",
+                "title": "Sorcerer: Wild Magic",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "sorcerer",
+                        "wild-magic-sorcery"
+                ],
+                "content": "# Wild Magic\n\n**Class:** [[class-sorcerer|Sorcerer]]\n\nA chaotic sorcerer whose magic surges into unstable buffs and bursts.\n\n## Gameplay Guide\n\nWild Magic is high-energy and unpredictable, but every surge is useful in combat.,Use Bend Luck when an important roll needs a push.\n\n## Features\n\n- **Level 3: Wild Surge** - Casting and subclass powers can spark a random combat boon.\n- **Level 6: Bend Luck** - Spend sorcery as a reaction to help an ally turn a near miss or failed save into success.\n- **Level 10: Controlled Chaos** - Trigger a more reliable wild surge when you need chaos to help.\n- **Level 14: Spell Bombardment** - Push your next damaging hit into a bigger chaotic burst.\n- **Level 18: Chaos Mastery** - Choose a decisive surge and recover sorcery power.\n\n## Active Abilities\n\n- **Level 3: Wild Sorcery Surge** (resource: bonusAction, refresh: shortRest, uses: 1) - Let wild magic erupt into a useful combat boon.\n- **Level 6: Bend Luck** (resource: reaction, refresh: longRest, uses: 3) - When an ally barely misses an attack or fails a save, twist luck to add +3.\n- **Level 10: Controlled Chaos** (resource: bonusAction, refresh: shortRest, uses: 1) - Shape the chaos into something useful, gaining a stronger random combat boon.\n- **Level 14: Spell Bombardment** (resource: bonusAction, refresh: shortRest, uses: 1) - Overload your next hit with chaotic force damage.\n- **Level 18: Chaos Mastery** (resource: bonusAction, refresh: longRest, uses: 1) - Master the surge, recovering sorcery power for another major turn.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-sorcerer-divine-soul",
+                "title": "Sorcerer: Divine Soul",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "sorcerer",
+                        "divine-soul"
+                ],
+                "content": "# Divine Soul\n\n**Class:** [[class-sorcerer|Sorcerer]]\n\nA sacred sorcerer who mixes arcane flexibility with healing and radiant protection.\n\n## Gameplay Guide\n\nDivine Soul is a support sorcerer. Use Favored by the Gods for key rolls and Unearthly Recovery when badly hurt.,You gain more healing and radiant options than other sorcerers.\n\n## Features\n\n- **Level 3: Divine Magic** - Learn sacred spells alongside sorcerer magic.\n- **Level 6: Empowered Healing** - Boost a healing moment with divine sorcery.\n- **Level 10: Otherworldly Wings** - Move with radiant grace and protect yourself briefly.\n- **Level 14: Unearthly Recovery** - Recover a large amount of HP when badly hurt.\n- **Level 18: Divine Conduit** - Recover spell power and bless the party with temporary HP.\n\n## Active Abilities\n\n- **Level 6: Empowered Healing** (resource: bonusAction, refresh: shortRest, uses: 1) - Pour divine sorcery into the party, restoring a modest amount of HP.\n- **Level 10: Otherworldly Wings** (resource: bonusAction, refresh: shortRest, uses: 1) - Move with radiant grace, gaining speed, AC, and a radiant weapon rider.\n- **Level 14: Unearthly Recovery** (resource: bonusAction, refresh: longRest, uses: 1) - When badly hurt, flood yourself with divine recovery.\n- **Level 18: Divine Conduit** (resource: action, refresh: longRest, uses: 1) - Open a divine conduit. The party gains temporary HP and divine protection.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-warlock-fiend-patron",
+                "title": "Warlock: The Fiend",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "warlock",
+                        "fiend-patron"
+                ],
+                "content": "# The Fiend\n\n**Class:** [[class-warlock|Warlock]]\n\nA destructive patron path that feeds on kills, fire, and infernal resilience.\n\n## Gameplay Guide\n\nFiend warlocks lean on infernal luck and burst damage.,Use Hurl Through Hell when one target needs to disappear under a huge infernal burst.\n\n## Features\n\n- **Level 3: Dark One's Blessing** - Feed on victory, gaining temporary HP after a kill or as an infernal combat burst.\n- **Level 6: Dark One's Own Luck** - Add infernal luck to an important roll.\n- **Level 10: Fiendish Resilience** - Briefly resist common dungeon damage with infernal toughness.\n- **Level 14: Hurl Through Hell** - Banish a foe through nightmare fire for heavy damage.\n- **Level 18: Infernal Patronage** - Recover pact power and ready hellfire when your patron pushes you onward.\n\n## Active Abilities\n\n- **Level 3: Dark One's Blessing** (resource: bonusAction, refresh: shortRest, uses: 1) - Draw infernal vigor from violence. Gain temporary HP for the next exchange.\n- **Level 6: Dark One's Own Luck** (resource: bonusAction, refresh: shortRest, uses: 1) - Call on infernal luck. Your next attack or save gains a strong bonus.\n- **Level 10: Fiendish Resilience** (resource: bonusAction, refresh: shortRest, uses: 1) - Harden yourself with fiendish resilience, resisting fire and poison briefly.\n- **Level 14: Hurl Through Hell** (resource: action, refresh: longRest, uses: 1) - Hurl a visible enemy through infernal torment, dealing psychic and fire damage and briefly banishing it.\n- **Level 18: Infernal Patronage** (resource: bonusAction, refresh: longRest, uses: 1) - Your patron pours power back into you. Recover pact spell points and ready hellfire.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-warlock-hexblade",
+                "title": "Warlock: The Hexblade",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "warlock",
+                        "hexblade"
+                ],
+                "content": "# The Hexblade\n\n**Class:** [[class-warlock|Warlock]]\n\nA cursed weapon warlock who marks prey and calls a specter ally.\n\n## Gameplay Guide\n\nHexblade plays like a curse duelist. Curse the target you want dead, then attack or blast it down.,Hexblade weapon attacks use Charisma for hit and damage in this game, so CHA stays your main combat stat.,Accursed Specter calls a short-lived spirit that fights beside you after you claim a soul.\n\n## Features\n\n- **Level 3: Hexblade's Curse** - Mark a foe so your hits against it are stronger.\n- **Level 6: Accursed Specter** - Call a short-duration specter ally.\n- **Level 10: Armor of Hexes** - When your curse is active, wrap yourself in defensive shadow.\n- **Level 14: Master of Hexes** - Move your curse's pressure into another strike when a target falls.\n- **Level 18: Cursed Sovereign** - Empower your curse against multiple enemies or one doomed target.\n\n## Active Abilities\n\n- **Level 3: Hexblade's Curse** (resource: bonusAction, refresh: shortRest, uses: 1) - Curse your prey. Your next weapon hit or blast deals extra necrotic damage and marks it.\n- **Level 6: Accursed Specter** (resource: action, refresh: longRest, uses: 1) - Call a short-lived specter that keeps its distance and harrys enemies.\n- **Level 10: Armor of Hexes** (resource: reaction, refresh: shortRest, uses: 1) - Let cursed shadow bend a strike away from you, raising your AC briefly.\n- **Level 14: Master of Hexes** (resource: bonusAction, refresh: shortRest, uses: 1) - Carry your curse onward. Your next hit deals necrotic damage and marks the new target.\n- **Level 18: Cursed Sovereign** (resource: action, refresh: longRest, uses: 1) - Unleash your curse in a burst, damaging and marking nearby enemies.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-warlock-great-old-one",
+                "title": "Warlock: The Great Old One",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "warlock",
+                        "great-old-one"
+                ],
+                "content": "# The Great Old One\n\n**Class:** [[class-warlock|Warlock]]\n\nAn alien mind patron that turns psychic pressure into fear, confusion, and brief domination.\n\n## Gameplay Guide\n\nGreat Old One controls the fight. Use psychic marks to weaken targets before they hurt the party.,Alien Thrall briefly turns a creature against its allies. Powerful foes resist full control but still suffer mental disruption.\n\n## Features\n\n- **Level 3: Psychic Intrusion** - Press alien thoughts into a target, dealing psychic damage and shaking its attacks.\n- **Level 6: Entropic Ward** - Twist probability to protect yourself and set up your next strike.\n- **Level 10: Thought Shield** - Resist psychic pressure and punish minds that strike yours.\n- **Level 14: Alien Thrall** - Briefly dominate an enemy or weaken a boss-safe target.\n- **Level 18: Elder Revelation** - Unleash a psychic burst that frightens the room.\n\n## Active Abilities\n\n- **Level 3: Psychic Intrusion** (resource: bonusAction, refresh: shortRest, uses: 1) - Press alien thoughts into a target, dealing psychic damage and shaking its attacks.\n- **Level 6: Entropic Ward** (resource: reaction, refresh: shortRest, uses: 1) - Twist a dangerous moment aside. Gain AC now and advantage on your next attack.\n- **Level 10: Thought Shield** (resource: bonusAction, refresh: shortRest, uses: 1) - Shield your mind, resisting psychic damage and preparing a psychic backlash.\n- **Level 14: Alien Thrall** (resource: action, refresh: longRest, uses: 1) - Briefly turn an enemy against its allies. Bosses suffer a weaker beguiled effect instead.\n- **Level 18: Elder Revelation** (resource: action, refresh: longRest, uses: 1) - Unleash a terrifying psychic wave around you.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-wizard-school-evocation",
+                "title": "Wizard: School of Evocation",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "wizard",
+                        "school-evocation"
+                ],
+                "content": "# School of Evocation\n\n**Class:** [[class-wizard|Wizard]]\n\nA battle wizard who throws safer, stronger blasts.\n\n## Gameplay Guide\n\nEvocation is the direct blaster school. Use Overchannel when a spell or strike needs to hit especially hard.,Use Overchannel when one spell needs to hit as hard as possible.\n\n## Features\n\n- **Level 3: Sculpt Spells** - Your area evocation spells are shaped around allies in this crawler's monster-targeting spell system.\n- **Level 6: Potent Cantrip** - Prepare a cantrip or quick blast to hit harder.\n- **Level 10: Empowered Evocation** - Drive extra Intelligence-fueled force into your next evocation hit.\n- **Level 14: Overchannel** - Once per rest, push a damage spell beyond normal limits.\n- **Level 18: Arch-Evoker** - Your first big blast in a hard fight becomes cheaper to follow up.\n\n## Active Abilities\n\n- **Level 6: Potent Cantrip** (resource: bonusAction, refresh: shortRest, uses: 1) - Empower a simple spell rhythm. Your next hit carries extra force damage.\n- **Level 10: Empowered Evocation** (resource: bonusAction, refresh: shortRest, uses: 1) - Add raw evocation force to your next spell or weapon hit.\n- **Level 14: Overchannel** (resource: bonusAction, refresh: longRest, uses: 1) - Overload your next spell or weapon hit with raw evocation force.\n- **Level 18: Arch-Evoker** (resource: bonusAction, refresh: shortRest, uses: 1) - Recover spell points after shaping a major blast, letting you keep pressure on the room.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-wizard-school-necromancy",
+                "title": "Wizard: School of Necromancy",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "wizard",
+                        "school-necromancy"
+                ],
+                "content": "# School of Necromancy\n\n**Class:** [[class-wizard|Wizard]]\n\nA death mage who drains life and fights beside a simple undead ally.\n\n## Gameplay Guide\n\nNecromancy rewards finishing enemies with spells and spending actions to call an undead helper.,The undead fights on its own beside the party. If the space is too crowded, its power becomes an immediate skeletal strike instead.\n\n## Features\n\n- **Level 3: Grim Harvest** - When death magic finishes a foe, recover through necromantic momentum.\n- **Level 6: Undead Thrall** - Summon a temporary skeletal ally that fights beside you.\n- **Level 10: Inured to Undeath** - Briefly harden yourself against necrotic harm and draining effects.\n- **Level 14: Command Undead** - Briefly dominate or frighten an undead or death-marked enemy.\n- **Level 18: Deathly Conduit** - Necrotic power heals you and strengthens your death magic.\n\n## Active Abilities\n\n- **Level 3: Grim Harvest** (resource: bonusAction, refresh: shortRest, uses: 1) - Draw strength from death magic, recovering HP before returning to the fight.\n- **Level 6: Undead Thrall** (resource: action, refresh: shortRest, uses: 1) - Raise a skeletal ally for this fight. If there is no room, a skeletal strike hits your target instead.\n- **Level 10: Inured to Undeath** (resource: bonusAction, refresh: shortRest, uses: 1) - Wrap yourself in deathly endurance, resisting necrotic damage for several rounds.\n- **Level 14: Command Undead** (resource: action, refresh: longRest, uses: 1) - Force an undead or death-marked enemy to turn on its allies for a short time. Powerful foes suffer fear instead.\n- **Level 18: Deathly Conduit** (resource: bonusAction, refresh: longRest, uses: 1) - Open a deathly conduit. Heal yourself and make your next hit deal necrotic damage.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        },
+        {
+                "id": "subclass-wizard-school-divination",
+                "title": "Wizard: School of Divination",
+                "folder": "Classes",
+                "tags": [
+                        "subclass",
+                        "wizard",
+                        "school-divination"
+                ],
+                "content": "# School of Divination\n\n**Class:** [[class-wizard|Wizard]]\n\nA fate reader who stores luck, reveals danger, and bends key rolls.\n\n## Gameplay Guide\n\nDivination is about control and foresight. Use Portent before a key attack or save.,Third Eye reveals practical dungeon threats such as traps and hidden danger.\n\n## Features\n\n- **Level 3: Portent** - Store a fate die and spend it as a bonus to your next important roll.\n- **Level 6: Expert Divination** - Reading the fight restores a little spell power.\n- **Level 10: Third Eye** - Reveal nearby traps and gain initiative foresight.\n- **Level 14: Greater Portent** - Hold an even stronger fate die for a decisive moment.\n- **Level 18: Fate Master** - Once per rest, force fate strongly toward an ally's success.\n\n## Active Abilities\n\n- **Level 3: Portent Die** (resource: bonusAction, refresh: longRest, uses: 2) - Read the next few heartbeats. Your next attack or spell gains a strong accuracy bonus.\n- **Level 6: Expert Divination** (resource: bonusAction, refresh: shortRest, uses: 1) - Turn a glimpse of the future into recovered spell power.\n- **Level 10: Third Eye** (resource: action, refresh: shortRest, uses: 1) - Open your sight to the dungeon. Nearby traps are revealed and you gain initiative-like focus.\n- **Level 14: Greater Portent** (resource: bonusAction, refresh: longRest, uses: 3) - Force a stronger omen into the moment. Your next attack or save gains a major bonus.\n- **Level 18: Fate Master** (resource: bonusAction, refresh: longRest, uses: 1) - Bend fate hard in your favor. Your next attack has advantage and your next save is heavily protected.",
+                "images": [],
+                "updatedAt": "2026-06-09T00:00:00.000Z"
+        }
+];
       const seedData = {
-        folders: ["World Bible", "Gods", "Handouts", "Factions", "Places", "Campaigns", "Relics", "Naming", "Images", "Archive"],
+        folders: ["World Bible", "Gods", "Races", "Classes", "Spells", "Handouts", "Factions", "Places", "Campaigns", "Relics", "Naming", "Images", "Archive"],
         articles: [
           {
             id: "world-bible-core",
@@ -1946,6 +2940,9 @@ Depthbound is a **broken post-empire frontier** where dungeon crawling is also m
 ## People and Powers
 
 - [[major-deities|Gods, Saints, and Divine Powers]]
+- [[rules-races-overview|Playable Races Overview]]
+- [[rules-classes-overview|Playable Classes Overview]]
+- [[rules-spells-compendium|Spell Compendium]]
 - [[faction-overview|Faction Overview]]
 - [[campaign-overview|Campaign Overview]]
 - [[naming-conventions|Naming Conventions]]
@@ -2877,6 +3874,18 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
             images: [],
             updatedAt: seedTime,
           },
+          ...rulesArticles,
+          {
+            id: "rules-spells-compendium",
+            title: "Spell Compendium",
+            folder: "Spells",
+            tags: ["rules", "spells", "classes", "live data"],
+            content: `# Spell Compendium
+
+This page reads from the actual game spell registry when opened. Use the live search and filters below to browse by spell level and class.`,
+            images: [],
+            updatedAt: seedTime,
+          },
           ...deityBookletArticles,
           ...deityHandoutArticles,
           {
@@ -2893,6 +3902,7 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
 
       let library = loadLibrary();
       let selectedId = articleIdFromHash() || library.articles[0]?.id || "";
+      const collapsedFolders = new Set(library.folders);
 
       const els = {
         search: document.querySelector("#lore-search"),
@@ -2967,7 +3977,9 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
             && !existing.content.includes("[[");
           const needsReligionRework = migrated.religionReworkVersion !== 4
             && (reworkedReligionIds.has(seedArticle.id) || seedArticle.id.startsWith("handout-") || seedArticle.id.startsWith("booklet-"));
-          if (isOldSeedDump || isOldStarterPage || needsReligionRework) {
+          const needsRulesRefresh = migrated.rulesDataVersion !== 2
+            && (seedArticle.id.startsWith("race-") || seedArticle.id.startsWith("class-") || seedArticle.id.startsWith("subclass-") || seedArticle.id.startsWith("rules-"));
+          if (isOldSeedDump || isOldStarterPage || needsReligionRework || needsRulesRefresh) {
             existing.title = seedArticle.title;
             existing.folder = seedArticle.folder;
             existing.tags = seedArticle.tags;
@@ -2981,6 +3993,7 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
           "god-arkhon",
         ].includes(article.id));
         migrated.religionReworkVersion = 4;
+        migrated.rulesDataVersion = 2;
         return migrated;
       }
 
@@ -3120,6 +4133,210 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
         return output.join("");
       }
 
+      const gameContentScripts = [
+        "../src/scripts/content/registry.js",
+        "../src/scripts/content/spells/core-spells.js",
+        "../src/scripts/content/classes/barbarian.js",
+        "../src/scripts/content/classes/fighter.js",
+        "../src/scripts/content/classes/monk.js",
+        "../src/scripts/content/classes/rogue.js",
+        "../src/scripts/content/classes/cleric.js",
+        "../src/scripts/content/classes/druid.js",
+        "../src/scripts/content/classes/wizard.js",
+        "../src/scripts/content/classes/bard.js",
+        "../src/scripts/content/classes/sorcerer.js",
+        "../src/scripts/content/classes/paladin.js",
+        "../src/scripts/content/classes/ranger.js",
+        "../src/scripts/content/classes/warlock.js",
+        "../src/scripts/content/classes/sidekick-warrior.js",
+        "../src/scripts/content/classes/sidekick-expert.js",
+        "../src/scripts/content/classes/sidekick-spellcaster.js",
+        "../src/scripts/content/classes/subclass-packs.js",
+      ];
+      let gameContentLoadPromise = null;
+
+      function loadScriptOnce(src) {
+        return new Promise((resolve, reject) => {
+          const existing = document.querySelector(`script[data-lore-runtime-src="${CSS.escape(src)}"]`);
+          if (existing?.dataset.loaded === "true") {
+            resolve();
+            return;
+          }
+          if (existing) {
+            existing.addEventListener("load", () => resolve(), { once: true });
+            existing.addEventListener("error", () => reject(new Error(`Could not load ${src}`)), { once: true });
+            return;
+          }
+          const script = document.createElement("script");
+          script.src = src;
+          script.dataset.loreRuntimeSrc = src;
+          script.addEventListener("load", () => {
+            script.dataset.loaded = "true";
+            resolve();
+          }, { once: true });
+          script.addEventListener("error", () => reject(new Error(`Could not load ${src}`)), { once: true });
+          document.head.append(script);
+        });
+      }
+
+      function loadGameContent() {
+        if (!gameContentLoadPromise) {
+          gameContentLoadPromise = gameContentScripts.reduce(
+            (promise, src) => promise.then(() => loadScriptOnce(src)),
+            Promise.resolve(),
+          );
+        }
+        return gameContentLoadPromise;
+      }
+
+      function spellLevelLabel(level) {
+        return Number(level) === 0 ? "Cantrip" : `Level ${level}`;
+      }
+
+      function labelFromId(id) {
+        return String(id || "")
+          .replace(/[-_]/g, " ")
+          .replace(/\b\w/g, (char) => char.toUpperCase());
+      }
+
+      function spellRangeText(range) {
+        if (!range) return "";
+        if (typeof range === "string") return range;
+        if (range.kind === "self") return range.feet ? `Self (${range.feet} ft)` : "Self";
+        if (range.kind === "touch") return "Touch";
+        if (range.kind === "melee") return range.feet ? `Melee (${range.feet} ft)` : "Melee";
+        if (range.feet) return `${range.feet} ft`;
+        return labelFromId(range.kind);
+      }
+
+      function spellDurationText(spell) {
+        if (spell.concentration) return "Concentration";
+        const duration = spell.duration;
+        if (!duration) return "";
+        if (typeof duration === "string") return duration;
+        if (duration.kind === "rounds") return `${duration.rounds} round${duration.rounds === 1 ? "" : "s"}`;
+        if (duration.kind === "minutes") return `${duration.minutes} minute${duration.minutes === 1 ? "" : "s"}`;
+        return labelFromId(duration.kind);
+      }
+
+      function classNameMap() {
+        return Object.fromEntries((window.DungeonContent?.list("classes") || []).map((entry) => [
+          entry.classId || entry.id,
+          entry.className || entry.name || labelFromId(entry.classId || entry.id),
+        ]));
+      }
+
+      function spellSearchHaystack(spell, classNames) {
+        return [
+          spell.id,
+          spell.name,
+          spell.school,
+          spell.description,
+          spell.resource,
+          spell.target,
+          ...(spell.classes || []),
+          ...(spell.classes || []).map((id) => classNames[id] || id),
+        ].join(" ").toLowerCase();
+      }
+
+      function renderSpellCompendium() {
+        const mount = document.querySelector("#spell-compendium");
+        if (!mount) return;
+        mount.innerHTML = `<div class="lore-empty">Loading live spell data...</div>`;
+        loadGameContent()
+          .then(() => {
+            const spells = (window.DungeonContent?.list("spells") || [])
+              .filter((spell) => !spell.aliasOf)
+              .sort((a, b) => (a.level ?? 0) - (b.level ?? 0) || String(a.name).localeCompare(String(b.name)));
+            const classes = classNameMap();
+            const classIds = Array.from(new Set(spells.flatMap((spell) => spell.classes || []))).sort((a, b) => (classes[a] || a).localeCompare(classes[b] || b));
+            mount.innerHTML = `
+              <div class="spell-compendium">
+                <div class="spell-controls">
+                  <label class="lore-field">
+                    Search spells
+                    <input id="spell-search" type="search" placeholder="Name, class, school, text..." />
+                  </label>
+                  <label class="lore-field">
+                    Level
+                    <select id="spell-level-filter">
+                      <option value="all">All levels</option>
+                      ${Array.from({ length: 10 }, (_, level) => `<option value="${level}">${spellLevelLabel(level)}</option>`).join("")}
+                    </select>
+                  </label>
+                  <label class="lore-field">
+                    Class
+                    <select id="spell-class-filter">
+                      <option value="all">All classes</option>
+                      ${classIds.map((id) => `<option value="${escapeHtml(id)}">${escapeHtml(classes[id] || labelFromId(id))}</option>`).join("")}
+                    </select>
+                  </label>
+                </div>
+                <div id="spell-summary" class="spell-summary"></div>
+                <div id="spell-results" class="spell-grid"></div>
+              </div>
+            `;
+
+            const search = mount.querySelector("#spell-search");
+            const levelFilter = mount.querySelector("#spell-level-filter");
+            const classFilter = mount.querySelector("#spell-class-filter");
+            const summary = mount.querySelector("#spell-summary");
+            const results = mount.querySelector("#spell-results");
+
+            const update = () => {
+              const query = search.value.trim().toLowerCase();
+              const level = levelFilter.value;
+              const classId = classFilter.value;
+              const filtered = spells.filter((spell) => {
+                if (level !== "all" && String(spell.level ?? 0) !== level) return false;
+                if (classId !== "all" && !(spell.classes || []).includes(classId)) return false;
+                if (query && !spellSearchHaystack(spell, classes).includes(query)) return false;
+                return true;
+              });
+              summary.textContent = `${filtered.length} of ${spells.length} spells`;
+              results.innerHTML = filtered.map((spell) => {
+                const classText = (spell.classes || []).map((id) => classes[id] || labelFromId(id)).join(", ") || "No class list";
+                const range = spellRangeText(spell.range);
+                const duration = spellDurationText(spell);
+                const meta = [
+                  spellLevelLabel(spell.level ?? 0),
+                  spell.school ? labelFromId(spell.school) : "",
+                  spell.resource ? labelFromId(spell.resource) : "",
+                  range,
+                  duration,
+                  spell.minCharacterLevelFull ? `Full caster L${spell.minCharacterLevelFull}+` : "",
+                  spell.minCharacterLevelHalf && spell.minCharacterLevelHalf < 99 ? `Half caster L${spell.minCharacterLevelHalf}+` : "",
+                ].filter(Boolean);
+                return `
+                  <article class="spell-card">
+                    <h3>${escapeHtml(spell.name || labelFromId(spell.id))}</h3>
+                    <div class="spell-meta">
+                      ${meta.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+                    </div>
+                    <p><strong>Classes:</strong> ${escapeHtml(classText)}</p>
+                    <p>${escapeHtml(spell.description || "No description listed.")}</p>
+                  </article>
+                `;
+              }).join("") || `<div class="lore-empty">No spells match those filters.</div>`;
+            };
+
+            search.addEventListener("input", update);
+            levelFilter.addEventListener("change", update);
+            classFilter.addEventListener("change", update);
+            update();
+          })
+          .catch((error) => {
+            mount.innerHTML = `<div class="lore-empty">Could not load live spell data: ${escapeHtml(error.message)}</div>`;
+          });
+      }
+
+      function mountSpecialArticle(article) {
+        if (article?.id === "rules-spells-compendium") {
+          els.articleBody.insertAdjacentHTML("beforeend", `<div id="spell-compendium"></div>`);
+          renderSpellCompendium();
+        }
+      }
+
       function renderFolderOptions() {
         const current = els.folderFilter.value || "all";
         els.folderFilter.innerHTML = `<option value="all">All folders</option>${library.folders
@@ -3145,6 +4362,7 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
 
       function renderTree() {
         const articles = filteredArticles();
+        const query = els.search.value.trim().toLowerCase();
         const grouped = new Map();
         library.folders.forEach((folder) => grouped.set(folder, []));
         articles.forEach((article) => {
@@ -3153,10 +4371,15 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
         });
         const html = [...grouped.entries()]
           .filter(([, items]) => items.length)
-          .map(([folder, items]) => `
+          .map(([folder, items]) => {
+            const isCollapsed = !query && collapsedFolders.has(folder);
+            return `
             <section class="lore-folder">
-              <h2 class="lore-folder-title">${escapeHtml(folder)}</h2>
-              <div class="lore-article-list">
+              <button class="lore-folder-toggle" type="button" data-folder-toggle="${escapeHtml(folder)}" aria-expanded="${isCollapsed ? "false" : "true"}">
+                ${escapeHtml(folder)}
+                <span>${isCollapsed ? "+" : "-"} ${items.length}</span>
+              </button>
+              <div class="lore-article-list" ${isCollapsed ? "hidden" : ""}>
                 ${items.map((article) => `
                   <button class="lore-article-button ${article.id === selectedId ? "active" : ""}" type="button" data-id="${escapeHtml(article.id)}">
                     <b>${escapeHtml(article.title)}</b>
@@ -3165,7 +4388,8 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
                 `).join("")}
               </div>
             </section>
-          `).join("");
+          `;
+          }).join("");
         els.tree.innerHTML = html || `<div class="lore-empty">No matching lore entries.</div>`;
       }
 
@@ -3189,6 +4413,7 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
           </figure>
         `).join("");
         els.articleBody.innerHTML = renderMarkdown(article.content);
+        mountSpecialArticle(article);
         renderEditor(article);
         renderTree();
       }
@@ -3374,6 +4599,14 @@ Crownshard Blade, Grave-Bronze Organ Pipe, The Unbroken Lantern, The Seventh Mil
       }
 
       els.tree.addEventListener("click", (event) => {
+        const folderButton = event.target.closest("[data-folder-toggle]");
+        if (folderButton) {
+          const folder = folderButton.dataset.folderToggle;
+          if (collapsedFolders.has(folder)) collapsedFolders.delete(folder);
+          else collapsedFolders.add(folder);
+          renderTree();
+          return;
+        }
         const button = event.target.closest("[data-id]");
         if (!button) return;
         selectArticle(button.dataset.id, { history: "push" });

@@ -96,6 +96,10 @@ function markFighterStableAtZero(fighter) {
 }
 
 function applyDamageToFighter(defender, damage) {
+  if (adminUnlimitedHeroActions(defender) && damage > 0) {
+    addLog(`${defender.name} ignores ${damage} damage in god mode.`, "important");
+    return;
+  }
   if (isWildShaped(defender)) {
     const previousBeastHp = defender.hp;
     defender.hp = Math.max(0, defender.hp - damage);
@@ -862,11 +866,16 @@ function resetTurnResources(fighter) {
 }
 
 function hasReactionAvailable(fighter) {
+  if (adminUnlimitedHeroActions(fighter)) return Boolean(fighter?.alive && !fighter.dead);
   return Boolean(fighter?.alive && !fighter.dead && fighter.hasReaction);
 }
 
 function consumeReaction(fighter, label = "reaction") {
   if (!hasReactionAvailable(fighter)) return false;
+  if (adminUnlimitedHeroActions(fighter)) {
+    addLog(`${fighter.name} uses their reaction${label ? ` for ${label}` : ""} in god mode.`, "important");
+    return true;
+  }
   fighter.hasReaction = false;
   addLog(`${fighter.name} uses their reaction${label ? ` for ${label}` : ""}.`, "important");
   return true;
@@ -1111,10 +1120,12 @@ function abilityResourceSpentForCombat(fighter, ability) {
 }
 
 function canSpendCombatAbility(fighter, ability) {
+  if (adminUnlimitedHeroActions(fighter)) return Boolean(ability && (fighter.level ?? 1) >= (ability.level ?? 1));
   return Boolean(ability && (fighter.level ?? 1) >= (ability.level ?? 1) && abilityResourceSpentForCombat(fighter, ability) < abilityMaxUses(fighter, ability));
 }
 
 function spendCombatAbilityUse(fighter, ability) {
+  if (adminUnlimitedHeroActions(fighter)) return;
   fighter.abilityUses = { ...(fighter.abilityUses ?? {}) };
   fighter.abilityUses[ability.id] = (fighter.abilityUses[ability.id] ?? 0) + 1;
 }
@@ -1654,6 +1665,26 @@ function removeSummonedAllies(reason = "fade") {
   state.party.heroIds = (state.party.heroIds ?? []).filter((id) => !summonIds.includes(id));
   state.party.rosterIds = (state.party.rosterIds ?? []).filter((id) => !summonIds.includes(id));
   state.initiative = (state.initiative ?? []).filter((entry) => !summonIds.includes(entry.fighterId));
+}
+
+function compactDefeatedHostileMonsters() {
+  const partyIds = new Set([...(state.party?.heroIds ?? []), ...(state.party?.rosterIds ?? [])]);
+  const removeIds = Object.values(state.fighters ?? {})
+    .filter((fighter) =>
+      fighter &&
+      !partyIds.has(fighter.id) &&
+      !fighter.alive &&
+      fighter.team !== "heroes" &&
+      !fighter.friendly &&
+      !fighter.summonedByHeroId &&
+      !fighter.tavernRecruit,
+    )
+    .map((fighter) => fighter.id);
+  if (!removeIds.length) return 0;
+  for (const id of removeIds) delete state.fighters[id];
+  state.initiative = (state.initiative ?? []).filter((entry) => !removeIds.includes(entry.fighterId));
+  if (selectedAttackTargetId && removeIds.includes(selectedAttackTargetId)) selectedAttackTargetId = null;
+  return removeIds.length;
 }
 
 function attacksPerAttackAction(fighter) {
@@ -4743,8 +4774,8 @@ function dropLootForMonster(monster) {
     window.DepthboundAchievements?.bossLoot?.(monster, loot.items ?? []);
   }
   const resolvedLoot = resolveMonsterLootDrop(monster, loot);
-  if (!resolvedLoot) return;
-  addLootPile(resolvedLoot);
+  if (resolvedLoot) addLootPile(resolvedLoot);
+  compactDefeatedHostileMonsters();
 }
 
 function addLootPile(loot) {
@@ -5405,6 +5436,7 @@ function threatPresent() {
 function endCurrentEncounter() {
   endRages("as the fight ends");
   removeSummonedAllies("fades as the fight ends");
+  compactDefeatedHostileMonsters();
   partyHeroes().forEach(clearTurnScopedCombatState);
   state.deathSaveAfterVictoryLogged = false;
   state.combatStarted = false;
@@ -5535,6 +5567,7 @@ function debugKillVisibleMonsters() {
     monster.hp = 0;
     monster.alive = false;
   });
+  compactDefeatedHostileMonsters();
   const shouldClearFightingPitWave =
     typeof handleFightingPitWaveClear === "function" &&
     typeof fightingPitCurrentRun === "function" &&
@@ -7114,6 +7147,7 @@ function metamagicPoolSpent(fighter) {
 
 function canSpendMetamagic(caster, spell, ability) {
   if (!ability || (caster.level ?? 1) < (ability.level ?? 1)) return false;
+  if (adminUnlimitedHeroActions(caster)) return true;
   return metamagicPoolSpent(caster) + metamagicCostForSpell(spell, ability) <= abilityMaxUses(caster, ability);
 }
 
@@ -7164,6 +7198,7 @@ function applyMetamagicToSpell(caster, spell, ability) {
 function spendMetamagic(caster, spell) {
   const meta = spell?.metamagic;
   if (!meta?.id) return;
+  if (adminUnlimitedHeroActions(caster)) return;
   const ability = metamagicAbilityForSpell(caster, meta.id);
   if (!ability) return;
   caster.abilityUses = { ...(caster.abilityUses ?? {}) };
@@ -7364,7 +7399,7 @@ async function maybeApplyFavoredFoe(attacker, defender) {
     const id = concentrationId(attacker);
     attacker.concentration = { id, spellId: "favored-foe", spellName: "Favored Foe" };
     attacker.abilityUses = { ...(attacker.abilityUses ?? {}) };
-    attacker.abilityUses[ability.id] = (attacker.abilityUses[ability.id] ?? 0) + 1;
+    if (!adminUnlimitedHeroActions(attacker)) attacker.abilityUses[ability.id] = (attacker.abilityUses[ability.id] ?? 0) + 1;
     applyStatusEffect(defender, { id: `favored-foe-${attacker.id}`, label: "Favored Foe", sourceId: attacker.id, concentrationId: id, durationRounds: 10 });
     target = defender;
     addLog(`${attacker.name} marks ${defender.name} as a favored foe.`, "important");
@@ -7382,27 +7417,30 @@ async function maybeApplyFavoredFoe(attacker, defender) {
 
 function canPaySpellCost(caster, spell) {
   if (spellBaseLevel(spell) === 0) return true;
+  if (adminUnlimitedHeroActions(caster)) return true;
   ensureSpellPointState(caster);
   return (caster.spellPoints ?? 0) >= spellPointCost(spell);
 }
 
 function canCastSpell(caster, spell) {
   const fromScroll = Boolean(spell?.castFromScroll);
+  const unlimited = adminUnlimitedHeroActions(caster);
   if (!heroCanAct(caster) || !spell || (!fromScroll && !canPaySpellCost(caster, spell))) return false;
   if (fromScroll && caster?.classId === "barbarian" && fighterIsRaging(caster)) return false;
-  if (fromScroll && !caster?.inventory?.items?.some((item) => item.id === spell.scrollItemId)) return false;
-  if (spell.potionBreath && !(caster?.statusEffects ?? []).some((effect) => effect.potionBreath?.type === spell.effect?.type && (Number(effect.potionBreath?.uses ?? 0) || 0) > 0)) return false;
-  if (!fromScroll && spell.metamagic?.id && !canSpendMetamagic(caster, spell, metamagicAbilityForSpell(caster, spell.metamagic.id))) return false;
+  if (fromScroll && !unlimited && !caster?.inventory?.items?.some((item) => item.id === spell.scrollItemId)) return false;
+  if (spell.potionBreath && !unlimited && !(caster?.statusEffects ?? []).some((effect) => effect.potionBreath?.type === spell.effect?.type && (Number(effect.potionBreath?.uses ?? 0) || 0) > 0)) return false;
+  if (!fromScroll && spell.metamagic?.id && !unlimited && !canSpendMetamagic(caster, spell, metamagicAbilityForSpell(caster, spell.metamagic.id))) return false;
   if (isWildShaped(caster) && (caster.level ?? 1) < 18) return false;
-  if (!fromScroll && spell.id === "dragonborn-breath" && (caster.abilityUses?.dragonbornBreath ?? 0) >= 1) return false;
+  if (!fromScroll && spell.id === "dragonborn-breath" && !unlimited && (caster.abilityUses?.dragonbornBreath ?? 0) >= 1) return false;
   if (!fromScroll && spell.racialAbilityId) {
     const ability = fighterAbilityDefinitions(caster).find((entry) => entry.id === spell.racialAbilityId);
     if (!ability || (caster.level ?? 1) < (ability.level ?? 1)) return false;
-    if ((caster.abilityUses?.[ability.id] ?? 0) >= abilityMaxUses(caster, ability)) return false;
+    if (!unlimited && (caster.abilityUses?.[ability.id] ?? 0) >= abilityMaxUses(caster, ability)) return false;
   }
   if (state.mode === "combat") {
-    if (spell.resource === "reaction") return Boolean(caster.hasReaction);
+    if (spell.resource === "reaction") return unlimited || Boolean(caster.hasReaction);
     if (activeFighter()?.id !== caster.id) return false;
+    if (unlimited) return true;
     if (["bonusAction", "weaponRider"].includes(spell.resource)) return Boolean(caster.hasBonusAction);
     return Boolean(caster.hasAction);
   }
@@ -7424,10 +7462,11 @@ function consumeSpellScrollItem(caster, spell) {
 function spendSpellResources(caster, spell) {
   if (spell.concentration) startConcentration(caster, spell);
   const fromScroll = Boolean(spell?.castFromScroll);
-  if (fromScroll) {
+  const unlimited = adminUnlimitedHeroActions(caster);
+  if (fromScroll && !unlimited) {
     consumeSpellScrollItem(caster, spell);
   }
-  if (spell.potionBreath) {
+  if (spell.potionBreath && !unlimited) {
     const effect = (caster.statusEffects ?? []).find((entry) => entry.potionBreath?.type === spell.effect?.type && (Number(entry.potionBreath?.uses ?? 0) || 0) > 0);
     if (effect?.potionBreath) {
       effect.potionBreath.uses = Math.max(0, (Number(effect.potionBreath.uses ?? 0) || 0) - 1);
@@ -7439,19 +7478,19 @@ function spendSpellResources(caster, spell) {
       }
     }
   }
-  if (!fromScroll && spell.id === "dragonborn-breath") {
+  if (!fromScroll && !unlimited && spell.id === "dragonborn-breath") {
     caster.abilityUses = { ...(caster.abilityUses ?? {}), dragonbornBreath: 1 };
   }
-  if (!fromScroll && spell.racialAbilityId) {
+  if (!fromScroll && !unlimited && spell.racialAbilityId) {
     caster.abilityUses = { ...(caster.abilityUses ?? {}), [spell.racialAbilityId]: (caster.abilityUses?.[spell.racialAbilityId] ?? 0) + 1 };
   }
   const cost = spellPointCost(spell);
-  if (!fromScroll && cost > 0) {
+  if (!fromScroll && !unlimited && cost > 0) {
     caster.spellPoints = Math.max(0, (caster.spellPoints ?? 0) - cost);
     addLog(`${caster.name} spends ${cost} SP on ${spell.name} (spell level ${spellCastLevel(spell)}).`, "important");
   }
-  if (!fromScroll) spendMetamagic(caster, spell);
-  if (state.mode === "combat") {
+  if (!fromScroll && !unlimited) spendMetamagic(caster, spell);
+  if (state.mode === "combat" && !unlimited) {
     if (spell.resource === "reaction") caster.hasReaction = false;
     else if (["bonusAction", "weaponRider"].includes(spell.resource)) caster.hasBonusAction = false;
     else caster.hasAction = false;

@@ -124,6 +124,24 @@ npc("apothecary", {
   description: "Disease diagnosis and treatment.",
 });
 
+npc("sister-maelis", {
+  name: "Sister Maelis",
+  title: "Keeper of the Graveyard",
+  portrait: "assets/tokens/Sister_Maelis.png",
+  token: { fallbackLabel: "SM" },
+  dialogue: {
+    entryLines: [
+      "Do not step on that grave. He was disagreeable in life and has not improved.",
+      "No, the funeral bell is not for sale.",
+      "The dead rarely mind visitors. They mind thieves.",
+      "Breathe. If you can still do that, most problems remain negotiable.",
+    ],
+  },
+  inspection:
+    "Sister Maelis is a Naevran graveyard keeper and local Gravebinder with dark practical robes, a lantern, a funeral bell, ink-stained fingers, and grave-thread bracelets. She protects names, bodies, ghosts, and records from being turned into tools by the Depth.",
+  description: "Graveyard keeper, resurrection witness, and Naevran priestess.",
+});
+
 npc("grumpy-wizard", {
   name: "Old Master Vell",
   title: "Grumpy Old Wizard",

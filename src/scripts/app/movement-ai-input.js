@@ -53,6 +53,7 @@ function isAiAllySafeStep(fighter, position, destination = null) {
 }
 
 function movementLimitFor(fighter) {
+  if (adminUnlimitedHeroActions(fighter)) return Infinity;
   return state.mode === "combat" ? fighter.movementLeft : Infinity;
 }
 
@@ -153,7 +154,8 @@ function sleep(ms) {
 }
 
 async function moveFighterAlongPath(fighter, path, silent = false) {
-  if (!heroCanAct(fighter) || (state.mode === "combat" && fighter.movementLeft <= 0)) return false;
+  const unlimitedMovement = adminUnlimitedHeroActions(fighter);
+  if (!heroCanAct(fighter) || (state.mode === "combat" && fighter.movementLeft <= 0 && !unlimitedMovement)) return false;
   const pathCost = (path ?? []).reduce((total, step) => total + movementCostAtPosition(step, fighter), 0);
   if (!path || path.length === 0 || pathCost > movementLimitFor(fighter)) return false;
   if (!canEndMovementOnTile(fighter, path.at(-1))) return false;
@@ -182,9 +184,9 @@ async function moveFighterAlongPath(fighter, path, silent = false) {
         stoppedByOpportunityDamage = true;
         break;
       }
-      if (state.mode === "combat" && fighter.movementLeft <= 0) break;
+      if (state.mode === "combat" && fighter.movementLeft <= 0 && !unlimitedMovement) break;
     }
-    if (!fighter.alive || fighter.hp <= 0 || (state.mode === "combat" && fighter.movementLeft <= 0)) break;
+    if (!fighter.alive || fighter.hp <= 0 || (state.mode === "combat" && fighter.movementLeft <= 0 && !unlimitedMovement)) break;
     if (!canMoveGrabbedEntityWithCarrier(fighter, fighter.position, step)) {
       addLog(`${fighter.name} cannot drag ${grabbedEntityMovementLabel(fighter)} any farther.`, "important");
       break;
@@ -224,7 +226,7 @@ async function moveFighterAlongPath(fighter, path, silent = false) {
     if (openedDoor && threatPresent()) break;
   }
 
-  if (state.mode === "combat") {
+  if (state.mode === "combat" && !unlimitedMovement) {
     fighter.movementLeft = Math.max(0, fighter.movementLeft - movedCost);
   }
   fighter.lastMoveFeet = movedSteps * feetPerSquare;
@@ -1494,7 +1496,7 @@ function heroCanStartMovement() {
   if (!gameHasStarted || movementInProgress || state.completed) return false;
   if (state.mode === "home") return heroCanAct(hero) && !isAutonomousAlly(hero);
   if (state.mode === "combat") {
-    return activeFighter()?.id === hero?.id && combatNeedsHeroTurns() && heroCanAct(hero) && hero.movementLeft > 0;
+    return activeFighter()?.id === hero?.id && combatNeedsHeroTurns() && heroCanAct(hero) && (hero.movementLeft > 0 || adminUnlimitedHeroActions(hero));
   }
   return heroCanAct(hero) && !threatPresent();
 }
@@ -1518,12 +1520,12 @@ function tryOpenDoorFromHeroPosition() {
   return door ? openDoor(door, hero) : false;
 }
 
-function tilePositionFromPoint(clientX, clientY) {
+function tilePositionFromPoint(clientX, clientY, geometry = null) {
   const tileLayer = els.room.querySelector(".tile-layer");
-  const rect = tileLayer?.getBoundingClientRect();
+  const rect = geometry?.rect ?? tileLayer?.getBoundingClientRect();
   if (!rect || clientX < rect.left || clientX >= rect.right || clientY < rect.top || clientY >= rect.bottom) return null;
 
-  const tileSize = rect.width / currentGridSize();
+  const tileSize = geometry?.tileSize ?? rect.width / currentGridSize();
   return {
     x: Math.floor((clientX - rect.left) / tileSize),
     y: Math.floor((clientY - rect.top) / tileSize),
@@ -1536,10 +1538,11 @@ function autoPathSegment(fighter, from, to, path) {
 
   const search = (avoidDetectedTraps) => {
     const queue = [{ position: from, steps: [] }];
+    let queueIndex = 0;
     const visited = new Set([positionKey(from), ...path.map(positionKey)]);
 
-    while (queue.length > 0) {
-      const current = queue.shift();
+    while (queueIndex < queue.length) {
+      const current = queue[queueIndex++];
       if (positionKey(current.position) === positionKey(pathGoal)) {
         return current.steps;
       }
@@ -1690,6 +1693,9 @@ function handleHeroPointerDown(event) {
   dragHeroId = heroId;
   lastDragHoverKey = "";
   renderRoom();
+  const dragTileLayer = els.room.querySelector(".tile-layer");
+  const dragRect = dragTileLayer?.getBoundingClientRect();
+  const dragGeometry = dragRect ? { rect: dragRect, tileSize: dragRect.width / currentGridSize() } : null;
 
   let queuedPointerPosition = null;
   let dragFrameRequested = false;
@@ -1702,7 +1708,7 @@ function handleHeroPointerDown(event) {
       if (!queuedPointerPosition) return;
       const pointer = queuedPointerPosition;
       queuedPointerPosition = null;
-      extendDragPath(tilePositionFromPoint(pointer.x, pointer.y));
+      extendDragPath(tilePositionFromPoint(pointer.x, pointer.y, dragGeometry));
     });
   };
 
@@ -1723,7 +1729,7 @@ function handleHeroPointerDown(event) {
   document.addEventListener("pointermove", handlePointerMove);
   document.addEventListener("pointerup", handlePointerUp);
   document.addEventListener("pointercancel", handlePointerCancel);
-  extendDragPath(tilePositionFromPoint(event.clientX, event.clientY));
+  extendDragPath(tilePositionFromPoint(event.clientX, event.clientY, dragGeometry));
 }
 
 function handleMapPanPointerDown(event) {

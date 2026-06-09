@@ -127,7 +127,7 @@ const campaigns = [
     progressTitle: "Find the Barrow Crown",
     progressDescription: "Follow the trail through the Barrow Crown dungeons and recover the relic that keeps the old dead sleeping.",
     completedTitle: "The Barrow Crown Recovered",
-    completedDescription: "The Barrow Crown campaign is complete. The placeholder ending text can be expanded when the finale is fully written.",
+    completedDescription: "The King Beneath is defeated. The dead kingdom under the hills has fallen silent, and Sister Maelis can begin the long work of naming the dead properly.",
   },
   description: `For centuries, the hills north of the old road were left untouched.
 Shepherds avoided them.
@@ -224,6 +224,23 @@ These are placeholder campaign slots using the same 8-dungeon template lineup as
   },
 ];
 
+const barrowCrownFinaleText = {
+  destroy: {
+    name: "The King Beneath",
+    intro: "The final stair leads below the graves, below the ossuaries, below even the oldest roots of the hills.\nThere, beneath the world of the living, waits a kingdom that was never allowed to die.\nYou see stone roads lined with dead soldiers. Empty houses carved into cavern walls. Banners hang without wind. At the center of it all rises a palace of burial stone, its towers pressing against the underside of the earth.\n\nThe Barrow Crown is not worn. It is carried like evidence, like a sentence, like a thing already condemned.\n\nAt the palace gates, the Ashen Herald waits one last time.\n\"Then you come as oathbreakers,\" it says. \"Good. Let the buried king hear a living answer.\"\n\nThe gates open.\n\nIn the throne hall beyond sits the first king, wrapped in royal burial cloth and ancient armor. His eyes burn like coals under a funeral crown that is no longer there.\n\"My crown,\" he says. \"My blood. My kingdom.\"\n\nHis gaze passes over each of you.\n\"My army will destroy everyone that stands in my way.\"",
+    outro: "The King Beneath falls from the throne dais like a statue finally remembering it is dust.\n\nFor one breath, the dead kingdom waits for another order.\n\nNone comes.\n\nThe Barrow Crown breaks in the party's hands. Not into treasure, not into a throne, but into a blade-black shard sharp with the end of command. Where it falls, the stone roads crack. Where it shines, no corpse kneels.\n\nOne by one, the dead soldiers lower their weapons. In the carved houses under the hills, frightened shades lift their faces toward a silence they have never known.\n\nAbove, the barrow hills will still have graves. Below, the kingdom that was never allowed to die begins, at last, to become a tomb.\n\nWhen Sister Maelis hears the bell stop ringing beneath the earth, she closes her ledger and writes only this: No king answered. No crown remained. The names may rest.",
+    completeLog: "The King Beneath is defeated. The Barrow Crown is destroyed, and the exit is ready.",
+    goalText: "Survive all five waves and kill the King Beneath.",
+  },
+  claim: {
+    name: "The Ashen Herald's Challenge",
+    intro: "The final stair leads below the graves, below the ossuaries, below even the oldest roots of the hills.\nThere, beneath the world of the living, waits a kingdom that was never allowed to die.\nYou see stone roads lined with dead soldiers. Empty houses carved into cavern walls. Banners hang without wind. At the center of it all rises a palace of burial stone, its towers pressing against the underside of the earth.\n\nThe Barrow Crown is not on your head yet. It hangs in the air before you, black iron and old gold, cold as judgment.\n\nAt the palace gates, the Ashen Herald waits alone.\n\"You would claim what even kings failed to carry,\" it says. \"Then I must know whether you are strong enough to withstand its power, and wise enough to survive its corruption.\"\n\nBehind the Herald, in the throne hall beyond, sits the corpse of the King Beneath, wrapped in royal burial cloth and ancient armor. The Herald reaches out one ashen hand.\n\nThe corpse of the first king crumbles into dust.\n\nThe dead army rises under the Herald's command.\n\"Stand,\" the Herald says. \"Test them.\"",
+    outro: "The Ashen Herald falls to one knee, its burning wings guttering into gray ash. Around the throne hall, the dead army lowers its weapons. Not in mercy. In recognition.\n\nThe Barrow Crown drifts down from the air and waits before you, heavier than iron, colder than the grave, alive with the need to command.\n\nThe Herald looks up one last time.\n\"Then rule,\" it says. \"And pray you remain yourself long enough to understand what you have taken.\"\n\nThe crown accepts your claim.\n\nFar above, Sister Maelis feels every grave-bell tremble at once. She does not celebrate. She records the hour, the names of the living, and the first warning: the dead are quiet now, but quiet is not the same as free.\n\nFrom this day forward, the Barrow Crown is not lost. It has a bearer. That may save kingdoms. It may also teach the dead to wait for your voice.",
+    completeLog: "The Ashen Herald is defeated. The Barrow Crown accepts its new claimant, and the exit is ready.",
+    goalText: "Survive all five waves and defeat the Ashen Herald.",
+  },
+};
+
 const cache = new Map();
 const overrideStorageKey = "depthbound.campaignDungeonOverrides.v1";
 
@@ -297,21 +314,26 @@ function barrowCrownFinaleBranch(template, gameState = window.state) {
   if (fate !== "destroy" && fate !== "claim") return template;
   const next = clone(template);
   next.barrowCrownDecision = fate;
-  if (fate === "destroy") {
-    return next;
-  } else {
-    next.name = "The Ashen Herald's Challenge";
+  const finale = barrowCrownFinaleText[fate];
+  if (finale) {
+    next.name = finale.name;
     next.intro = {
       ...(next.intro ?? {}),
-      text: "The final stair leads below the graves, below the ossuaries, below even the oldest roots of the hills.\nThere, beneath the world of the living, waits a kingdom that was never allowed to die.\nYou see stone roads lined with dead soldiers. Empty houses carved into cavern walls. Banners hang without wind. At the center of it all rises a palace of burial stone, its towers pressing against the underside of the earth.\n\nThe Barrow Crown is not on your head yet. It hangs in the air before you, black iron and old gold, cold as judgment.\n\nAt the palace gates, the Ashen Herald waits alone.\n\"You would claim what even kings failed to carry,\" it says. \"Then I must know whether you are strong enough to withstand its power, and wise enough to survive its corruption.\"\n\nBehind the Herald, in the throne hall beyond, sits the corpse of the King Beneath, wrapped in royal burial cloth and ancient armor. The Herald reaches out one ashen hand.\n\nThe corpse of the first king crumbles into dust.\n\nThe dead army rises under the Herald's command.\n\"Stand,\" the Herald says. \"Test them.\"",
+      text: finale.intro,
     };
     next.outro = {
       ...(next.outro ?? {}),
-      text: "The Ashen Herald falls to one knee, its burning wings guttering into gray ash. Around the throne hall, the dead army lowers its weapons. Not in mercy. In recognition.\n\nThe Barrow Crown drifts down from the air and waits before you, heavier than iron, colder than the grave, alive with the need to command.\n\nThe Herald looks up one last time.\n\"Then rule,\" it says. \"And pray you remain yourself long enough to understand what you have taken.\"\n\nThe crown accepts your claim.",
+      text: finale.outro,
     };
     if (next.waveEncounter) {
-      next.waveEncounter.completeLog = "The Ashen Herald is defeated. The Barrow Crown accepts its new claimant, and the exit is ready.";
-      next.waveEncounter.goalText = "Survive all five waves and defeat the Ashen Herald.";
+      next.waveEncounter.completeLog = finale.completeLog;
+      next.waveEncounter.goalText = finale.goalText;
+    }
+  }
+  if (fate === "destroy") {
+    return next;
+  } else {
+    if (next.waveEncounter) {
       next.waveEncounter.preWaveStories = {
         ...(next.waveEncounter.preWaveStories ?? {}),
         5: {

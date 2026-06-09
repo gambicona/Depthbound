@@ -65,6 +65,7 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
   const hero = createCombatant({
     ...heroTemplate,
   });
+  const heroFaith = applyClericFaithToHero(hero);
   hero.token = tokenFromName(hero.name, hero.token);
   hero.position = { ...dungeon.startPosition };
   const firstRoom = dungeon.rooms.find((room) => room.id === dungeon.entranceRoomId) ?? dungeon.rooms[0];
@@ -73,6 +74,8 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
   const terrainSummary = terrainFloorSummary(dungeonObjects);
   const encounterTarget = randomDungeonSizeEncounterTarget(dungeonSize?.id, Math.max(0, dungeon.roomCount - 1));
   const monsters = createDungeonMonsters(dungeon, hero.position, heroForDifficulty ?? hero, exit.roomId, dungeonObjects, themeId, encounterTarget, generatorOverrides ?? {});
+
+  const initialPartyTomes = heroFaith ? addClericFaithHandoutToTomes([], heroFaith.id) : [];
 
   return {
     themeId,
@@ -122,7 +125,7 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
     campaignProgress: {},
     questFlags: {},
     partyResources: {},
-    partyTomes: [],
+    partyTomes: initialPartyTomes,
     world: null,
     lootPiles: [],
     dungeonObjects,
@@ -266,15 +269,123 @@ function tomeEntryFromItem(item) {
   };
 }
 
+const clericFaithDefinitions = {
+  lioran: {
+    id: "lioran",
+    name: "Lioran, the Dawn-Bearer",
+    shortName: "Lioran",
+    handoutItemId: "religion-lioran-booklet",
+    summary: "Light, courage, truth, and protection against the cruel uses of darkness.",
+    goodFor: "Good for Light, Peace, Protection, and last-hope clerics.",
+  },
+  maera: {
+    id: "maera",
+    name: "Maera Hearthwise",
+    shortName: "Maera",
+    handoutItemId: "religion-maera-booklet",
+    summary: "Hearths, shelter, guest-right, food, thresholds, and the human duty of welcome.",
+    goodFor: "Good for Life, Peace, Protection-style clerics.",
+  },
+  hadrin: {
+    id: "hadrin",
+    name: "Hadrin Mile-Saint",
+    shortName: "Hadrin",
+    handoutItemId: "religion-hadrin-booklet",
+    summary: "Roads, waymarks, safe passage, honest distance, and the hope of return.",
+    goodFor: "Good for travel, community, Vigilant, and Protection-style clerics.",
+  },
+  naevra: {
+    id: "naevra",
+    name: "Naevra, Keeper of Names",
+    shortName: "Naevra",
+    handoutItemId: "religion-naevra-booklet",
+    summary: "Memory, burial, rightful naming, mercy for the dead, and resistance to undeath.",
+    goodFor: "Good for Grave, Knowledge, mercy, and soul-warden clerics.",
+  },
+  orund: {
+    id: "orund",
+    name: "Orund Embervein",
+    shortName: "Orund",
+    handoutItemId: "religion-orund-booklet",
+    summary: "Forge-work, honest craft, lawful claim, endurance, mines, tools, and oaths.",
+    goodFor: "Good for Forge, Order, Protection, and oath-bound craft clerics.",
+  },
+  thessa: {
+    id: "thessa",
+    name: "Thessa Thorn-Crowned",
+    shortName: "Thessa",
+    handoutItemId: "religion-thessa-booklet",
+    summary: "Wild pacts, boundaries, hunting law, blood-price, old woods, and kept bargains.",
+    goodFor: "Good for Nature, Tempest-flavored, boundary, and pactland clerics.",
+  },
+  crucible: {
+    id: "crucible",
+    name: "The Four Crucible Powers",
+    shortName: "Crucible Powers",
+    handoutItemId: "religion-crucible-booklet",
+    summary: "Flame, Stone, Tide, and Storm treated as bargained-with powers, not temple gods.",
+    goodFor: "Good for elemental, Arcana, Knowledge, and Nature-style clerics.",
+  },
+};
+
+function clericFaithOptions() {
+  return Object.values(clericFaithDefinitions);
+}
+
+function clericFaithDefinition(faithId = "lioran") {
+  return clericFaithDefinitions[String(faithId ?? "").trim().toLowerCase()] ?? clericFaithDefinitions.lioran;
+}
+
+function normalizeClericFaithId(faithId = "lioran") {
+  return clericFaithDefinition(faithId).id;
+}
+
+function applyClericFaithToHero(hero) {
+  if (!hero || hero.classId !== "cleric") return null;
+  const faith = clericFaithDefinition(hero.clericFaithId ?? hero.faithId ?? hero.deityId ?? hero.patronId);
+  hero.clericFaithId = faith.id;
+  hero.clericFaithName = faith.name;
+  return faith;
+}
+
+function addPartyTomeEntryToList(tomes, item) {
+  const normalizedTomes = normalizePartyTomes(tomes ?? []);
+  const entry = tomeEntryFromItem(item);
+  if (!entry) return normalizedTomes;
+  const signature = `${entry.baseItemId}|${entry.title}|${entry.text}|${entry.categories.join(",")}|${entry.temporary ? "temporary" : "permanent"}`;
+  const exists = normalizedTomes.some(
+    (tome) => `${tome.baseItemId}|${tome.title}|${tome.text}|${(tome.categories ?? []).join(",")}|${tome.temporary ? "temporary" : "permanent"}` === signature,
+  );
+  if (!exists) normalizedTomes.push(entry);
+  return normalizedTomes;
+}
+
+function addClericFaithHandoutToTomes(tomes, faithId) {
+  const faith = clericFaithDefinition(faithId);
+  const item = getContentDefinition("items", faith.handoutItemId);
+  if (!item) return normalizePartyTomes(tomes ?? []);
+  return addPartyTomeEntryToList(tomes, { ...item, id: faith.handoutItemId, baseItemId: faith.handoutItemId });
+}
+
+function ensureClericFaithTomes(gameState = state) {
+  if (!gameState?.fighters) return;
+  gameState.partyTomes = normalizePartyTomes(gameState.partyTomes ?? []);
+  Object.values(gameState.fighters).forEach((fighter) => {
+    const faith = applyClericFaithToHero(fighter);
+    if (faith) gameState.partyTomes = addClericFaithHandoutToTomes(gameState.partyTomes, faith.id);
+  });
+}
+
 function addPartyTomeItem(item) {
+  const beforeCount = normalizePartyTomes(state.partyTomes ?? []).length;
+  state.partyTomes = addPartyTomeEntryToList(state.partyTomes ?? [], item);
   const entry = tomeEntryFromItem(item);
   if (!entry) return null;
-  state.partyTomes = normalizePartyTomes(state.partyTomes ?? []);
   const signature = `${entry.baseItemId}|${entry.title}|${entry.text}|${entry.categories.join(",")}|${entry.temporary ? "temporary" : "permanent"}`;
   const existing = state.partyTomes.find((tome) => `${tome.baseItemId}|${tome.title}|${tome.text}|${(tome.categories ?? []).join(",")}|${tome.temporary ? "temporary" : "permanent"}` === signature);
-  if (existing) return existing;
-  state.partyTomes.push(entry);
-  for (const behavior of Object.values(window.DungeonNpcBehaviors ?? {})) behavior.recordItemCollected?.(item);
+  if (state.partyTomes.length > beforeCount) {
+    for (const behavior of Object.values(window.DungeonNpcBehaviors ?? {})) behavior.recordItemCollected?.(item);
+  }
   return entry;
 }
 
@@ -2255,7 +2366,7 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
   removeLegacyTestingBeastAllyFromPartyData(normalizedPartyData);
   const incomingHeroes = (Array.isArray(heroOrHeroes) ? heroOrHeroes : [heroOrHeroes]).filter((hero) => !isLegacyTestingBeastAlly(hero));
   const partyResources = normalizePartyResources(normalizedPartyData?.partyResources ?? state?.partyResources ?? {});
-  const partyTomes = normalizePartyTomes(normalizedPartyData?.partyTomes ?? state?.partyTomes ?? []);
+  let partyTomes = normalizePartyTomes(normalizedPartyData?.partyTomes ?? state?.partyTomes ?? []);
   for (const hero of incomingHeroes) {
     if (!hero?.inventory?.items?.length) continue;
     const keptItems = [];
@@ -2272,6 +2383,10 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
       }
     }
     hero.inventory.items = keptItems;
+  }
+  for (const hero of incomingHeroes) {
+    const faith = applyClericFaithToHero(hero);
+    if (faith) partyTomes = addClericFaithHandoutToTomes(partyTomes, faith.id);
   }
   const rosterIds = normalizedPartyData?.rosterIds?.length ? normalizedPartyData.rosterIds : incomingHeroes.map((hero) => hero.id);
   const livingRosterIds = rosterIds.filter((id) => !incomingHeroes.find((hero) => hero.id === id)?.dead);
@@ -2404,6 +2519,10 @@ function karmicD20Bonus() {
 function rollD20ForFighter(fighter, options = {}) {
   const usePlayerMode = playerControlledFighter(fighter);
   const mode = usePlayerMode ? normalizeD20Mode(state?.d20Mode) : "random";
+  if (usePlayerMode && adminNat20Active()) {
+    const rawRolls = options.disadvantage || options.advantage ? [20, 20] : [20];
+    return { roll: 20, rolls: [...rawRolls], rawRolls, mode: "adminNat20", hiddenBonus: 0 };
+  }
   const rollOne = () => {
     const roll = baseD20ForMode(mode);
     if (fighter?.racialTraits?.halflingLucky && roll === 1) {
@@ -3719,10 +3838,13 @@ function applyHeroCreationOptions(template, options = {}) {
   const hitDie = template.hitDie ?? 10;
   const level = settings.level ?? 1;
   const maxHp = abilityScores ? hitDie + abilityMods.con + (raceTraits.hpPerLevel ?? 0) * level : (settings.maxHp ?? template.maxHp);
+  const clericFaith = classId === "cleric" ? clericFaithDefinition(options.clericFaithId ?? settings.clericFaithId) : null;
   return {
     ...settings,
     classId,
     className: settings.className ?? settings.class ?? "Fighter",
+    clericFaithId: clericFaith?.id,
+    clericFaithName: clericFaith?.name,
     raceSelection,
     race: raceTraits.raceId,
     subrace: raceTraits.subraceId,
@@ -3906,10 +4028,23 @@ function adminEnabled() {
   return adminMode && gameHasStarted;
 }
 
+function adminGodModeActive() {
+  return Boolean(adminEnabled() && adminGodMode);
+}
+
+function adminNat20Active() {
+  return Boolean(adminEnabled() && adminNat20Mode);
+}
+
+function adminUnlimitedHeroActions(fighter) {
+  return Boolean(adminGodModeActive() && fighter && playerControlledFighter(fighter));
+}
+
 function disableAdminModeOptions() {
   showDungeonLayout = false;
   adminTeleportEnabled = false;
   adminGodMode = false;
+  adminNat20Mode = false;
   inventoryAdminOpen = false;
   adminMonsterCatalogOpen = false;
   adminProgressOpen = false;
@@ -6633,6 +6768,7 @@ function createCombatant(template) {
     canMoveThroughMonsters: false,
     flying: Boolean(template.flying),
   };
+  applyClericFaithToHero(combatant);
   if (combatant.baseAttackAbilityMod === undefined) {
     combatant.baseAttackAbilityMod = scoreToMod(baseAbilityScore(combatant, attackAbilityForWeapon(activeWeapon(combatant), combatant)));
   }
@@ -7153,6 +7289,7 @@ function normalizeLoadedState(loadedState) {
     fighter.equipment = normalizeEquipment(fighter.equipment);
     fighter.inventory = normalizeInventory(fighter.inventory);
     compactStackableInventoryItems(fighter);
+    applyClericFaithToHero(fighter);
     ensureFighterAbilityState(fighter);
     ensureSpellPointState(fighter);
     fighter.hasBonusAction = fighter.hasBonusAction ?? true;
@@ -7163,6 +7300,7 @@ function normalizeLoadedState(loadedState) {
     refreshDerivedStats(fighter);
   });
 
+  ensureClericFaithTomes(normalized);
   return normalized;
 }
 

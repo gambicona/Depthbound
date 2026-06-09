@@ -699,16 +699,16 @@ h1 {
 
 .menu-panel {
   background:
-    linear-gradient(150deg, rgba(14, 16, 16, 0.76), rgba(5, 7, 8, 0.84)),
+    linear-gradient(150deg, rgba(13, 20, 20, 0.82), rgba(5, 7, 8, 0.88)),
     repeating-linear-gradient(90deg, rgba(199, 246, 234, 0.035) 0 1px, transparent 1px 7px);
   border: 1px solid rgba(147, 216, 204, 0.38);
   border-radius: 8px;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.58), inset 0 0 0 1px rgba(255, 244, 212, 0.08);
   display: grid;
-  gap: 14px;
-  max-width: 380px;
+  gap: 16px;
+  max-width: 460px;
   padding: 18px;
-  width: min(100%, 380px);
+  width: min(100%, 460px);
 }
 
 .menu-panel:has(.main-achievements:not(.hidden)),
@@ -719,10 +719,41 @@ h1 {
 
 .menu-actions {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
-.menu-actions .comic-menu-button {
+.menu-primary-actions {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1.38fr) minmax(132px, 0.62fr);
+}
+
+.menu-primary-button {
+  box-shadow: 0 14px 30px rgba(16, 91, 93, 0.22), inset 0 0 0 1px rgba(234, 255, 249, 0.12);
+  font-size: 1rem;
+  min-height: 58px;
+}
+
+.menu-continue-button {
+  min-height: 58px;
+}
+
+.menu-secondary-actions {
+  border-top: 1px solid rgba(246, 234, 216, 0.1);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding-top: 12px;
+}
+
+.menu-secondary-actions button {
+  background: rgba(7, 17, 18, 0.62);
+  border-color: rgba(115, 218, 205, 0.32);
+  min-height: 44px;
+  padding: 9px 12px;
+}
+
+.menu-secondary-actions .comic-menu-button {
   background:
     linear-gradient(135deg, rgba(87, 53, 104, 0.42), rgba(21, 74, 79, 0.62)),
     linear-gradient(180deg, rgba(16, 21, 22, 0.94), rgba(7, 10, 12, 0.96));
@@ -730,8 +761,8 @@ h1 {
   box-shadow: inset 0 0 0 1px rgba(255, 244, 212, 0.07), 0 0 18px rgba(115, 218, 205, 0.08);
 }
 
-.menu-actions .comic-menu-button:hover,
-.menu-actions .comic-menu-button:focus-visible {
+.menu-secondary-actions .comic-menu-button:hover,
+.menu-secondary-actions .comic-menu-button:focus-visible {
   border-color: rgba(220, 176, 239, 0.68);
   box-shadow: inset 0 0 0 1px rgba(255, 244, 212, 0.1), 0 0 22px rgba(188, 139, 216, 0.18);
 }
@@ -750,6 +781,54 @@ h1 {
 .main-settings {
   display: grid;
   gap: 10px;
+}
+
+.dm-toolbox-menu {
+  background: rgba(7, 17, 18, 0.46);
+  border: 1px solid rgba(115, 218, 205, 0.26);
+  border-radius: 8px;
+  display: grid;
+  overflow: hidden;
+}
+
+.dm-toolbox-menu > summary {
+  align-items: center;
+  color: var(--button-text);
+  cursor: pointer;
+  display: flex;
+  font-weight: 900;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 14px;
+  text-transform: none;
+}
+
+.dm-toolbox-menu > summary::after {
+  color: var(--chrome-accent);
+  content: "+";
+  font-size: 1.1rem;
+}
+
+.dm-toolbox-menu[open] > summary {
+  border-bottom: 1px solid rgba(115, 218, 205, 0.18);
+}
+
+.dm-toolbox-menu[open] > summary::after {
+  content: "-";
+}
+
+.dm-toolbox-links {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.dm-toolbox-links a {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 40px;
+  text-decoration: none;
 }
 
 .main-comics {
@@ -3727,6 +3806,25 @@ button[data-ui-icon]::before,
   width: min(100%, 760px);
 }
 
+.dialog-panel.quest-log-dialog {
+  max-height: min(860px, 92vh);
+  max-width: 1180px;
+  width: min(calc(100vw - 32px), 1180px);
+}
+
+.quest-log-dialog .fighter-info-body {
+  padding: 14px;
+}
+
+.quest-log-dialog .dialog-message {
+  min-height: 0;
+}
+
+.quest-log-dialog .dialog-actions {
+  grid-template-columns: minmax(160px, 240px);
+  justify-content: end;
+}
+
 .dialog-panel.faction-intro-panel {
   max-width: 920px;
   width: min(calc(100vw - 28px), 920px);
@@ -4611,6 +4709,89 @@ button[data-ui-icon]::before,
   line-height: 1.35;
   padding-left: 8px;
   text-transform: none;
+}
+
+.faith-choice-dialog .dialog-actions {
+  grid-template-columns: 1fr;
+}
+
+.cleric-faith-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.cleric-faith-option {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 42px;
+}
+
+.cleric-faith-pick,
+.cleric-faith-info {
+  min-height: 0;
+  white-space: normal;
+}
+
+.cleric-faith-pick {
+  align-items: start;
+  display: grid;
+  gap: 5px;
+  justify-items: start;
+  line-height: 1.25;
+  padding: 10px 12px;
+  text-align: left;
+  text-transform: none;
+}
+
+.cleric-faith-pick b {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.cleric-faith-pick span,
+.cleric-faith-pick small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.cleric-faith-pick small {
+  color: #e7d5b4;
+}
+
+.cleric-faith-info {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  padding: 0;
+}
+
+.cleric-faith-detail {
+  background: rgba(19, 13, 13, 0.32);
+  border: 1px solid rgba(246, 234, 216, 0.12);
+  border-radius: 8px;
+  color: var(--text);
+  max-height: 280px;
+  overflow: auto;
+  padding: 12px;
+  text-align: left;
+  text-transform: none;
+}
+
+.cleric-faith-detail h1,
+.cleric-faith-detail h2,
+.cleric-faith-detail h3 {
+  font-family: Georgia, serif;
+  margin: 12px 0 6px;
+}
+
+.cleric-faith-detail p,
+.cleric-faith-detail li {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .select-choice-field {
@@ -6961,6 +7142,46 @@ button[data-ui-icon]::before,
   margin: 8px 0 0;
 }
 
+.maelis-graveyard-card {
+  align-items: stretch;
+  border-color: rgba(176, 188, 190, 0.28);
+  grid-template-columns: 112px minmax(0, 1fr);
+}
+
+.maelis-graveyard-card .npc-portrait,
+.maelis-graveyard-card .npc-portrait-button {
+  height: 112px;
+  width: 112px;
+}
+
+.maelis-card-copy {
+  min-width: 0;
+}
+
+.maelis-card-copy b,
+.maelis-card-copy span,
+.maelis-card-copy p {
+  overflow-wrap: anywhere;
+}
+
+.maelis-state-line {
+  color: #d6c5a6;
+  font-style: italic;
+}
+
+.maelis-card-actions {
+  align-content: center;
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.maelis-card-actions button {
+  min-height: 42px;
+  white-space: normal;
+}
+
 .guild-card {
   border-color: rgba(215, 168, 79, 0.38);
 }
@@ -7655,6 +7876,16 @@ button[data-ui-icon]::before,
   width: min(100%, 860px);
 }
 
+#village-menu.maelis-chat-open .fighter-info-panel {
+  max-height: min(880px, 94vh);
+  max-width: 1180px;
+  width: min(100%, 1180px);
+}
+
+#village-menu.maelis-chat-open .fighter-info-body {
+  padding: 16px;
+}
+
 #village-menu.guild-open .fighter-info-panel {
   max-height: min(840px, 92vh);
   max-width: 1180px;
@@ -8090,6 +8321,176 @@ button[data-ui-icon]::before,
   opacity: 0.48;
 }
 
+.maelis-chat-view {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 260px minmax(0, 1fr);
+}
+
+.maelis-chat-portrait {
+  background:
+    linear-gradient(180deg, rgba(28, 34, 39, 0.9), rgba(12, 15, 17, 0.96)),
+    var(--chrome-pattern);
+  border: 1px solid rgba(176, 188, 190, 0.28);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  padding: 12px;
+  position: sticky;
+  top: 0;
+}
+
+.maelis-chat-portrait > div {
+  display: grid;
+  gap: 3px;
+  text-align: center;
+}
+
+.maelis-chat-portrait b {
+  color: var(--text);
+}
+
+.maelis-chat-portrait span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.maelis-chat-main {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.maelis-chat-text,
+.maelis-main-topics,
+.maelis-answer {
+  background: rgba(13, 10, 11, 0.22);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.maelis-chat-text p,
+.maelis-answer p {
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 750;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.maelis-player-line {
+  color: var(--muted) !important;
+  font-style: italic;
+}
+
+.maelis-stage-direction {
+  color: #b8c9c5 !important;
+  font-style: italic;
+  font-weight: 650 !important;
+  opacity: 0.86;
+}
+
+.maelis-idle-line,
+.maelis-service-note {
+  border-left: 3px solid rgba(176, 188, 190, 0.36);
+  color: #d6c5a6 !important;
+  padding-left: 10px;
+}
+
+.maelis-main-topics h3,
+.maelis-topic-group h4,
+.maelis-suggested b {
+  color: var(--gold);
+  margin: 0;
+}
+
+.maelis-topic-groups {
+  column-count: 2;
+  column-gap: 10px;
+}
+
+.maelis-topic-group {
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  display: grid;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.maelis-topic-group div,
+.maelis-suggested div {
+  display: grid;
+  gap: 8px;
+}
+
+.maelis-topic-group button,
+.maelis-suggested button {
+  min-height: 42px;
+  padding: 9px 12px;
+  width: 100%;
+  white-space: normal;
+}
+
+.maelis-suggested {
+  border-top: 1px solid rgba(246, 234, 216, 0.1);
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.maelis-chat-footer {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.maelis-chat-footer button {
+  background: rgba(9, 29, 28, 0.72);
+  border-color: rgba(90, 169, 163, 0.42);
+  color: #d8efe9;
+  min-height: 38px;
+  padding: 8px 12px;
+  width: 100%;
+  white-space: normal;
+}
+
+.maelis-chat-footer button:hover:not(:disabled) {
+  background: rgba(18, 66, 62, 0.86);
+  border-color: rgba(118, 214, 206, 0.62);
+}
+
+@media (max-width: 980px) {
+  .maelis-graveyard-card,
+  .maelis-chat-view {
+    grid-template-columns: 1fr;
+  }
+
+  .maelis-graveyard-card {
+    justify-items: stretch;
+  }
+
+  .maelis-chat-portrait {
+    position: static;
+  }
+
+  .maelis-topic-groups {
+    column-count: 1;
+  }
+}
+
+@media (max-width: 560px) {
+  .maelis-card-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 720px) {
   .travel-map-body {
     max-height: 92vh;
@@ -8430,8 +8831,66 @@ button[data-ui-icon]::before,
 .quest-log-list {
   display: grid;
   gap: 10px;
-  max-height: min(58vh, 560px);
+  max-height: none;
   overflow: auto;
+}
+
+.quest-log-section,
+.quest-log-completed {
+  display: grid;
+  gap: 10px;
+}
+
+.quest-log-section h3 {
+  color: var(--gold);
+  margin: 0;
+}
+
+.quest-log-completed {
+  background: rgba(13, 10, 11, 0.18);
+  border: 1px solid rgba(246, 234, 216, 0.1);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.quest-log-completed > summary {
+  color: var(--gold);
+  cursor: pointer;
+  font-weight: 900;
+  list-style-position: inside;
+}
+
+.quest-log-completed > summary span {
+  color: var(--muted);
+  float: right;
+  font-size: 0.78rem;
+}
+
+.quest-log-completed .quest-log-list {
+  margin-top: 10px;
+}
+
+.quest-log-layout {
+  align-items: start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(280px, 0.78fr) minmax(520px, 1.22fr);
+  max-height: min(70vh, 680px);
+  min-height: 0;
+}
+
+.quest-log-column,
+.quest-tome-column {
+  min-height: 0;
+  overflow: auto;
+}
+
+.quest-log-column {
+  max-height: min(70vh, 680px);
+}
+
+.quest-tome-column {
+  max-height: min(70vh, 680px);
 }
 
 .quest-log-entry {
@@ -8445,6 +8904,17 @@ button[data-ui-icon]::before,
 
 .quest-log-entry.ready {
   border-color: rgba(126, 191, 137, 0.72);
+}
+
+.quest-log-entry.completed {
+  background: rgba(9, 16, 16, 0.24);
+  border-color: rgba(176, 188, 190, 0.22);
+  opacity: 0.84;
+}
+
+.quest-log-entry.completed p,
+.quest-log-entry.completed .quest-progress {
+  color: var(--muted);
 }
 
 .quest-log-entry b,
@@ -8464,7 +8934,7 @@ button[data-ui-icon]::before,
 }
 
 .ancient-tome-list {
-  margin-top: 12px;
+  margin-top: 0;
 }
 
 .ancient-tome-list h3 {
@@ -8473,6 +8943,10 @@ button[data-ui-icon]::before,
 
 .ancient-tome-entry summary {
   cursor: pointer;
+}
+
+.ancient-tome-entry {
+  padding: 12px 14px;
 }
 
 .ancient-tome-category {
@@ -8501,7 +8975,7 @@ button[data-ui-icon]::before,
 .ancient-tome-subcategory {
   background: rgba(255, 255, 255, 0.025);
   border-color: rgba(255, 255, 255, 0.08);
-  margin-left: 10px;
+  margin-left: 0;
 }
 
 .ancient-tome-subcategory > summary {
@@ -8511,8 +8985,9 @@ button[data-ui-icon]::before,
 
 .ancient-tome-text {
   display: grid;
-  gap: 8px;
-  line-height: 1.55;
+  gap: 10px;
+  line-height: 1.62;
+  max-width: 74ch;
 }
 
 .ancient-tome-text h3,
@@ -8524,6 +8999,33 @@ button[data-ui-icon]::before,
 
 .ancient-tome-text ul {
   padding-left: 18px;
+}
+
+.ancient-tome-text p,
+.ancient-tome-text li {
+  font-size: 0.94rem;
+}
+
+@media (max-width: 980px) {
+  .dialog-panel.quest-log-dialog {
+    max-width: none;
+    width: min(calc(100vw - 20px), 760px);
+  }
+
+  .quest-log-layout {
+    grid-template-columns: 1fr;
+    max-height: min(72vh, 720px);
+  }
+
+  .quest-log-column,
+  .quest-tome-column {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .quest-log-dialog .fighter-info-body {
+    overflow-y: auto;
+  }
 }
 
 .object-result {
@@ -9034,6 +9536,11 @@ button[data-ui-icon]::before,
 
   .menu-panel {
     max-width: 100%;
+  }
+
+  .menu-primary-actions,
+  .menu-secondary-actions {
+    grid-template-columns: 1fr;
   }
 
   .menu-volume {

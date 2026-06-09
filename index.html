@@ -17,12 +17,16 @@
         <img class="main-menu-title" src="assets/backgrounds/title.png" alt="Depthbound" />
         <div class="menu-panel">
           <div class="menu-actions">
-            <button id="start-adventure" type="button">Start New Adventure</button>
-            <button id="load-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="save-slots">Load</button>
-            <button id="achievements-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="main-achievements">Achievements</button>
-            <button id="main-tutorial" class="ghost-button" type="button">Tutorial</button>
-            <button id="read-comic-menu" class="ghost-button comic-menu-button" type="button" aria-expanded="false" aria-controls="main-comics">Read Comic</button>
-            <button id="settings-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="main-settings">Settings</button>
+            <div class="menu-primary-actions">
+              <button id="start-adventure" class="menu-primary-button" type="button">Start New Adventure</button>
+              <button id="load-menu" class="ghost-button menu-continue-button" type="button" aria-expanded="false" aria-controls="save-slots">Load</button>
+            </div>
+            <div class="menu-secondary-actions" aria-label="Other main menu options">
+              <button id="achievements-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="main-achievements">Achievements</button>
+              <button id="main-tutorial" class="ghost-button" type="button">Tutorial</button>
+              <button id="read-comic-menu" class="ghost-button comic-menu-button" type="button" aria-expanded="false" aria-controls="main-comics">Read Comic</button>
+              <button id="settings-menu" class="ghost-button" type="button" aria-expanded="false" aria-controls="main-settings">Settings</button>
+            </div>
           </div>
           <button id="main-menu-back" class="ghost-button menu-back hidden" type="button">Back</button>
           <div id="main-comics" class="main-comics hidden" aria-label="Comics"></div>
@@ -45,11 +49,16 @@
             </label>
             <button id="choose-save-folder" class="ghost-button" type="button">Choose Save Folder</button>
             <button id="manage-token-art" class="ghost-button" type="button">Manage Token Pictures</button>
-            <a class="ghost-button" href="dungeon-creator.html">Dungeon Creator</a>
-            <a class="ghost-button" href="monster-catalogue.html">Monster Catalogue</a>
-            <a class="ghost-button" href="Lore/index.html">Lore Compendium</a>
-            <a class="ghost-button" href="custom-item-creator.html">Custom Item Creator</a>
-            <a class="ghost-button" href="recruit-creator.html">Recruit Creator</a>
+            <details class="dm-toolbox-menu">
+              <summary>DM Toolbox</summary>
+              <div class="dm-toolbox-links">
+                <a class="ghost-button" href="dungeon-creator.html">Dungeon Creator</a>
+                <a class="ghost-button" href="monster-catalogue.html">Monster Catalogue</a>
+                <a class="ghost-button" href="Lore/index.html">Lore Compendium</a>
+                <a class="ghost-button" href="custom-item-creator.html">Custom Item Creator</a>
+                <a class="ghost-button" href="recruit-creator.html">Recruit Creator</a>
+              </div>
+            </details>
           </div>
           <p id="save-status" class="save-status"></p>
         </div>
@@ -103,10 +112,21 @@
                 <a id="bug-report" class="ghost-button button-link bug-report-button" href="https://forms.gle/REPLACE_WITH_YOUR_BUG_REPORT_FORM" target="_blank" rel="noopener">Report Issue</a>
                 <button id="new-game" class="ghost-button" type="button">Main Menu</button>
                 <button id="tutorial" class="ghost-button" type="button">Tutorial</button>
+                <details class="dm-toolbox-menu top-dm-toolbox-menu">
+                  <summary>DM Toolbox</summary>
+                  <div class="dm-toolbox-links">
+                    <a class="ghost-button" href="dungeon-creator.html">Dungeon Creator</a>
+                    <a class="ghost-button" href="monster-catalogue.html">Monster Catalogue</a>
+                    <a class="ghost-button" href="Lore/index.html">Lore Compendium</a>
+                    <a class="ghost-button" href="custom-item-creator.html">Custom Item Creator</a>
+                    <a class="ghost-button" href="recruit-creator.html">Recruit Creator</a>
+                  </div>
+                </details>
                 <button id="toggle-admin-mode" class="ghost-button admin-mode-button" type="button">Admin Tools</button>
                 <div id="top-admin-actions" class="top-admin-actions hidden" aria-label="Admin quick actions">
                   <button class="admin-toggle" type="button" data-action="toggle-admin-teleport">Teleport Off</button>
                   <button class="admin-toggle" type="button" data-action="toggle-admin-god">God Mode Off</button>
+                  <button class="admin-toggle" type="button" data-action="toggle-admin-nat20">Nat 20 Off</button>
                   <button type="button" data-action="admin-heal">Full Heal</button>
                   <button type="button" data-action="admin-refresh">Refresh Actions</button>
                   <button type="button" data-action="admin-reveal-current-room">Reveal Room</button>
@@ -564,6 +584,7 @@
     <script src="src/scripts/content/npcs/village-npcs.js" defer></script>
     <script src="src/scripts/content/npcs/borren.js" defer></script>
     <script src="src/scripts/content/npcs/old-lady-chat.js" defer></script>
+    <script src="src/scripts/content/npcs/sister-maelis-chat.js" defer></script>
     <script src="src/scripts/content/npcs/old-lady.js" defer></script>
     <script src="src/scripts/content/classes/sidekick-warrior.js" defer></script>
     <script src="src/scripts/content/classes/sidekick-expert.js" defer></script>

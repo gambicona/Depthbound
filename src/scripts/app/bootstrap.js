@@ -32,6 +32,7 @@ let suppressInspectUntil = 0;
 let adminMode = false;
 let adminTeleportEnabled = false;
 let adminGodMode = false;
+let adminNat20Mode = false;
 let inventoryAdminOpen = false;
 let adminMonsterCatalogOpen = false;
 let adminProgressOpen = false;

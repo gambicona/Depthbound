@@ -110,15 +110,16 @@ function escapeHtml(value) {
 }
 
 const heroCreationProgress = {
-  save: { current: 1, total: 9, label: "Save" },
-  identity: { current: 2, total: 9, label: "Hero" },
-  class: { current: 3, total: 9, label: "Class" },
-  race: { current: 4, total: 9, label: "Ancestry" },
-  abilities: { current: 5, total: 9, label: "Abilities" },
-  gear: { current: 6, total: 9, label: "Gear" },
-  training: { current: 7, total: 9, label: "Training" },
-  magic: { current: 8, total: 9, label: "Magic" },
-  luck: { current: 9, total: 9, label: "Luck" },
+  save: { current: 1, total: 10, label: "Save" },
+  identity: { current: 2, total: 10, label: "Hero" },
+  class: { current: 3, total: 10, label: "Class" },
+  race: { current: 4, total: 10, label: "Ancestry" },
+  abilities: { current: 5, total: 10, label: "Abilities" },
+  gear: { current: 6, total: 10, label: "Gear" },
+  training: { current: 7, total: 10, label: "Training" },
+  magic: { current: 8, total: 10, label: "Magic" },
+  faith: { current: 9, total: 10, label: "Faith" },
+  luck: { current: 10, total: 10, label: "Luck" },
 };
 
 function dialogProgressMarkup(progress = null) {
@@ -3265,6 +3266,103 @@ async function chooseLevelUpExpertise(hero) {
   return labels.length ? ` Expertise gained: ${labels.join(", ")}.` : "";
 }
 
+function clericFaithHandoutText(faith) {
+  const item = getContentDefinition("items", faith?.handoutItemId);
+  return String(item?.handout?.text ?? item?.customDescription ?? item?.description ?? `${faith?.name ?? "Faith"}\n\n${faith?.summary ?? ""}`).trim();
+}
+
+function clericFaithDetailMarkup(faith) {
+  const text = clericFaithHandoutText(faith);
+  if (typeof handoutTextMarkup === "function") return handoutTextMarkup(text);
+  return text
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${escapeHtml(paragraph.replace(/^#+\s*/, ""))}</p>`)
+    .join("");
+}
+
+function clericFaithChoiceMarkup(detailFaithId = "") {
+  const options = clericFaithOptions();
+  const detailFaith = detailFaithId ? clericFaithDefinition(detailFaithId) : null;
+  return `
+    ${dialogProgressMarkup(heroCreationProgress.faith)}
+    <p>Choose the cleric's faith. This is a story and journal choice only; it does not change class mechanics.</p>
+    <div class="cleric-faith-list">
+      ${options
+        .map(
+          (faith) => `
+            <div class="cleric-faith-option">
+              <button type="button" class="cleric-faith-pick" data-faith-choice="${escapeAttribute(faith.id)}">
+                <b>${escapeHtml(faith.name)}</b>
+                <span>${escapeHtml(faith.summary)}</span>
+                <small>${escapeHtml(faith.goodFor)}</small>
+              </button>
+              <button type="button" class="cleric-faith-info" data-faith-info="${escapeAttribute(faith.id)}" aria-label="More about ${escapeAttribute(faith.name)}">
+                <span class="choice-info-glyph" aria-hidden="true">i</span>
+              </button>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+    ${
+      detailFaith
+        ? `<div class="cleric-faith-detail">
+            <div class="subclass-guide-title"><span class="choice-info-glyph" aria-hidden="true">i</span><b>${escapeHtml(detailFaith.name)}</b></div>
+            ${clericFaithDetailMarkup(detailFaith)}
+          </div>`
+        : `<p class="empty-note">Use the i buttons to read a faith's full church booklet before choosing.</p>`
+    }
+  `;
+}
+
+function chooseClericFaith(classId = defaultContent.heroClass) {
+  if (classId !== "cleric") return Promise.resolve(null);
+  return new Promise((resolve) => {
+    restoreDialogInputField();
+    let detailFaithId = "";
+    els.gameDialogTitle.textContent = "Choose Cleric Faith";
+    els.gameDialogField.classList.add("hidden");
+    els.gameDialogActions.innerHTML = `<button type="button" class="ghost-button" data-dialog-action="back">Back</button>`;
+    els.gameDialogForm.classList.add("faith-choice-dialog");
+
+    const render = () => {
+      els.gameDialogMessage.innerHTML = clericFaithChoiceMarkup(detailFaithId);
+    };
+
+    const cleanup = (value) => {
+      els.gameDialogMessage.removeEventListener("click", handleMessageClick);
+      els.gameDialogActions.removeEventListener("click", handleActionClick);
+      els.gameDialogForm.classList.remove("faith-choice-dialog");
+      els.gameDialog.classList.add("hidden");
+      activeDialogCancel = null;
+      resolve(value);
+    };
+
+    const handleMessageClick = (event) => {
+      const infoButton = event.target.closest("[data-faith-info]");
+      if (infoButton) {
+        detailFaithId = infoButton.dataset.faithInfo;
+        render();
+        return;
+      }
+      const choiceButton = event.target.closest("[data-faith-choice]");
+      if (choiceButton) cleanup(choiceButton.dataset.faithChoice);
+    };
+
+    const handleActionClick = (event) => {
+      const button = event.target.closest("[data-dialog-action]");
+      if (button?.dataset.dialogAction === "back") cleanup(dialogBackValue);
+    };
+
+    els.gameDialogMessage.addEventListener("click", handleMessageClick);
+    els.gameDialogActions.addEventListener("click", handleActionClick);
+    activeDialogCancel = () => cleanup(null);
+    render();
+    els.gameDialog.classList.remove("hidden");
+    els.gameDialogMessage.querySelector("[data-faith-choice]")?.focus();
+  });
+}
+
 async function createCharacterOptions(raceSelection = defaultRaceSelection, classId = defaultContent.heroClass) {
   const raceTraits = raceTraitsForSelection(raceSelection);
   let step = 0;
@@ -3319,11 +3417,14 @@ async function createCharacterOptions(raceSelection = defaultRaceSelection, clas
         ? await chooseClassCantrips({ ...classTemplate, classCantripList, level: 1 }, cantripChoiceCount)
         : { spells: [], unusedCredits: 0 };
       if (cantripChoice === dialogBackValue) continue;
+      const clericFaithId = await chooseClericFaith(classId);
+      if (clericFaithId === dialogBackValue) continue;
       const fightingStyle = await chooseFightingStyle(classId);
       if (fightingStyle === dialogBackValue) continue;
       return {
         abilityScores,
         fightingStyle,
+        clericFaithId,
         classSpellList,
         classCantripList,
         spells: [...cantripChoice.spells, ...spellChoice.spells],
@@ -3351,6 +3452,7 @@ function createQuickStartCharacterOptions(raceSelection = defaultRaceSelection, 
   return {
     abilityScores: classPredefinedAbilityScores[classId] ?? pregeneratedAbilityScores,
     fightingStyle: fightingStyleChoicesForClass(classId)[0]?.value ?? null,
+    clericFaithId: classId === "cleric" ? normalizeClericFaithId("lioran") : null,
     classSpellList,
     classCantripList,
     spells: [...cantripChoices, ...spellChoices],

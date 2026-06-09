@@ -202,6 +202,7 @@ async function showWaitingRecruitDialog(recruitId) {
     state.party.maxActiveHeroSlots = Math.max(activeClassHeroLimit(), 5);
   }
   state.party.heroIds = uniqueValues([...(state.party.heroIds ?? []), recruit.id]);
+  ensureClericFaithTomes(state);
   if (!state.party.activeHeroId) state.party.activeHeroId = recruit.id;
   const marker = (state.dungeonObjects ?? []).find((object) => object.id === recruit.recruitMarkerId);
   if (marker) {
@@ -474,6 +475,8 @@ function ensureCombatantToken(fighter) {
   els.room.querySelector(".token-layer")?.prepend(createCombatantToken(fighter));
 }
 
+let renderedTileElementsByKey = new Map();
+
 function createTileButton(position) {
   const tile = document.createElement("button");
   tile.className = "tile";
@@ -535,6 +538,7 @@ function homeGridPositionFromPointerEvent(event) {
 function buildRoom() {
   els.room.innerHTML = "";
   renderedTileKeys = new Set();
+  renderedTileElementsByKey = new Map();
   const mapGridSize = currentGridSize();
   const scaledTileSizePx = currentTileSizePx();
   const roomSizePx = mapGridSize * scaledTileSizePx;
@@ -759,7 +763,8 @@ function renderTileButtons(tileKeys) {
 
   for (const tileKey of Array.from(renderedTileKeys)) {
     if (tileKeys.has(tileKey)) continue;
-    tileLayer.querySelector(`[data-tile-key="${tileKey}"]`)?.remove();
+    renderedTileElementsByKey.get(tileKey)?.remove();
+    renderedTileElementsByKey.delete(tileKey);
     renderedTileKeys.delete(tileKey);
   }
 
@@ -767,7 +772,7 @@ function renderTileButtons(tileKeys) {
   for (const tileKey of tileKeys) {
     const position = positionFromKey(tileKey);
     if (renderedTileKeys.has(tileKey)) {
-      const existing = tileLayer.querySelector(`[data-tile-key="${tileKey}"]`);
+      const existing = renderedTileElementsByKey.get(tileKey);
       if (existing) {
         existing.style.left = `${position.x * scaledTileSizePx}px`;
         existing.style.top = `${position.y * scaledTileSizePx}px`;
@@ -780,6 +785,7 @@ function renderTileButtons(tileKeys) {
     tile.style.top = `${position.y * scaledTileSizePx}px`;
     tileLayer.append(tile);
     renderedTileKeys.add(tileKey);
+    renderedTileElementsByKey.set(tileKey, tile);
   }
 }
 
@@ -1105,7 +1111,7 @@ let renderedDragPathKeys = new Set();
 
 function tileElementAt(position) {
   if (!position) return null;
-  return els.room.querySelector(`.tile[data-x="${position.x}"][data-y="${position.y}"]`);
+  return renderedTileElementsByKey.get(positionKey(position)) ?? null;
 }
 
 function clearRenderedDragPathPreview() {
@@ -1123,13 +1129,15 @@ function renderDragPathPreview() {
   const nextKeys = new Set(path.map(positionKey));
   for (const key of renderedDragPathKeys) {
     if (nextKeys.has(key)) continue;
-    const tile = tileElementAt(positionFromKey(key));
+    const tile = renderedTileElementsByKey.get(key);
     if (!tile) continue;
     tile.classList.remove("path-preview");
     tile.textContent = "";
   }
   path.forEach((step, index) => {
-    const tile = tileElementAt(step);
+    const key = positionKey(step);
+    if (renderedDragPathKeys.has(key) && nextKeys.has(key) && tileElementAt(step)?.textContent === String(index + 1)) return;
+    const tile = renderedTileElementsByKey.get(key);
     if (!tile) return;
     tile.classList.add("path-preview");
     tile.textContent = String(index + 1);
@@ -1256,6 +1264,7 @@ function renderRoom() {
     : heroTurn
       ? reachableTiles(hero, state.fighters, {
           gridSize: currentGridSize(),
+          maxCost: adminUnlimitedHeroActions(hero) ? Infinity : undefined,
           walkable,
           canTraverse: (from, to, path) => canTraverseFootprintMovementEdge(hero, from, to, path),
           moveCost: (_from, to) => movementCostAtPosition(to, hero),
@@ -2541,6 +2550,7 @@ function showCombatantInfo(fighter) {
   const weaponName = weapon?.name ?? fighter.damage?.weaponName ?? fighter.baseDamage?.weaponName ?? "Natural weapon";
   const abilities = ["str", "dex", "con", "int", "wis", "cha"];
   const heroTemplate = heroView ? getHeroTemplate(fighter.classId) : null;
+  const clericFaith = heroView && fighter.classId === "cleric" ? clericFaithDefinition(fighter.clericFaithId) : null;
   const racialTraits = heroView && isClassHero(fighter) ? activeRaceFeatureLinesForFighter(fighter).slice(2) : [];
   const subclass = heroView ? subclassDefinitionForHero(fighter) : null;
   const subclassFeatures = subclass
@@ -2590,6 +2600,7 @@ function showCombatantInfo(fighter) {
           <div class="equipment-summary">
             <div><b>${isSidekickWarrior(fighter) ? "Creature" : "Race"}</b><span>${escapeHtml(isSidekickWarrior(fighter) ? fighterCreatureType(fighter) || "companion" : [fighter.speciesName, fighter.subraceName].filter(Boolean).join(" - ") || "Unknown")}</span></div>
             <div><b>Class</b><span>${escapeHtml(fighter.className ?? "Adventurer")} ${fighter.level ?? 1}</span></div>
+            ${clericFaith ? `<div><b>Faith</b><span>${escapeHtml(clericFaith.name)}</span></div>` : ""}
             <div><b>Weapon</b><span>${escapeHtml(weaponName)}</span></div>
             <div><b>Push/Drag/Lift</b><span>${fighter.pushDragLiftLb ?? refreshPushDragLiftStats(fighter)} lb${fighter.racialTraits?.powerfulBuild ? " (Powerful Build)" : ""}</span></div>
           </div>
@@ -2616,6 +2627,21 @@ function showCombatantInfo(fighter) {
             meta: "Class and training",
             body: heroProficienciesMarkup(fighter, heroTemplate),
           })}
+          ${
+            clericFaith
+              ? inspectDetailsMarkup({
+                  title: "Faith",
+                  meta: clericFaith.shortName,
+                  open: true,
+                  body: `
+                    <p><b>${escapeHtml(clericFaith.name)}</b></p>
+                    <p>${escapeHtml(clericFaith.summary)}</p>
+                    <p>${escapeHtml(clericFaith.goodFor)}</p>
+                    <p class="empty-note">The matching faith booklet is unlocked in the Ancient Tome journal.</p>
+                  `,
+                })
+              : ""
+          }
           ${activeFactionSetBonusMarkup(fighter)}
           ${inspectDetailsMarkup({
             title: "Class Features",
@@ -2746,16 +2772,18 @@ function showDungeonObjectInfo(object) {
   const heroTriedLock = Boolean(object.lockAttemptsByHero?.[hero.id]);
   const canPickLock = objectLocked && !specialLock && objectAdjacent && canActInCombat && fighterCanPickLocks(hero) && !heroTriedLock;
   const canAnswerSpecialLock = objectLocked && specialLock && objectAdjacent && canActInCombat;
-  const disarmTarget = object.trap ?? object;
+  const standaloneTrap = objectIsTrap(object);
+  const attachedTrap = standaloneTrap ? null : object.trap;
+  const disarmTarget = attachedTrap ?? object;
   const heroTriedDisarm = Boolean(disarmTarget.disarmAttemptsByHero?.[hero.id]);
   const canDisarm =
     state.mode !== "combat" &&
     objectAdjacent &&
-    ((objectIsTrap(object) && object.detected && object.armed !== false && !object.disarmed) ||
-      object.trap?.detected) &&
+    ((standaloneTrap && object.detected && object.armed !== false && !object.disarmed) ||
+      attachedTrap?.detected) &&
     !heroTriedDisarm;
   const canDispelTrap = canDispelMagicTrap(hero, disarmTarget, object);
-  const visibleTrap = object.trap?.detected ? object.trap : objectIsTrap(object) && object.detected ? object : null;
+  const visibleTrap = standaloneTrap && object.detected ? object : attachedTrap?.detected ? attachedTrap : null;
   const canInvestigate = state.mode !== "combat" && objectCanInspect(object) && objectAdjacent && !object.investigated;
   const uniqueInteraction = object.uniqueInteractionClaimed ? null : objectComponent(object, "uniqueInteraction");
   const uniqueInteractionAvailable = Boolean(uniqueInteraction && state.mode !== "combat" && objectAdjacent && canActInCombat);
@@ -2894,11 +2922,11 @@ function showDungeonObjectInfo(object) {
       objectLocked
         ? specialLock
           ? `<p class="empty-note">Locked by ${escapeHtml(specialLock.label)}. Contents hidden until the key is given.${
-              object.trap ? " A trap must be disarmed first or it will trigger during unlocking." : ""
+              attachedTrap ? " A trap must be disarmed first or it will trigger during unlocking." : ""
             }</p>
              <button type="button" data-action="answer-special-lock" data-object="${escapeAttribute(object.id)}" ${canAnswerSpecialLock ? "" : "disabled"}>Enter Key</button>`
           : `<p class="empty-note">Locked. Contents hidden until the lock is picked.${
-              object.trap ? " A trap must be disarmed first or it will trigger during lockpicking." : ""
+              attachedTrap ? " A trap must be disarmed first or it will trigger during lockpicking." : ""
             }</p>
              <button type="button" data-action="pick-lock" data-object="${escapeAttribute(object.id)}" ${canPickLock ? "" : "disabled"}>${
                heroTriedLock ? "Lock Attempt Spent" : `Pick Lock (DC ${object.lockDc ?? 12})`
@@ -2913,16 +2941,16 @@ function showDungeonObjectInfo(object) {
         : ""
     }
     ${
-      objectIsTrap(object)
+      standaloneTrap
         ? `<button type="button" data-action="disarm-trap" data-object="${escapeAttribute(object.id)}" ${canDisarm ? "" : "disabled"}>Disarm</button>${
             canDispelTrap ? `<button type="button" data-action="dispel-trap" data-object="${escapeAttribute(object.id)}">Dispel Magic</button>` : ""
           }`
         : ""
     }
     ${
-      object.trap?.detected
+      attachedTrap?.detected
         ? `<button type="button" data-action="disarm-trap" data-object="${escapeAttribute(object.id)}" ${canDisarm ? "" : "disabled"}>Disarm ${escapeHtml(
-            object.trap.name,
+            attachedTrap.name,
           )}</button>${canDispelTrap ? `<button type="button" data-action="dispel-trap" data-object="${escapeAttribute(object.id)}">Dispel Magic</button>` : ""}`
         : ""
     }
@@ -3030,11 +3058,11 @@ function showDungeonObjectInfo(object) {
         <div class="stat-pill"><b>${objectBlocksMovement(object) ? "No" : "Yes"}</b><span>Crossable</span></div>
         <div class="stat-pill"><b>${template.interactable ? "Yes" : "No"}</b><span>Interactable</span></div>
         ${componentLabels ? `<div class="stat-pill"><b>${escapeHtml(componentLabels)}</b><span>Features</span></div>` : ""}
-        ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.armed === false ? "Spent" : "Armed"}</b><span>State</span></div>` : ""}
-        ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.spotDc ?? 12}</b><span>Spot DC</span></div>` : ""}
-        ${objectIsTrap(object) ? `<div class="stat-pill"><b>${object.detected ? "Spotted" : "Hidden"}</b><span>Detection</span></div>` : ""}
+        ${standaloneTrap ? `<div class="stat-pill"><b>${object.armed === false ? "Spent" : "Armed"}</b><span>State</span></div>` : ""}
+        ${standaloneTrap ? `<div class="stat-pill"><b>${object.spotDc ?? 12}</b><span>Spot DC</span></div>` : ""}
+        ${standaloneTrap ? `<div class="stat-pill"><b>${object.detected ? "Spotted" : "Hidden"}</b><span>Detection</span></div>` : ""}
         ${visibleTrap ? `<div class="stat-pill"><b>${trapIsMagical(visibleTrap, object) ? "Magical" : "Mechanical"}</b><span>Trap Type</span></div>` : ""}
-        ${object.trap?.detected ? `<div class="stat-pill"><b>${object.trap.spotDc ?? 12}</b><span>Trap DC</span></div>` : ""}
+        ${attachedTrap?.detected ? `<div class="stat-pill"><b>${attachedTrap.spotDc ?? 12}</b><span>Trap DC</span></div>` : ""}
         ${object.lockDc || specialLock ? `<div class="stat-pill"><b>${object.locked ? "Locked" : "Open"}</b><span>Lock</span></div>` : ""}
         ${specialLock ? `<div class="stat-pill"><b>${escapeHtml(specialLock.label)}</b><span>Key Lock</span></div>` : object.lockDc ? `<div class="stat-pill"><b>${object.lockDc}</b><span>Lock DC</span></div>` : ""}
         ${destructible ? `<div class="stat-pill"><b>${objectArmorClass(object)}</b><span>AC</span></div>` : ""}
@@ -4742,6 +4770,7 @@ async function createRosterHero() {
   rosterIds.add(heroId);
   state.party.rosterIds = Array.from(rosterIds);
   state.fighters[heroId] = prepareRestedHero(hero, homeHeroPositions(state.party.rosterIds).find((entry) => entry.id === heroId)?.position ?? { x: 4, y: 6 });
+  ensureClericFaithTomes(state);
   const addedToActiveParty = isClassHero(state.fighters[heroId]) && activeClassHeroIds().length < activeClassHeroLimit();
   if (addedToActiveParty) {
     state.party.heroIds = uniqueValues([...(state.party.heroIds ?? ["hero"]), heroId]);
@@ -4766,6 +4795,7 @@ function addHeroToParty(heroId) {
   }
   if (isClassHero(hero) && activeClassHeroIds().length >= activeClassHeroLimit()) return;
   state.party.heroIds = uniqueValues([...(state.party.heroIds ?? ["hero"]), heroId]);
+  ensureClericFaithTomes(state);
   if (isClassHero(hero)) {
     const boundIds = boundCompanionsForOwner(heroId)
       .map((companion) => companion.id)
@@ -8360,7 +8390,8 @@ function fighterAbilityUnavailableReason(fighter, ability) {
   }
   if (ability.invocationOption && ability.resource === "passive") return "";
   if (ability.resource === "passive") return "";
-  if (abilityResourceSpent(fighter, ability) >= abilityMaxUses(fighter, ability)) return "No uses remaining.";
+  const unlimited = adminUnlimitedHeroActions(fighter);
+  if (!unlimited && abilityResourceSpent(fighter, ability) >= abilityMaxUses(fighter, ability)) return "No uses remaining.";
   if (ability.id === "rage" && fighterWearsHeavyArmor(fighter)) return "Cannot rage while wearing heavy armor.";
   if (ability.id === "layOnHands" && !partyHeroes().some((target) => !target.dead && (target.id === fighter.id || hasMeleeAccess(fighter, target)) && ((target.hp ?? 0) < (target.maxHp ?? 0) || (typeof fighterDiseases === "function" && fighterDiseases(target).length > 0)))) {
     return "No wounded or diseased adjacent hero.";
@@ -8409,6 +8440,7 @@ function fighterAbilityUnavailableReason(fighter, ability) {
   }
   if (state.mode === "combat") {
     if (activeFighter()?.id !== fighter.id) return "Not this hero's turn.";
+    if (unlimited) return "";
     if (ability.resource === "bonusAction" && !fighter.hasBonusAction) return "Bonus action already used.";
     if (ability.resource === "action" && !fighter.hasAction) return "Action already used.";
     if (ability.resource === "reaction" && !fighter.hasReaction) return "Reaction already used.";
@@ -10939,7 +10971,7 @@ function travelForageForCamp() {
   } else {
     const roll = typeof rollSkillCheck === "function"
       ? rollSkillCheck(forager.hero, "wis", "survival", { guidance: true })
-      : { roll: rollDie(20), bonus: forager.bonus, total: 0 };
+      : { roll: rollD20ForFighter(forager.hero).roll, bonus: forager.bonus, total: 0 };
     if (!roll.total) roll.total = (roll.roll ?? 0) + (roll.bonus ?? forager.bonus);
     const dc = forageProfile.dc;
     const success = roll.total >= dc;
@@ -11120,7 +11152,7 @@ function travelInnTryHungryFallback() {
   if (!camp.innPersuasionAttempted && persuader?.hero) {
     const roll = typeof rollSkillCheck === "function"
       ? rollSkillCheck(persuader.hero, "cha", "persuasion", { guidance: true })
-      : { roll: rollDie(20), bonus: persuader.bonus, total: 0 };
+      : { roll: rollD20ForFighter(persuader.hero).roll, bonus: persuader.bonus, total: 0 };
     if (!roll.total) roll.total = (roll.roll ?? 0) + (roll.bonus ?? persuader.bonus);
     camp.innPersuasionAttempted = true;
     camp.innPersuasion = {
@@ -11759,7 +11791,13 @@ function travelEventCheckResult(check = {}) {
   }
   const roll = typeof rollSkillCheck === "function"
     ? rollSkillCheck(hero, check.ability ?? "wis", check.skill ?? "survival", { guidance: true })
-    : { total: rollDie(20) + skillCheckBonus(hero, check.ability ?? "wis", check.skill ?? "survival"), roll: 0, bonus: 0, guidance: 0 };
+    : {
+        roll: rollD20ForFighter(hero).roll,
+        bonus: skillCheckBonus(hero, check.ability ?? "wis", check.skill ?? "survival"),
+        total: 0,
+        guidance: 0,
+      };
+  if (!roll.total) roll.total = (roll.roll ?? 0) + (roll.bonus ?? 0) + (roll.guidance ?? 0);
   const success = roll.total >= (check.dc ?? 10);
   return {
     success,
@@ -15306,6 +15344,67 @@ function villageGraveyardSectionMarkup(graveyardCount = 0) {
   `;
 }
 
+const sisterMaelisNpcId = "sister-maelis";
+
+function sisterMaelisNpc() {
+  return window.DungeonContent.get("npcs", sisterMaelisNpcId) ?? {
+    id: sisterMaelisNpcId,
+    name: "Sister Maelis",
+    title: "Keeper of the Graveyard",
+    portrait: "assets/tokens/Sister_Maelis.png",
+    token: { fallbackLabel: "SM" },
+  };
+}
+
+function sisterMaelisChatData() {
+  return window.DungeonNpcChats?.maelis ?? { hubChoices: [], idleLines: [], stateVariants: [], nodes: {} };
+}
+
+function sisterMaelisBarrowProgress() {
+  return Math.max(0, Math.floor(Number(state?.campaignProgress?.["barrow-crown"]) || 0));
+}
+
+function sisterMaelisStateVariant() {
+  const progress = sisterMaelisBarrowProgress();
+  return sisterMaelisChatData().stateVariants
+    ?.filter((entry) => progress >= (entry.progress ?? 0))
+    .sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0))[0] ?? null;
+}
+
+function sisterMaelisRandomIdleLine() {
+  const lines = sisterMaelisChatData().idleLines ?? [];
+  return lines.length ? lines[Math.floor(Math.random() * lines.length)] : npcEntryLine(sisterMaelisNpc());
+}
+
+function sisterMaelisGraveyardLine() {
+  state.questFlags ??= {};
+  if (!state.questFlags.sisterMaelisGraveyardIntroSeen) {
+    state.questFlags.sisterMaelisGraveyardIntroSeen = true;
+    return "You are standing in a graveyard, carrying weapons, wounds, and questions. I am Sister Maelis. Keeper of this yard, servant of Naevra, and the person who will be very cross if you die somewhere I cannot find the body.";
+  }
+  return sisterMaelisRandomIdleLine() || "Back again. Good. I prefer repeat visitors when they are still breathing.";
+}
+
+function sisterMaelisCardMarkup() {
+  const maelis = sisterMaelisNpc();
+  const variant = sisterMaelisStateVariant();
+  return `
+    <section class="npc-card maelis-graveyard-card">
+      ${npcPortraitMarkup(maelis)}
+      <div class="maelis-card-copy">
+        <b>${escapeHtml(maelis.name ?? "Sister Maelis")}</b>
+        <span>${escapeHtml(maelis.title ?? "Keeper of the Graveyard")}</span>
+        <p>${escapeHtml(sisterMaelisGraveyardLine())}</p>
+        ${variant?.addOn ? `<p class="maelis-state-line">${escapeHtml(variant.addOn)}</p>` : ""}
+      </div>
+      <div class="maelis-card-actions">
+        <button type="button" data-action="start-npc-chat" data-npc="${sisterMaelisNpcId}" data-chat-state="MAELIS_HUB">Have a chat with Sister Maelis</button>
+        <button type="button" class="ghost-button" data-action="start-npc-chat" data-npc="${sisterMaelisNpcId}" data-chat-state="MAELIS_SERVICES">Ask About Services</button>
+      </div>
+    </section>
+  `;
+}
+
 function showNpcInspection(npcId = activeStoreNpcId) {
   const npc = window.DungeonContent.get("npcs", npcId);
   if (!npc) return;
@@ -15431,11 +15530,12 @@ function graveyardCorpseMarkup(corpse) {
 }
 
 function renderGraveyardMenu() {
-  els.villageMenu?.classList.remove("npc-chat-open", "guild-open", "village-index-open");
+  els.villageMenu?.classList.remove("npc-chat-open", "maelis-chat-open", "guild-open", "village-index-open");
   setVillageBackButtonVisible(true);
   setVillageMusicKey("");
   const dead = deadRosterHeroes();
   els.villageBody.innerHTML = `
+    ${sisterMaelisCardMarkup()}
     <p class="empty-note">Dead companions can be preserved, looted, or restored here once their body has been sent home.</p>
     <section class="graveyard-list">
       ${dead.length ? dead.map(graveyardCorpseMarkup).join("") : `<p class="empty-note">No dead companions are recorded.</p>`}
@@ -15443,6 +15543,214 @@ function renderGraveyardMenu() {
   `;
   resetVillageScroll();
 }
+
+const sisterMaelisTopicGroups = [
+  { title: "Faith & Naevra", ids: ["FAITH_01", "NAEVRA_01", "MYTH_01"] },
+  { title: "The Graveyard", ids: ["GRAVEYARD_01", "REVIVE_01"] },
+  { title: "The Barrow Crown", ids: ["CROWN_01"] },
+  { title: "Personal", ids: ["PERSONAL_01", "FLIRT_01"] },
+  { title: "Services", ids: ["MAELIS_SERVICES"] },
+];
+
+let sisterMaelisActiveAnswer = null;
+
+function sisterMaelisNode(nodeId = "MAELIS_HUB") {
+  if (nodeId === "MAELIS_GOODBYE") {
+    return {
+      id: "MAELIS_GOODBYE",
+      player: "I should go.",
+      lines: ["Then go alive, return named, and do not make extra work for me."],
+      options: [],
+    };
+  }
+  return sisterMaelisChatData().nodes?.[nodeId] ?? null;
+}
+
+function sisterMaelisChoiceLabel(nodeId = "") {
+  if (nodeId === "MAELIS_HUB") return "Ask something else.";
+  if (nodeId === "MAELIS_SERVICES") return "I need your services.";
+  if (nodeId === "MAELIS_GOODBYE") return "I should go.";
+  const node = sisterMaelisNode(nodeId);
+  return node?.player || node?.options?.[0]?.label || nodeId;
+}
+
+function sisterMaelisOptionButton(option, className = "") {
+  if (option?.id === "MAELIS_CLOSE") {
+    return `<button type="button" class="${className}" data-action="npc-chat-option" data-npc="${sisterMaelisNpcId}" data-chat-state="MAELIS_HUB" data-option="MAELIS_CLOSE">${escapeHtml(option.label ?? "Leave")}</button>`;
+  }
+  if (!option?.id || option.id === "MAELIS_GOODBYE") {
+    return `<button type="button" class="${className}" data-action="npc-chat-option" data-npc="${sisterMaelisNpcId}" data-chat-state="MAELIS_HUB" data-option="MAELIS_GOODBYE">${escapeHtml(option?.label ?? "I should go.")}</button>`;
+  }
+  const label = option.label || sisterMaelisChoiceLabel(option.id);
+  return `<button type="button" class="${className}" data-action="npc-chat-option" data-npc="${sisterMaelisNpcId}" data-chat-state="MAELIS_HUB" data-option="${escapeAttribute(option.id)}">${escapeHtml(label)}</button>`;
+}
+
+function sisterMaelisHubChoices() {
+  const data = sisterMaelisChatData();
+  const choices = [...(data.hubChoices ?? [])];
+  const variant = sisterMaelisStateVariant();
+  if (variant?.id) choices.splice(5, 0, { id: variant.id, label: variant.label });
+  return choices.filter((choice) => choice.id && sisterMaelisNode(choice.id));
+}
+
+function sisterMaelisHubMarkup() {
+  const choices = sisterMaelisHubChoices();
+  const byId = new Map(choices.map((choice) => [choice.id, choice]));
+  const grouped = sisterMaelisTopicGroups
+    .map((group) => ({
+      ...group,
+      choices: group.ids.map((id) => byId.get(id)).filter(Boolean),
+    }))
+    .filter((group) => group.choices.length);
+  const groupedIds = new Set(grouped.flatMap((group) => group.choices.map((choice) => choice.id)));
+  const remaining = choices.filter((choice) => !groupedIds.has(choice.id));
+  return `
+    <div class="maelis-topic-groups">
+      ${grouped
+        .map(
+          (group) => `
+            <section class="maelis-topic-group">
+              <h4>${escapeHtml(group.title)}</h4>
+              <div>${group.choices.map((choice) => sisterMaelisOptionButton(choice)).join("")}</div>
+            </section>
+          `,
+        )
+        .join("")}
+      ${
+        remaining.length
+          ? `<section class="maelis-topic-group"><h4>Current Matters</h4><div>${remaining.map((choice) => sisterMaelisOptionButton(choice)).join("")}</div></section>`
+          : ""
+      }
+    </div>
+  `;
+}
+
+function sisterMaelisAnswerMarkup(answer) {
+  if (!answer) return "";
+  const suggested = (answer.options ?? []).filter((option) => option.id && sisterMaelisNode(option.id));
+  return `
+    <section class="maelis-answer">
+      ${answer.player ? `<p class="maelis-player-line">You: ${escapeHtml(answer.player)}</p>` : ""}
+      ${answer.lines.map(sisterMaelisLineMarkup).join("")}
+      ${
+        answer.service
+          ? `<p class="maelis-service-note">${escapeHtml(
+              answer.service === "revive"
+                ? "Use the corpse records below this conversation to choose an available resurrection rite."
+                : answer.service === "preserve"
+                  ? "Preservation is handled through the corpse records when a suitable rite or spell is available."
+                  : "This service is noted for future graveyard systems; for now, Maelis explains how it works.",
+            )}</p>`
+          : ""
+      }
+      ${
+        suggested.length
+          ? `<div class="maelis-suggested"><b>Suggested follow-ups</b><div>${suggested.map((option) => sisterMaelisOptionButton(option)).join("")}</div></div>`
+          : ""
+      }
+    </section>
+  `;
+}
+
+function sisterMaelisLineIsDirection(line = "") {
+  const text = String(line).trim();
+  if (!text) return false;
+  return /^(She (begins|closes|considers|counts|does not blink|exhales|folds|frowns|gestures|gives|glances|holds|leans|lets|lifts|looks|lowers|marks|meets|opens|pauses|picks|pockets|points|prepares|raises|rests|rings|says|shuts|shows|sighs|smiles|softens|studies|taps|tilts|touches|turns|watches)\b|Her (answer|eyes|expression|face|fingers|gaze|mouth|smile|voice)\b|Maelis's expression\b)/i.test(text);
+}
+
+function sisterMaelisLineMarkup(line = "") {
+  const text = String(line).trim();
+  if (!text) return "";
+  if (sisterMaelisLineIsDirection(text)) {
+    return `<p class="maelis-stage-direction">${escapeHtml(text)}</p>`;
+  }
+  return `<p>Maelis: ${escapeHtml(text)}</p>`;
+}
+
+function sisterMaelisGreetingMarkup(greetingNode) {
+  const line = (greetingNode?.lines ?? []).find((entry) => !sisterMaelisLineIsDirection(entry));
+  return line ? sisterMaelisLineMarkup(line) : "";
+}
+
+function renderSisterMaelisChat(nodeId = "MAELIS_HUB") {
+  els.villageMenu?.classList.add("npc-chat-open", "maelis-chat-open");
+  setVillageBackButtonVisible(true);
+  setVillageMusicKey("village:gravebinders");
+  const maelis = sisterMaelisNpc();
+  const isHub = !nodeId || nodeId === "MAELIS_HUB";
+  const isServices = nodeId === "MAELIS_SERVICES";
+  const isGoodbye = nodeId === "MAELIS_GOODBYE";
+  const answer = isHub ? null : sisterMaelisNode(nodeId);
+  state.questFlags ??= {};
+  const greetingNode = state.questFlags.sisterMaelisChatMet ? sisterMaelisNode("MAELIS_GREETING_REPEAT") : sisterMaelisNode("MAELIS_GREETING_FIRST");
+  state.questFlags.sisterMaelisChatMet = true;
+  sisterMaelisActiveAnswer = answer;
+  els.villageBody.innerHTML = `
+    <section class="maelis-chat-view">
+      <aside class="maelis-chat-portrait">
+        ${npcPortraitMarkup(maelis, "old-lady-chat-image", { clickable: false })}
+        <div>
+          <b>${escapeHtml(maelis.name ?? "Sister Maelis")}</b>
+          <span>Naevran graveyard keeper</span>
+        </div>
+      </aside>
+      <div class="maelis-chat-main">
+        <section class="maelis-chat-text">
+          ${
+            isHub
+              ? sisterMaelisGreetingMarkup(greetingNode)
+              : sisterMaelisAnswerMarkup(answer)
+          }
+        </section>
+        ${
+          isGoodbye
+            ? ""
+            : `<section class="maelis-main-topics">
+                <h3>${isHub ? "Ask Sister Maelis" : "Main Topics"}</h3>
+                ${sisterMaelisHubMarkup()}
+              </section>`
+        }
+        <div class="maelis-chat-footer">
+          ${
+            isGoodbye
+              ? sisterMaelisOptionButton({ id: "MAELIS_CLOSE", label: "Leave" }, "ghost-button")
+              : `
+                ${!isHub ? sisterMaelisOptionButton({ id: "MAELIS_HUB", label: "Ask something else." }, "ghost-button") : ""}
+                ${!isServices ? sisterMaelisOptionButton({ id: "MAELIS_SERVICES", label: "I need your services." }, "ghost-button") : ""}
+                ${sisterMaelisOptionButton({ id: "MAELIS_GOODBYE", label: "I should go." }, "ghost-button")}
+              `
+          }
+        </div>
+      </div>
+    </section>
+  `;
+  resetVillageScroll();
+}
+
+function sisterMaelisUseChatOption(optionId = "") {
+  if (optionId === "MAELIS_CLOSE") {
+    sisterMaelisActiveAnswer = null;
+    renderGraveyardMenu();
+    return;
+  }
+  renderSisterMaelisChat(optionId || "MAELIS_HUB");
+}
+
+window.DungeonNpcBehaviors ??= {};
+window.DungeonNpcBehaviors[sisterMaelisNpcId] = {
+  visit() {
+    renderGraveyardMenu();
+  },
+  returnToVisit() {
+    renderGraveyardMenu();
+  },
+  startChat(chatStateId = "MAELIS_HUB") {
+    renderSisterMaelisChat(chatStateId || "MAELIS_HUB");
+  },
+  useChatOption(_chatStateId, optionId) {
+    sisterMaelisUseChatOption(optionId);
+  },
+};
 
 function renderTeleportCirclesMenu() {
   const circles = travelKnownTeleportCircles();
@@ -21556,13 +21864,22 @@ function campaignQuestLogEntries() {
       const quest = campaign.quest ?? {};
       const started = completed > 0;
       const finished = completed >= campaign.count;
+      const barrowFate = campaign.id === "barrow-crown" ? state?.questFlags?.barrowCrownDecision : "";
       const title = finished
-        ? quest.completedTitle ?? `${campaign.name} Complete`
+        ? barrowFate === "destroy"
+          ? "The Barrow Crown Destroyed"
+          : barrowFate === "claim"
+            ? "The Barrow Crown Claimed"
+            : quest.completedTitle ?? `${campaign.name} Complete`
         : started
           ? quest.progressTitle ?? campaign.name
           : quest.initialTitle ?? campaign.name;
       const description = finished
-        ? quest.completedDescription ?? `${campaign.name} is complete.`
+        ? barrowFate === "destroy"
+          ? "The King Beneath is defeated, the Barrow Crown is broken, and the dead kingdom under the hills has finally fallen silent. Sister Maelis can begin naming the dead without a buried throne answering back."
+          : barrowFate === "claim"
+            ? "The Ashen Herald is defeated, and the Barrow Crown has accepted a living bearer. The dead kingdom is quiet for now, but Sister Maelis knows quiet is not the same as freedom."
+            : quest.completedDescription ?? `${campaign.name} is complete.`
         : started
           ? quest.progressDescription ?? campaign.description
           : quest.initialDescription ?? campaign.description;
@@ -21572,6 +21889,7 @@ function campaignQuestLogEntries() {
         title,
         description,
         ready: finished,
+        completed: finished,
         objectives: [
           {
             label: started || finished ? campaign.name : `Begin ${campaign.name}`,
@@ -21593,7 +21911,15 @@ function acceptedQuestLogEntries() {
   ].filter(Boolean);
 }
 
+function questLogSections(entries = acceptedQuestLogEntries()) {
+  return {
+    active: entries.filter((entry) => !entry.completed),
+    completed: entries.filter((entry) => entry.completed),
+  };
+}
+
 function ancientTomeEntries() {
+  ensureClericFaithTomes(state);
   const entries = state?.mode === "home" ? permanentPartyTomes(state?.partyTomes ?? []) : normalizePartyTomes(state?.partyTomes ?? []);
   if (state?.mode === "home" && (state?.partyTomes ?? []).length !== entries.length) state.partyTomes = entries;
   return entries.sort((a, b) => (a.collectedAt ?? 0) - (b.collectedAt ?? 0) || a.title.localeCompare(b.title));
@@ -21698,10 +22024,10 @@ function cancelQuestLogEntry(entry) {
 
 function questLogEntryMarkup(entry) {
   return `
-    <article class="quest-log-entry${entry.ready ? " ready" : ""}">
+    <article class="quest-log-entry${entry.ready ? " ready" : ""}${entry.completed ? " completed" : ""}">
       <div>
         <b>${escapeHtml(entry.title ?? "Quest")}</b>
-        <span>${escapeHtml(entry.giver ?? "Quest")}${entry.ready ? " - Ready" : ""}</span>
+        <span>${escapeHtml(entry.giver ?? "Quest")}${entry.completed ? " - Complete" : entry.ready ? " - Ready" : ""}</span>
       </div>
       ${entry.description ? `<p>${escapeHtml(entry.description)}</p>` : ""}
       ${(entry.objectives ?? [])
@@ -21720,26 +22046,63 @@ function questLogEntryMarkup(entry) {
   `;
 }
 
+function questLogSectionMarkup(title, entries, { completed = false } = {}) {
+  if (entries.length) {
+    const list = `<section class="quest-log-list">${entries.map(questLogEntryMarkup).join("")}</section>`;
+    return completed
+      ? `
+        <details class="quest-log-completed" open>
+          <summary>${escapeHtml(title)} <span>${entries.length}</span></summary>
+          ${list}
+        </details>
+      `
+      : `
+        <section class="quest-log-section">
+          <h3>${escapeHtml(title)}</h3>
+          ${list}
+        </section>
+      `;
+  }
+  return completed
+    ? ""
+    : `
+      <section class="quest-log-section">
+        <h3>${escapeHtml(title)}</h3>
+        <p class="empty-note">No active quests.</p>
+      </section>
+    `;
+}
+
 function renderQuestLogButton() {
   if (!els.questLogButton) return;
-  const questCount = gameHasStarted ? acceptedQuestLogEntries().length : 0;
+  const sections = gameHasStarted ? questLogSections() : { active: [], completed: [] };
+  const questCount = sections.active.length;
   els.questLogButton.disabled = !gameHasStarted;
   els.questLogButton.innerHTML = `Quests <span>${questCount}</span>`;
-  els.questLogButton.title = questCount ? `${questCount} accepted quest${questCount === 1 ? "" : "s"}` : "No accepted quests";
+  els.questLogButton.title = questCount
+    ? `${questCount} active quest${questCount === 1 ? "" : "s"}${sections.completed.length ? `, ${sections.completed.length} completed` : ""}`
+    : sections.completed.length
+      ? `${sections.completed.length} completed quest${sections.completed.length === 1 ? "" : "s"}`
+      : "No active quests";
 }
 
 function showQuestLog() {
   if (!gameHasStarted) return;
   const entries = acceptedQuestLogEntries();
+  const sections = questLogSections(entries);
+  els.gameDialogForm.classList.add("quest-log-dialog");
   els.gameDialogTitle.textContent = "Quest Log";
   els.gameDialogMessage.innerHTML = `
-    ${
-      entries.length
-        ? `<section class="quest-log-list">${entries.map(questLogEntryMarkup).join("")}</section>`
-        : `<p class="empty-note">No accepted quests.</p>`
-    }
-    ${adminEnabled() ? renderAdminProgressCatalog({ forceOpen: true, showToggle: false }) : ""}
-    ${ancientTomeMarkup()}
+    <div class="quest-log-layout">
+      <div class="quest-log-column">
+        ${questLogSectionMarkup("Active Quests", sections.active)}
+        ${questLogSectionMarkup("Completed Quests", sections.completed, { completed: true })}
+        ${adminEnabled() ? renderAdminProgressCatalog({ forceOpen: true, showToggle: false }) : ""}
+      </div>
+      <div class="quest-tome-column">
+        ${ancientTomeMarkup()}
+      </div>
+    </div>
   `;
   els.gameDialogField.classList.add("hidden");
   els.gameDialogField.innerHTML = "";
@@ -21747,6 +22110,7 @@ function showQuestLog() {
   const cleanup = () => {
     els.gameDialogActions.removeEventListener("click", handleClick);
     els.gameDialogMessage.removeEventListener("click", handleMessageClick);
+    els.gameDialogForm.classList.remove("quest-log-dialog");
     els.gameDialog.classList.add("hidden");
     activeDialogCancel = null;
   };
@@ -24845,21 +25209,22 @@ async function useFighterAbility(abilityId) {
   const hero = state.mode === "combat" ? activeFighter() : activeHero();
   const ability = availableFighterAbilities(hero).find((entry) => entry.id === abilityId);
   if (!canUseFighterAbility(hero, ability)) return;
+  const unlimited = adminUnlimitedHeroActions(hero);
 
   if (ability.id === "wildShape" && isWildShaped(hero)) {
-    if (state.mode === "combat") hero.hasBonusAction = false;
+    if (state.mode === "combat" && !unlimited) hero.hasBonusAction = false;
     revertWildShape(hero);
     hideAbilitiesMenu();
     render();
     return;
   }
 
-  hero.abilityUses[ability.id] = (hero.abilityUses[ability.id] ?? 0) + 1;
-  if (state.mode === "combat" && ability.resource === "bonusAction") {
+  if (!unlimited) hero.abilityUses[ability.id] = (hero.abilityUses[ability.id] ?? 0) + 1;
+  if (!unlimited && state.mode === "combat" && ability.resource === "bonusAction") {
     hero.hasBonusAction = false;
-  } else if (state.mode === "combat" && ability.resource === "action" && ability.id !== "eldritchBlast") {
+  } else if (!unlimited && state.mode === "combat" && ability.resource === "action" && ability.id !== "eldritchBlast") {
     hero.hasAction = false;
-  } else if (state.mode === "combat" && ability.resource === "reaction") {
+  } else if (!unlimited && state.mode === "combat" && ability.resource === "reaction") {
     hero.hasReaction = false;
   }
 
@@ -24871,8 +25236,8 @@ async function useFighterAbility(abilityId) {
   }
 
   if (ability.potionBreathAction) {
-    hero.abilityUses[ability.id] = Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1);
-    if (state.mode === "combat") hero.hasAction = true;
+    if (!unlimited) hero.abilityUses[ability.id] = Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1);
+    if (state.mode === "combat" && !unlimited) hero.hasAction = true;
     const spell = getContentDefinition("spells", ability.potionBreathAction.spellId);
     if (!spell) {
       addLog(`${hero.name}'s breath is not ready yet.`, "important");
@@ -25421,8 +25786,8 @@ async function useFighterAbility(abilityId) {
   }
 
   if (ability.id === "dragonbornBreath") {
-    hero.abilityUses[ability.id] = Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1);
-    if (state.mode === "combat") hero.hasAction = true;
+    if (!unlimited) hero.abilityUses[ability.id] = Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1);
+    if (state.mode === "combat" && !unlimited) hero.hasAction = true;
     const baseBreath = getContentDefinition("spells", "dragonborn-breath");
     const breath = {
       ...baseBreath,
@@ -25488,8 +25853,8 @@ async function useFighterAbility(abilityId) {
   if (ability.id === "bardicInspiration") {
     const target = await chooseAbilityTarget(hero, "Bardic Inspiration", "Choose a hero to inspire.");
     if (!target) {
-      hero.abilityUses[ability.id] = Math.max(0, (hero.abilityUses[ability.id] ?? 1) - 1);
-      if (state.mode === "combat") hero.hasBonusAction = true;
+      if (!unlimited) hero.abilityUses[ability.id] = Math.max(0, (hero.abilityUses[ability.id] ?? 1) - 1);
+      if (state.mode === "combat" && !unlimited) hero.hasBonusAction = true;
       renderAbilitiesMenu();
       return;
     }
@@ -25517,14 +25882,14 @@ async function useFighterAbility(abilityId) {
       return;
     }
     const spentBefore = Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1);
-    const remainingPool = Math.max(0, abilityMaxUses(hero, ability) - spentBefore);
+    const remainingPool = unlimited ? 999 : Math.max(0, abilityMaxUses(hero, ability) - spentBefore);
     const use = await chooseLayOnHandsUse(hero, target, remainingPool);
     if (!use) {
       refundFighterAbilityUse(hero, ability);
       renderAbilitiesMenu();
       return;
     }
-    hero.abilityUses[ability.id] = Math.min(abilityMaxUses(hero, ability), spentBefore + use.amount);
+    if (!unlimited) hero.abilityUses[ability.id] = Math.min(abilityMaxUses(hero, ability), spentBefore + use.amount);
     const targetText = target.id === hero.id ? "" : ` on ${target.name}`;
     if (use.kind === "cureDisease") {
       const removed = typeof cureFighterDisease === "function" ? cureFighterDisease(target, use.diseaseId) : [];
@@ -25538,13 +25903,13 @@ async function useFighterAbility(abilityId) {
 
   if (ability.id === "divineSmite") {
     ensureSpellPointState(hero);
-    const spend = Math.min(hero.spellPoints ?? 0, 5);
+    const spend = unlimited ? 5 : Math.min(hero.spellPoints ?? 0, 5);
     if (spend <= 0) {
-      hero.abilityUses[ability.id] = Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1);
-      if (state.mode === "combat") hero.hasBonusAction = true;
+      if (!unlimited) hero.abilityUses[ability.id] = Math.max(0, (hero.abilityUses?.[ability.id] ?? 1) - 1);
+      if (state.mode === "combat" && !unlimited) hero.hasBonusAction = true;
       addLog(`${hero.name} needs spell points to prepare Divine Smite.`, "important");
     } else {
-      hero.spellPoints = Math.max(0, (hero.spellPoints ?? 0) - spend);
+      if (!unlimited) hero.spellPoints = Math.max(0, (hero.spellPoints ?? 0) - spend);
       const dice = Math.min(5, 2 + Math.max(0, spend - 2));
       const roll = rollDice(dice, 8);
       applyStatusEffect(hero, { id: "divine-smite", label: `Divine Smite ${dice}d8`, weaponRider: true, damageBonus: roll.total, damageType: "radiant", expiresAtEndOfTurn: true });
@@ -26193,6 +26558,7 @@ function renderControls() {
     }
     const teleport = els.topAdminActions.querySelector("[data-action='toggle-admin-teleport']");
     const god = els.topAdminActions.querySelector("[data-action='toggle-admin-god']");
+    const nat20 = els.topAdminActions.querySelector("[data-action='toggle-admin-nat20']");
     if (teleport) {
       teleport.textContent = adminTeleportEnabled ? "Teleport On" : "Teleport Off";
       teleport.classList.toggle("active", adminTeleportEnabled);
@@ -26200,6 +26566,10 @@ function renderControls() {
     if (god) {
       god.textContent = adminGodMode ? "God Mode On" : "God Mode Off";
       god.classList.toggle("active", adminGodMode);
+    }
+    if (nat20) {
+      nat20.textContent = adminNat20Mode ? "Nat 20 On" : "Nat 20 Off";
+      nat20.classList.toggle("active", adminNat20Mode);
     }
   }
   els.zoomOut.disabled = roomZoom <= 0.5;
