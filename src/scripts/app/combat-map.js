@@ -4183,11 +4183,15 @@ function triggerCustomDungeonStory(event, context = {}) {
   }
   customStoryTriggerQueue = customStoryTriggerQueue.then(async () => {
     for (const trigger of matches) {
+      const voiceIds = state.campaignId && typeof dungeonVoiceLineIdsForPrefix === "function" && typeof campaignDungeonVoicePrefix === "function"
+        ? await dungeonVoiceLineIdsForPrefix(campaignDungeonVoicePrefix(state.campaignId, state.campaignIndex, "trigger", trigger.id ?? trigger.title ?? "story-trigger"))
+        : [];
       await showDungeonStoryDialog({
         title: customStoryTriggerTitle(trigger, context),
         text: trigger.text,
         images: trigger.images ?? [],
         actionLabel: "Continue",
+        voiceIds,
       });
     }
     return true;
@@ -4406,13 +4410,24 @@ function checkDungeonCompletion(hero = activeHero()) {
   };
   state.completed = true;
   if (outro?.text || outro?.images?.length) {
-    void showDungeonStoryDialog({
-      title: state.customDungeon?.name ?? "Dungeon Complete",
-      text: outro.text,
-      images: outro.images,
-      actionLabel: "Return Home",
-      goalText: customGoalStatus().text,
-    }).then(finishDungeon);
+    const outroVoicePrefix = state.campaignId === "barrow-crown" && state.questFlags?.barrowCrownDecision && Math.floor(Number(state.campaignIndex) || 0) === 6 && typeof campaignChoiceVoicePrefix === "function"
+      ? campaignChoiceVoicePrefix(state.campaignId, state.questFlags.barrowCrownDecision)
+      : state.campaignId && typeof campaignDungeonVoicePrefix === "function"
+        ? campaignDungeonVoicePrefix(state.campaignId, state.campaignIndex, "outro")
+        : "";
+    const outroVoiceIdsPromise = outroVoicePrefix && typeof dungeonVoiceLineIdsForPrefix === "function"
+      ? dungeonVoiceLineIdsForPrefix(outroVoicePrefix)
+      : Promise.resolve([]);
+    void outroVoiceIdsPromise
+      .then((voiceIds) => showDungeonStoryDialog({
+        title: state.customDungeon?.name ?? "Dungeon Complete",
+        text: outro.text,
+        images: outro.images,
+        actionLabel: "Return Home",
+        goalText: customGoalStatus().text,
+        voiceIds,
+      }))
+      .then(finishDungeon);
   } else {
     finishDungeon();
   }
@@ -8324,6 +8339,7 @@ function spellRevivalWindowSeconds(spell) {
 
 function canSpellReviveCorpse(caster, spell, corpseHero) {
   if (!caster || !spell || !corpseHero?.dead) return false;
+  if (corpseRevivalBlockedReason(corpseHero)) return false;
   if (corpseHero.barrowCrownDeathCurse) return false;
   if (!heroCanAct(caster)) return false;
   if (spell.effect?.kind !== "revive") return false;
@@ -8334,7 +8350,7 @@ function canSpellReviveCorpse(caster, spell, corpseHero) {
 
 function reviveCorpseWithSpell(caster, corpseHero, spell) {
   if (!canSpellReviveCorpse(caster, spell, corpseHero)) {
-    addLog(`${spell?.name ?? "The spell"} cannot restore ${corpseHero?.name ?? "that corpse"} in its current state.`, "important");
+    addLog(corpseRevivalBlockedReason(corpseHero) || `${spell?.name ?? "The spell"} cannot restore ${corpseHero?.name ?? "that corpse"} in its current state.`, "important");
     return false;
   }
   spendSpellResources(caster, spell);

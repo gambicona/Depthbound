@@ -1379,6 +1379,11 @@ function ensureHeroCorpseState(hero, options = {}) {
     location: options.location ?? previous.location ?? (previous.sentHome || hero.corpseAtBase ? "base" : "dungeon"),
     preservedUntilDungeonTimeSeconds: Math.max(0, Math.floor(Number(previous.preservedUntilDungeonTimeSeconds ?? 0) || 0)),
     preservedUntilCampaignTimeSeconds,
+    maelisGentleKeeping: Boolean(previous.maelisGentleKeeping),
+    maelisGentleKeepingDebtCp: Math.max(0, Math.floor(Number(previous.maelisGentleKeepingDebtCp) || 0)),
+    maelisKeepingAgeSeconds: Math.max(0, Math.floor(Number(previous.maelisKeepingAgeSeconds) || 0)),
+    buried: Boolean(previous.buried),
+    buriedAtCampaignTimeSeconds: previous.buriedAtCampaignTimeSeconds ?? null,
     transportedAtDungeonTimeSeconds: previous.transportedAtDungeonTimeSeconds ?? null,
     transportedAtCampaignTimeSeconds: previous.transportedAtCampaignTimeSeconds ?? null,
     revivedAtDungeonTimeSeconds: previous.revivedAtDungeonTimeSeconds ?? null,
@@ -1395,7 +1400,7 @@ function heroCorpseLocation(hero) {
 
 function corpsePreserved(hero, nowSeconds = campaignElapsedSeconds({ sync: false })) {
   const corpse = ensureHeroCorpseState(hero);
-  return Boolean(corpse && (corpse.preservedUntilCampaignTimeSeconds ?? 0) > nowSeconds);
+  return Boolean(corpse && !corpse.buried && (corpse.maelisGentleKeeping || (corpse.preservedUntilCampaignTimeSeconds ?? 0) > nowSeconds));
 }
 
 function corpseAgeSeconds(hero, nowSeconds = campaignElapsedSeconds({ sync: false })) {
@@ -1405,6 +1410,10 @@ function corpseAgeSeconds(hero, nowSeconds = campaignElapsedSeconds({ sync: fals
 }
 
 function corpseEffectiveAgeSeconds(hero, nowSeconds = campaignElapsedSeconds({ sync: false })) {
+  const corpse = ensureHeroCorpseState(hero);
+  if (corpse?.maelisGentleKeeping && !corpse.buried) {
+    return Math.max(0, Math.floor(Number(corpse.maelisKeepingAgeSeconds ?? corpseAgeSeconds(hero, nowSeconds)) || 0));
+  }
   if (corpsePreserved(hero, nowSeconds)) return 0;
   return corpseAgeSeconds(hero, nowSeconds);
 }
@@ -1412,6 +1421,19 @@ function corpseEffectiveAgeSeconds(hero, nowSeconds = campaignElapsedSeconds({ s
 function corpseDecompositionStatus(hero, nowSeconds = campaignElapsedSeconds({ sync: false })) {
   const corpse = ensureHeroCorpseState(hero);
   if (!corpse) return { label: "Alive", detail: "" };
+  if (corpse.buried) {
+    return {
+      label: "Buried",
+      detail: "The body has been given to the graveyard. Only True Name Restoration can call this soul back.",
+    };
+  }
+  if (corpse.maelisGentleKeeping) {
+    const keptAge = corpseEffectiveAgeSeconds(hero, nowSeconds);
+    return {
+      label: "Kept",
+      detail: `Sister Maelis' Gentle Keeping holds the body at ${formatDuration(keptAge)} since death. ${Math.max(0, Math.floor((corpse.maelisGentleKeepingDebtCp ?? 0) / 100))} gp will be added if you choose resurrection.`,
+    };
+  }
   if (corpsePreserved(hero, nowSeconds)) {
     return {
       label: "Preserved",
@@ -1425,7 +1447,14 @@ function corpseDecompositionStatus(hero, nowSeconds = campaignElapsedSeconds({ s
 }
 
 function deadRosterHeroes() {
-  return rosterHeroes().filter((hero) => isClassHero(hero) && hero.dead);
+  return rosterHeroes()
+    .filter((hero) => isClassHero(hero) && hero.dead)
+    .sort((a, b) => {
+      const aCorpse = ensureHeroCorpseState(a);
+      const bCorpse = ensureHeroCorpseState(b);
+      if (Boolean(aCorpse?.buried) !== Boolean(bCorpse?.buried)) return aCorpse?.buried ? 1 : -1;
+      return (aCorpse?.diedAtCampaignTimeSeconds ?? 0) - (bCorpse?.diedAtCampaignTimeSeconds ?? 0);
+    });
 }
 
 function prepareTimedEffect(effect) {
@@ -2117,6 +2146,11 @@ function isPlayerControlledCompanion(fighter) {
 
 function isRangerBeastCompanion(fighter) {
   return Boolean(fighter?.rangerCompanionOwnerId && fighter?.rangerCompanion === true);
+}
+
+function corpseRevivalBlockedReason(corpseHero) {
+  if (isRangerBeastCompanion(corpseHero)) return "Ranger beast companions cannot be resurrected. A Beast Master must call a new companion instead.";
+  return "";
 }
 
 function isSpellBoundSummon(fighter) {

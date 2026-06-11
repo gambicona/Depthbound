@@ -5,16 +5,16 @@ from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_DIR = ROOT / "assets" / "bottomtiles" / "noiso"
+SOURCE_DIR = Path(r"E:\OneDrive\DD\GameAssets\worldbuilder\noiso")
 OUTPUT_DIR = ROOT / "assets" / "bottomtiles" / "noiso_fitted"
 BLACK_THRESHOLD = 18
 OVERHANG_BLACK_THRESHOLD = 48
-CLEAR_ALL_BLACK_TILES = {"forest_normal", "mountain"}
+CLEAR_ALL_BLACK_TILES = {"mountain"}
 
 
 def is_edge_black(pixel, threshold=BLACK_THRESHOLD):
     r, g, b, a = pixel
-    return a == 0 or (a > 0 and r <= threshold and g <= threshold and b <= threshold)
+    return a > 0 and r <= threshold and g <= threshold and b <= threshold
 
 
 def clear_connected_edge_black(image):
@@ -60,6 +60,9 @@ def clear_all_near_black(image):
 
 
 def main():
+    if not SOURCE_DIR.exists():
+        raise FileNotFoundError(f"Noiso source folder not found: {SOURCE_DIR}")
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     for source_path in sorted(SOURCE_DIR.glob("*.png")):
         image = Image.open(source_path).convert("RGBA")

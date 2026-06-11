@@ -9642,7 +9642,7 @@ function travelMarkerMarkup(structure, row, col, chunkX = null, chunkY = null) {
   if (travelTeleportCircleAtHex(hex)) markers.push(`<span class="travel-marker">Circle</span>`);
   if (travelRumorAtHex(hex)) markers.push(`<span class="travel-marker rumor-marker">Rumor</span>`);
   if (routeStep) markers.push(`<span class="travel-marker route-marker">${escapeHtml(routeStep)}</span>`);
-  return markers.join("");
+  return markers.length ? `<span class="travel-marker-stack">${markers.join("")}</span>` : "";
 }
 
 function travelObjectMarkup(objects = []) {
@@ -14554,6 +14554,8 @@ function settlementTempleRiteWindowSeconds(rite) {
 
 function settlementTempleCanRevive(corpse, rite) {
   if (!corpse?.dead || !rite) return { ok: false, reason: "No corpse." };
+  const blockedReason = corpseRevivalBlockedReason(corpse);
+  if (blockedReason) return { ok: false, reason: blockedReason };
   const spell = settlementTempleRiteSpell(rite);
   if (!spell?.effect || spell.effect.kind !== "revive") return { ok: false, reason: "Rite unavailable." };
   const effectiveAge = corpseEffectiveAgeSeconds(corpse);
@@ -14899,6 +14901,7 @@ function showHomeMenu() {
 }
 
 function hideHomeMenu() {
+  if (typeof stopDungeonVoiceLine === "function") stopDungeonVoiceLine();
   els.homeMenu.classList.add("hidden");
   els.homeMenu.classList.remove("camp-dock", "inn-dock");
   els.closeHomeMenu?.classList.remove("hidden");
@@ -15344,67 +15347,6 @@ function villageGraveyardSectionMarkup(graveyardCount = 0) {
   `;
 }
 
-const sisterMaelisNpcId = "sister-maelis";
-
-function sisterMaelisNpc() {
-  return window.DungeonContent.get("npcs", sisterMaelisNpcId) ?? {
-    id: sisterMaelisNpcId,
-    name: "Sister Maelis",
-    title: "Keeper of the Graveyard",
-    portrait: "assets/tokens/Sister_Maelis.png",
-    token: { fallbackLabel: "SM" },
-  };
-}
-
-function sisterMaelisChatData() {
-  return window.DungeonNpcChats?.maelis ?? { hubChoices: [], idleLines: [], stateVariants: [], nodes: {} };
-}
-
-function sisterMaelisBarrowProgress() {
-  return Math.max(0, Math.floor(Number(state?.campaignProgress?.["barrow-crown"]) || 0));
-}
-
-function sisterMaelisStateVariant() {
-  const progress = sisterMaelisBarrowProgress();
-  return sisterMaelisChatData().stateVariants
-    ?.filter((entry) => progress >= (entry.progress ?? 0))
-    .sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0))[0] ?? null;
-}
-
-function sisterMaelisRandomIdleLine() {
-  const lines = sisterMaelisChatData().idleLines ?? [];
-  return lines.length ? lines[Math.floor(Math.random() * lines.length)] : npcEntryLine(sisterMaelisNpc());
-}
-
-function sisterMaelisGraveyardLine() {
-  state.questFlags ??= {};
-  if (!state.questFlags.sisterMaelisGraveyardIntroSeen) {
-    state.questFlags.sisterMaelisGraveyardIntroSeen = true;
-    return "You are standing in a graveyard, carrying weapons, wounds, and questions. I am Sister Maelis. Keeper of this yard, servant of Naevra, and the person who will be very cross if you die somewhere I cannot find the body.";
-  }
-  return sisterMaelisRandomIdleLine() || "Back again. Good. I prefer repeat visitors when they are still breathing.";
-}
-
-function sisterMaelisCardMarkup() {
-  const maelis = sisterMaelisNpc();
-  const variant = sisterMaelisStateVariant();
-  return `
-    <section class="npc-card maelis-graveyard-card">
-      ${npcPortraitMarkup(maelis)}
-      <div class="maelis-card-copy">
-        <b>${escapeHtml(maelis.name ?? "Sister Maelis")}</b>
-        <span>${escapeHtml(maelis.title ?? "Keeper of the Graveyard")}</span>
-        <p>${escapeHtml(sisterMaelisGraveyardLine())}</p>
-        ${variant?.addOn ? `<p class="maelis-state-line">${escapeHtml(variant.addOn)}</p>` : ""}
-      </div>
-      <div class="maelis-card-actions">
-        <button type="button" data-action="start-npc-chat" data-npc="${sisterMaelisNpcId}" data-chat-state="MAELIS_HUB">Have a chat with Sister Maelis</button>
-        <button type="button" class="ghost-button" data-action="start-npc-chat" data-npc="${sisterMaelisNpcId}" data-chat-state="MAELIS_SERVICES">Ask About Services</button>
-      </div>
-    </section>
-  `;
-}
-
 function showNpcInspection(npcId = activeStoreNpcId) {
   const npc = window.DungeonContent.get("npcs", npcId);
   if (!npc) return;
@@ -15505,11 +15447,152 @@ function renderVillageMenu() {
   `;
 }
 
+const maelisGentleKeepingDebtCp = 5000;
+const maelisYearSeconds = 365 * 24 * 60 * 60;
+
+const maelisGraveyardRites = [
+  { id: "last-spark", name: "Last Spark", spellId: "revivify", priceCp: 30000, windowSeconds: corpseRevivifyWindowSeconds, requiresBody: true },
+  { id: "grave-recall", name: "Grave Recall", spellId: "raise-dead", priceCp: 50000, windowSeconds: corpseRaiseDeadWindowSeconds, requiresBody: true },
+  { id: "deep-calling", name: "Deep Calling", spellId: "resurrection", priceCp: 100000, windowSeconds: 100 * maelisYearSeconds, requiresBody: true },
+  { id: "true-name-restoration", name: "True Name Restoration", spellId: "true-resurrection", priceCp: 2500000, windowSeconds: 200 * maelisYearSeconds, requiresBody: false },
+];
+
+function ensureMaelisGentleKeeping(corpse) {
+  if (!corpse?.dead) return null;
+  const record = ensureHeroCorpseState(corpse);
+  if (!record || record.buried || record.location !== "base" || record.maelisGentleKeeping) return record;
+  record.maelisGentleKeeping = true;
+  record.maelisGentleKeepingDebtCp = Math.max(maelisGentleKeepingDebtCp, Math.floor(Number(record.maelisGentleKeepingDebtCp) || 0));
+  record.maelisKeepingAgeSeconds = corpseAgeSeconds(corpse);
+  record.gentleKeepingStartedAtCampaignTimeSeconds = campaignElapsedSeconds({ sync: false });
+  addLog(`Sister Maelis receives ${corpse.name}'s body and begins Gentle Keeping. The body will remain at ${formatDuration(record.maelisKeepingAgeSeconds)} since death; ${priceText(record.maelisGentleKeepingDebtCp)} is owed only if you choose resurrection.`, "important");
+  return record;
+}
+
+function maelisGraveyardRiteSpell(rite) {
+  const spell = window.DungeonContent.get("spells", rite.spellId);
+  return spell ? spellWithCastLevel(spell, spellBaseLevel(spell)) : null;
+}
+
+function maelisGraveyardRiteTotalCp(corpse, rite) {
+  const record = ensureHeroCorpseState(corpse);
+  const keepingDebt = record?.maelisGentleKeeping && !record?.buried ? Math.max(0, Math.floor(Number(record.maelisGentleKeepingDebtCp) || 0)) : 0;
+  return (rite?.priceCp ?? 0) + keepingDebt;
+}
+
+function maelisCanPerformGraveyardRite(corpse, rite) {
+  if (!corpse?.dead || !rite) return { ok: false, reason: "No corpse." };
+  const blockedReason = corpseRevivalBlockedReason(corpse);
+  if (blockedReason) return { ok: false, reason: blockedReason };
+  const record = ensureHeroCorpseState(corpse);
+  const spell = maelisGraveyardRiteSpell(rite);
+  if (!spell?.effect || spell.effect.kind !== "revive") return { ok: false, reason: "Rite unavailable." };
+  if (corpse.barrowCrownDeathCurse) return { ok: false, reason: "The Barrow Crown still holds this soul." };
+  if (record?.location !== "base" && !record?.buried) return { ok: false, reason: "The body is not at the graveyard." };
+  if (record?.buried && rite.requiresBody) return { ok: false, reason: "The body has been buried. Only True Name Restoration remains." };
+  const age = rite.requiresBody ? corpseEffectiveAgeSeconds(corpse) : corpseAgeSeconds(corpse);
+  if (age > rite.windowSeconds) return { ok: false, reason: `${rite.name} can no longer reach this death.` };
+  const totalCp = maelisGraveyardRiteTotalCp(corpse, rite);
+  if (moneyToCp(partyPurse()) < totalCp) return { ok: false, reason: `Need ${priceText(totalCp)}.` };
+  return { ok: true, spell, totalCp };
+}
+
+function maelisGraveyardRiteButtons(corpse) {
+  const record = ensureHeroCorpseState(corpse);
+  return maelisGraveyardRites
+    .filter((rite) => !record?.buried || !rite.requiresBody)
+    .map((rite) => {
+      const check = maelisCanPerformGraveyardRite(corpse, rite);
+      const totalCp = maelisGraveyardRiteTotalCp(corpse, rite);
+      return `
+        <button type="button" data-action="maelis-perform-rite" data-corpse="${escapeAttribute(corpse.id)}" data-rite="${escapeAttribute(rite.id)}" ${check.ok ? "" : "disabled"} title="${escapeAttribute(check.ok ? "Maelis can perform this rite." : check.reason)}">
+          ${escapeHtml(rite.name)} <small>${escapeHtml(priceText(totalCp))}</small>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function maelisPerformGraveyardRite(corpseId = "", riteId = "") {
+  const corpse = corpseById(corpseId);
+  const rite = maelisGraveyardRites.find((entry) => entry.id === riteId);
+  const check = maelisCanPerformGraveyardRite(corpse, rite);
+  if (!corpse || !rite || !check.ok || !check.spell) {
+    addLog(check.reason || "Sister Maelis cannot perform that rite.", "important");
+    renderGraveyardMenu();
+    return;
+  }
+  if (!spendMoney(partyPurse(), check.totalCp)) return;
+  const spell = check.spell;
+  const reviveHp = Math.max(1, Math.floor(corpse.maxHp * (spell.effect?.hpFraction ?? 0)) || (spell.effect?.hp ?? 1));
+  corpse.dead = false;
+  corpse.alive = true;
+  corpse.hp = Math.min(corpse.maxHp, reviveHp);
+  corpse.temporaryHp = 0;
+  corpse.stableAtZero = false;
+  corpse.deathSaves = { successes: 0, failures: 0 };
+  corpse.deathLootDropped = false;
+  corpse.barrowCrownDeathCurse = false;
+  corpse.corpse = {
+    ...(corpse.corpse ?? {}),
+    revivedAtDungeonTimeSeconds: dungeonElapsedSeconds({ sync: false }),
+    revivedAtCampaignTimeSeconds: campaignElapsedSeconds({ sync: false }),
+    location: null,
+    maelisGentleKeeping: false,
+    maelisGentleKeepingDebtCp: 0,
+    maelisKeepingAgeSeconds: 0,
+    buried: false,
+  };
+  corpse.corpseAtBase = false;
+  state.party.rosterIds = uniqueValues([...(state.party.rosterIds ?? []), corpse.id]);
+  state.party.heroIds = uniqueValues([...(state.party.heroIds ?? []), corpse.id]);
+  if (!state.party.activeHeroId || state.fighters[state.party.activeHeroId]?.dead) state.party.activeHeroId = corpse.id;
+  refreshDerivedStats(corpse);
+  addLog(`Sister Maelis performs ${rite.name}. ${corpse.name} returns with ${corpse.hp} HP for ${priceText(check.totalCp)}.`, "important");
+  render();
+  renderGraveyardMenu();
+}
+
+async function maelisBuryCorpse(corpseId = "") {
+  const corpse = corpseById(corpseId);
+  if (!corpse?.dead) return;
+  const record = ensureHeroCorpseState(corpse);
+  if (!record || record.buried || record.location !== "base") {
+    addLog(`${corpse.name}'s body must be at the graveyard before burial.`, "important");
+    renderGraveyardMenu();
+    return;
+  }
+  const choice = await showChoiceDialog({
+    title: "Bury Companion",
+    message: `Bury ${corpse.name}? This ends Gentle Keeping and destroys the body. Only True Name Restoration will remain possible.`,
+    choices: [
+      { value: "cancel", label: "Cancel" },
+      { value: "bury", label: "Bury Them" },
+    ],
+  });
+  if (choice !== "bury") {
+    renderGraveyardMenu();
+    return;
+  }
+  record.buried = true;
+  record.location = "buried";
+  record.maelisGentleKeeping = false;
+  record.maelisGentleKeepingDebtCp = 0;
+  record.buriedAtCampaignTimeSeconds = campaignElapsedSeconds({ sync: false });
+  corpse.corpseAtBase = false;
+  addLog(`Sister Maelis buries ${corpse.name}. The body is gone; only True Name Restoration remains.`, "important");
+  render();
+  renderGraveyardMenu();
+}
+
 function graveyardCorpseMarkup(corpse) {
+  ensureMaelisGentleKeeping(corpse);
   const status = corpseDecompositionStatus(corpse);
-  const reviveButtons = corpseSpellButtons(corpse, ["revivify", "raise-dead", "resurrection", "true-resurrection"], { requireBase: true });
-  const preserveButtons = corpseSpellButtons(corpse, ["gentle-repose"], { requireBase: true });
-  const location = heroCorpseLocation(corpse) === "base" ? "At base" : "Still in dungeon";
+  const record = ensureHeroCorpseState(corpse);
+  const reviveButtons = maelisGraveyardRiteButtons(corpse);
+  const spellButtons = record?.buried ? "" : corpseSpellButtons(corpse, ["revivify", "raise-dead", "resurrection", "true-resurrection"], { requireBase: true });
+  const location = record?.buried ? "Buried in the graveyard" : heroCorpseLocation(corpse) === "base" ? "At graveyard" : "Still in dungeon";
+  const canBury = !record?.buried && heroCorpseLocation(corpse) === "base";
   return `
     <section class="graveyard-entry">
       <div>
@@ -15518,239 +15601,21 @@ function graveyardCorpseMarkup(corpse) {
         <small>${escapeHtml(status.detail)}</small>
       </div>
       <div class="object-actions">
-        ${preserveButtons || ""}
         ${reviveButtons || ""}
+        ${spellButtons || ""}
+        ${canBury ? `<button type="button" class="ghost-button" data-action="maelis-bury-corpse" data-corpse="${escapeAttribute(corpse.id)}">Bury Body</button>` : ""}
       </div>
-      <details>
-        <summary>Belongings</summary>
-        ${corpseLootRows(corpse, heroCorpseLocation(corpse) === "base")}
-      </details>
-    </section>
-  `;
-}
-
-function renderGraveyardMenu() {
-  els.villageMenu?.classList.remove("npc-chat-open", "maelis-chat-open", "guild-open", "village-index-open");
-  setVillageBackButtonVisible(true);
-  setVillageMusicKey("");
-  const dead = deadRosterHeroes();
-  els.villageBody.innerHTML = `
-    ${sisterMaelisCardMarkup()}
-    <p class="empty-note">Dead companions can be preserved, looted, or restored here once their body has been sent home.</p>
-    <section class="graveyard-list">
-      ${dead.length ? dead.map(graveyardCorpseMarkup).join("") : `<p class="empty-note">No dead companions are recorded.</p>`}
-    </section>
-  `;
-  resetVillageScroll();
-}
-
-const sisterMaelisTopicGroups = [
-  { title: "Faith & Naevra", ids: ["FAITH_01", "NAEVRA_01", "MYTH_01"] },
-  { title: "The Graveyard", ids: ["GRAVEYARD_01", "REVIVE_01"] },
-  { title: "The Barrow Crown", ids: ["CROWN_01"] },
-  { title: "Personal", ids: ["PERSONAL_01", "FLIRT_01"] },
-  { title: "Services", ids: ["MAELIS_SERVICES"] },
-];
-
-let sisterMaelisActiveAnswer = null;
-
-function sisterMaelisNode(nodeId = "MAELIS_HUB") {
-  if (nodeId === "MAELIS_GOODBYE") {
-    return {
-      id: "MAELIS_GOODBYE",
-      player: "I should go.",
-      lines: ["Then go alive, return named, and do not make extra work for me."],
-      options: [],
-    };
-  }
-  return sisterMaelisChatData().nodes?.[nodeId] ?? null;
-}
-
-function sisterMaelisChoiceLabel(nodeId = "") {
-  if (nodeId === "MAELIS_HUB") return "Ask something else.";
-  if (nodeId === "MAELIS_SERVICES") return "I need your services.";
-  if (nodeId === "MAELIS_GOODBYE") return "I should go.";
-  const node = sisterMaelisNode(nodeId);
-  return node?.player || node?.options?.[0]?.label || nodeId;
-}
-
-function sisterMaelisOptionButton(option, className = "") {
-  if (option?.id === "MAELIS_CLOSE") {
-    return `<button type="button" class="${className}" data-action="npc-chat-option" data-npc="${sisterMaelisNpcId}" data-chat-state="MAELIS_HUB" data-option="MAELIS_CLOSE">${escapeHtml(option.label ?? "Leave")}</button>`;
-  }
-  if (!option?.id || option.id === "MAELIS_GOODBYE") {
-    return `<button type="button" class="${className}" data-action="npc-chat-option" data-npc="${sisterMaelisNpcId}" data-chat-state="MAELIS_HUB" data-option="MAELIS_GOODBYE">${escapeHtml(option?.label ?? "I should go.")}</button>`;
-  }
-  const label = option.label || sisterMaelisChoiceLabel(option.id);
-  return `<button type="button" class="${className}" data-action="npc-chat-option" data-npc="${sisterMaelisNpcId}" data-chat-state="MAELIS_HUB" data-option="${escapeAttribute(option.id)}">${escapeHtml(label)}</button>`;
-}
-
-function sisterMaelisHubChoices() {
-  const data = sisterMaelisChatData();
-  const choices = [...(data.hubChoices ?? [])];
-  const variant = sisterMaelisStateVariant();
-  if (variant?.id) choices.splice(5, 0, { id: variant.id, label: variant.label });
-  return choices.filter((choice) => choice.id && sisterMaelisNode(choice.id));
-}
-
-function sisterMaelisHubMarkup() {
-  const choices = sisterMaelisHubChoices();
-  const byId = new Map(choices.map((choice) => [choice.id, choice]));
-  const grouped = sisterMaelisTopicGroups
-    .map((group) => ({
-      ...group,
-      choices: group.ids.map((id) => byId.get(id)).filter(Boolean),
-    }))
-    .filter((group) => group.choices.length);
-  const groupedIds = new Set(grouped.flatMap((group) => group.choices.map((choice) => choice.id)));
-  const remaining = choices.filter((choice) => !groupedIds.has(choice.id));
-  return `
-    <div class="maelis-topic-groups">
-      ${grouped
-        .map(
-          (group) => `
-            <section class="maelis-topic-group">
-              <h4>${escapeHtml(group.title)}</h4>
-              <div>${group.choices.map((choice) => sisterMaelisOptionButton(choice)).join("")}</div>
-            </section>
-          `,
-        )
-        .join("")}
       ${
-        remaining.length
-          ? `<section class="maelis-topic-group"><h4>Current Matters</h4><div>${remaining.map((choice) => sisterMaelisOptionButton(choice)).join("")}</div></section>`
-          : ""
-      }
-    </div>
-  `;
-}
-
-function sisterMaelisAnswerMarkup(answer) {
-  if (!answer) return "";
-  const suggested = (answer.options ?? []).filter((option) => option.id && sisterMaelisNode(option.id));
-  return `
-    <section class="maelis-answer">
-      ${answer.player ? `<p class="maelis-player-line">You: ${escapeHtml(answer.player)}</p>` : ""}
-      ${answer.lines.map(sisterMaelisLineMarkup).join("")}
-      ${
-        answer.service
-          ? `<p class="maelis-service-note">${escapeHtml(
-              answer.service === "revive"
-                ? "Use the corpse records below this conversation to choose an available resurrection rite."
-                : answer.service === "preserve"
-                  ? "Preservation is handled through the corpse records when a suitable rite or spell is available."
-                  : "This service is noted for future graveyard systems; for now, Maelis explains how it works.",
-            )}</p>`
-          : ""
-      }
-      ${
-        suggested.length
-          ? `<div class="maelis-suggested"><b>Suggested follow-ups</b><div>${suggested.map((option) => sisterMaelisOptionButton(option)).join("")}</div></div>`
-          : ""
+        record?.buried
+          ? ""
+          : `<details>
+              <summary>Belongings</summary>
+              ${corpseLootRows(corpse, heroCorpseLocation(corpse) === "base")}
+            </details>`
       }
     </section>
   `;
 }
-
-function sisterMaelisLineIsDirection(line = "") {
-  const text = String(line).trim();
-  if (!text) return false;
-  return /^(She (begins|closes|considers|counts|does not blink|exhales|folds|frowns|gestures|gives|glances|holds|leans|lets|lifts|looks|lowers|marks|meets|opens|pauses|picks|pockets|points|prepares|raises|rests|rings|says|shuts|shows|sighs|smiles|softens|studies|taps|tilts|touches|turns|watches)\b|Her (answer|eyes|expression|face|fingers|gaze|mouth|smile|voice)\b|Maelis's expression\b)/i.test(text);
-}
-
-function sisterMaelisLineMarkup(line = "") {
-  const text = String(line).trim();
-  if (!text) return "";
-  if (sisterMaelisLineIsDirection(text)) {
-    return `<p class="maelis-stage-direction">${escapeHtml(text)}</p>`;
-  }
-  return `<p>Maelis: ${escapeHtml(text)}</p>`;
-}
-
-function sisterMaelisGreetingMarkup(greetingNode) {
-  const line = (greetingNode?.lines ?? []).find((entry) => !sisterMaelisLineIsDirection(entry));
-  return line ? sisterMaelisLineMarkup(line) : "";
-}
-
-function renderSisterMaelisChat(nodeId = "MAELIS_HUB") {
-  els.villageMenu?.classList.add("npc-chat-open", "maelis-chat-open");
-  setVillageBackButtonVisible(true);
-  setVillageMusicKey("village:gravebinders");
-  const maelis = sisterMaelisNpc();
-  const isHub = !nodeId || nodeId === "MAELIS_HUB";
-  const isServices = nodeId === "MAELIS_SERVICES";
-  const isGoodbye = nodeId === "MAELIS_GOODBYE";
-  const answer = isHub ? null : sisterMaelisNode(nodeId);
-  state.questFlags ??= {};
-  const greetingNode = state.questFlags.sisterMaelisChatMet ? sisterMaelisNode("MAELIS_GREETING_REPEAT") : sisterMaelisNode("MAELIS_GREETING_FIRST");
-  state.questFlags.sisterMaelisChatMet = true;
-  sisterMaelisActiveAnswer = answer;
-  els.villageBody.innerHTML = `
-    <section class="maelis-chat-view">
-      <aside class="maelis-chat-portrait">
-        ${npcPortraitMarkup(maelis, "old-lady-chat-image", { clickable: false })}
-        <div>
-          <b>${escapeHtml(maelis.name ?? "Sister Maelis")}</b>
-          <span>Naevran graveyard keeper</span>
-        </div>
-      </aside>
-      <div class="maelis-chat-main">
-        <section class="maelis-chat-text">
-          ${
-            isHub
-              ? sisterMaelisGreetingMarkup(greetingNode)
-              : sisterMaelisAnswerMarkup(answer)
-          }
-        </section>
-        ${
-          isGoodbye
-            ? ""
-            : `<section class="maelis-main-topics">
-                <h3>${isHub ? "Ask Sister Maelis" : "Main Topics"}</h3>
-                ${sisterMaelisHubMarkup()}
-              </section>`
-        }
-        <div class="maelis-chat-footer">
-          ${
-            isGoodbye
-              ? sisterMaelisOptionButton({ id: "MAELIS_CLOSE", label: "Leave" }, "ghost-button")
-              : `
-                ${!isHub ? sisterMaelisOptionButton({ id: "MAELIS_HUB", label: "Ask something else." }, "ghost-button") : ""}
-                ${!isServices ? sisterMaelisOptionButton({ id: "MAELIS_SERVICES", label: "I need your services." }, "ghost-button") : ""}
-                ${sisterMaelisOptionButton({ id: "MAELIS_GOODBYE", label: "I should go." }, "ghost-button")}
-              `
-          }
-        </div>
-      </div>
-    </section>
-  `;
-  resetVillageScroll();
-}
-
-function sisterMaelisUseChatOption(optionId = "") {
-  if (optionId === "MAELIS_CLOSE") {
-    sisterMaelisActiveAnswer = null;
-    renderGraveyardMenu();
-    return;
-  }
-  renderSisterMaelisChat(optionId || "MAELIS_HUB");
-}
-
-window.DungeonNpcBehaviors ??= {};
-window.DungeonNpcBehaviors[sisterMaelisNpcId] = {
-  visit() {
-    renderGraveyardMenu();
-  },
-  returnToVisit() {
-    renderGraveyardMenu();
-  },
-  startChat(chatStateId = "MAELIS_HUB") {
-    renderSisterMaelisChat(chatStateId || "MAELIS_HUB");
-  },
-  useChatOption(_chatStateId, optionId) {
-    sisterMaelisUseChatOption(optionId);
-  },
-};
 
 function renderTeleportCirclesMenu() {
   const circles = travelKnownTeleportCircles();
@@ -15864,6 +15729,7 @@ function teleportToKnownCircle(circleId = "") {
 }
 
 function showVillageMenu() {
+  if (typeof stopDungeonVoiceLine === "function") stopDungeonVoiceLine();
   hideHomeMenu();
   const settlementProfile = travelCurrentSettlementProfile();
   if (settlementProfile) {
@@ -15875,6 +15741,7 @@ function showVillageMenu() {
 }
 
 function hideVillageMenu() {
+  if (typeof stopDungeonVoiceLine === "function") stopDungeonVoiceLine();
   setVillageMusicKey("");
   setVillageBackButtonVisible(false);
   els.villageMenu.classList.add("hidden");

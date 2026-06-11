@@ -2,6 +2,7 @@ const fs = require("fs");
 const http = require("http");
 const path = require("path");
 const crypto = require("crypto");
+const { spawn } = require("child_process");
 
 const root = __dirname;
 const port = Number(process.env.PORT || process.argv[2] || 8000);
@@ -55,6 +56,12 @@ const writableHelperRegistries = new Map([
   ["recruits", "creator-recruits.json"],
 ]);
 
+const writableVoiceTextFiles = new Set([
+  "src/scripts/content/npcs/sister-maelis-chat.js",
+  "src/scripts/content/npcs/old-lady-chat.js",
+  "src/scripts/content/npcs/village-npcs.js",
+]);
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -103,6 +110,7 @@ const mimeTypes = {
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".wav": "audio/wav",
+  ".webm": "audio/webm",
 };
 
 function safePath(urlPath) {
@@ -135,12 +143,226 @@ function writableHelperRegistryPath(kind) {
   return file ? path.resolve(root, file) : null;
 }
 
+function slugPart(value, fallback = "line") {
+  const slug = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || fallback;
+}
+
+function safeVoiceRelativePath(sourceId, lineId, extension = ".webm") {
+  const source = slugPart(sourceId, "general");
+  const line = slugPart(lineId, "line");
+  const ext = extension === ".mp3" || extension === ".ogg" || extension === ".wav" || extension === ".webm" ? extension : ".webm";
+  return path.join("assets", "voice", source, `${line}${ext}`);
+}
+
+function safeProcessedVoiceRelativePath(sourceId, lineId, extension = ".wav") {
+  const source = slugPart(sourceId, "general");
+  const line = slugPart(lineId, "line");
+  const ext = extension === ".mp3" || extension === ".ogg" || extension === ".wav" || extension === ".webm" ? extension : ".wav";
+  return path.join("assets", "voice", "processed", source, `${line}${ext}`);
+}
+
+function voiceManifestPath() {
+  return path.resolve(root, "assets", "voice", "voice-manifest.json");
+}
+
+function updateCampaignsJsDescription(campaignId, text, callback) {
+  const filePath = path.resolve(root, "src", "scripts", "campaigns.js");
+  fs.readFile(filePath, "utf8", (readError, source) => {
+    if (readError) {
+      callback(readError);
+      return;
+    }
+    const escapedId = String(campaignId).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`(id:\\s*"${escapedId}"[\\s\\S]*?description:\\s*\`)[\\s\\S]*?(\`,\\s*count:\\s*\\d+)`);
+    if (!pattern.test(source)) {
+      callback(new Error("Campaign description field was not found."));
+      return;
+    }
+    const escapedText = String(text)
+      .replace(/\\/g, "\\\\")
+      .replace(/`/g, "\\`")
+      .replace(/\$\{/g, "\\${");
+    const nextSource = source.replace(pattern, `$1${escapedText}$2`);
+    fs.writeFile(filePath, nextSource, "utf8", callback);
+  });
+}
+
+function updateCampaignDungeonText(sourceRef, text, callback) {
+  const campaign = writableCampaignDungeons.get(sourceRef?.campaignId);
+  const index = Math.floor(Number(sourceRef?.index));
+  if (!campaign || index < 1 || index > campaign.count) {
+    callback(new Error("Campaign dungeon source is not writable."));
+    return;
+  }
+  const filePath = path.resolve(root, campaign.folder, `Dungeon${index}.json`);
+  if (!filePath.startsWith(root)) {
+    callback(new Error("Campaign dungeon path is not writable."));
+    return;
+  }
+  fs.readFile(filePath, "utf8", (readError, existing) => {
+    if (readError) {
+      callback(readError);
+      return;
+    }
+    let template;
+    try {
+      template = JSON.parse(existing);
+    } catch (error) {
+      callback(error);
+      return;
+    }
+    if (sourceRef.field === "intro.text") {
+      template.intro ??= {};
+      template.intro.text = text;
+    } else if (sourceRef.field === "outro.text") {
+      template.outro ??= {};
+      template.outro.text = text;
+    } else if (sourceRef.field === "storyTrigger.text") {
+      const triggers = Array.isArray(template.storyTriggers) ? template.storyTriggers : [];
+      const trigger = sourceRef.triggerId
+        ? triggers.find((entry) => entry.id === sourceRef.triggerId)
+        : triggers[Math.max(0, Math.floor(Number(sourceRef.triggerIndex) || 0))];
+      if (!trigger) {
+        callback(new Error("Story trigger was not found."));
+        return;
+      }
+      trigger.text = text;
+    } else if (sourceRef.field === "waveStory.text") {
+      const waveStories = template.waveEncounter?.preWaveStories ?? {};
+      const story = waveStories[String(sourceRef.wave)];
+      if (!story) {
+        callback(new Error("Wave story was not found."));
+        return;
+      }
+      story.text = text;
+    } else {
+      callback(new Error("Unsupported campaign text field."));
+      return;
+    }
+    fs.writeFile(filePath, `${JSON.stringify(template, null, 2)}\n`, "utf8", callback);
+  });
+}
+
+function updateBarrowCrownChoiceText(sourceRef, text, callback) {
+  const filePath = path.resolve(root, "src", "scripts", "app", "rendering-inventory.js");
+  const choice = sourceRef?.choice === "claim" ? "claim" : sourceRef?.choice === "destroy" ? "destroy" : "";
+  if (!choice) {
+    callback(new Error("Unsupported Barrow Crown choice."));
+    return;
+  }
+  fs.readFile(filePath, "utf8", (readError, source) => {
+    if (readError) {
+      callback(readError);
+      return;
+    }
+    const pattern = new RegExp(`(${choice}:\\s*\`)[\\s\\S]*?(\`,\\n\\s*(?:destroy|claim|};))`);
+    if (!pattern.test(source)) {
+      callback(new Error("Barrow Crown choice text was not found."));
+      return;
+    }
+    const escapedText = String(text)
+      .replace(/\\/g, "\\\\")
+      .replace(/`/g, "\\`")
+      .replace(/\$\{/g, "\\${");
+    const nextSource = source.replace(pattern, `$1${escapedText}$2`);
+    fs.writeFile(filePath, nextSource, "utf8", callback);
+  });
+}
+
+function updateLiteralJsString(sourceRef, text, callback) {
+  const relativeFile = String(sourceRef?.file ?? "").replace(/\\/g, "/");
+  if (!writableVoiceTextFiles.has(relativeFile)) {
+    callback(new Error("Voice text file is not writable."));
+    return;
+  }
+  const originalText = String(sourceRef?.originalText ?? "");
+  if (!originalText) {
+    callback(new Error("Missing original source text."));
+    return;
+  }
+  const filePath = path.resolve(root, relativeFile);
+  if (!filePath.startsWith(root)) {
+    callback(new Error("Voice text path is not writable."));
+    return;
+  }
+  fs.readFile(filePath, "utf8", (readError, source) => {
+    if (readError) {
+      callback(readError);
+      return;
+    }
+    const originalLiteral = JSON.stringify(originalText);
+    const nextLiteral = JSON.stringify(String(text));
+    const index = source.indexOf(originalLiteral);
+    if (index < 0) {
+      callback(new Error("Original source string was not found. Reload the recorder and try again."));
+      return;
+    }
+    const nextSource = `${source.slice(0, index)}${nextLiteral}${source.slice(index + originalLiteral.length)}`;
+    fs.writeFile(filePath, nextSource, "utf8", callback);
+  });
+}
+
+function updateVoiceSourceText(sourceRef, text, callback) {
+  if (!sourceRef || typeof sourceRef !== "object") {
+    callback(null, false);
+    return;
+  }
+  if (sourceRef.kind === "campaign-description") {
+    updateCampaignsJsDescription(sourceRef.campaignId, text, (error) => callback(error, true));
+    return;
+  }
+  if (sourceRef.kind === "campaign-dungeon") {
+    updateCampaignDungeonText(sourceRef, text, (error) => callback(error, true));
+    return;
+  }
+  if (sourceRef.kind === "barrow-crown-choice") {
+    updateBarrowCrownChoiceText(sourceRef, text, (error) => callback(error, true));
+    return;
+  }
+  if (sourceRef.kind === "literal-js-string") {
+    updateLiteralJsString(sourceRef, text, (error) => callback(error, true));
+    return;
+  }
+  callback(null, false);
+}
+
 function sendJson(response, status, payload) {
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-cache",
   });
   response.end(JSON.stringify(payload));
+}
+
+function convertVoiceWavToWebm(inputPath, outputPath, callback) {
+  const ffmpeg = spawn("ffmpeg", [
+    "-y",
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-i",
+    inputPath,
+    "-c:a",
+    "libopus",
+    "-b:a",
+    "64k",
+    outputPath,
+  ]);
+  let stderr = "";
+  ffmpeg.stderr.on("data", (chunk) => {
+    stderr += chunk.toString();
+  });
+  ffmpeg.on("error", (error) => callback(error));
+  ffmpeg.on("close", (code) => {
+    if (code === 0) callback(null);
+    else callback(new Error(stderr.trim() || `ffmpeg exited with code ${code}`));
+  });
 }
 
 function send(ws, payload) {
@@ -533,6 +755,306 @@ const server = http.createServer((request, response) => {
         });
       } catch (error) {
         logEvent("warn", "Invalid helper registry save JSON", { bytes: Buffer.byteLength(body, "utf8"), error: error.message });
+        sendJson(response, 400, { saved: false, error: "Invalid JSON" });
+      }
+    });
+    return;
+  }
+
+  if (request.method === "POST" && request.url?.split("?")[0] === "/save-voice-line") {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 80 * 1024 * 1024) request.destroy();
+    });
+    request.on("end", () => {
+      try {
+        const payload = JSON.parse(body);
+        const lineId = String(payload?.lineId ?? "").trim();
+        const sourceId = String(payload?.sourceId ?? "").trim();
+        const audioBase64 = String(payload?.audioBase64 ?? "");
+        if (!lineId || !sourceId || !audioBase64) {
+          sendJson(response, 400, { saved: false, error: "Missing sourceId, lineId, or audioBase64." });
+          return;
+        }
+        const mimeType = String(payload?.mimeType ?? "audio/webm").toLowerCase();
+        const extension = mimeType.includes("mpeg") || mimeType.includes("mp3") ? ".mp3" : mimeType.includes("ogg") ? ".ogg" : mimeType.includes("wav") ? ".wav" : ".webm";
+        const relativeAudioPath = safeVoiceRelativePath(sourceId, lineId, extension);
+        const audioPath = path.resolve(root, relativeAudioPath);
+        if (!audioPath.startsWith(root)) {
+          sendJson(response, 403, { saved: false, error: "Voice path is not writable." });
+          return;
+        }
+        const audioBuffer = Buffer.from(audioBase64, "base64");
+        if (!audioBuffer.length || audioBuffer.length > 40 * 1024 * 1024) {
+          sendJson(response, 400, { saved: false, error: "Invalid or oversized audio payload." });
+          return;
+        }
+        const manifestPath = voiceManifestPath();
+        fs.mkdir(path.dirname(audioPath), { recursive: true }, (mkdirError) => {
+          if (mkdirError) {
+            logEvent("error", "Failed to prepare voice directory", { audioPath, error: mkdirError.message });
+            sendJson(response, 500, { saved: false, error: "Write failed." });
+            return;
+          }
+          fs.writeFile(audioPath, audioBuffer, (audioError) => {
+            if (audioError) {
+              logEvent("error", "Failed to save voice line", { audioPath, error: audioError.message });
+              sendJson(response, 500, { saved: false, error: "Write failed." });
+              return;
+            }
+            fs.mkdir(path.dirname(manifestPath), { recursive: true }, (manifestMkdirError) => {
+              if (manifestMkdirError) {
+                logEvent("error", "Failed to prepare voice manifest directory", { manifestPath, error: manifestMkdirError.message });
+                sendJson(response, 500, { saved: false, error: "Manifest write failed." });
+                return;
+              }
+              fs.readFile(manifestPath, "utf8", (readError, existing) => {
+                let manifest = { version: 1, lines: {} };
+                if (!readError && existing.trim()) {
+                  try {
+                    const parsed = JSON.parse(existing);
+                    manifest = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : manifest;
+                    manifest.lines = manifest.lines && typeof manifest.lines === "object" && !Array.isArray(manifest.lines) ? manifest.lines : {};
+                  } catch (_error) {
+                    manifest = { version: 1, lines: {} };
+                  }
+                }
+                manifest.version = 1;
+                manifest.updatedAt = nowIso();
+                manifest.lines[lineId] = {
+                  id: lineId,
+                  sourceId,
+                  speaker: payload.speaker ?? "",
+                  text: payload.text ?? "",
+                  inputMode: payload.inputMode ?? "mic",
+                  file: relativeAudioPath.replace(/\\/g, "/"),
+                  mimeType,
+                  recordedAt: nowIso(),
+                };
+                fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8", (manifestError) => {
+                  if (manifestError) {
+                    logEvent("error", "Failed to save voice manifest", { manifestPath, error: manifestError.message });
+                    sendJson(response, 500, { saved: false, error: "Manifest write failed." });
+                    return;
+                  }
+                  logEvent("info", "Saved voice line", { lineId, file: relativeAudioPath.replace(/\\/g, "/") });
+                  sendJson(response, 200, { saved: true, file: relativeAudioPath.replace(/\\/g, "/"), manifest: path.relative(root, manifestPath).replace(/\\/g, "/") });
+                });
+              });
+            });
+          });
+        });
+      } catch (error) {
+        logEvent("warn", "Invalid voice line save JSON", { bytes: Buffer.byteLength(body, "utf8"), error: error.message });
+        sendJson(response, 400, { saved: false, error: "Invalid JSON" });
+      }
+    });
+    return;
+  }
+
+  if (request.method === "POST" && request.url?.startsWith("/save-voice-line-text")) {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 1024 * 1024) request.destroy();
+    });
+    request.on("end", () => {
+      try {
+        const payload = JSON.parse(body);
+        const lineId = String(payload?.lineId ?? "").trim();
+        const sourceId = String(payload?.sourceId ?? "").trim();
+        const text = String(payload?.text ?? "").trim();
+        if (!lineId || !sourceId || !text) {
+          sendJson(response, 400, { saved: false, error: "Missing sourceId, lineId, or text." });
+          return;
+        }
+        if (text.length > 20000) {
+          sendJson(response, 400, { saved: false, error: "Text is too long." });
+          return;
+        }
+        const manifestPath = voiceManifestPath();
+        const writeManifestText = (sourceSaved) => fs.mkdir(path.dirname(manifestPath), { recursive: true }, (mkdirError) => {
+          if (mkdirError) {
+            logEvent("error", "Failed to prepare voice manifest directory", { manifestPath, error: mkdirError.message });
+            sendJson(response, 500, { saved: false, error: "Manifest write failed." });
+            return;
+          }
+          fs.readFile(manifestPath, "utf8", (readError, existing) => {
+            let manifest = { version: 1, lines: {} };
+            if (!readError && existing.trim()) {
+              try {
+                const parsed = JSON.parse(existing);
+                manifest = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : manifest;
+                manifest.lines = manifest.lines && typeof manifest.lines === "object" && !Array.isArray(manifest.lines) ? manifest.lines : {};
+              } catch (_error) {
+                manifest = { version: 1, lines: {} };
+              }
+            }
+            const previous = manifest.lines[lineId] ?? {};
+            manifest.version = 1;
+            manifest.updatedAt = nowIso();
+            manifest.lines[lineId] = {
+              ...previous,
+              id: lineId,
+              sourceId,
+              speaker: payload.speaker ?? previous.speaker ?? "",
+              text,
+              textEditedAt: nowIso(),
+            };
+            fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8", (manifestError) => {
+              if (manifestError) {
+                logEvent("error", "Failed to save voice line text", { manifestPath, error: manifestError.message });
+                sendJson(response, 500, { saved: false, error: "Manifest write failed." });
+                return;
+              }
+              logEvent("info", "Saved voice line text", { lineId, sourceId, sourceSaved });
+              sendJson(response, 200, { saved: true, lineId, sourceSaved, manifest: path.relative(root, manifestPath).replace(/\\/g, "/") });
+            });
+          });
+        });
+        updateVoiceSourceText(payload.sourceRef, payload.sourceText ?? text, (sourceError, sourceSaved) => {
+          if (sourceError) {
+            logEvent("error", "Failed to save source voice text", { lineId, sourceId, error: sourceError.message });
+            sendJson(response, 500, { saved: false, error: sourceError.message || "Source write failed." });
+            return;
+          }
+          writeManifestText(Boolean(sourceSaved));
+        });
+      } catch (error) {
+        logEvent("warn", "Invalid voice line text save JSON", { bytes: Buffer.byteLength(body, "utf8"), error: error.message });
+        sendJson(response, 400, { saved: false, error: "Invalid JSON" });
+      }
+    });
+    return;
+  }
+
+  if (request.method === "POST" && request.url?.startsWith("/save-processed-voice-line")) {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 120 * 1024 * 1024) request.destroy();
+    });
+    request.on("end", () => {
+      try {
+        const payload = JSON.parse(body);
+        const lineId = String(payload?.lineId ?? "").trim();
+        const sourceId = String(payload?.sourceId ?? "").trim();
+        const audioBase64 = String(payload?.audioBase64 ?? "");
+        if (!lineId || !sourceId || !audioBase64) {
+          sendJson(response, 400, { saved: false, error: "Missing sourceId, lineId, or audioBase64." });
+          return;
+        }
+        const mimeType = String(payload?.mimeType ?? "audio/wav").toLowerCase();
+        const outputFormat = String(payload?.outputFormat ?? "webm").toLowerCase();
+        const wantsWebm = outputFormat === "webm";
+        const extension = wantsWebm
+          ? ".webm"
+          : mimeType.includes("mpeg") || mimeType.includes("mp3")
+            ? ".mp3"
+            : mimeType.includes("ogg")
+              ? ".ogg"
+              : mimeType.includes("webm")
+                ? ".webm"
+                : ".wav";
+        const processedMimeType = wantsWebm ? "audio/webm;codecs=opus" : mimeType;
+        const relativeAudioPath = safeProcessedVoiceRelativePath(sourceId, lineId, extension);
+        const audioPath = path.resolve(root, relativeAudioPath);
+        const needsConversion = wantsWebm && !mimeType.includes("webm");
+        const tempAudioPath = needsConversion ? path.resolve(path.dirname(audioPath), `${path.basename(audioPath)}.source.wav`) : audioPath;
+        if (!audioPath.startsWith(root)) {
+          sendJson(response, 403, { saved: false, error: "Voice path is not writable." });
+          return;
+        }
+        const audioBuffer = Buffer.from(audioBase64, "base64");
+        if (!audioBuffer.length || audioBuffer.length > 80 * 1024 * 1024) {
+          sendJson(response, 400, { saved: false, error: "Invalid or oversized audio payload." });
+          return;
+        }
+        const manifestPath = voiceManifestPath();
+        fs.mkdir(path.dirname(audioPath), { recursive: true }, (mkdirError) => {
+          if (mkdirError) {
+            logEvent("error", "Failed to prepare processed voice directory", { audioPath, error: mkdirError.message });
+            sendJson(response, 500, { saved: false, error: "Write failed." });
+            return;
+          }
+          const updateProcessedManifest = () => {
+            fs.readFile(manifestPath, "utf8", (readError, existing) => {
+              let manifest = { version: 1, lines: {} };
+              if (!readError && existing.trim()) {
+                try {
+                  const parsed = JSON.parse(existing);
+                  manifest = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : manifest;
+                  manifest.lines = manifest.lines && typeof manifest.lines === "object" && !Array.isArray(manifest.lines) ? manifest.lines : {};
+                } catch (_error) {
+                  manifest = { version: 1, lines: {} };
+                }
+              }
+              const previous = manifest.lines[lineId] ?? {};
+              const file = relativeAudioPath.replace(/\\/g, "/");
+              manifest.version = 1;
+              manifest.updatedAt = nowIso();
+              manifest.lines[lineId] = {
+                ...previous,
+                id: lineId,
+                sourceId,
+                speaker: payload.speaker ?? previous.speaker ?? "",
+                text: payload.text ?? previous.text ?? "",
+                rawFile: payload.rawFile ?? previous.rawFile ?? previous.file ?? "",
+                file,
+                processedFile: file,
+                processedMimeType,
+                processedAt: nowIso(),
+                processing: {
+                  preset: payload.preset ?? "Custom",
+                  settings: payload.settings ?? {},
+                  outputFormat: wantsWebm ? "webm" : extension.slice(1),
+                },
+              };
+              fs.mkdir(path.dirname(manifestPath), { recursive: true }, (manifestMkdirError) => {
+                if (manifestMkdirError) {
+                  logEvent("error", "Failed to prepare voice manifest directory", { manifestPath, error: manifestMkdirError.message });
+                  sendJson(response, 500, { saved: false, error: "Manifest write failed." });
+                  return;
+                }
+                fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8", (manifestError) => {
+                  if (manifestError) {
+                    logEvent("error", "Failed to save processed voice manifest", { manifestPath, error: manifestError.message });
+                    sendJson(response, 500, { saved: false, error: "Manifest write failed." });
+                    return;
+                  }
+                  logEvent("info", "Saved processed voice line", { lineId, file, outputFormat: wantsWebm ? "webm" : extension.slice(1) });
+                  sendJson(response, 200, { saved: true, file, manifest: path.relative(root, manifestPath).replace(/\\/g, "/") });
+                });
+              });
+            });
+          };
+          fs.writeFile(tempAudioPath, audioBuffer, (audioError) => {
+            if (audioError) {
+              logEvent("error", "Failed to save processed voice source", { audioPath: tempAudioPath, error: audioError.message });
+              sendJson(response, 500, { saved: false, error: "Write failed." });
+              return;
+            }
+            if (!needsConversion) {
+              updateProcessedManifest();
+              return;
+            }
+            convertVoiceWavToWebm(tempAudioPath, audioPath, (convertError) => {
+              fs.unlink(tempAudioPath, () => {});
+              if (convertError) {
+                logEvent("error", "Failed to convert processed voice to WebM", { audioPath, error: convertError.message });
+                sendJson(response, 500, { saved: false, error: "FFmpeg WebM conversion failed. Install ffmpeg and try again." });
+                return;
+              }
+              updateProcessedManifest();
+              });
+          });
+        });
+      } catch (error) {
+        logEvent("warn", "Invalid processed voice line save JSON", { bytes: Buffer.byteLength(body, "utf8"), error: error.message });
         sendJson(response, 400, { saved: false, error: "Invalid JSON" });
       }
     });

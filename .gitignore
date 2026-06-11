@@ -11,6 +11,7 @@ build/
 
 # Logs and local env files
 *.log
+__pycache__/
 artifacts/
 .edge-profile/
 .tmp/
@@ -20,3 +21,6 @@ edge-dom.txt
 edge-log.txt
 .env
 .env.*
+
+# Local voice recording and processing workspace
+assets/voice/

@@ -7,10 +7,16 @@ const TILE_SIZE = 172;
 const HEX_WIDTH = 150;
 const HEX_HEIGHT = 172;
 const CROP_OVERSCAN = 0.035;
+const LEGACY_FITTED_TILE_SIZE = 1254;
 const OVERHANG_TILES = {
   forest_normal: { top: 0.18, shoulderInset: 0.08, sourceTop: 41, baseTop: 150 },
   mountain: { top: 0.22, shoulderInset: 0.28, sourceTop: 54, baseTop: 170 },
   swamp: { left: 0.1, sourceLeft: 110 }
+};
+const CROPPED_TILE_OFFSETS = {
+  forest_normal: { x: 102, y: 40 },
+  mountain: { x: 155, y: 54 },
+  swamp: { x: 150, y: 108 }
 };
 const IMAGE_SOURCE_CROPS = {
   actic_frozenlake: crop(191, 119, 880, 1022),
@@ -2550,10 +2556,7 @@ function drawEmptyHex(row, col) {
 
 function drawHexImage(image, tile, x, y) {
   const points = footprintPoints(x, y);
-  const source = expandedCrop(
-    IMAGE_SOURCE_CROPS[tile] || crop(0, 0, image.naturalWidth, image.naturalHeight),
-    image
-  );
+  const source = tileSourceCrop(image, tile);
   ctx.save();
   tracePolygon(points);
   ctx.clip();
@@ -2572,13 +2575,13 @@ function drawHexImage(image, tile, x, y) {
 }
 
 function drawOverhangTop(image, tile, x, y, config) {
-  const baseSource = expandedCrop(
-    IMAGE_SOURCE_CROPS[tile] || crop(0, 0, image.naturalWidth, image.naturalHeight),
-    image
-  );
+  const baseSource = tileSourceCrop(image, tile);
   const overhangPixels = HEX_HEIGHT * config.top;
   const overhangPoints = overhangFootprintPoints(x, y, overhangPixels, config.shoulderInset || 0);
-  const sourceTop = config.sourceTop ?? Math.max(0, baseSource.y - baseSource.height * config.top);
+  const offset = CROPPED_TILE_OFFSETS[tile] || { x: 0, y: 0 };
+  const sourceTop = imageUsesCroppedFittedCanvas(image)
+    ? clamp((config.sourceTop ?? offset.y) - offset.y, 0, baseSource.y)
+    : config.sourceTop ?? Math.max(0, baseSource.y - baseSource.height * config.top);
   const sourceHeight = Math.max(1, baseSource.y + baseSource.height - sourceTop);
   const sourceWidth = baseSource.width;
   const sourceX = baseSource.x;
@@ -2602,12 +2605,12 @@ function drawOverhangTop(image, tile, x, y, config) {
 }
 
 function drawOverhangLeft(image, tile, x, y, config) {
-  const baseSource = expandedCrop(
-    IMAGE_SOURCE_CROPS[tile] || crop(0, 0, image.naturalWidth, image.naturalHeight),
-    image
-  );
+  const baseSource = tileSourceCrop(image, tile);
   const overhangPixels = HEX_WIDTH * config.left;
-  const sourceLeft = config.sourceLeft ?? Math.max(0, baseSource.x - baseSource.width * config.left);
+  const offset = CROPPED_TILE_OFFSETS[tile] || { x: 0, y: 0 };
+  const sourceLeft = imageUsesCroppedFittedCanvas(image)
+    ? clamp((config.sourceLeft ?? offset.x) - offset.x, 0, baseSource.x)
+    : config.sourceLeft ?? Math.max(0, baseSource.x - baseSource.width * config.left);
   const sourceWidth = Math.max(1, baseSource.x + baseSource.width - sourceLeft);
   const points = leftOverhangFootprintPoints(x, y, overhangPixels);
 
@@ -3146,10 +3149,7 @@ function drawFlatHexThumbnail(image, tile, x, y, size) {
   const width = size * (HEX_WIDTH / HEX_HEIGHT);
   const offsetX = (size - width) * 0.5;
   const points = flatHexPoints(x + offsetX, y, width, size);
-  const source = expandedCrop(
-    IMAGE_SOURCE_CROPS[tile] || crop(0, 0, image.naturalWidth, image.naturalHeight),
-    image
-  );
+  const source = tileSourceCrop(image, tile);
   ctx.save();
   tracePolygon(points);
   ctx.clip();
@@ -5376,6 +5376,29 @@ function chunkKey(x, y) {
 
 function crop(x, y, width, height) {
   return { x, y, width, height };
+}
+
+function imageUsesCroppedFittedCanvas(image) {
+  return image.naturalWidth < LEGACY_FITTED_TILE_SIZE || image.naturalHeight < LEGACY_FITTED_TILE_SIZE;
+}
+
+function tileSourceCrop(image, tile) {
+  const fullSource = crop(0, 0, image.naturalWidth, image.naturalHeight);
+  if (!imageUsesCroppedFittedCanvas(image)) {
+    return expandedCrop(IMAGE_SOURCE_CROPS[tile] || fullSource, image);
+  }
+
+  const legacySource = IMAGE_SOURCE_CROPS[tile];
+  const offset = CROPPED_TILE_OFFSETS[tile];
+  if (!legacySource || !offset) {
+    return fullSource;
+  }
+
+  const x = clamp(legacySource.x - offset.x, 0, image.naturalWidth - 1);
+  const y = clamp(legacySource.y - offset.y, 0, image.naturalHeight - 1);
+  const right = clamp(legacySource.x + legacySource.width - offset.x, x + 1, image.naturalWidth);
+  const bottom = clamp(legacySource.y + legacySource.height - offset.y, y + 1, image.naturalHeight);
+  return expandedCrop(crop(x, y, right - x, bottom - y), image);
 }
 
 function expandedCrop(source, image) {

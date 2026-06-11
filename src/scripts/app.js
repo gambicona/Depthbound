@@ -254,15 +254,19 @@ if (els.bugReport) {
     }
   });
 }
-els.showDungeonIntro?.addEventListener("click", () => {
+els.showDungeonIntro?.addEventListener("click", async () => {
   const intro = state.customDungeon?.intro;
   if (!intro?.text && !(intro?.images ?? []).length) return;
+  const voiceIds = state.campaignId && typeof dungeonVoiceLineIdsForPrefix === "function" && typeof campaignDungeonVoicePrefix === "function"
+    ? await dungeonVoiceLineIdsForPrefix(campaignDungeonVoicePrefix(state.campaignId, state.campaignIndex, "intro"))
+    : [];
   void showDungeonStoryDialog({
     title: state.customDungeon?.name ?? state.room.name,
     text: intro.text,
     images: intro.images,
     actionLabel: "Close",
     goalText: customGoalStatus().text,
+    voiceIds,
   });
 });
 els.tutorial.addEventListener("click", showTutorial);
@@ -1044,6 +1048,12 @@ els.villageMenu?.addEventListener("click", (event) => {
   if (button?.dataset.action === "open-graveyard") {
     renderGraveyardMenu();
   }
+  if (button?.dataset.action === "maelis-perform-rite") {
+    maelisPerformGraveyardRite(button.dataset.corpse, button.dataset.rite);
+  }
+  if (button?.dataset.action === "maelis-bury-corpse") {
+    void maelisBuryCorpse(button.dataset.corpse);
+  }
   if (button?.dataset.action === "open-teleport-circles") {
     renderTeleportCirclesMenu();
   }
@@ -1088,9 +1098,11 @@ els.villageMenu?.addEventListener("click", (event) => {
     settlementReviveCorpse(button.dataset.corpse, button.dataset.rite, button.dataset.storefront);
   }
   if (button?.dataset.action === "back-to-settlement-list") {
+    if (typeof stopDungeonVoiceLine === "function") stopDungeonVoiceLine();
     renderSettlementMenu();
   }
   if (button?.dataset.action === "settlement-return-inn") {
+    if (typeof stopDungeonVoiceLine === "function") stopDungeonVoiceLine();
     hideVillageMenu();
     showHomeMenu();
   }
@@ -1101,6 +1113,7 @@ els.villageMenu?.addEventListener("click", (event) => {
     showNpcInspection(button.dataset.npc);
   }
   if (button?.dataset.action === "back-to-village-list") {
+    if (typeof stopDungeonVoiceLine === "function") stopDungeonVoiceLine();
     renderVillageMenu();
   }
   if (button?.dataset.action === "return-npc-visit") {
@@ -1194,6 +1207,7 @@ els.villageMenu?.addEventListener("click", (event) => {
     useNpcChatOption(button.dataset.npc, button.dataset.chatState, button.dataset.option);
   }
   if (button?.dataset.action === "close-village") {
+    if (typeof stopDungeonVoiceLine === "function") stopDungeonVoiceLine();
     hideVillageMenu();
     showHomeMenu();
   }

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Depthbound Voice Studio</title>
+    <link rel="stylesheet" href="src/styles/main.css" />
+    <style>
+      body { margin: 0; background: #061110; color: #f2dfbf; font-family: system-ui, sans-serif; }
+      main { width: min(1580px, calc(100vw - 32px)); min-height: calc(100vh - 32px); margin: 16px auto; display: grid; grid-template-columns: minmax(0, 1fr) 410px; gap: 14px; }
+      h1, h2, h3, p { margin-top: 0; }
+      code { color: #9be8dc; }
+      .panel { border: 1px solid rgba(77, 201, 190, 0.35); background: rgba(4, 17, 16, 0.94); border-radius: 8px; padding: 16px; min-height: 0; }
+      .topbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 12px; }
+      .actions, .filters, .preset-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      button, .ghost-button, select, input { border: 1px solid rgba(77, 201, 190, 0.5); border-radius: 6px; background: #0a201e; color: #f2dfbf; font-weight: 800; padding: 9px 12px; }
+      button { cursor: pointer; background: #1d897f; color: #fff; }
+      button.secondary, .ghost-button { background: transparent; color: #f2dfbf; text-decoration: none; }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      input[type="range"] { padding: 0; accent-color: #4dc9be; }
+      .studio-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr); gap: 14px; }
+      .line-card, .control-card { display: grid; gap: 12px; }
+      .meta-grid, .slider-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .meta-grid div, .context-box, .current-line, .queue-item, .slider-row, .serious-card { border: 1px solid rgba(220, 177, 112, 0.22); border-radius: 6px; background: rgba(255,255,255,0.03); padding: 10px; }
+      .meta-grid b, .queue-item b, .slider-row b, .serious-card b { display: block; color: #dcb170; font-size: 0.78rem; text-transform: uppercase; }
+      .current-line { font-size: 1.18rem; line-height: 1.45; }
+      .queue { display: grid; gap: 8px; max-height: calc(100vh - 236px); overflow: auto; }
+      .queue-tools { display: grid; gap: 8px; margin-bottom: 10px; }
+      .queue-tools .actions { align-items: stretch; }
+      .queue-item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; text-align: left; cursor: pointer; }
+      .queue-item input { margin: 2px 0 0; padding: 0; }
+      .queue-item span, .queue-item small { min-width: 0; }
+      .queue-item.active { border-color: rgba(77, 201, 190, 0.75); background: rgba(29, 137, 127, 0.16); }
+      .queue-item.selected { box-shadow: inset 0 0 0 1px rgba(240, 201, 108, 0.5); }
+      .queue-item.done { opacity: 0.8; }
+      .status { color: #bba37c; min-height: 1.3em; }
+      .slider-row { display: grid; gap: 6px; }
+      .slider-row label { display: flex; justify-content: space-between; gap: 10px; }
+      .preset-controls select { flex: 1 1 220px; min-width: 0; }
+      audio { width: 100%; }
+      .serious-card { display: grid; gap: 8px; }
+      .serious-card ul { margin: 0; padding-left: 18px; color: #d9c5a3; }
+      @media (max-width: 1150px) { main, .studio-grid { grid-template-columns: 1fr; } .meta-grid, .slider-grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="panel">
+        <div class="topbar">
+          <div>
+            <h1>Voice Studio</h1>
+            <p class="status">Preview voice effects in-browser. Save processed takes through <code>playtest-server.js</code>.</p>
+          </div>
+          <div class="actions">
+            <a class="ghost-button" href="voice-recorder.html">Recorder</a>
+            <a class="ghost-button" href="index.html">Open Game</a>
+          </div>
+        </div>
+        <div class="filters">
+          <label>Source <select id="source-select"></select></label>
+          <button id="reload-manifest" class="secondary" type="button">Reload Manifest</button>
+        </div>
+        <hr />
+        <div class="studio-grid">
+          <article id="line-card" class="line-card"></article>
+          <article class="control-card">
+            <h2>Processing</h2>
+            <div class="preset-controls">
+              <label>Preset <select id="preset-select"></select></label>
+              <button id="reset-processing" class="secondary" type="button">Reset</button>
+              <button id="save-preset" class="secondary" type="button">Save As Preset</button>
+            </div>
+            <div class="slider-grid" id="slider-grid"></div>
+            <div class="actions">
+              <button id="preview-raw" class="secondary" type="button">Preview Raw</button>
+              <button id="preview-processed" type="button">Preview Processed</button>
+              <button id="save-processed" type="button">Save Final WebM</button>
+            </div>
+            <p id="studio-status" class="status"></p>
+            <section class="serious-card">
+              <b>Serious Cleanup Toolchain</b>
+              <p>This studio is good for quick in-game character color. A dedicated audio editor is useful when a take has room noise, harsh S sounds, mouth clicks, or needs batch cleanup across many files.</p>
+              <ul>
+                <li>FFmpeg: normalize volume, filter rumble/hiss, compress dynamics, convert to compact WebM.</li>
+                <li>Audacity/Reaper: visual noise repair, de-essing, mouth-click removal, formant/pitch plugins, reusable batch chains.</li>
+                <li>Recommended workflow: keep raw local, export processed <code>.webm</code>, commit only final files plus manifest.</li>
+              </ul>
+            </section>
+          </article>
+        </div>
+      </section>
+      <aside class="panel">
+        <h2>Recorded Lines</h2>
+        <p id="queue-summary" class="status"></p>
+        <div class="queue-tools">
+          <div class="actions">
+            <button id="select-all-lines" class="secondary" type="button">Select All</button>
+            <button id="select-raw-lines" class="secondary" type="button">Select Raw Only</button>
+            <button id="clear-selected-lines" class="secondary" type="button">Clear</button>
+          </div>
+          <div class="actions">
+            <button id="batch-selected" type="button">Apply To Selected</button>
+            <button id="batch-raw" type="button">Apply To All Raw Only</button>
+          </div>
+        </div>
+        <div id="line-queue" class="queue"></div>
+      </aside>
+    </main>
+
+    <script src="src/scripts/voice-tooling-bootstrap.js"></script>
+    <script src="src/scripts/content/npcs/village-npcs.js"></script>
+    <script src="src/scripts/content/npcs/old-lady-chat.js"></script>
+    <script src="src/scripts/content/npcs/sister-maelis-chat.js"></script>
+    <script src="src/scripts/campaigns.js"></script>
+    <script src="src/scripts/voice-catalog.js"></script>
+    <script src="src/scripts/voice-studio.js"></script>
+  </body>
+</html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Depthbound Voice Recorder</title>
+    <link rel="stylesheet" href="src/styles/main.css" />
+    <style>
+      body { margin: 0; background: #061110; color: #f2dfbf; font-family: system-ui, sans-serif; }
+      main { width: min(1500px, calc(100vw - 32px)); min-height: calc(100vh - 32px); margin: 16px auto; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 14px; }
+      h1, h2, h3, p { margin-top: 0; }
+      .panel { border: 1px solid rgba(77, 201, 190, 0.35); background: rgba(4, 17, 16, 0.94); border-radius: 8px; padding: 16px; min-height: 0; }
+      .topbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 12px; }
+      .actions, .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      button, .ghost-button, select, input, textarea { border: 1px solid rgba(77, 201, 190, 0.5); border-radius: 6px; background: #0a201e; color: #f2dfbf; font-weight: 800; padding: 9px 12px; }
+      button { cursor: pointer; background: #1d897f; color: #fff; }
+      button.secondary, .ghost-button { background: transparent; color: #f2dfbf; text-decoration: none; }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      .studio-link { display: inline-flex; margin-top: 8px; }
+      .line-card { display: grid; gap: 14px; }
+      .meta-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+      .meta-grid div, .context-box, .current-line, .queue-item { border: 1px solid rgba(220, 177, 112, 0.22); border-radius: 6px; background: rgba(255,255,255,0.03); padding: 10px; }
+      .meta-grid b, .queue-item b { display: block; color: #dcb170; font-size: 0.78rem; text-transform: uppercase; }
+      .current-line { font-size: 1.35rem; line-height: 1.45; }
+      .context-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .context-box p { color: #d9c5a3; }
+      .stage { color: #b9a98c; font-style: italic; }
+      .wave-editor { display: grid; gap: 8px; border: 1px solid rgba(220, 177, 112, 0.22); border-radius: 6px; background: rgba(255,255,255,0.03); padding: 10px; }
+      .wave-editor canvas { width: 100%; height: 124px; border-radius: 6px; background: #041211; border: 1px solid rgba(77, 201, 190, 0.25); cursor: crosshair; }
+      .wave-editor small { color: #bba37c; }
+      .queue { display: grid; gap: 8px; max-height: calc(100vh - 210px); overflow: auto; }
+      .queue-item { text-align: left; cursor: pointer; }
+      .queue-item.active { border-color: rgba(77, 201, 190, 0.75); background: rgba(29, 137, 127, 0.16); }
+      .queue-item.done { opacity: 0.55; }
+      .status { color: #bba37c; min-height: 1.3em; }
+      audio { width: 100%; }
+      textarea { width: 100%; box-sizing: border-box; resize: vertical; line-height: 1.45; font: inherit; font-weight: 650; }
+      @media (max-width: 1050px) { main { grid-template-columns: 1fr; } .meta-grid, .context-grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="panel">
+        <div class="topbar">
+          <div>
+            <h1>Voice Recorder</h1>
+            <p class="status">Run through <code>playtest-server.js</code> so recordings can be written to disk.</p>
+          </div>
+          <div class="actions">
+            <a class="ghost-button" href="index.html">Open Game</a>
+            <a class="ghost-button" href="Lore/index.html">Lore</a>
+          </div>
+        </div>
+        <div class="filters">
+          <label>Source <select id="source-select"></select></label>
+          <label>Input <select id="input-mode">
+            <option value="mic">Microphone</option>
+            <option value="system">Computer / Discord audio</option>
+            <option value="mixed">Microphone + computer audio</option>
+          </select></label>
+          <label><input id="show-recorded" type="checkbox" /> Show recorded</label>
+          <button id="previous-line" class="secondary" type="button">Previous</button>
+          <button id="next-line" class="secondary" type="button">Next unvoiced</button>
+        </div>
+        <hr />
+        <article id="line-card" class="line-card"></article>
+      </section>
+      <aside class="panel">
+        <h2>Queue</h2>
+        <p id="queue-summary" class="status"></p>
+        <div id="line-queue" class="queue"></div>
+      </aside>
+    </main>
+
+    <script src="src/scripts/voice-tooling-bootstrap.js"></script>
+    <script src="src/scripts/content/npcs/village-npcs.js"></script>
+    <script src="src/scripts/content/npcs/old-lady-chat.js"></script>
+    <script src="src/scripts/content/npcs/sister-maelis-chat.js"></script>
+    <script src="src/scripts/campaigns.js"></script>
+    <script src="src/scripts/voice-catalog.js"></script>
+    <script src="src/scripts/voice-recorder.js"></script>
+  </body>
+</html>

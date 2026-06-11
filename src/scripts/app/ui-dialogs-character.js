@@ -1399,14 +1399,17 @@ function customGoalStatusForTemplate(template) {
   return { text: "Complete the dungeon goal." };
 }
 
-function showDungeonStoryDialog({ title, text = "", images = [], actionLabel = "Continue", goalText = "" }) {
+async function showDungeonStoryDialog({ title, text = "", images = [], actionLabel = "Continue", goalText = "", voiceIds = [] }) {
+  const displayText = voiceIds.length && typeof dungeonVoiceTextForLineIds === "function"
+    ? await dungeonVoiceTextForLineIds(voiceIds, text)
+    : text;
   return new Promise((resolve) => {
     els.gameDialogTitle.textContent = title;
     els.gameDialogForm.classList.add("wide-dialog", "story-dialog-panel");
     els.gameDialogMessage.innerHTML = `
       <div class="story-dialog-content">
         ${storyImageMarkup(images)}
-        ${text ? storyTextMarkup(text) : ""}
+        ${displayText ? storyTextMarkup(displayText) : ""}
         ${goalText ? `<p class="story-goal"><b>Goal:</b> ${narrativeHighlightMarkup(goalText)}</p>` : ""}
       </div>
     `;
@@ -1415,6 +1418,7 @@ function showDungeonStoryDialog({ title, text = "", images = [], actionLabel = "
     const button = els.gameDialogActions.querySelector("[data-story-continue]");
     const cleanup = () => {
       button.removeEventListener("click", cleanup);
+      if (typeof stopDungeonVoiceLine === "function") stopDungeonVoiceLine();
       els.gameDialogForm.classList.remove("wide-dialog", "story-dialog-panel");
       els.gameDialog.classList.add("hidden");
       activeDialogCancel = null;
@@ -1424,6 +1428,7 @@ function showDungeonStoryDialog({ title, text = "", images = [], actionLabel = "
     activeDialogCancel = cleanup;
     els.gameDialog.classList.remove("hidden");
     button.focus();
+    if (voiceIds.length && typeof playDungeonVoiceLineSequence === "function") void playDungeonVoiceLineSequence(voiceIds);
   });
 }
 
@@ -3793,10 +3798,16 @@ async function showCampaignMenu(campaignId) {
   if (!campaign || !(window.DungeonCampaigns?.isUnlocked?.(campaignId, state) ?? true)) return;
   const completed = state.campaignProgress?.[campaign.id] ?? 0;
   const entries = await Promise.all(Array.from({ length: campaign.count }, (_, index) => window.DungeonCampaigns.dungeon(campaign.id, index + 1)));
+  const campaignVoiceIds = campaign.id === "barrow-crown" && typeof dungeonVoiceLineIdsForPrefix === "function" && typeof campaignDescriptionVoicePrefix === "function"
+    ? await dungeonVoiceLineIdsForPrefix(campaignDescriptionVoicePrefix(campaign.id))
+    : [];
+  const campaignDescriptionText = campaignVoiceIds.length && typeof dungeonVoiceTextForLineIds === "function"
+    ? await dungeonVoiceTextForLineIds(campaignVoiceIds, campaign.description)
+    : campaign.description;
   return new Promise((resolve) => {
     els.gameDialogForm.classList.add("campaign-dialog");
     els.gameDialogTitle.textContent = campaign.name;
-    els.gameDialogMessage.innerHTML = campaignDescriptionMarkup(campaign.description);
+    els.gameDialogMessage.innerHTML = campaignDescriptionMarkup(campaignDescriptionText);
     els.gameDialogMessage.classList.add("campaign-dialog-message");
     els.gameDialogField.classList.add("hidden");
     els.gameDialogActions.classList.add("campaign-dungeon-list");
@@ -3810,6 +3821,7 @@ async function showCampaignMenu(campaignId) {
       .join("");
     const cleanup = (value) => {
       els.gameDialogActions.removeEventListener("click", handleClick);
+      if (typeof stopDungeonVoiceLine === "function") stopDungeonVoiceLine();
       els.gameDialogForm.classList.remove("campaign-dialog");
       els.gameDialogMessage.classList.remove("campaign-dialog-message");
       els.gameDialogActions.classList.remove("campaign-dungeon-list");
@@ -3825,6 +3837,7 @@ async function showCampaignMenu(campaignId) {
     els.gameDialogActions.addEventListener("click", handleClick);
     activeDialogCancel = () => cleanup(null);
     els.gameDialog.classList.remove("hidden");
+    if (campaignVoiceIds.length && typeof playDungeonVoiceLineSequence === "function") void playDungeonVoiceLineSequence(campaignVoiceIds);
   });
 }
 
@@ -3837,12 +3850,16 @@ async function startCampaignDungeon(campaignId, options = {}) {
   const partyMembers = partyIds.map((id) => state.fighters[id]).filter((hero) => hero && !hero.dead);
   const comfortScores = homeComfortScoresForActiveParty(state);
   if (template.intro?.text || template.intro?.images?.length) {
+    const introVoiceIds = typeof dungeonVoiceLineIdsForPrefix === "function" && typeof campaignDungeonVoicePrefix === "function"
+      ? await dungeonVoiceLineIdsForPrefix(campaignDungeonVoicePrefix(campaignId, dungeonIndex, "intro"))
+      : [];
     await showDungeonStoryDialog({
       title: template.name,
       text: template.intro.text,
       images: template.intro.images,
       actionLabel: `Venture into the ${template.name}`,
       goalText: customGoalStatusForTemplate(template).text,
+      voiceIds: introVoiceIds,
     });
   }
   const previousState = state;
