@@ -778,8 +778,39 @@ els.storeMenu.addEventListener("click", (event) => {
     showNpcInspection(button.dataset.npc);
     return;
   }
+  if (button?.dataset.action === "start-npc-chat") {
+    startNpcChat(button.dataset.npc, button.dataset.chatState);
+    return;
+  }
   if (button?.dataset.action === "buy-store-item") {
     buyStoreItem(button.dataset.item);
+  }
+  if (button?.dataset.action === "buy-sophie-reserve-item") {
+    buySophieReserveItem(button.dataset.item);
+  }
+  if (button?.dataset.action === "buy-sophie-pack") {
+    buySophiePack(button.dataset.pack);
+  }
+  if (button?.dataset.action === "complete-sophie-quest") {
+    completeSophieQuest(button.dataset.quest);
+  }
+  if (button?.dataset.action === "complete-sarthax-quest") {
+    completeSarthaxQuest(button.dataset.quest);
+  }
+  if (button?.dataset.action === "complete-fizzwick-quest") {
+    completeFizzwickQuest(button.dataset.quest);
+  }
+  if (button?.dataset.action === "complete-ilyra-quest") {
+    completeIlyraQuest(button.dataset.quest);
+  }
+  if (button?.dataset.action === "complete-vell-quest") {
+    completeVellQuest(button.dataset.quest);
+  }
+  if (button?.dataset.action === "complete-vaelion-quest") {
+    completeVaelionQuest(button.dataset.quest);
+  }
+  if (button?.dataset.action === "complete-borren-quest") {
+    completeBorrenQuest(button.dataset.quest);
   }
   if (button?.dataset.action === "sell-store-item") {
     sellStoreItem(button.dataset.item);
@@ -1209,6 +1240,22 @@ els.villageMenu?.addEventListener("click", (event) => {
   }
   if (button?.dataset.action === "npc-chat-option") {
     useNpcChatOption(button.dataset.npc, button.dataset.chatState, button.dataset.option);
+  }
+  if (button?.dataset.action === "npc-chat-speaker") {
+    if (button.dataset.npc === "sister-maelis") {
+      window.sisterMaelisSwitchSpeaker?.(button.dataset.hero);
+      return;
+    }
+    window.DepthboundNpcRelationships?.switchSpeaker?.(button.dataset.npc, button.dataset.hero);
+  }
+  if (button?.dataset.action === "admin-npc-relationship") {
+    if (window.DepthboundNpcRelationships?.adjust?.(button.dataset.npc, button.dataset.field, button.dataset.delta, { heroId: button.dataset.hero })) {
+      if (button.dataset.npc === "sister-maelis") {
+        window.sisterMaelisSwitchSpeaker?.(button.dataset.hero);
+      } else {
+        window.DepthboundNpcRelationships?.switchSpeaker?.(button.dataset.npc, button.dataset.hero);
+      }
+    }
   }
   if (button?.dataset.action === "close-village") {
     if (typeof stopDungeonVoiceLine === "function") stopDungeonVoiceLine();

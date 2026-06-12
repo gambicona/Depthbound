@@ -124,6 +124,7 @@ function createInitialState(heroNameOverride = "", heroForDifficulty = null, her
     monsterCompendium: {},
     campaignProgress: {},
     questFlags: {},
+    npcRelationships: {},
     partyResources: {},
     partyTomes: initialPartyTomes,
     world: null,
@@ -681,6 +682,7 @@ function createDungeonStateForParty(partyMembers, previousState, themeId = defau
   nextState.worldDay = normalizeWorldDay(previousState?.worldDay);
   nextState.campaignProgress = cloneData(previousState?.campaignProgress ?? {});
   nextState.questFlags = cloneData(previousState?.questFlags ?? {});
+  nextState.npcRelationships = cloneData(previousState?.npcRelationships ?? {});
   nextState.partyResources = normalizePartyResources(previousState?.partyResources ?? {});
   nextState.partyTomes = permanentPartyTomes(previousState?.partyTomes ?? []);
   nextState.world = window.DepthboundWorldTravel?.normalizeWorldState?.(previousState?.world) ?? previousState?.world ?? null;
@@ -895,6 +897,7 @@ function createCustomDungeonStateFromTemplate(partyMembers, previousState, templ
     monsterCompendium: normalizeMonsterCompendium(previousState?.monsterCompendium),
     campaignProgress: cloneData(previousState?.campaignProgress ?? {}),
     questFlags: cloneData(previousState?.questFlags ?? {}),
+    npcRelationships: cloneData(previousState?.npcRelationships ?? {}),
     partyResources: normalizePartyResources(previousState?.partyResources ?? {}),
     partyTomes: permanentPartyTomes(previousState?.partyTomes ?? []),
     world: window.DepthboundWorldTravel?.normalizeWorldState?.(previousState?.world) ?? previousState?.world ?? null,
@@ -2489,6 +2492,7 @@ function createHomeState(heroOrHeroes, chest = [], chestMoney = { cp: 0, sp: 0, 
     monsterCompendium: normalizeMonsterCompendium(partyData ? normalizedPartyData?.monsterCompendium : state?.monsterCompendium),
     campaignProgress: cloneData(normalizedPartyData?.campaignProgress ?? {}),
     questFlags,
+    npcRelationships: cloneData(normalizedPartyData?.npcRelationships ?? state?.npcRelationships ?? {}),
     partyResources: normalizePartyResources(partyResources),
     partyTomes: permanentPartyTomes(partyTomes),
     world,
@@ -7111,6 +7115,7 @@ function normalizeLoadedState(loadedState) {
     monsterCompendium: normalizeMonsterCompendium(loadedState.monsterCompendium ?? freshState.monsterCompendium),
     campaignProgress: cloneData(loadedState.campaignProgress ?? freshState.campaignProgress ?? {}),
     questFlags: cloneData(loadedState.questFlags ?? freshState.questFlags ?? {}),
+    npcRelationships: cloneData(loadedState.npcRelationships ?? freshState.npcRelationships ?? {}),
     partyResources: normalizePartyResources(loadedState.partyResources ?? freshState.partyResources ?? {}),
     partyTomes: loadedMode === "home" ? permanentPartyTomes(loadedState.partyTomes ?? freshState.partyTomes ?? []) : normalizePartyTomes(loadedState.partyTomes ?? freshState.partyTomes ?? []),
     world: window.DepthboundWorldTravel?.normalizeWorldState?.(loadedState.world ?? freshState.world) ?? loadedState.world ?? freshState.world ?? null,

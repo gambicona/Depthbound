@@ -137,20 +137,22 @@ function simpleConsumable(id, name, description, use = {}) {
 
 function thrownConsumable(id, name, description, cost, use = {}) {
   if (window.DungeonContent.get?.("items", id)) return;
+  const { store, ...useConfig } = use;
   window.DungeonContent.register("items", id, {
     name,
     type: "consumable",
-    category: use.category ?? "thrown flask",
+    category: useConfig.category ?? "thrown flask",
     cost,
-    weightLb: use.weightLb ?? 1,
+    weightLb: useConfig.weightLb ?? 1,
     slots: ["belt1", "belt2", "belt3", "belt4", "belt5"],
-    tags: uniqueTags(["consumable", "thrown", "alchemical", "alchemist", ...(use.tags ?? [])]),
+    tags: uniqueTags(["consumable", "thrown", "alchemical", "alchemist", ...(useConfig.tags ?? [])]),
+    ...(store ? { store } : {}),
     description,
     use: {
       kind: "thrownConsumable",
       resource: "action",
       consume: true,
-      ...use,
+      ...useConfig,
     },
   });
 }
@@ -371,6 +373,305 @@ simpleConsumable("crystal-shard", "Crystal Shard", "A small arcane component or 
 });
 simpleConsumable("sacred-ash", "Sacred Ash", "A pinch of ash from a consecrated flame. Use it to resist necrotic damage and gain +1 AC for the rest of the dungeon.", {
   status: { id: "sacred-ash", label: "Sacred Ash", acBonus: 1, resistances: ["necrotic"], expiresAtHome: true },
+});
+simpleConsumable("sophie-last-minute-kit", "Sophie's Last-Minute Kit", "A carefully packed pouch of chalk, thread, hooks, waxed cloth, needle, buttons, and one small lucky button that Sophie expects back. Use it to gain +1 to saving throws and skill checks for 1 hour.", {
+  status: {
+    id: "sophie-last-minute-kit",
+    label: "Last-Minute Kit",
+    saveBonus: 1,
+    skillBonus: 1,
+    durationHours: 1,
+    conditionDescription: "Sophie's practical odds and ends grant +1 to saving throws and skill checks for 1 hour.",
+  },
+});
+simpleConsumable("kessa-hunters-trophy-charm", "Kessa's Hunter Trophy Charm", "A small binding of tooth, cord, and scratched tally marks. Use it to gain +1 to attack rolls and skill checks for the rest of the dungeon.", {
+  status: {
+    id: "kessa-hunters-trophy-charm",
+    label: "Hunter Trophy",
+    attackBonus: 1,
+    skillBonus: 1,
+    expiresAtHome: true,
+    conditionDescription: "Kessa's trophy charm grants +1 to attack rolls and skill checks for the rest of the dungeon.",
+  },
+});
+simpleConsumable("briarhook-fang-guard", "Briarhook Fang-Guard", "A rugged throat charm made from a trophy Kessa respected enough to keep ugly. Use it to gain +1 AC and resistance to piercing damage for the rest of the dungeon.", {
+  status: {
+    id: "briarhook-fang-guard",
+    label: "Fang-Guard",
+    acBonus: 1,
+    resistances: ["piercing"],
+    expiresAtHome: true,
+    conditionDescription: "The Briarhook Fang-Guard grants +1 AC and resistance to piercing damage for the rest of the dungeon.",
+  },
+});
+simpleConsumable("odran-candle-seal", "Odran's Candle-Seal", "A black wax seal wrapped in ash-thread and copied grave script. Use it to resist necrotic damage and gain +1 to saving throws for the rest of the dungeon.", {
+  status: {
+    id: "odran-candle-seal",
+    label: "Candle-Seal",
+    saveBonus: 1,
+    resistances: ["necrotic"],
+    expiresAtHome: true,
+    conditionDescription: "Odran's candle-seal grants +1 to saving throws and resistance to necrotic damage for the rest of the dungeon.",
+  },
+});
+simpleConsumable("vellshade-name-bell", "Vellshade Name-Bell", "A small blackened bell etched with ledger marks and a space for a living thumbprint. Use it to gain +1 to saving throws and skill checks for the rest of the dungeon.", {
+  status: {
+    id: "vellshade-name-bell",
+    label: "Name-Bell",
+    saveBonus: 1,
+    skillBonus: 1,
+    expiresAtHome: true,
+    conditionDescription: "The Vellshade Name-Bell grants +1 to saving throws and skill checks for the rest of the dungeon.",
+  },
+});
+simpleConsumable("maelis-name-thread", "Maelis's Name-Thread", "A length of grave-thread knotted once for every recovered name. Use it to gain +1 to saving throws and resistance to necrotic damage for the rest of the dungeon.", {
+  status: {
+    id: "maelis-name-thread",
+    label: "Name-Thread",
+    saveBonus: 1,
+    resistances: ["necrotic"],
+    expiresAtHome: true,
+    conditionDescription: "Maelis's name-thread grants +1 to saving throws and resistance to necrotic damage for the rest of the dungeon.",
+  },
+});
+simpleConsumable("maelis-ledger-bell", "Maelis's Ledger Bell", "A small brass bell wrapped in copied ledger script. Use it to gain +1 to saving throws and skill checks for the rest of the dungeon.", {
+  status: {
+    id: "maelis-ledger-bell",
+    label: "Ledger Bell",
+    saveBonus: 1,
+    skillBonus: 1,
+    expiresAtHome: true,
+    conditionDescription: "Maelis's ledger bell grants +1 to saving throws and skill checks for the rest of the dungeon.",
+  },
+});
+simpleConsumable("maelis-grave-ledger-seal", "Maelis's Grave-Ledger Seal", "A black wax seal pressed over ash-thread and weatherproof script. Use it to gain +1 AC and +1 to saving throws for the rest of the dungeon.", {
+  status: {
+    id: "maelis-grave-ledger-seal",
+    label: "Grave-Ledger Seal",
+    acBonus: 1,
+    saveBonus: 1,
+    expiresAtHome: true,
+    conditionDescription: "Maelis's grave-ledger seal grants +1 AC and +1 to saving throws for the rest of the dungeon.",
+  },
+});
+simpleConsumable("maelis-black-ribbon-rite", "Maelis's Black Ribbon Rite", "A black ribbon tied around a restored page of names. Use it to gain +1 AC, +1 to saving throws, and resistance to necrotic damage for the rest of the dungeon.", {
+  status: {
+    id: "maelis-black-ribbon-rite",
+    label: "Black Ribbon",
+    acBonus: 1,
+    saveBonus: 1,
+    resistances: ["necrotic"],
+    expiresAtHome: true,
+    conditionDescription: "Maelis's black ribbon rite grants +1 AC, +1 to saving throws, and resistance to necrotic damage for the rest of the dungeon.",
+  },
+});
+simpleConsumable("tavren-stabilizing-vial", "Tavren's Stabilizing Vial", "A sealed calibration vial that clicks whenever nearby magic becomes personally ambitious. Use it to gain +1 to saving throws and resistance to lightning damage for the rest of the dungeon.", {
+  status: {
+    id: "tavren-stabilizing-vial",
+    label: "Stabilizing Vial",
+    saveBonus: 1,
+    resistances: ["lightning"],
+    expiresAtHome: true,
+    conditionDescription: "Tavren's stabilizing vial grants +1 to saving throws and resistance to lightning damage for the rest of the dungeon.",
+  },
+});
+simpleConsumable("quillflare-calibration-lens", "Quillflare Calibration Lens", "A brass-ringed lens that makes unstable forces look briefly well behaved. Use it to gain +1 to skill checks and damage rolls for the rest of the dungeon.", {
+  status: {
+    id: "quillflare-calibration-lens",
+    label: "Calibration Lens",
+    skillBonus: 1,
+    damageBonus: 1,
+    expiresAtHome: true,
+    conditionDescription: "The Quillflare Calibration Lens grants +1 to skill checks and damage rolls for the rest of the dungeon.",
+  },
+});
+simpleConsumable("seraphel-preservation-kit", "Seraphel's Preservation Kit", "A compact case of felt, slate tags, soft brushes, copying paper, and a very stern pencil. Use it to gain +2 to skill checks for the rest of the dungeon.", {
+  status: {
+    id: "seraphel-preservation-kit",
+    label: "Preservation Kit",
+    skillBonus: 2,
+    expiresAtHome: true,
+    conditionDescription: "Seraphel's preservation kit grants +2 to skill checks for the rest of the dungeon.",
+  },
+});
+simpleConsumable("inkglass-black-label", "Inkglass Black Label", "A sealed black archive label used for relics that should be remembered carefully and handled twice as carefully. Use it to gain +1 to saving throws and skill checks for the rest of the dungeon.", {
+  status: {
+    id: "inkglass-black-label",
+    label: "Black Label",
+    saveBonus: 1,
+    skillBonus: 1,
+    expiresAtHome: true,
+    conditionDescription: "The Inkglass Black Label grants +1 to saving throws and skill checks for the rest of the dungeon.",
+  },
+});
+simpleConsumable("nella-route-ledger", "Nella's Route Ledger", "A waxed field ledger with angry margins, good paper, and a foldout route grid. Use it to gain +2 to skill checks for the rest of the dungeon.", {
+  status: {
+    id: "nella-route-ledger",
+    label: "Route Ledger",
+    skillBonus: 2,
+    expiresAtHome: true,
+    conditionDescription: "Nella's route ledger grants +2 to skill checks for the rest of the dungeon.",
+  },
+});
+simpleConsumable("waymark-charter", "Waymark Charter", "A signed Expedition Board charter with prepared route marks and a very precise warning not to improvise heroically. Use it to gain +1 to saving throws and +10 ft speed for the rest of the dungeon.", {
+  status: {
+    id: "waymark-charter",
+    label: "Waymark Charter",
+    saveBonus: 1,
+    speedBonusFeet: 10,
+    expiresAtHome: true,
+    conditionDescription: "The Waymark Charter grants +1 to saving throws and +10 ft speed for the rest of the dungeon.",
+  },
+});
+simpleConsumable("brakka-footwork-straps", "Brakka's Footwork Straps", "Weighted practice straps marked with Pit Marshal notches. Use them to gain +1 AC and +1 to skill checks for the rest of the dungeon.", {
+  status: {
+    id: "brakka-footwork-straps",
+    label: "Footwork Straps",
+    acBonus: 1,
+    skillBonus: 1,
+    expiresAtHome: true,
+    conditionDescription: "Brakka's footwork straps grant +1 AC and +1 to skill checks for the rest of the dungeon.",
+  },
+});
+simpleConsumable("ironbell-champion-wraps", "Ironbell Champion Wraps", "Heavy hand wraps stitched with a small bell mark. Use them to gain +1 to attack rolls and saving throws for the rest of the dungeon.", {
+  status: {
+    id: "ironbell-champion-wraps",
+    label: "Champion Wraps",
+    attackBonus: 1,
+    saveBonus: 1,
+    expiresAtHome: true,
+    conditionDescription: "Ironbell Champion Wraps grant +1 to attack rolls and saving throws for the rest of the dungeon.",
+  },
+});
+simpleConsumable("sarthax-inkward-seal", "Sarthax's Inkward Seal", "A lacquered arcane seal covered in disciplined red script. Use it to gain +1 to saving throws and skill checks for the rest of the dungeon.", {
+  status: {
+    id: "sarthax-inkward-seal",
+    label: "Inkward Seal",
+    saveBonus: 1,
+    skillBonus: 1,
+    expiresAtHome: true,
+    conditionDescription: "Sarthax's Inkward Seal grants +1 to saving throws and skill checks for the rest of the dungeon.",
+  },
+});
+simpleConsumable("veyrune-containment-script", "Veyrune Containment Script", "A folded scroll-strip designed to hold dangerous pressure in a clean pattern. Use it to gain +1 damage and +1 to saving throws for the rest of the dungeon.", {
+  status: {
+    id: "veyrune-containment-script",
+    label: "Containment Script",
+    damageBonus: 1,
+    saveBonus: 1,
+    expiresAtHome: true,
+    conditionDescription: "The Veyrune Containment Script grants +1 damage and +1 to saving throws for the rest of the dungeon.",
+  },
+});
+simpleConsumable("ilyra-field-dressing", "Ilyra's Field Dressing", "A clean, tightly packed dressing prepared with bitter salve and no patience for heroic bleeding. Use it to heal 2d4+2 HP.", {
+  kind: "healing",
+  resource: "action",
+  dice: { count: 2, sides: 4 },
+  bonus: 2,
+});
+simpleConsumable("ilyra-aunts-remedy", "Aunt Fen's Old Remedy", "A warm-smelling restorative made from root, honey, and bitter herbs. Use it to heal 4d4+4 HP.", {
+  kind: "healing",
+  resource: "action",
+  dice: { count: 4, sides: 4 },
+  bonus: 4,
+});
+simpleConsumable("ilyra-last-breath-cordial", "Ilyra's Last-Breath Cordial", "A sealed cordial Ilyra makes only for those she trusts not to waste it. Use it to heal 8d4+8 HP.", {
+  kind: "healing",
+  resource: "action",
+  dice: { count: 8, sides: 4 },
+  bonus: 8,
+});
+simpleConsumable("vell-sour-ward", "Vell's Sour Ward", "A knotted charm that smells faintly of smoke, iron, and bad decisions. Use it to resist necrotic and psychic damage for the rest of the dungeon.", {
+  status: {
+    id: "vell-sour-ward",
+    label: "Sour Ward",
+    resistances: ["necrotic", "psychic"],
+    expiresAtHome: true,
+    conditionDescription: "Vell's Sour Ward grants resistance to necrotic and psychic damage for the rest of the dungeon.",
+  },
+});
+simpleConsumable("vells-knot-cutter", "Vell's Knot-Cutter", "A bitter little charm of black thread, iron filings, and sealed ichor. Use it to gain +2 to saving throws for the rest of the dungeon.", {
+  status: {
+    id: "vells-knot-cutter",
+    label: "Knot-Cutter",
+    saveBonus: 2,
+    expiresAtHome: true,
+    conditionDescription: "Vell's Knot-Cutter grants +2 to saving throws for the rest of the dungeon.",
+  },
+});
+simpleConsumable("vaelion-honest-edge-oil", "Vaelion's Honest Edge Oil", "A small vial of clean weapon oil that makes flaws obvious and edges truthful. Use it to gain +1 to attack rolls for the rest of the dungeon.", {
+  status: {
+    id: "vaelion-honest-edge-oil",
+    label: "Honest Edge",
+    attackBonus: 1,
+    expiresAtHome: true,
+    conditionDescription: "Vaelion's Honest Edge Oil grants +1 to attack rolls for the rest of the dungeon.",
+  },
+});
+simpleConsumable("vaelion-grave-edge-oil", "Vaelion's Grave-Edge Oil", "A pale oil made for weapons meant to answer the restless dead. Use it to gain +1 damage and resist necrotic damage for the rest of the dungeon.", {
+  status: {
+    id: "vaelion-grave-edge-oil",
+    label: "Grave Edge",
+    damageBonus: 1,
+    resistances: ["necrotic"],
+    expiresAtHome: true,
+    conditionDescription: "Vaelion's Grave-Edge Oil grants +1 damage and resistance to necrotic damage for the rest of the dungeon.",
+  },
+});
+simpleConsumable("vaelion-quiet-temper", "Vaelion's Quiet Temper", "A narrow strip of tempered steel wrapped in linen. Use it to gain +1 to attack rolls and saving throws for the rest of the dungeon.", {
+  status: {
+    id: "vaelion-quiet-temper",
+    label: "Quiet Temper",
+    attackBonus: 1,
+    saveBonus: 1,
+    expiresAtHome: true,
+    conditionDescription: "Vaelion's Quiet Temper grants +1 to attack rolls and saving throws for the rest of the dungeon.",
+  },
+});
+simpleConsumable("borren-armor-care-kit", "Borren's Armor Care Kit", "Oil, rivets, clean cloth, and one note that simply says clean the joints. Use it to gain +1 AC for the rest of the dungeon.", {
+  status: {
+    id: "borren-armor-care-kit",
+    label: "Armor Care",
+    acBonus: 1,
+    expiresAtHome: true,
+    conditionDescription: "Borren's Armor Care Kit grants +1 AC for the rest of the dungeon.",
+  },
+});
+simpleConsumable("ashmantle-furnace-plate", "Ashmantle Furnace Plate", "A copied furnace warning stamped with the Ashmantle mark. Use it to gain +1 to saving throws and resist fire damage for the rest of the dungeon.", {
+  status: {
+    id: "ashmantle-furnace-plate",
+    label: "Furnace Plate",
+    saveBonus: 1,
+    resistances: ["fire"],
+    expiresAtHome: true,
+    conditionDescription: "The Ashmantle Furnace Plate grants +1 to saving throws and resistance to fire damage for the rest of the dungeon.",
+  },
+});
+simpleConsumable("borren-ashmantle-plate-mark", "Borren's Ashmantle Plate Mark", "A soot-dark plate stamp made with Borren's own hand. Use it to gain +1 AC and +1 to saving throws for the rest of the dungeon.", {
+  status: {
+    id: "borren-ashmantle-plate-mark",
+    label: "Ashmantle Mark",
+    acBonus: 1,
+    saveBonus: 1,
+    expiresAtHome: true,
+    conditionDescription: "Borren's Ashmantle Plate Mark grants +1 AC and +1 to saving throws for the rest of the dungeon.",
+  },
+});
+thrownConsumable("fizzwick-careful-popper", "Fizzwick's Careful Popper", "A squat flask with three warning labels and a reassuringly thick cork. Throw it at a visible enemy within 20 ft: on a hit it deals 2d4 fire damage.", gp(0), {
+  category: "bomb",
+  store: { buyable: false },
+  tags: ["bomb", "fire", "explosive", "boom", "fizzwick"],
+  rangeFeet: 20,
+  attackAbility: "dex",
+  damage: { count: 2, sides: 4, type: "fire" },
+});
+thrownConsumable("fizzwick-almost-responsible-detonator", "Fizzwick's Almost-Responsible Detonator", "A palm-sized volatile device with a brass safety tab and a label reading probably point away. Throw it at a visible enemy within 30 ft: on a hit it deals 3d6 thunder damage.", gp(0), {
+  category: "bomb",
+  store: { buyable: false },
+  tags: ["bomb", "thunder", "explosive", "boom", "fizzwick", "rare"],
+  rangeFeet: 30,
+  attackAbility: "dex",
+  damage: { count: 3, sides: 6, type: "thunder" },
 });
 
 statusPotion("potion-climbing", "Potion of Climbing", "common", gp(150), "Drink this potion to gain a climbing speed-like mobility boost for 1 hour.", {

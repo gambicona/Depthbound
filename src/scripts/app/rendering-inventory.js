@@ -15024,6 +15024,26 @@ function villageMusicKeyForNpc(npcId) {
   return `village:${npcId}`;
 }
 
+function factionNpcChatButtonMarkup(npcId) {
+  if (!window.DungeonNpcBehaviors?.[npcId]?.startChat) return "";
+  return `<button type="button" class="ghost-button guild-hero-chat" data-action="start-npc-chat" data-npc="${escapeAttribute(npcId)}" data-chat-state="">Have a chat</button>`;
+}
+
+function npcFriendshipAwardForReputation(reputation = 0) {
+  const rep = Math.max(0, Math.floor(Number(reputation) || 0));
+  if (rep >= 80) return 4;
+  if (rep >= 40) return 3;
+  return 2;
+}
+
+function awardPartyNpcFriendship(npcId = "", amount = 2, source = "") {
+  window.DepthboundNpcRelationships?.addParty?.(npcId, Math.max(1, Math.floor(Number(amount) || 1)), source);
+}
+
+function awardPartyNpcFriendshipForWork(npcId = "", source = "", reputation = 0) {
+  awardPartyNpcFriendship(npcId, npcFriendshipAwardForReputation(reputation), source);
+}
+
 function setVillageMusicKey(key = "") {
   activeVillageMusicKey = key;
   updateBackgroundMusic();
@@ -15234,6 +15254,36 @@ async function presentFactionFirstContacts() {
     factionFirstContactRunning = false;
   }
 }
+
+async function presentFactionFirstContactNow(factionId) {
+  const definition = factionFirstContactDefinitions.find((entry) => entry.id === factionId);
+  if (!definition || !gameHasStarted || !state) return false;
+  const npc = window.DungeonContent?.get?.("npcs", definition.id);
+  const seen = factionFirstContactSeenMap();
+  seen[definition.id] = true;
+  addLog(`${npc?.name ?? factionSymbolDefinitions[definition.id]?.name ?? "A faction representative"} presents ${npc?.village?.label ?? factionSymbolDefinitions[definition.id]?.name ?? "their faction"}.`, "important");
+  await showChoiceDialog({
+    title: definition.title,
+    message: factionFirstContactMessage(definition, npc),
+    messageHtml: factionFirstContactMarkup(definition, npc),
+    dialogClass: "wide-dialog faction-intro-panel",
+    choices: [
+      {
+        value: "welcome",
+        label: "Welcome Them",
+        description: "Their faction is now ready to work from the home village.",
+      },
+    ],
+  });
+  window.DepthboundPlaytest?.syncNow?.();
+  render();
+  return true;
+}
+
+window.DepthboundFactionIntros = {
+  ...(window.DepthboundFactionIntros ?? {}),
+  presentNow: presentFactionFirstContactNow,
+};
 
 function scheduleFactionFirstContacts() {
   if (factionFirstContactScheduled || factionFirstContactRunning) return;
@@ -16782,6 +16832,51 @@ const monsterHunterTurnIns = [
     reputation: 16,
   },
 ];
+const kessaQuestStateKey = "kessaFriendshipQuests";
+const kessaQuestDefinitions = {
+  "track-casts": {
+    title: "Track Casts for Kessa",
+    description: "Kessa wants clean proof of spoor: casts, claws, fangs, or hide pieces she can use to teach track-reading without flattering anyone's drawing hand.",
+    requirements: [{ label: "Beast spoor proof", requirement: { type: "component", tagsAll: ["beast"], tagsAny: ["fang", "claw", "hide", "trophy"] }, quantity: 2 }],
+    rewardCp: 5000,
+    reputation: 8,
+    friendship: 2,
+    acceptedLog: "Kessa asks for clean spoor proof for a tracking lesson.",
+    completeLog: "Kessa marks useful track lessons from the proof and grudgingly admits it will help.",
+  },
+  "wyvern-teeth": {
+    title: "Teeth of Something That Learned",
+    description: "Kessa is watching for predators clever enough to change tactics. Bring dangerous trophies that prove old teeth, venom, horns, scales, or claws.",
+    requirements: [{ label: "Dangerous predator trophies", requirement: { type: "component", tagsAll: ["monster-part"], tagsAny: ["fang", "claw", "venom", "scale", "horn"] }, quantity: 3 }],
+    rewardCp: 12000,
+    reputation: 14,
+    friendship: 3,
+    acceptedLog: "Kessa names clever predators as the prey that still worries her.",
+    completeLog: "Kessa studies the trophies for signs of learned hunting and files a quiet warning with the Lodge.",
+  },
+  "beast-that-learned": {
+    title: "The Beast That Learned Her Name",
+    description: "Kessa wants proof from a rare or stubborn monster so she can teach others what a thinking threat looks like before it starts choosing targets.",
+    requirements: [{ label: "Rare monster trophies", requirement: { type: "component", tagsAll: ["monster-part"], tagsAny: ["trophy", "fang", "claw", "scale", "hide", "venom"] }, quantity: 4 }],
+    rewardCp: 18000,
+    reputation: 20,
+    friendship: 4,
+    rewardItemId: "kessa-hunters-trophy-charm",
+    acceptedLog: "Kessa asks for proof from a beast dangerous enough to teach from.",
+    completeLog: "Kessa turns the lesson into a hunter's trophy charm and lets the party keep it.",
+  },
+  "fang-guard": {
+    title: "A Trophy Worth Her Wall",
+    description: "Kessa will hunt beside someone only after they bring a trophy ugly enough to matter and honest enough to trust.",
+    requirements: [{ label: "Major trophy pieces", requirement: { type: "component", tagsAll: ["monster-part"], tagsAny: ["trophy", "fang", "claw", "horn", "scale", "shell", "venom"] }, quantity: 5 }],
+    rewardCp: 0,
+    reputation: 25,
+    friendship: 5,
+    rewardItemId: "briarhook-fang-guard",
+    acceptedLog: "Kessa names the price of choosing: proof worthy of her wall.",
+    completeLog: "Kessa makes the Briarhook Fang-Guard and says nothing sentimental about it, which is sentimental for her.",
+  },
+};
 
 function monsterHunterProgress() {
   state.questFlags = { ...(state.questFlags ?? {}) };
@@ -17158,11 +17253,134 @@ function monsterHunterRankRewardsMarkup() {
   `;
 }
 
+function kessaQuestRoot() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[kessaQuestStateKey] ??= {};
+  return state.questFlags[kessaQuestStateKey];
+}
+
+function kessaQuestState(questId = "") {
+  const root = kessaQuestRoot();
+  root[questId] ??= { status: "available" };
+  return root[questId];
+}
+
+function acceptKessaQuest(questId = "") {
+  const def = kessaQuestDefinitions[questId];
+  if (!def) return;
+  const quest = kessaQuestState(questId);
+  if (quest.status === "completed" || quest.status === "accepted") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog(def.acceptedLog, "important");
+  renderQuestLogButton();
+}
+
+function kessaQuestRequirementProgress(entry) {
+  return Math.min(Math.max(1, entry.quantity ?? 1), materialCountForRequirement(entry.requirement));
+}
+
+function kessaQuestReady(questId = "") {
+  const def = kessaQuestDefinitions[questId];
+  const quest = kessaQuestState(questId);
+  if (!def || quest.status !== "accepted") return false;
+  return (def.requirements ?? []).every((entry) => materialCountForRequirement(entry.requirement) >= Math.max(1, entry.quantity ?? 1));
+}
+
+function completeKessaQuest(questId = "") {
+  const def = kessaQuestDefinitions[questId];
+  const quest = kessaQuestState(questId);
+  if (!def || quest.status !== "accepted" || !kessaQuestReady(questId)) return;
+  for (const entry of def.requirements ?? []) {
+    if (!consumeMaterialsForRequirement(entry.requirement, Math.max(1, entry.quantity ?? 1))) return;
+  }
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  if (def.rewardCp) addMoney(partyPurse(), def.rewardCp);
+  if (def.rewardItemId) addItemToPartyInventory(createItemInstance(def.rewardItemId, "kessa"), "kessa-reward");
+  const progress = monsterHunterProgress();
+  progress.reputation += Math.max(0, Math.floor(Number(def.reputation) || 0));
+  awardPartyNpcFriendship(monsterHunterGuildId, def.friendship ?? 2, `quest:${monsterHunterGuildId}:${questId}`);
+  addLog(`${def.completeLog}${def.rewardCp ? ` Kessa pays ${priceText(def.rewardCp)}.` : ""} Trophy Lodge reputation +${def.reputation}.`, "important");
+  render();
+  renderMonsterHunterGuild();
+  renderQuestLogButton();
+}
+
+function cancelKessaQuest(questId = "") {
+  const quest = kessaQuestState(questId);
+  if (quest.status !== "accepted") return false;
+  quest.status = "available";
+  quest.cancelledAt = Date.now();
+  delete quest.acceptedAt;
+  addLog("Kessa's trust work is no longer tracked.", "important");
+  return true;
+}
+
+function kessaQuestLogEntries() {
+  return Object.entries(kessaQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = kessaQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return null;
+      const ready = quest.status === "accepted" && kessaQuestReady(questId);
+      return {
+        id: `kessa-${questId}`,
+        giver: "Kessa Briarhook",
+        title: def.title,
+        description: def.description,
+        ready,
+        completed: quest.status === "completed",
+        cancelable: quest.status === "accepted",
+        cancelType: "npc",
+        npcId: monsterHunterGuildId,
+        questId,
+        objectives: (def.requirements ?? []).map((entry) => ({
+          label: entry.label,
+          progress: kessaQuestRequirementProgress(entry),
+          target: Math.max(1, entry.quantity ?? 1),
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function kessaFriendshipQuestRowsMarkup() {
+  const rows = Object.entries(kessaQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = kessaQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return "";
+      const ready = kessaQuestReady(questId);
+      return `
+        <article class="guild-contract-row ${ready ? "ready" : ""}">
+          <div>
+            <b>${escapeHtml(def.title)}</b>
+            <span>${escapeHtml(def.description)}</span>
+            ${(def.requirements ?? [])
+              .map((entry) => {
+                const target = Math.max(1, entry.quantity ?? 1);
+                return `<small>${escapeHtml(entry.label)}: ${escapeHtml(Math.min(target, materialCountForRequirement(entry.requirement)))}/${escapeHtml(target)} - ${escapeHtml(def.rewardCp ? priceText(def.rewardCp) : "Unique reward")}, ${escapeHtml(def.reputation)} rep</small>`;
+              })
+              .join("")}
+          </div>
+          ${
+            quest.status === "completed"
+              ? `<button type="button" disabled>Done</button>`
+              : `<button type="button" data-action="complete-npc-quest" data-npc="${escapeAttribute(monsterHunterGuildId)}" data-quest="${escapeAttribute(questId)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Trophies"}</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+  return rows ? `<section class="guild-section"><h3>Kessa's Trust Work</h3><div class="guild-contract-list">${rows}</div></section>` : "";
+}
+
 function monsterHunterBoardStats(progress = monsterHunterProgress()) {
   const activeContracts = monsterHunterContracts.filter((contract) => monsterHunterContractState(contract.id).status === "accepted").length;
   const readyContracts = monsterHunterContracts.filter(monsterHunterContractReady).length;
   const readyTurnIns = monsterHunterTurnIns.filter(monsterHunterTurnInReady).length;
-  return { activeContracts, readyContracts, readyTurnIns, rank: monsterHunterRank(progress) };
+  const activeTrust = Object.keys(kessaQuestDefinitions).filter((questId) => kessaQuestState(questId).status === "accepted").length;
+  const readyTrust = Object.keys(kessaQuestDefinitions).filter(kessaQuestReady).length;
+  return { activeContracts: activeContracts + activeTrust, readyContracts, readyTurnIns: readyTurnIns + readyTrust, rank: monsterHunterRank(progress) };
 }
 
 function monsterHunterBoardHeaderMarkup(npc, progress) {
@@ -17176,6 +17394,7 @@ function monsterHunterBoardHeaderMarkup(npc, progress) {
         <h3>${guildNpcNameButtonMarkup(npc, "Lodge Contact")}</h3>
         <b>${escapeHtml(npc.title)}</b>
         <p>${escapeHtml(npcEntryLine(npc) || npc.description || "")}</p>
+        ${factionNpcChatButtonMarkup(monsterHunterGuildId)}
       </div>
       <div class="guild-hero-stats">
         <div>
@@ -17224,10 +17443,11 @@ function setMonsterHunterBoardPanel(panel = "contracts") {
 }
 
 function monsterHunterMainPanelMarkup(progress) {
+  const trustWork = kessaFriendshipQuestRowsMarkup();
   if (monsterHunterBoardPanel === "turnins") return monsterHunterTurnInsMarkup();
   if (monsterHunterBoardPanel === "shop") return factionSetShopMarkup(monsterHunterGuildId, monsterHunterRank(progress), "Lodge Gear");
   if (monsterHunterBoardPanel === "catalog") return factionSetCatalogMarkup(monsterHunterGuildId, monsterHunterRank(progress), "Lodge Set Catalog");
-  return monsterHunterContractsMarkup();
+  return `${trustWork}${monsterHunterContractsMarkup()}`;
 }
 
 function renderMonsterHunterGuild(npc = window.DungeonContent.get("npcs", monsterHunterGuildId)) {
@@ -17282,6 +17502,7 @@ function completeMonsterHunterContract(contractId) {
   progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
   progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
   window.DepthboundAchievements?.factionWork?.(monsterHunterGuildId, "contract");
+  awardPartyNpcFriendshipForWork(monsterHunterGuildId, `contract:${monsterHunterGuildId}:${contract.id}`, contract.reputation);
   addLog(`The Trophy Lodge pays ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
   render();
   renderMonsterHunterGuild();
@@ -17297,6 +17518,7 @@ function completeMonsterHunterTurnIn(turnInId) {
   progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
   progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
   window.DepthboundAchievements?.factionWork?.(monsterHunterGuildId, "turn-in");
+  awardPartyNpcFriendshipForWork(monsterHunterGuildId, `turn-in:${monsterHunterGuildId}:${turnIn.id}`, turnIn.reputation);
   addLog(`Kessa Briarhook accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Trophy Lodge reputation +${turnIn.reputation}.`, "important");
   render();
   renderMonsterHunterGuild();
@@ -17371,12 +17593,16 @@ function monsterHunterQuestLogEntries() {
 }
 
 window.DungeonNpcBehaviors ??= {};
+window.DepthboundKessaQuests = {
+  accept: acceptKessaQuest,
+};
 window.DungeonNpcBehaviors[monsterHunterGuildId] = {
   visit: renderMonsterHunterGuild,
   returnToVisit: () => renderMonsterHunterGuild(),
   recordMonsterKill: recordMonsterHunterKill,
-  questLogEntries: monsterHunterQuestLogEntries,
-  cancelQuest: cancelMonsterHunterContract,
+  questLogEntries: () => [...monsterHunterQuestLogEntries(), ...kessaQuestLogEntries()],
+  completeQuest: completeKessaQuest,
+  cancelQuest: (questId) => cancelKessaQuest(questId) || cancelMonsterHunterContract(questId),
   adminProgressEntries() {
     const progress = monsterHunterProgress();
     return [
@@ -17523,6 +17749,51 @@ const gravebinderTurnIns = [
     reputation: 22,
   },
 ];
+const odranQuestStateKey = "odranFriendshipQuests";
+const odranQuestDefinitions = {
+  "grave-mark": {
+    title: "A Proper Grave Mark",
+    description: "Odran wants burial tokens and marked remains for teaching grave marks that preserve names instead of decorating grief.",
+    requirements: [{ label: "Burial tokens or marked remains", requirement: { type: "component", tagsAny: ["bone", "skull", "grave", "ash", "spirit"] }, quantity: 3 }],
+    rewardCp: 4000,
+    reputation: 8,
+    friendship: 2,
+    acceptedLog: "Odran asks for grave materials suitable for teaching proper grave marks.",
+    completeLog: "Odran turns the materials into a quiet lesson on names, tokens, and accurate grief.",
+  },
+  "black-candle": {
+    title: "Black Candles for Unedited Words",
+    description: "Odran needs grave wax, ash, or spirit traces to make candles for carrying messages from the dead without improving them.",
+    requirements: [{ label: "Grave wax, ash, or spirit traces", requirement: { type: "component", tagsAny: ["wax", "ash", "spirit", "ectoplasm", "grave"] }, quantity: 4 }],
+    rewardCp: 9000,
+    reputation: 14,
+    friendship: 3,
+    acceptedLog: "Odran names black candles as work he trusts to few people.",
+    completeLog: "Odran prepares black candles and records exactly what the dead should be allowed to say.",
+  },
+  "ledger-debts": {
+    title: "Debts of the Unnamed",
+    description: "Odran is seeking scraps of identity: grave tokens, inscriptions, old cloth, and proof that lets an unnamed dead person become particular again.",
+    requirements: [{ label: "Lost-name evidence", requirement: { type: "component", tagsAny: ["grave", "cloth", "bone", "spirit", "ash", "skull"] }, quantity: 5 }],
+    rewardCp: 14000,
+    reputation: 20,
+    friendship: 4,
+    rewardItemId: "odran-candle-seal",
+    acceptedLog: "Odran admits the unnamed dead are the grief that still follows him.",
+    completeLog: "Odran files the evidence into the ledger and presses a candle-seal into the party's hands.",
+  },
+  "name-bell": {
+    title: "Materials for a Name-Bell",
+    description: "Odran will let the party carry one of his candles if they bring materials fit for a name-bell: ash, bone, spirit traces, and grave metal.",
+    requirements: [{ label: "Name-bell materials", requirement: { type: "component", tagsAny: ["grave", "ash", "bone", "spirit", "metal", "bell"] }, quantity: 6 }],
+    rewardCp: 0,
+    reputation: 25,
+    friendship: 5,
+    rewardItemId: "vellshade-name-bell",
+    acceptedLog: "Odran considers whether the party's hands are steady enough to carry a Gravebinder candle.",
+    completeLog: "Odran makes the Vellshade Name-Bell and pretends it is only procedure.",
+  },
+};
 const gravebinderRecruitClasses = ["cleric", "paladin"];
 const gravebinderRecruitStateKey = "gravebinder-recruits";
 
@@ -17880,11 +18151,134 @@ function gravebinderRankRewardsMarkup() {
   `;
 }
 
+function odranQuestRoot() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[odranQuestStateKey] ??= {};
+  return state.questFlags[odranQuestStateKey];
+}
+
+function odranQuestState(questId = "") {
+  const root = odranQuestRoot();
+  root[questId] ??= { status: "available" };
+  return root[questId];
+}
+
+function acceptOdranQuest(questId = "") {
+  const def = odranQuestDefinitions[questId];
+  if (!def) return;
+  const quest = odranQuestState(questId);
+  if (quest.status === "completed" || quest.status === "accepted") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog(def.acceptedLog, "important");
+  renderQuestLogButton();
+}
+
+function odranQuestRequirementProgress(entry) {
+  return Math.min(Math.max(1, entry.quantity ?? 1), materialCountForRequirement(entry.requirement));
+}
+
+function odranQuestReady(questId = "") {
+  const def = odranQuestDefinitions[questId];
+  const quest = odranQuestState(questId);
+  if (!def || quest.status !== "accepted") return false;
+  return (def.requirements ?? []).every((entry) => materialCountForRequirement(entry.requirement) >= Math.max(1, entry.quantity ?? 1));
+}
+
+function completeOdranQuest(questId = "") {
+  const def = odranQuestDefinitions[questId];
+  const quest = odranQuestState(questId);
+  if (!def || quest.status !== "accepted" || !odranQuestReady(questId)) return;
+  for (const entry of def.requirements ?? []) {
+    if (!consumeMaterialsForRequirement(entry.requirement, Math.max(1, entry.quantity ?? 1))) return;
+  }
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  if (def.rewardCp) addMoney(partyPurse(), def.rewardCp);
+  if (def.rewardItemId) addItemToPartyInventory(createItemInstance(def.rewardItemId, "odran"), "odran-reward");
+  const progress = gravebinderProgress();
+  progress.reputation += Math.max(0, Math.floor(Number(def.reputation) || 0));
+  awardPartyNpcFriendship(gravebinderGuildId, def.friendship ?? 2, `quest:${gravebinderGuildId}:${questId}`);
+  addLog(`${def.completeLog}${def.rewardCp ? ` Odran pays ${priceText(def.rewardCp)}.` : ""} Gravebinder reputation +${def.reputation}.`, "important");
+  render();
+  renderGravebinderGuild();
+  renderQuestLogButton();
+}
+
+function cancelOdranQuest(questId = "") {
+  const quest = odranQuestState(questId);
+  if (quest.status !== "accepted") return false;
+  quest.status = "available";
+  quest.cancelledAt = Date.now();
+  delete quest.acceptedAt;
+  addLog("Odran's personal rite work is no longer tracked.", "important");
+  return true;
+}
+
+function odranQuestLogEntries() {
+  return Object.entries(odranQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = odranQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return null;
+      const ready = quest.status === "accepted" && odranQuestReady(questId);
+      return {
+        id: `odran-${questId}`,
+        giver: "Odran Vellshade",
+        title: def.title,
+        description: def.description,
+        ready,
+        completed: quest.status === "completed",
+        cancelable: quest.status === "accepted",
+        cancelType: "npc",
+        npcId: gravebinderGuildId,
+        questId,
+        objectives: (def.requirements ?? []).map((entry) => ({
+          label: entry.label,
+          progress: odranQuestRequirementProgress(entry),
+          target: Math.max(1, entry.quantity ?? 1),
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function odranFriendshipQuestRowsMarkup() {
+  const rows = Object.entries(odranQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = odranQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return "";
+      const ready = odranQuestReady(questId);
+      return `
+        <article class="guild-contract-row ${ready ? "ready" : ""}">
+          <div>
+            <b>${escapeHtml(def.title)}</b>
+            <span>${escapeHtml(def.description)}</span>
+            ${(def.requirements ?? [])
+              .map((entry) => {
+                const target = Math.max(1, entry.quantity ?? 1);
+                return `<small>${escapeHtml(entry.label)}: ${escapeHtml(Math.min(target, materialCountForRequirement(entry.requirement)))}/${escapeHtml(target)} - ${escapeHtml(def.rewardCp ? priceText(def.rewardCp) : "Unique reward")}, ${escapeHtml(def.reputation)} rep</small>`;
+              })
+              .join("")}
+          </div>
+          ${
+            quest.status === "completed"
+              ? `<button type="button" disabled>Done</button>`
+              : `<button type="button" data-action="complete-npc-quest" data-npc="${escapeAttribute(gravebinderGuildId)}" data-quest="${escapeAttribute(questId)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Remains"}</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+  return rows ? `<section class="guild-section"><h3>Odran's Quiet Rites</h3><div class="guild-contract-list">${rows}</div></section>` : "";
+}
+
 function gravebinderBoardStats(progress = gravebinderProgress()) {
   const activeContracts = gravebinderContracts.filter((contract) => gravebinderContractState(contract.id).status === "accepted").length;
   const readyContracts = gravebinderContracts.filter(gravebinderContractReady).length;
   const readyTurnIns = gravebinderTurnIns.filter(gravebinderTurnInReady).length;
-  return { activeContracts, readyContracts, readyTurnIns, rank: gravebinderRank(progress) };
+  const activeQuietRites = Object.keys(odranQuestDefinitions).filter((questId) => odranQuestState(questId).status === "accepted").length;
+  const readyQuietRites = Object.keys(odranQuestDefinitions).filter(odranQuestReady).length;
+  return { activeContracts: activeContracts + activeQuietRites, readyContracts, readyTurnIns: readyTurnIns + readyQuietRites, rank: gravebinderRank(progress) };
 }
 
 function gravebinderBoardHeaderMarkup(npc, progress) {
@@ -17898,6 +18292,7 @@ function gravebinderBoardHeaderMarkup(npc, progress) {
         <h3>${guildNpcNameButtonMarkup(npc, "Gravebinder Contact")}</h3>
         <b>${escapeHtml(npc.title)}</b>
         <p>${escapeHtml(npcEntryLine(npc) || npc.description || "")}</p>
+        ${factionNpcChatButtonMarkup(gravebinderGuildId)}
       </div>
       <div class="guild-hero-stats">
         <div>
@@ -17947,11 +18342,12 @@ function setGravebinderBoardPanel(panel = "contracts") {
 }
 
 function gravebinderMainPanelMarkup(progress) {
+  const quietRites = odranFriendshipQuestRowsMarkup();
   if (gravebinderBoardPanel === "turnins") return gravebinderTurnInsMarkup();
   if (gravebinderBoardPanel === "recruits") return gravebinderRecruitsMarkup(progress);
   if (gravebinderBoardPanel === "shop") return factionSetShopMarkup(gravebinderGuildId, gravebinderRank(progress), "Grave Gear");
   if (gravebinderBoardPanel === "catalog") return factionSetCatalogMarkup(gravebinderGuildId, gravebinderRank(progress), "Gravebinder Set Catalog");
-  return gravebinderContractsMarkup();
+  return `${quietRites}${gravebinderContractsMarkup()}`;
 }
 
 function renderGravebinderGuild(npc = window.DungeonContent.get("npcs", gravebinderGuildId)) {
@@ -18006,6 +18402,7 @@ function completeGravebinderContract(contractId) {
   progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
   progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
   window.DepthboundAchievements?.factionWork?.(gravebinderGuildId, "contract");
+  awardPartyNpcFriendshipForWork(gravebinderGuildId, `contract:${gravebinderGuildId}:${contract.id}`, contract.reputation);
   addLog(`The Gravebinders pay ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
   render();
   renderGravebinderGuild();
@@ -18021,6 +18418,7 @@ function completeGravebinderTurnIn(turnInId) {
   progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
   progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
   window.DepthboundAchievements?.factionWork?.(gravebinderGuildId, "turn-in");
+  awardPartyNpcFriendshipForWork(gravebinderGuildId, `turn-in:${gravebinderGuildId}:${turnIn.id}`, turnIn.reputation);
   addLog(`Odran Vellshade accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Gravebinder reputation +${turnIn.reputation}.`, "important");
   render();
   renderGravebinderGuild();
@@ -18097,6 +18495,9 @@ function gravebinderQuestLogEntries() {
     });
 }
 
+window.DepthboundOdranQuests = {
+  accept: acceptOdranQuest,
+};
 window.DungeonNpcBehaviors[gravebinderGuildId] = {
   visit: renderGravebinderGuild,
   returnToVisit: () => renderGravebinderGuild(),
@@ -18112,8 +18513,9 @@ window.DungeonNpcBehaviors[gravebinderGuildId] = {
     return true;
   },
   recordMonsterKill: recordGravebinderKill,
-  questLogEntries: gravebinderQuestLogEntries,
-  cancelQuest: cancelGravebinderContract,
+  questLogEntries: () => [...gravebinderQuestLogEntries(), ...odranQuestLogEntries()],
+  completeQuest: completeOdranQuest,
+  cancelQuest: (questId) => cancelOdranQuest(questId) || cancelGravebinderContract(questId),
   adminProgressEntries() {
     const progress = gravebinderProgress();
     return [
@@ -18260,6 +18662,51 @@ const crucibleTurnIns = [
     reputation: 26,
   },
 ];
+const tavrenQuestStateKey = "tavrenFriendshipQuests";
+const tavrenQuestDefinitions = {
+  "field-notes": {
+    title: "Field Notes That Do Not Explode",
+    description: "Tavren wants stable motes, crystal, or pressure pieces so he can teach sample handling without losing anyone's eyebrows.",
+    requirements: [{ label: "Stable arcane samples", requirement: { type: "component", tagsAny: ["elemental", "crystal", "pressure", "arcane-reagent", "magic-reagent"] }, quantity: 3 }],
+    rewardCp: 4500,
+    reputation: 8,
+    friendship: 2,
+    acceptedLog: "Tavren requests stable samples for a lesson in evidence that stays in its jar.",
+    completeLog: "Tavren turns the samples into field notes, labels everything twice, and only briefly smells smoke.",
+  },
+  "conductive-moss": {
+    title: "Conductive Moss Inquiry",
+    description: "Tavren needs storm, crystal, or living-growth reagents to determine whether conductive moss is a plant behaving like lightning or lightning wearing a salad.",
+    requirements: [{ label: "Storm, crystal, or growth reagents", requirement: { type: "component", tagsAny: ["storm", "lightning", "thunder", "crystal", "plant", "wood", "arcane-reagent"] }, quantity: 4 }],
+    rewardCp: 9500,
+    reputation: 14,
+    friendship: 3,
+    acceptedLog: "Tavren opens a private inquiry into conductive moss and floor-based betrayal.",
+    completeLog: "Tavren files the conductive moss notes under 'botany, probable revenge' and pays for the trouble.",
+  },
+  "fourfold-lens": {
+    title: "The Fourfold Lens",
+    description: "Tavren wants balanced essences from different elemental arguments: fire, stone, tide, storm, crystal, or primal force.",
+    requirements: [{ label: "Balanced elemental essences", requirement: { type: "component", tagsAll: ["elemental"], tagsAny: ["fire", "air", "earth", "water", "storm", "stone", "crystal", "primal"] }, quantity: 5 }],
+    rewardCp: 15000,
+    reputation: 20,
+    friendship: 4,
+    rewardItemId: "tavren-stabilizing-vial",
+    acceptedLog: "Tavren admits the theory that keeps him awake and asks for balanced elemental essences.",
+    completeLog: "Tavren calibrates the Fourfold Lens and rewards the party with a stabilizing vial that seems mostly trustworthy.",
+  },
+  "storm-valve": {
+    title: "The Impossible Storm Valve",
+    description: "Tavren needs a primal core, storm essence, pressure housing, or equivalent unstable components to build a surge into something more useful than an incident.",
+    requirements: [{ label: "Unstable valve components", requirement: { type: "component", tagsAny: ["primal", "core", "storm", "lightning", "pressure", "gear", "elemental"] }, quantity: 6 }],
+    rewardCp: 0,
+    reputation: 25,
+    friendship: 5,
+    rewardItemId: "quillflare-calibration-lens",
+    acceptedLog: "Tavren accepts help with the impossible storm valve and marks a safe standing distance in chalk.",
+    completeLog: "Tavren completes the storm valve prototype and gives the party a calibration lens with only three warnings.",
+  },
+};
 
 function crucibleProgress() {
   state.questFlags = { ...(state.questFlags ?? {}) };
@@ -18436,11 +18883,134 @@ function crucibleRankRewardsMarkup() {
   `;
 }
 
+function tavrenQuestRoot() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[tavrenQuestStateKey] ??= {};
+  return state.questFlags[tavrenQuestStateKey];
+}
+
+function tavrenQuestState(questId = "") {
+  const root = tavrenQuestRoot();
+  root[questId] ??= { status: "available" };
+  return root[questId];
+}
+
+function acceptTavrenQuest(questId = "") {
+  const def = tavrenQuestDefinitions[questId];
+  if (!def) return;
+  const quest = tavrenQuestState(questId);
+  if (quest.status === "completed" || quest.status === "accepted") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog(def.acceptedLog, "important");
+  renderQuestLogButton();
+}
+
+function tavrenQuestRequirementProgress(entry) {
+  return Math.min(Math.max(1, entry.quantity ?? 1), materialCountForRequirement(entry.requirement));
+}
+
+function tavrenQuestReady(questId = "") {
+  const def = tavrenQuestDefinitions[questId];
+  const quest = tavrenQuestState(questId);
+  if (!def || quest.status !== "accepted") return false;
+  return (def.requirements ?? []).every((entry) => materialCountForRequirement(entry.requirement) >= Math.max(1, entry.quantity ?? 1));
+}
+
+function completeTavrenQuest(questId = "") {
+  const def = tavrenQuestDefinitions[questId];
+  const quest = tavrenQuestState(questId);
+  if (!def || quest.status !== "accepted" || !tavrenQuestReady(questId)) return;
+  for (const entry of def.requirements ?? []) {
+    if (!consumeMaterialsForRequirement(entry.requirement, Math.max(1, entry.quantity ?? 1))) return;
+  }
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  if (def.rewardCp) addMoney(partyPurse(), def.rewardCp);
+  if (def.rewardItemId) addItemToPartyInventory(createItemInstance(def.rewardItemId, "tavren"), "tavren-reward");
+  const progress = crucibleProgress();
+  progress.reputation += Math.max(0, Math.floor(Number(def.reputation) || 0));
+  awardPartyNpcFriendship(crucibleGuildId, def.friendship ?? 2, `quest:${crucibleGuildId}:${questId}`);
+  addLog(`${def.completeLog}${def.rewardCp ? ` Tavren pays ${priceText(def.rewardCp)}.` : ""} Collegium reputation +${def.reputation}.`, "important");
+  render();
+  renderCrucibleGuild();
+  renderQuestLogButton();
+}
+
+function cancelTavrenQuest(questId = "") {
+  const quest = tavrenQuestState(questId);
+  if (quest.status !== "accepted") return false;
+  quest.status = "available";
+  quest.cancelledAt = Date.now();
+  delete quest.acceptedAt;
+  addLog("Tavren's personal experiment is no longer tracked.", "important");
+  return true;
+}
+
+function tavrenQuestLogEntries() {
+  return Object.entries(tavrenQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = tavrenQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return null;
+      const ready = quest.status === "accepted" && tavrenQuestReady(questId);
+      return {
+        id: `tavren-${questId}`,
+        giver: "Tavren Quillflare",
+        title: def.title,
+        description: def.description,
+        ready,
+        completed: quest.status === "completed",
+        cancelable: quest.status === "accepted",
+        cancelType: "npc",
+        npcId: crucibleGuildId,
+        questId,
+        objectives: (def.requirements ?? []).map((entry) => ({
+          label: entry.label,
+          progress: tavrenQuestRequirementProgress(entry),
+          target: Math.max(1, entry.quantity ?? 1),
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function tavrenFriendshipQuestRowsMarkup() {
+  const rows = Object.entries(tavrenQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = tavrenQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return "";
+      const ready = tavrenQuestReady(questId);
+      return `
+        <article class="guild-contract-row ${ready ? "ready" : ""}">
+          <div>
+            <b>${escapeHtml(def.title)}</b>
+            <span>${escapeHtml(def.description)}</span>
+            ${(def.requirements ?? [])
+              .map((entry) => {
+                const target = Math.max(1, entry.quantity ?? 1);
+                return `<small>${escapeHtml(entry.label)}: ${escapeHtml(Math.min(target, materialCountForRequirement(entry.requirement)))}/${escapeHtml(target)} - ${escapeHtml(def.rewardCp ? priceText(def.rewardCp) : "Prototype reward")}, ${escapeHtml(def.reputation)} rep</small>`;
+              })
+              .join("")}
+          </div>
+          ${
+            quest.status === "completed"
+              ? `<button type="button" disabled>Filed</button>`
+              : `<button type="button" data-action="complete-npc-quest" data-npc="${escapeAttribute(crucibleGuildId)}" data-quest="${escapeAttribute(questId)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Samples"}</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+  return rows ? `<section class="guild-section"><h3>Tavren's Private Experiments</h3><div class="guild-contract-list">${rows}</div></section>` : "";
+}
+
 function crucibleBoardStats(progress = crucibleProgress()) {
   const activeContracts = crucibleContracts.filter((contract) => crucibleContractState(contract.id).status === "accepted").length;
   const readyContracts = crucibleContracts.filter(crucibleContractReady).length;
   const readyTurnIns = crucibleTurnIns.filter(crucibleTurnInReady).length;
-  return { activeContracts, readyContracts, readyTurnIns, rank: crucibleRank(progress) };
+  const activeExperiments = Object.keys(tavrenQuestDefinitions).filter((questId) => tavrenQuestState(questId).status === "accepted").length;
+  const readyExperiments = Object.keys(tavrenQuestDefinitions).filter(tavrenQuestReady).length;
+  return { activeContracts: activeContracts + activeExperiments, readyContracts, readyTurnIns: readyTurnIns + readyExperiments, rank: crucibleRank(progress) };
 }
 
 function crucibleBoardHeaderMarkup(npc, progress) {
@@ -18454,6 +19024,7 @@ function crucibleBoardHeaderMarkup(npc, progress) {
         <h3>${guildNpcNameButtonMarkup(npc, "Collegium Contact")}</h3>
         <b>${escapeHtml(npc.title)}</b>
         <p>${escapeHtml(npcEntryLine(npc) || npc.description || "")}</p>
+        ${factionNpcChatButtonMarkup(crucibleGuildId)}
       </div>
       <div class="guild-hero-stats">
         <div>
@@ -18502,10 +19073,11 @@ function setCrucibleBoardPanel(panel = "contracts") {
 }
 
 function crucibleMainPanelMarkup(progress) {
+  const privateExperiments = tavrenFriendshipQuestRowsMarkup();
   if (crucibleBoardPanel === "turnins") return crucibleTurnInsMarkup();
   if (crucibleBoardPanel === "shop") return factionSetShopMarkup(crucibleGuildId, crucibleRank(progress), "Crucible Gear");
   if (crucibleBoardPanel === "catalog") return factionSetCatalogMarkup(crucibleGuildId, crucibleRank(progress), "Crucible Set Catalog");
-  return crucibleContractsMarkup();
+  return `${privateExperiments}${crucibleContractsMarkup()}`;
 }
 
 function renderCrucibleGuild(npc = window.DungeonContent.get("npcs", crucibleGuildId)) {
@@ -18560,6 +19132,7 @@ function completeCrucibleContract(contractId) {
   progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
   progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
   window.DepthboundAchievements?.factionWork?.(crucibleGuildId, "contract");
+  awardPartyNpcFriendshipForWork(crucibleGuildId, `contract:${crucibleGuildId}:${contract.id}`, contract.reputation);
   addLog(`The Crucible Collegium pays ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
   render();
   renderCrucibleGuild();
@@ -18575,6 +19148,7 @@ function completeCrucibleTurnIn(turnInId) {
   progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
   progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
   window.DepthboundAchievements?.factionWork?.(crucibleGuildId, "turn-in");
+  awardPartyNpcFriendshipForWork(crucibleGuildId, `turn-in:${crucibleGuildId}:${turnIn.id}`, turnIn.reputation);
   addLog(`Tavren Quillflare accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Collegium reputation +${turnIn.reputation}.`, "important");
   render();
   renderCrucibleGuild();
@@ -18651,12 +19225,16 @@ function crucibleQuestLogEntries() {
     });
 }
 
+window.DepthboundTavrenQuests = {
+  accept: acceptTavrenQuest,
+};
 window.DungeonNpcBehaviors[crucibleGuildId] = {
   visit: renderCrucibleGuild,
   returnToVisit: () => renderCrucibleGuild(),
   recordMonsterKill: recordCrucibleKill,
-  questLogEntries: crucibleQuestLogEntries,
-  cancelQuest: cancelCrucibleContract,
+  questLogEntries: () => [...crucibleQuestLogEntries(), ...tavrenQuestLogEntries()],
+  completeQuest: completeTavrenQuest,
+  cancelQuest: (questId) => cancelTavrenQuest(questId) || cancelCrucibleContract(questId),
   adminProgressEntries() {
     const progress = crucibleProgress();
     return [
@@ -18803,6 +19381,51 @@ const antiquarianTurnIns = [
     reputation: 34,
   },
 ];
+const seraphelQuestStateKey = "seraphelFriendshipQuests";
+const seraphelQuestDefinitions = {
+  cataloging: {
+    title: "Proper Cataloging",
+    description: "Seraphel wants modest antiquities, field notes, or marked fragments for a lesson in making history useful without making it false.",
+    requirements: [{ label: "Catalogable find", requirement: { type: "treasure", tagsAny: ["art", "art-object", "valuable", "trade-good", "relic"] }, quantity: 2 }],
+    rewardCp: 5000,
+    reputation: 8,
+    friendship: 2,
+    acceptedLog: "Seraphel asks for modest finds suitable for a proper cataloging lesson.",
+    completeLog: "Seraphel catalogs the finds, corrects three assumptions, and approves the labels.",
+  },
+  provenance: {
+    title: "Fragments of Provenance",
+    description: "Seraphel trusts you with broken truth: reliquary fragments, old art, marked valuables, or inscriptions with useful context.",
+    requirements: [{ label: "Provenance fragments", requirement: { type: "treasure", tagsAny: ["relic", "reliquary", "art", "valuable", "funerary", "prayer"] }, quantity: 3 }],
+    rewardCp: 10500,
+    reputation: 14,
+    friendship: 3,
+    acceptedLog: "Seraphel names broken objects as the finds that prove careful hands.",
+    completeLog: "Seraphel reconstructs enough provenance to make the archive argue productively.",
+  },
+  "lost-room": {
+    title: "The Lost Room",
+    description: "Seraphel is trying to prove an erased room existed. She needs charters, seals, royal fragments, contradictory records, or major contextual finds.",
+    requirements: [{ label: "Lost-room evidence", requirement: { type: "treasure", tagsAny: ["royal", "charter", "signet", "crown", "coronet", "relic", "ancient"] }, quantity: 2 }],
+    rewardCp: 16000,
+    reputation: 20,
+    friendship: 4,
+    rewardItemId: "seraphel-preservation-kit",
+    acceptedLog: "Seraphel admits the lost rooms still haunt her and asks for proof one of them existed.",
+    completeLog: "Seraphel pins the evidence to a map and rewards the party with a preservation kit.",
+  },
+  "black-label": {
+    title: "A Black Label for Dangerous History",
+    description: "Seraphel needs a major relic, dangerous antiquity, or ancient text with enough provenance to be preserved without becoming a heroic lie.",
+    requirements: [{ label: "Dangerous antiquity", requirement: { type: "treasure", tagsAny: ["royal", "crown", "reliquary", "charter", "funerary", "ancient", "relic"], minValueGp: 250 }, quantity: 1 }],
+    rewardCp: 0,
+    reputation: 25,
+    friendship: 5,
+    rewardItemId: "inkglass-black-label",
+    acceptedLog: "Seraphel opens a black-label preservation case and asks for dangerous history with context.",
+    completeLog: "Seraphel prepares the black label and decides the party can be trusted near the truth.",
+  },
+};
 
 function antiquarianProgress() {
   state.questFlags = { ...(state.questFlags ?? {}) };
@@ -19011,11 +19634,143 @@ function antiquarianRankRewardsMarkup() {
   `;
 }
 
+function seraphelQuestRoot() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[seraphelQuestStateKey] ??= {};
+  return state.questFlags[seraphelQuestStateKey];
+}
+
+function seraphelQuestState(questId = "") {
+  const root = seraphelQuestRoot();
+  root[questId] ??= { status: "available" };
+  return root[questId];
+}
+
+function acceptSeraphelQuest(questId = "") {
+  const def = seraphelQuestDefinitions[questId];
+  if (!def) return;
+  const quest = seraphelQuestState(questId);
+  if (quest.status === "completed" || quest.status === "accepted") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog(def.acceptedLog, "important");
+  renderQuestLogButton();
+}
+
+function seraphelRequirementTurnIn(entry) {
+  return { requirement: entry.requirement ?? {}, quantity: Math.max(1, entry.quantity ?? 1) };
+}
+
+function seraphelQuestRequirementProgress(entry) {
+  const turnIn = seraphelRequirementTurnIn(entry);
+  return Math.min(turnIn.quantity, antiquarianTurnInCount(turnIn));
+}
+
+function seraphelQuestReady(questId = "") {
+  const def = seraphelQuestDefinitions[questId];
+  const quest = seraphelQuestState(questId);
+  if (!def || quest.status !== "accepted") return false;
+  return (def.requirements ?? []).every((entry) => {
+    const turnIn = seraphelRequirementTurnIn(entry);
+    return antiquarianTurnInCount(turnIn) >= turnIn.quantity;
+  });
+}
+
+function completeSeraphelQuest(questId = "") {
+  const def = seraphelQuestDefinitions[questId];
+  const quest = seraphelQuestState(questId);
+  if (!def || quest.status !== "accepted" || !seraphelQuestReady(questId)) return;
+  for (const entry of def.requirements ?? []) {
+    const turnIn = seraphelRequirementTurnIn(entry);
+    if (!consumeAntiquarianTurnIn(turnIn, turnIn.quantity)) return;
+  }
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  if (def.rewardCp) addMoney(partyPurse(), def.rewardCp);
+  if (def.rewardItemId) addItemToPartyInventory(createItemInstance(def.rewardItemId, "seraphel"), "seraphel-reward");
+  const progress = antiquarianProgress();
+  progress.reputation += Math.max(0, Math.floor(Number(def.reputation) || 0));
+  awardPartyNpcFriendship(antiquarianGuildId, def.friendship ?? 2, `quest:${antiquarianGuildId}:${questId}`);
+  addLog(`${def.completeLog}${def.rewardCp ? ` Seraphel pays ${priceText(def.rewardCp)}.` : ""} Antiquarian reputation +${def.reputation}.`, "important");
+  render();
+  renderAntiquarianGuild();
+  renderQuestLogButton();
+}
+
+function cancelSeraphelQuest(questId = "") {
+  const quest = seraphelQuestState(questId);
+  if (quest.status !== "accepted") return false;
+  quest.status = "available";
+  quest.cancelledAt = Date.now();
+  delete quest.acceptedAt;
+  addLog("Seraphel's personal commission is no longer tracked.", "important");
+  return true;
+}
+
+function seraphelQuestLogEntries() {
+  return Object.entries(seraphelQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = seraphelQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return null;
+      const ready = quest.status === "accepted" && seraphelQuestReady(questId);
+      return {
+        id: `seraphel-${questId}`,
+        giver: "Seraphel Inkglass",
+        title: def.title,
+        description: def.description,
+        ready,
+        completed: quest.status === "completed",
+        cancelable: quest.status === "accepted",
+        cancelType: "npc",
+        npcId: antiquarianGuildId,
+        questId,
+        objectives: (def.requirements ?? []).map((entry) => ({
+          label: entry.label,
+          progress: seraphelQuestRequirementProgress(entry),
+          target: Math.max(1, entry.quantity ?? 1),
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function seraphelFriendshipQuestRowsMarkup() {
+  const rows = Object.entries(seraphelQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = seraphelQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return "";
+      const ready = seraphelQuestReady(questId);
+      return `
+        <article class="guild-contract-row ${ready ? "ready" : ""}">
+          <div>
+            <b>${escapeHtml(def.title)}</b>
+            <span>${escapeHtml(def.description)}</span>
+            ${(def.requirements ?? [])
+              .map((entry) => {
+                const target = Math.max(1, entry.quantity ?? 1);
+                return `<small>${escapeHtml(entry.label)}: ${escapeHtml(seraphelQuestRequirementProgress(entry))}/${escapeHtml(target)} - ${escapeHtml(def.rewardCp ? priceText(def.rewardCp) : "Archive reward")}, ${escapeHtml(def.reputation)} rep</small>`;
+              })
+              .join("")}
+          </div>
+          ${
+            quest.status === "completed"
+              ? `<button type="button" disabled>Filed</button>`
+              : `<button type="button" data-action="complete-npc-quest" data-npc="${escapeAttribute(antiquarianGuildId)}" data-quest="${escapeAttribute(questId)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Finds"}</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+  return rows ? `<section class="guild-section"><h3>Seraphel's Private Catalogues</h3><div class="guild-contract-list">${rows}</div></section>` : "";
+}
+
 function antiquarianBoardStats(progress = antiquarianProgress()) {
   const activeContracts = antiquarianContracts.filter((contract) => antiquarianContractState(contract.id).status === "accepted").length;
   const readyContracts = antiquarianContracts.filter(antiquarianContractReady).length;
   const readyTurnIns = antiquarianTurnIns.filter(antiquarianTurnInReady).length;
-  return { activeContracts, readyContracts, readyTurnIns, rank: antiquarianRank(progress) };
+  const activeCatalogues = Object.keys(seraphelQuestDefinitions).filter((questId) => seraphelQuestState(questId).status === "accepted").length;
+  const readyCatalogues = Object.keys(seraphelQuestDefinitions).filter(seraphelQuestReady).length;
+  return { activeContracts: activeContracts + activeCatalogues, readyContracts, readyTurnIns: readyTurnIns + readyCatalogues, rank: antiquarianRank(progress) };
 }
 
 function antiquarianBoardHeaderMarkup(npc, progress) {
@@ -19029,6 +19784,7 @@ function antiquarianBoardHeaderMarkup(npc, progress) {
         <h3>${guildNpcNameButtonMarkup(npc, "Society Contact")}</h3>
         <b>${escapeHtml(npc.title)}</b>
         <p>${escapeHtml(npcEntryLine(npc) || npc.description || "")}</p>
+        ${factionNpcChatButtonMarkup(antiquarianGuildId)}
       </div>
       <div class="guild-hero-stats">
         <div>
@@ -19077,10 +19833,11 @@ function setAntiquarianBoardPanel(panel = "contracts") {
 }
 
 function antiquarianMainPanelMarkup(progress) {
+  const privateCatalogues = seraphelFriendshipQuestRowsMarkup();
   if (antiquarianBoardPanel === "turnins") return antiquarianTurnInsMarkup();
   if (antiquarianBoardPanel === "shop") return factionSetShopMarkup(antiquarianGuildId, antiquarianRank(progress), "Archive Gear");
   if (antiquarianBoardPanel === "catalog") return factionSetCatalogMarkup(antiquarianGuildId, antiquarianRank(progress), "Antiquarian Set Catalog");
-  return antiquarianContractsMarkup();
+  return `${privateCatalogues}${antiquarianContractsMarkup()}`;
 }
 
 function renderAntiquarianGuild(npc = window.DungeonContent.get("npcs", antiquarianGuildId)) {
@@ -19135,6 +19892,7 @@ function completeAntiquarianContract(contractId) {
   progress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
   progress.completedContracts[contract.id] = (progress.completedContracts[contract.id] ?? 0) + 1;
   window.DepthboundAchievements?.factionWork?.(antiquarianGuildId, "contract");
+  awardPartyNpcFriendshipForWork(antiquarianGuildId, `contract:${antiquarianGuildId}:${contract.id}`, contract.reputation);
   addLog(`The Antiquarian Society pays ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
   render();
   renderAntiquarianGuild();
@@ -19150,6 +19908,7 @@ function completeAntiquarianTurnIn(turnInId) {
   progress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
   progress.turnIns[turnIn.id] = (progress.turnIns[turnIn.id] ?? 0) + 1;
   window.DepthboundAchievements?.factionWork?.(antiquarianGuildId, "turn-in");
+  awardPartyNpcFriendshipForWork(antiquarianGuildId, `turn-in:${antiquarianGuildId}:${turnIn.id}`, turnIn.reputation);
   addLog(`Professor Seraphel Inkglass accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Antiquarian reputation +${turnIn.reputation}.`, "important");
   render();
   renderAntiquarianGuild();
@@ -19225,12 +19984,16 @@ function antiquarianQuestLogEntries() {
     });
 }
 
+window.DepthboundSeraphelQuests = {
+  accept: acceptSeraphelQuest,
+};
 window.DungeonNpcBehaviors[antiquarianGuildId] = {
   visit: renderAntiquarianGuild,
   returnToVisit: () => renderAntiquarianGuild(),
   recordItemCollected: recordAntiquarianItemCollected,
-  questLogEntries: antiquarianQuestLogEntries,
-  cancelQuest: cancelAntiquarianContract,
+  questLogEntries: () => [...antiquarianQuestLogEntries(), ...seraphelQuestLogEntries()],
+  completeQuest: completeSeraphelQuest,
+  cancelQuest: (questId) => cancelSeraphelQuest(questId) || cancelAntiquarianContract(questId),
   adminProgressEntries() {
     const progress = antiquarianProgress();
     return [
@@ -19499,6 +20262,7 @@ function createCompactGuildBoard(config) {
           <h3>${guildNpcNameButtonMarkup(npc, config.label)}</h3>
           <b>${escapeHtml(npc?.title ?? "")}</b>
           <p>${escapeHtml(npcEntryLine(npc) || npc?.description || "")}</p>
+          ${factionNpcChatButtonMarkup(config.id)}
         </div>
         <div class="guild-hero-stats">
           <div>
@@ -19607,6 +20371,7 @@ function createCompactGuildBoard(config) {
     guildProgress.reputation += Math.max(0, Math.floor(Number(contract.reputation) || 0));
     guildProgress.completedContracts[contract.id] = (guildProgress.completedContracts[contract.id] ?? 0) + 1;
     window.DepthboundAchievements?.factionWork?.(config.id, "contract");
+    awardPartyNpcFriendshipForWork(config.id === "boom-club" ? "alchemist" : config.id, `contract:${config.id}:${contract.id}`, contract.reputation);
     addLog(`${config.payLogName} pays ${priceText(contract.rewardCp)} for ${contract.name}. Reputation +${contract.reputation}.`, "important");
     render();
     renderGuild();
@@ -19622,6 +20387,7 @@ function createCompactGuildBoard(config) {
     guildProgress.reputation += Math.max(0, Math.floor(Number(turnIn.reputation) || 0));
     guildProgress.turnIns[turnIn.id] = (guildProgress.turnIns[turnIn.id] ?? 0) + 1;
     window.DepthboundAchievements?.factionWork?.(config.id, "turn-in");
+    awardPartyNpcFriendshipForWork(config.id === "boom-club" ? "alchemist" : config.id, `turn-in:${config.id}:${turnIn.id}`, turnIn.reputation);
     addLog(`${config.turnInLogName} accepts ${turnIn.name} and pays ${priceText(turnIn.rewardCp)}. Reputation +${turnIn.reputation}.`, "important");
     render();
     renderGuild();
@@ -20060,6 +20826,7 @@ function claimExpeditionRoadProject(projectId = "") {
   progress.reputation += Math.max(0, Math.floor(Number(project.reputation) || 0));
   window.DepthboundAchievements?.unlock?.("line-on-the-ledger", undefined, { projectId: project.id, targetLabel: project.targetLabel });
   window.DepthboundAchievements?.factionWork?.("expedition-board", "road");
+  awardPartyNpcFriendshipForWork("expedition-board", `road:expedition-board:${project.id}`, project.reputation);
   addMoney(partyPurse(), project.rewardCp);
   addTravelRoadKits(Math.max(1, Math.floor(Number(project.bonusKits) || 1)));
   roadState.connectedTargets[project.targetId || travelHexKeyForHex(project.target)] = {
@@ -20324,6 +21091,195 @@ function renameExpeditionTeleportCircle(circleId = "") {
   renderQuestLogButton();
 }
 
+const nellaQuestStateKey = "nellaFriendshipQuests";
+const nellaQuestDefinitions = {
+  "route-notes": {
+    title: "Proper Route Notes",
+    description: "Nella wants repair stock and route supplies so she can teach notes useful to exhausted people in bad weather.",
+    requirements: [{ label: "Repair stock", requirement: { type: "component", tagsAny: ["wood", "cloth", "leather", "metal", "crafting"] }, quantity: 4 }],
+    rewardCp: 4500,
+    reputation: 8,
+    friendship: 2,
+    acceptedLog: "Nella asks for repair stock and supplies for a proper route-note lesson.",
+    completeLog: "Nella turns the supplies into a route-note kit and corrects every vague adjective.",
+  },
+  "red-ledger": {
+    title: "The Red Ledger Search Kit",
+    description: "Nella needs rations, light, and field gear for missing-party searches that do not create a second missing party.",
+    requirements: [
+      { label: "Trail rations", requirement: { itemId: "trail-ration" }, quantity: 3 },
+      { label: "Torches", requirement: { itemId: "torch" }, quantity: 3 },
+    ],
+    rewardCp: 9000,
+    reputation: 14,
+    friendship: 3,
+    acceptedLog: "Nella opens the red ledger and asks for supplies fit for a missing-party search.",
+    completeLog: "Nella packs the red-ledger kit and looks briefly less worried, which is worrying in a new way.",
+  },
+  "milepost-cache": {
+    title: "The Disagreeing Milepost",
+    description: "Nella wants road materials and repair stock for a cache at a route where two correct maps disagree.",
+    requirements: [
+      { label: "Road-building kits", requirement: { itemId: "road-building-kit" }, quantity: 2 },
+      { label: "Repair stock", requirement: { type: "component", tagsAny: ["wood", "cloth", "leather", "metal", "crafting"] }, quantity: 4 },
+    ],
+    rewardCp: 14000,
+    reputation: 20,
+    friendship: 4,
+    rewardItemId: "nella-route-ledger",
+    acceptedLog: "Nella names the route with two correct maps and asks for a prepared milepost cache.",
+    completeLog: "Nella files the disagreeing milepost cache and gives the party a route ledger with useful margins.",
+  },
+  "waymark-charter": {
+    title: "A Hard Map Charter",
+    description: "Nella will mark a hard route under the party's name if they bring enough road kits and repair stock to deserve the ink.",
+    requirements: [
+      { label: "Road-building kits", requirement: { itemId: "road-building-kit" }, quantity: 3 },
+      { label: "Charter repair stock", requirement: { type: "component", tagsAny: ["wood", "cloth", "leather", "metal", "crafting"] }, quantity: 6 },
+    ],
+    rewardCp: 0,
+    reputation: 25,
+    friendship: 5,
+    rewardItemId: "waymark-charter",
+    acceptedLog: "Nella opens a hard map charter and waits to see if the party deserves the ink.",
+    completeLog: "Nella signs the Waymark Charter and gives the party a route that expects them to come back smarter.",
+  },
+};
+
+function nellaQuestRoot() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[nellaQuestStateKey] ??= {};
+  return state.questFlags[nellaQuestStateKey];
+}
+
+function nellaQuestState(questId = "") {
+  const root = nellaQuestRoot();
+  root[questId] ??= { status: "available" };
+  return root[questId];
+}
+
+function acceptNellaQuest(questId = "") {
+  const def = nellaQuestDefinitions[questId];
+  if (!def) return;
+  const quest = nellaQuestState(questId);
+  if (quest.status === "completed" || quest.status === "accepted") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog(def.acceptedLog, "important");
+  renderQuestLogButton();
+}
+
+function nellaQuestRequirementProgress(entry) {
+  return Math.min(Math.max(1, entry.quantity ?? 1), materialCountForRequirement(entry.requirement));
+}
+
+function nellaQuestReady(questId = "") {
+  const def = nellaQuestDefinitions[questId];
+  const quest = nellaQuestState(questId);
+  if (!def || quest.status !== "accepted") return false;
+  return (def.requirements ?? []).every((entry) => materialCountForRequirement(entry.requirement) >= Math.max(1, entry.quantity ?? 1));
+}
+
+function completeNellaQuest(questId = "") {
+  const def = nellaQuestDefinitions[questId];
+  const quest = nellaQuestState(questId);
+  if (!def || quest.status !== "accepted" || !nellaQuestReady(questId)) return;
+  for (const entry of def.requirements ?? []) {
+    if (!consumeMaterialsForRequirement(entry.requirement, Math.max(1, entry.quantity ?? 1))) return;
+  }
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  if (def.rewardCp) addMoney(partyPurse(), def.rewardCp);
+  if (def.rewardItemId) addItemToPartyInventory(createItemInstance(def.rewardItemId, "nella"), "nella-reward");
+  const progress = expeditionBoardApi.progress();
+  progress.reputation += Math.max(0, Math.floor(Number(def.reputation) || 0));
+  awardPartyNpcFriendship("expedition-board", def.friendship ?? 2, `quest:expedition-board:${questId}`);
+  addLog(`${def.completeLog}${def.rewardCp ? ` Nella pays ${priceText(def.rewardCp)}.` : ""} Expedition Board reputation +${def.reputation}.`, "important");
+  render();
+  expeditionBoardApi.renderGuild();
+  renderQuestLogButton();
+}
+
+function cancelNellaQuest(questId = "") {
+  const quest = nellaQuestState(questId);
+  if (quest.status !== "accepted") return false;
+  quest.status = "available";
+  quest.cancelledAt = Date.now();
+  delete quest.acceptedAt;
+  addLog("Nella's trust route is no longer tracked.", "important");
+  return true;
+}
+
+function nellaQuestLogEntries() {
+  return Object.entries(nellaQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = nellaQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return null;
+      const ready = quest.status === "accepted" && nellaQuestReady(questId);
+      return {
+        id: `nella-${questId}`,
+        giver: "Nella Waymark",
+        title: def.title,
+        description: def.description,
+        ready,
+        completed: quest.status === "completed",
+        cancelable: quest.status === "accepted",
+        cancelType: "npc",
+        npcId: "expedition-board",
+        questId,
+        objectives: (def.requirements ?? []).map((entry) => ({
+          label: entry.label,
+          progress: nellaQuestRequirementProgress(entry),
+          target: Math.max(1, entry.quantity ?? 1),
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function nellaTrustRoutesMarkup() {
+  const rows = Object.entries(nellaQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = nellaQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return "";
+      const ready = nellaQuestReady(questId);
+      return `
+        <article class="guild-contract-row ${ready ? "ready" : ""}">
+          <div>
+            <b>${escapeHtml(def.title)}</b>
+            <span>${escapeHtml(def.description)}</span>
+            ${(def.requirements ?? [])
+              .map((entry) => {
+                const target = Math.max(1, entry.quantity ?? 1);
+                return `<small>${escapeHtml(entry.label)}: ${escapeHtml(Math.min(target, materialCountForRequirement(entry.requirement)))}/${escapeHtml(target)} - ${escapeHtml(def.rewardCp ? priceText(def.rewardCp) : "Route reward")}, ${escapeHtml(def.reputation)} rep</small>`;
+              })
+              .join("")}
+          </div>
+          ${
+            quest.status === "completed"
+              ? `<button type="button" disabled>Filed</button>`
+              : `<button type="button" data-action="complete-npc-quest" data-npc="expedition-board" data-quest="${escapeAttribute(questId)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Supplies"}</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+  return `
+    <section class="guild-section">
+      <h3>Nella's Trust Routes</h3>
+      ${
+        rows
+          ? `<div class="guild-contract-list">${rows}</div>`
+          : `<p class="empty-note">Nella has no personal route work open with this speaker yet.</p>`
+      }
+    </section>
+  `;
+}
+
+function expeditionExtraQuestLogEntries() {
+  return [...expeditionRoadQuestLogEntries(), ...nellaQuestLogEntries()];
+}
+
 const expeditionBoardApi = createCompactGuildBoard({
   id: "expedition-board",
   stateKey: "expeditionBoard",
@@ -20337,10 +21293,11 @@ const expeditionBoardApi = createCompactGuildBoard({
   turnInsTitle: "Supply Turn-Ins",
   turnInsButtonLabel: "Supply Turn-Ins",
   extraPanels: [
+    { id: "trust", label: "Trust Routes", render: nellaTrustRoutesMarkup },
     { id: "roads", label: "Road Projects", render: expeditionRoadProjectsMarkup },
     { id: "mileposts", label: "Milepost Missions", render: expeditionMilepostCampaignMarkup },
   ],
-  extraQuestLogEntries: expeditionRoadQuestLogEntries,
+  extraQuestLogEntries: expeditionExtraQuestLogEntries,
   factionSetShopTitle: "Expedition Gear",
   factionSetCatalogTitle: "Expedition Set Catalog",
   readyContractText: "posting",
@@ -20441,6 +21398,18 @@ const expeditionBoardApi = createCompactGuildBoard({
   },
 });
 
+window.DepthboundNellaQuests = {
+  accept: acceptNellaQuest,
+};
+{
+  const expeditionBehavior = window.DungeonNpcBehaviors?.["expedition-board"];
+  const baseExpeditionCancelQuest = expeditionBehavior?.cancelQuest;
+  if (expeditionBehavior) {
+    expeditionBehavior.completeQuest = completeNellaQuest;
+    expeditionBehavior.cancelQuest = (questId) => cancelNellaQuest(questId) || baseExpeditionCancelQuest?.(questId) || false;
+  }
+}
+
 function acceptExpeditionContract(contractId) {
   expeditionBoardApi.acceptContract(contractId);
 }
@@ -20482,6 +21451,13 @@ const boomClubApi = createCompactGuildBoard({
   adminMidLabel: "Certified Spark",
   adminHighLabel: "Blast Fellow",
   cancelType: "boom-club",
+  extraPanels: [
+    {
+      id: "projects",
+      label: "Fizzwick's Projects",
+      render: () => fizzwickProjectRowsMarkup() || `<section class="store-section"><h3>Fizzwick's Projects</h3><p class="empty-note">No private experiments are active. Earn Fizzwick's trust and ask him about less sensible work.</p></section>`,
+    },
+  ],
   ranks: [
     { name: "Observer", threshold: 0, reward: "Fizzwick will accept basic volatile errands." },
     { name: "Fuse Holder", threshold: 25, reward: "The club posts more interesting reagent tests." },
@@ -20607,6 +21583,57 @@ const fightingPitRanks = [
   { name: "Champion Heat", threshold: 240, reward: "Reserved for stronger arena rewards and elite bouts." },
   { name: "Glory-King", threshold: 480, reward: "Reserved for legendary pit progression." },
 ];
+const brakkaQuestStateKey = "brakkaFriendshipQuests";
+const brakkaQuestDefinitions = {
+  "footwork-straps": {
+    title: "Footwork Straps",
+    description: "Brakka wants leather, cloth, or repair stock to mark practice straps for learning footwork before pride gets loud.",
+    requirements: [{ label: "Practice strap materials", requirement: { type: "component", tagsAny: ["leather", "cloth", "wood", "metal", "crafting", "repair"] }, quantity: 4 }],
+    rewardCp: 4000,
+    renown: 8,
+    friendship: 2,
+    acceptedLog: "Brakka asks for materials to make footwork straps.",
+    completeLog: "Brakka marks the straps, demonstrates three humiliatingly simple steps, and calls it progress.",
+  },
+  "clean-bouts": {
+    title: "Clean Bouts",
+    description: "Brakka needs healing supplies and repair stock for bouts that stay hard without becoming murder.",
+    requirements: [
+      { label: "Healing supplies", requirement: { itemId: "potion-healing" }, quantity: 1 },
+      { label: "Repair stock", requirement: { type: "component", tagsAny: ["wood", "cloth", "leather", "metal", "crafting", "repair"] }, quantity: 4 },
+    ],
+    rewardCp: 8500,
+    renown: 14,
+    friendship: 3,
+    acceptedLog: "Brakka asks for supplies that keep clean bouts clean.",
+    completeLog: "Brakka stocks the medic rail and sand gate, then mutters that prevention is cheaper than speeches.",
+  },
+  "stop-bell": {
+    title: "Stop-Bell Repairs",
+    description: "Brakka wants metal and leather for stop-bell repairs. A bell that cannot be heard is not a rule.",
+    requirements: [{ label: "Bell repair materials", requirement: { type: "component", tagsAny: ["metal", "iron", "leather", "crafting", "repair"] }, quantity: 5 }],
+    rewardCp: 13000,
+    renown: 20,
+    friendship: 4,
+    rewardItemId: "brakka-footwork-straps",
+    acceptedLog: "Brakka asks for stop-bell repair materials and says little else about the old fight.",
+    completeLog: "Brakka repairs the stop bell and gives the party practice straps bearing her mark.",
+  },
+  "champion-wraps": {
+    title: "Champion Wraps",
+    description: "Brakka will train the party under her rules if they bring proper materials for wraps that carry the Pit Marshal's mark.",
+    requirements: [
+      { label: "Champion wrap materials", requirement: { type: "component", tagsAny: ["leather", "cloth", "metal", "iron", "crafting", "repair"] }, quantity: 6 },
+      { label: "Medic reserve", requirement: { itemId: "potion-healing" }, quantity: 2 },
+    ],
+    rewardCp: 0,
+    renown: 25,
+    friendship: 5,
+    rewardItemId: "ironbell-champion-wraps",
+    acceptedLog: "Brakka agrees to train the party properly if they bring materials worthy of her mark.",
+    completeLog: "Brakka binds the champion wraps, rings the bell once, and says the party may carry her rules outside the pit.",
+  },
+};
 
 function fightingPitProgress() {
   state.questFlags = { ...(state.questFlags ?? {}) };
@@ -20621,6 +21648,136 @@ function fightingPitProgress() {
   return progress;
 }
 
+function brakkaQuestRoot() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[brakkaQuestStateKey] ??= {};
+  return state.questFlags[brakkaQuestStateKey];
+}
+
+function brakkaQuestState(questId = "") {
+  const root = brakkaQuestRoot();
+  root[questId] ??= { status: "available" };
+  return root[questId];
+}
+
+function acceptBrakkaQuest(questId = "") {
+  const def = brakkaQuestDefinitions[questId];
+  if (!def) return;
+  const quest = brakkaQuestState(questId);
+  if (quest.status === "completed" || quest.status === "accepted") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog(def.acceptedLog, "important");
+  renderQuestLogButton();
+}
+
+function brakkaQuestRequirementProgress(entry) {
+  return Math.min(Math.max(1, entry.quantity ?? 1), materialCountForRequirement(entry.requirement));
+}
+
+function brakkaQuestReady(questId = "") {
+  const def = brakkaQuestDefinitions[questId];
+  const quest = brakkaQuestState(questId);
+  if (!def || quest.status !== "accepted") return false;
+  return (def.requirements ?? []).every((entry) => materialCountForRequirement(entry.requirement) >= Math.max(1, entry.quantity ?? 1));
+}
+
+function completeBrakkaQuest(questId = "") {
+  const def = brakkaQuestDefinitions[questId];
+  const quest = brakkaQuestState(questId);
+  if (!def || quest.status !== "accepted" || !brakkaQuestReady(questId)) return;
+  for (const entry of def.requirements ?? []) {
+    if (!consumeMaterialsForRequirement(entry.requirement, Math.max(1, entry.quantity ?? 1))) return;
+  }
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  if (def.rewardCp) addMoney(partyPurse(), def.rewardCp);
+  if (def.rewardItemId) addItemToPartyInventory(createItemInstance(def.rewardItemId, "brakka"), "brakka-reward");
+  const progress = fightingPitProgress();
+  progress.renown += Math.max(0, Math.floor(Number(def.renown) || 0));
+  awardPartyNpcFriendship(fightingPitId, def.friendship ?? 2, `quest:${fightingPitId}:${questId}`);
+  addLog(`${def.completeLog}${def.rewardCp ? ` Brakka pays ${priceText(def.rewardCp)}.` : ""} Fighting Pit renown +${def.renown}.`, "important");
+  render();
+  renderFightingPit();
+  renderQuestLogButton();
+}
+
+function cancelBrakkaQuest(questId = "") {
+  const quest = brakkaQuestState(questId);
+  if (quest.status !== "accepted") return false;
+  quest.status = "available";
+  quest.cancelledAt = Date.now();
+  delete quest.acceptedAt;
+  addLog("Brakka's pit work is no longer tracked.", "important");
+  return true;
+}
+
+function brakkaQuestLogEntries() {
+  return Object.entries(brakkaQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = brakkaQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return null;
+      const ready = quest.status === "accepted" && brakkaQuestReady(questId);
+      return {
+        id: `brakka-${questId}`,
+        giver: "Brakka Ironbell",
+        title: def.title,
+        description: def.description,
+        ready,
+        completed: quest.status === "completed",
+        cancelable: quest.status === "accepted",
+        cancelType: "npc",
+        npcId: fightingPitId,
+        questId,
+        objectives: (def.requirements ?? []).map((entry) => ({
+          label: entry.label,
+          progress: brakkaQuestRequirementProgress(entry),
+          target: Math.max(1, entry.quantity ?? 1),
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function brakkaTrustWorkMarkup() {
+  const rows = Object.entries(brakkaQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = brakkaQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return "";
+      const ready = brakkaQuestReady(questId);
+      return `
+        <article class="guild-contract-row ${ready ? "ready" : ""}">
+          <div>
+            <b>${escapeHtml(def.title)}</b>
+            <span>${escapeHtml(def.description)}</span>
+            ${(def.requirements ?? [])
+              .map((entry) => {
+                const target = Math.max(1, entry.quantity ?? 1);
+                return `<small>${escapeHtml(entry.label)}: ${escapeHtml(Math.min(target, materialCountForRequirement(entry.requirement)))}/${escapeHtml(target)} - ${escapeHtml(def.rewardCp ? priceText(def.rewardCp) : "Training reward")}, ${escapeHtml(def.renown)} renown</small>`;
+              })
+              .join("")}
+          </div>
+          ${
+            quest.status === "completed"
+              ? `<button type="button" disabled>Done</button>`
+              : `<button type="button" data-action="complete-npc-quest" data-npc="${escapeAttribute(fightingPitId)}" data-quest="${escapeAttribute(questId)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Gear"}</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+  return `
+    <section class="guild-section">
+      <h3>Brakka's Trust Work</h3>
+      ${
+        rows
+          ? `<div class="guild-contract-list">${rows}</div>`
+          : `<p class="empty-note">Brakka has no personal pit work open with this speaker yet.</p>`
+      }
+    </section>
+  `;
+}
+
 function fightingPitRank(progress = fightingPitProgress()) {
   const renown = Math.max(0, Math.floor(Number(progress.renown) || 0));
   let current = 0;
@@ -20631,12 +21788,13 @@ function fightingPitRank(progress = fightingPitProgress()) {
 }
 
 function setFightingPitBoardPanel(panel = "rules") {
-  const allowed = new Set(["rules", "shop", "catalog"]);
+  const allowed = new Set(["rules", "trust", "shop", "catalog"]);
   fightingPitBoardPanel = allowed.has(panel) ? panel : "rules";
   renderFightingPit();
 }
 
 function fightingPitMainPanelMarkup(progress) {
+  if (fightingPitBoardPanel === "trust") return brakkaTrustWorkMarkup();
   if (fightingPitBoardPanel === "shop") return factionSetShopMarkup(fightingPitId, fightingPitRank(progress), "Pit Gear");
   if (fightingPitBoardPanel === "catalog") return factionSetCatalogMarkup(fightingPitId, fightingPitRank(progress), "Fighting Pit Set Catalog");
   return `
@@ -21035,6 +22193,7 @@ function awardFightingPitWave() {
   progress.bestCategory = Math.max(progress.bestCategory, category);
   if (boss) progress.bossesDefeated += 1;
   window.DepthboundAchievements?.pitWave?.({ wave, category, boss, defeated, rewardCp, renown });
+  if (boss) awardPartyNpcFriendship(fightingPitId, 2, `pit-boss:${wave}`);
   addLog(`The pit adds ${priceText(rewardCp)} to the reward purse and awards ${renown} renown for ${defeated} defeated foe${defeated === 1 ? "" : "s"}.`, "important");
   return { wave, category, boss, defeated, rewardCp, renown };
 }
@@ -21092,6 +22251,7 @@ function renderFightingPit(npc = window.DungeonContent.get("npcs", fightingPitId
           <h3>${guildNpcNameButtonMarkup(npc, "Pit Marshal")}</h3>
           <b>${escapeHtml(npc?.title ?? "")}</b>
           <p>${escapeHtml(npcEntryLine(npc) || npc?.description || "")}</p>
+          ${factionNpcChatButtonMarkup(fightingPitId)}
         </div>
         <div class="guild-hero-stats">
           <div><span>Renown</span><b>${escapeHtml(progress.renown)}</b></div>
@@ -21111,6 +22271,7 @@ function renderFightingPit(npc = window.DungeonContent.get("npcs", fightingPitId
             <h3>Pit Gate</h3>
             <button type="button" data-action="start-fighting-pit">Enter the Pit</button>
             ${panelButton("rules", "Wave Rules")}
+            ${panelButton("trust", "Pit Trust")}
             ${panelButton("shop", "Pit Gear")}
             ${panelButton("catalog", "See Sets")}
           </section>
@@ -21172,10 +22333,16 @@ async function startFightingPitRun() {
   await spawnFightingPitWave();
 }
 
+window.DepthboundBrakkaQuests = {
+  accept: acceptBrakkaQuest,
+};
 window.DungeonNpcBehaviors[fightingPitId] = {
   visit: renderFightingPit,
   returnToVisit: () => renderFightingPit(),
   setBoardPanel: setFightingPitBoardPanel,
+  questLogEntries: brakkaQuestLogEntries,
+  completeQuest: completeBrakkaQuest,
+  cancelQuest: cancelBrakkaQuest,
   currentRank: () => fightingPitRank(),
   rankNameForTier: (tier) => fightingPitRanks[Math.max(1, Math.floor(Number(tier) || 1))]?.name ?? `Rank ${Math.max(1, Math.floor(Number(tier) || 1))}`,
   adminProgressEntries() {
@@ -21520,6 +22687,7 @@ function completeBorrenClaimHammerQuest() {
   quest.completedAt = Date.now();
   state.questFlags["flag.borren.claimHammerReturned"] = true;
   state.questFlags["flag.borren.smithChainStarted"] = true;
+  awardPartyNpcFriendship("armorsmith", 4, "quest:borren-claim-hammer");
   addLog(borrenClaimHammerText().logs.complete, "important");
   renderStoreMenu();
   renderInventoryMenu();
@@ -21588,6 +22756,7 @@ function applySmithMaterialCommissionHandIn(npcId, commission, contributions) {
   const materialText = contributions
     .map((entry) => `${entry.quantity} ${getItemTemplate(entry.itemId)?.name ?? entry.itemId}`)
     .join(", ");
+  awardPartyNpcFriendship(npcId, 2, `commission:${npcId}:${commission.id ?? commission.itemId ?? commission.completedAt}`);
   addLog(`${npc.name} takes ${materialText} and pays ${priceText(rewardCp)}.`, "important");
   render();
   renderStoreMenu();
@@ -22029,6 +23198,1545 @@ function toggleQuestLog() {
   showQuestLog();
 }
 
+const sophieNpcId = "general-merchant";
+const sophieQuestStateKey = "sophieFriendshipQuests";
+const sophieReserveItems = ["potion-healing", "torch", "hooded-lantern", "lantern-oil", "trail-ration", "arrows-20", "bolts-20"];
+const sophiePackDefinitions = {
+  emergency: {
+    name: "Emergency Travel Kit",
+    summary: "A practical bundle Sophie prepares after the travel-paper favor.",
+    itemIds: ["potion-healing", "torch", "torch", "torch", "lantern-oil", "lantern-oil", "trail-ration", "trail-ration"],
+    discount: 0.85,
+  },
+  delver: {
+    name: "Boring Delver Pack",
+    summary: "Oil, light, food, and one healing potion. Boring things save lives.",
+    itemIds: ["potion-healing", "hooded-lantern", "lantern-oil", "lantern-oil", "torch", "torch", "trail-ration", "trail-ration", "trail-ration"],
+    discount: 0.8,
+  },
+  marksman: {
+    name: "Keep Your Distance Pack",
+    summary: "Bolts, arrows, lights, and oil for heroes who prefer trouble over there.",
+    itemIds: ["arrows-20", "bolts-20", "torch", "torch", "lantern-oil", "trail-ration"],
+    discount: 0.8,
+  },
+};
+const sophieQuestDefinitions = {
+  "travel-papers": {
+    title: "Papers for Sophie's Brother",
+    description: "Sophie needs official-looking seals, signets, or charters so she can move her brother somewhere safer.",
+    acceptedLog: "Sophie quietly asks the party to bring useful papers, seals, or a signet for her brother.",
+    completeLog: "Sophie takes the documents and seals with careful hands. Her brother's road out looks a little less impossible.",
+    rewardCp: 15000,
+    friendship: 3,
+    unlockFlag: "flag.sophie.emergencyKitUnlocked",
+    requirements: [
+      {
+        label: "Official papers, seals, or signet",
+        quantity: 1,
+        requirement: {
+          itemIds: ["valuable-sealed-noble-wax", "valuable-fine-parchment-roll", "art-platinum-signet-chain", "art-illuminated-royal-charter"],
+        },
+      },
+    ],
+  },
+  "last-minute-kit": {
+    title: "Sophie's Last-Minute Kit",
+    description: "Sophie can prepare a special kit if the party brings enough reliable mundane materials.",
+    acceptedLog: "Sophie starts a list for a proper Last-Minute Kit: cloth, leather, and something rigid enough to hold useful little answers.",
+    completeLog: "Sophie packs a pouch with hard-won care, then adds one small lucky button with a look that forbids losing it.",
+    rewardItemId: "sophie-last-minute-kit",
+    rewardCp: 0,
+    friendship: 5,
+    unlockFlag: "flag.sophie.lastMinuteKitMade",
+    requirements: [
+      {
+        label: "Good cloth, silk, or thread",
+        quantity: 2,
+        requirement: { itemIds: ["cloth-scrap", "spider-silk", "valuable-bolt-of-silk"] },
+      },
+      {
+        label: "Usable leather or hide",
+        quantity: 1,
+        requirement: { itemIds: ["leather-scrap", "beast-hide"] },
+      },
+      {
+        label: "Wood, glass, or crystal fittings",
+        quantity: 1,
+        requirement: { itemIds: ["wood-bundle", "slag-glass", "crystal-shard"] },
+      },
+    ],
+  },
+};
+
+function sophieQuestRoot() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[sophieQuestStateKey] ??= {};
+  return state.questFlags[sophieQuestStateKey];
+}
+
+function sophieQuestState(questId = "") {
+  const root = sophieQuestRoot();
+  root[questId] ??= { status: "available" };
+  return root[questId];
+}
+
+function sophieUnlockReserve() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags["flag.sophie.reserveShelfUnlocked"] = true;
+}
+
+function sophieUnlockPacks() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags["flag.sophie.packsUnlocked"] = true;
+}
+
+function acceptSophieQuest(questId = "") {
+  const def = sophieQuestDefinitions[questId];
+  if (!def) return;
+  const quest = sophieQuestState(questId);
+  if (quest.status === "completed" || quest.status === "accepted") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog(def.acceptedLog, "important");
+  renderQuestLogButton();
+}
+
+function sophieQuestRequirementProgress(entry) {
+  return Math.min(Math.max(1, entry.quantity ?? 1), materialCountForRequirement(entry.requirement));
+}
+
+function sophieQuestReady(questId = "") {
+  const def = sophieQuestDefinitions[questId];
+  const quest = sophieQuestState(questId);
+  if (!def || quest.status !== "accepted") return false;
+  return (def.requirements ?? []).every((entry) => materialCountForRequirement(entry.requirement) >= Math.max(1, entry.quantity ?? 1));
+}
+
+function completeSophieQuest(questId = "") {
+  const def = sophieQuestDefinitions[questId];
+  const quest = sophieQuestState(questId);
+  if (!def || quest.status !== "accepted" || !sophieQuestReady(questId)) return;
+  for (const entry of def.requirements ?? []) {
+    if (!consumeMaterialsForRequirement(entry.requirement, Math.max(1, entry.quantity ?? 1))) return;
+  }
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  if (def.rewardCp) addMoney(partyPurse(), def.rewardCp);
+  if (def.rewardItemId) addItemToPartyInventory(createItemInstance(def.rewardItemId, "sophie"), "sophie-reward");
+  if (def.unlockFlag) {
+    state.questFlags = { ...(state.questFlags ?? {}) };
+    state.questFlags[def.unlockFlag] = true;
+  }
+  awardPartyNpcFriendship(sophieNpcId, def.friendship ?? 2, `quest:${sophieNpcId}:${questId}`);
+  addLog(`${def.completeLog}${def.rewardCp ? ` Sophie pays ${priceText(def.rewardCp)}.` : ""}`, "important");
+  render();
+  renderStoreMenu({ preserveScroll: true });
+  renderQuestLogButton();
+}
+
+function cancelSophieQuest(questId = "") {
+  const quest = sophieQuestState(questId);
+  if (quest.status !== "accepted") return false;
+  quest.status = "available";
+  quest.cancelledAt = Date.now();
+  delete quest.acceptedAt;
+  addLog("Sophie's favor is no longer tracked.", "important");
+  return true;
+}
+
+function sophieQuestLogEntries() {
+  return Object.entries(sophieQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = sophieQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return null;
+      const ready = quest.status === "accepted" && sophieQuestReady(questId);
+      return {
+        id: `sophie-${questId}`,
+        giver: "Sophie",
+        title: def.title,
+        description: def.description,
+        ready,
+        completed: quest.status === "completed",
+        cancelable: quest.status === "accepted",
+        cancelType: "npc",
+        npcId: sophieNpcId,
+        questId,
+        objectives: (def.requirements ?? []).map((entry) => ({
+          label: entry.label,
+          progress: sophieQuestRequirementProgress(entry),
+          target: Math.max(1, entry.quantity ?? 1),
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function sophieDiscountedPrice(itemId = "", multiplier = 0.9) {
+  const item = getItemTemplate(itemId);
+  if (!item) return 0;
+  return Math.max(1, Math.floor(storeItemBuyValueCp(item, { shop: { buyPriceMultiplier: multiplier } })));
+}
+
+function addSophiePackItems(itemIds = []) {
+  for (const itemId of itemIds) {
+    const template = getItemTemplate(itemId);
+    if (!template) continue;
+    if (template.resourceInventory === "party") {
+      addPartyResourceItem(template, 1);
+    } else {
+      addItemToPartyInventory(createItemInstance(itemId, "sophie-pack"), "sophie-pack");
+    }
+  }
+}
+
+function buySophieReserveItem(itemId = "") {
+  const npc = storeNpcDefinition();
+  if (npc?.id !== sophieNpcId || !state?.questFlags?.["flag.sophie.reserveShelfUnlocked"] || !sophieReserveItems.includes(itemId)) return;
+  const template = getItemTemplate(itemId);
+  if (!template) return;
+  const price = sophieDiscountedPrice(itemId, 0.9);
+  if (!spendMoney(partyPurse(), price)) return;
+  addSophiePackItems([itemId]);
+  addLog(`The party buys ${template.name} from Sophie's reserve shelf for ${priceText(price)}.`, "important");
+  render();
+  renderStoreMenu({ preserveScroll: true });
+}
+
+function sophiePackPrice(pack) {
+  return Math.max(
+    1,
+    Math.floor((pack?.itemIds ?? []).reduce((sum, itemId) => sum + sophieDiscountedPrice(itemId, 1), 0) * Math.max(0.1, Number(pack?.discount) || 1)),
+  );
+}
+
+function buySophiePack(packId = "") {
+  const npc = storeNpcDefinition();
+  const pack = sophiePackDefinitions[packId];
+  const emergencyUnlocked = packId === "emergency" && state?.questFlags?.["flag.sophie.emergencyKitUnlocked"];
+  const packsUnlocked = packId !== "emergency" && state?.questFlags?.["flag.sophie.packsUnlocked"];
+  if (npc?.id !== sophieNpcId || !pack || (!emergencyUnlocked && !packsUnlocked)) return;
+  const price = sophiePackPrice(pack);
+  if (!spendMoney(partyPurse(), price)) return;
+  addSophiePackItems(pack.itemIds);
+  addLog(`The party buys ${pack.name} from Sophie for ${priceText(price)}.`, "important");
+  render();
+  renderStoreMenu({ preserveScroll: true });
+}
+
+function sophieFriendshipQuestRowsMarkup() {
+  const rows = Object.entries(sophieQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = sophieQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return "";
+      const ready = sophieQuestReady(questId);
+      return `
+        <article class="store-row ${ready ? "ready" : ""}">
+          <div>
+            <b>${escapeHtml(def.title)}</b>
+            <span>${escapeHtml(def.description)}</span>
+            ${(def.requirements ?? [])
+              .map((entry) => {
+                const target = Math.max(1, entry.quantity ?? 1);
+                return `<small>${escapeHtml(entry.label)}: ${escapeHtml(Math.min(target, materialCountForRequirement(entry.requirement)))}/${escapeHtml(target)}</small>`;
+              })
+              .join("")}
+          </div>
+          ${
+            quest.status === "completed"
+              ? `<button type="button" disabled>Done</button>`
+              : `<button type="button" data-action="complete-sophie-quest" data-quest="${escapeAttribute(questId)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Items"}</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+  return rows ? `<section class="store-section"><h3>Sophie's Favors</h3><div class="store-list">${rows}</div></section>` : "";
+}
+
+function sophieReserveMarkup() {
+  if (!state?.questFlags?.["flag.sophie.reserveShelfUnlocked"]) return "";
+  return `
+    <section class="store-section">
+      <h3>Sophie's Reserve Shelf</h3>
+      <p class="empty-note">Essentials Sophie keeps aside for people she trusts not to waste them. Reserve price: 10% off.</p>
+      <div class="store-list">
+        ${sophieReserveItems
+          .map((itemId) => {
+            const item = getItemTemplate(itemId);
+            const price = sophieDiscountedPrice(itemId, 0.9);
+            return item
+              ? `<article class="store-row">
+                  <div><b>${escapeHtml(item.name)}</b><span>${escapeHtml(itemDetails(item))} - ${escapeHtml(priceText(price))}</span></div>
+                  <button type="button" data-action="buy-sophie-reserve-item" data-item="${escapeAttribute(itemId)}" ${moneyToCp(partyPurse()) >= price ? "" : "disabled"}>Buy</button>
+                </article>`
+              : "";
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function sophiePacksMarkup() {
+  const available = Object.entries(sophiePackDefinitions).filter(([packId]) =>
+    packId === "emergency" ? state?.questFlags?.["flag.sophie.emergencyKitUnlocked"] : state?.questFlags?.["flag.sophie.packsUnlocked"],
+  );
+  if (!available.length) return "";
+  return `
+    <section class="store-section">
+      <h3>Sophie Packs</h3>
+      <div class="store-list">
+        ${available
+          .map(([packId, pack]) => {
+            const price = sophiePackPrice(pack);
+            const contents = pack.itemIds
+              .map((itemId) => getItemTemplate(itemId)?.name ?? itemId)
+              .reduce((counts, name) => ({ ...counts, [name]: (counts[name] ?? 0) + 1 }), {});
+            const contentText = Object.entries(contents)
+              .map(([name, count]) => `${count} ${name}`)
+              .join(", ");
+            return `
+              <article class="store-row">
+                <div>
+                  <b>${escapeHtml(pack.name)}</b>
+                  <span>${escapeHtml(pack.summary)} ${escapeHtml(contentText)} - ${escapeHtml(priceText(price))}</span>
+                </div>
+                <button type="button" data-action="buy-sophie-pack" data-pack="${escapeAttribute(packId)}" ${moneyToCp(partyPurse()) >= price ? "" : "disabled"}>Buy Pack</button>
+              </article>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function sophieFriendshipStoreMarkup(npc) {
+  if (npc?.id !== sophieNpcId) return "";
+  return `${sophieFriendshipQuestRowsMarkup()}${sophieReserveMarkup()}${sophiePacksMarkup()}`;
+}
+
+window.DepthboundSophieQuests = {
+  unlockReserve: sophieUnlockReserve,
+  unlockPacks: sophieUnlockPacks,
+  accept: acceptSophieQuest,
+};
+
+window.DungeonNpcBehaviors ??= {};
+window.DungeonNpcBehaviors[sophieNpcId] = {
+  ...(window.DungeonNpcBehaviors[sophieNpcId] ?? {}),
+  questLogEntries: sophieQuestLogEntries,
+  completeQuest: completeSophieQuest,
+  cancelQuest: cancelSophieQuest,
+};
+
+const sarthaxNpcId = "arcanist";
+const sarthaxQuestStateKey = "sarthaxFriendshipQuests";
+const sarthaxQuestDefinitions = {
+  "scroll-handling": {
+    title: "Proper Scroll Handling",
+    description: "Sarthax wants clean practice materials before he teaches reliable scroll handling.",
+    requirements: [{ label: "Arcane practice materials", requirement: { type: "component", tagsAny: ["arcane-reagent", "magic-reagent", "crystal", "crafting"] }, quantity: 3 }],
+    rewardCp: 5000,
+    friendship: 2,
+    acceptedLog: "Sarthax agrees to teach proper scroll handling if the party brings clean practice materials.",
+    completeLog: "Sarthax inspects the materials, discards one with theatrical contempt, and teaches the party how not to murder a scroll by accident.",
+  },
+  "ink-purity": {
+    title: "Ink Purity",
+    description: "Sarthax needs clean crystal, reagent, or alchemical stock to test scroll ink purity.",
+    requirements: [{ label: "Ink-purity reagents", requirement: { type: "component", tagsAny: ["crystal", "arcane-reagent", "magic-reagent", "alchemy"] }, quantity: 4 }],
+    rewardCp: 10000,
+    friendship: 3,
+    acceptedLog: "Sarthax requests clean reagents for an ink-purity test.",
+    completeLog: "Sarthax tests the reagents, accepts the least embarrassing samples, and admits they will do.",
+  },
+  "containment-geometry": {
+    title: "Containment Geometry",
+    description: "Sarthax needs pressure-aware materials for a containment formula that refuses to behave.",
+    requirements: [{ label: "Containment materials", requirement: { type: "component", tagsAny: ["pressure", "crystal", "gear", "metal", "arcane-reagent", "magic-reagent"] }, quantity: 5 }],
+    rewardCp: 15000,
+    friendship: 4,
+    rewardItemId: "sarthax-inkward-seal",
+    acceptedLog: "Sarthax marks a workbench line and asks for materials suitable for containment geometry.",
+    completeLog: "Sarthax completes the containment sketch, then hands over an inkward seal with a warning not to test it by being foolish on purpose.",
+  },
+  "controlled-consequence": {
+    title: "Controlled Consequence Script",
+    description: "Sarthax will attempt a dangerous controlled-consequence script if the party brings high-grade arcane materials.",
+    requirements: [{ label: "High-grade arcane materials", requirement: { type: "component", tagsAny: ["primal", "core", "pressure", "crystal", "arcane-reagent", "magic-reagent"] }, quantity: 6 }],
+    rewardCp: 0,
+    friendship: 5,
+    rewardItemId: "veyrune-containment-script",
+    acceptedLog: "Sarthax agrees to let the party assist with a controlled-consequence script.",
+    completeLog: "Sarthax finishes the controlled-consequence script, says nothing exploded in a way that matters, and permits the party to carry a copy.",
+  },
+};
+
+function sarthaxQuestRoot() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[sarthaxQuestStateKey] ??= {};
+  return state.questFlags[sarthaxQuestStateKey];
+}
+
+function sarthaxQuestState(questId = "") {
+  const root = sarthaxQuestRoot();
+  root[questId] ??= { status: "available" };
+  return root[questId];
+}
+
+function acceptSarthaxQuest(questId = "") {
+  const def = sarthaxQuestDefinitions[questId];
+  if (!def) return;
+  const quest = sarthaxQuestState(questId);
+  if (quest.status === "completed" || quest.status === "accepted") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog(def.acceptedLog, "important");
+  renderQuestLogButton();
+}
+
+function sarthaxQuestRequirementProgress(entry) {
+  return Math.min(Math.max(1, entry.quantity ?? 1), materialCountForRequirement(entry.requirement));
+}
+
+function sarthaxQuestReady(questId = "") {
+  const def = sarthaxQuestDefinitions[questId];
+  const quest = sarthaxQuestState(questId);
+  if (!def || quest.status !== "accepted") return false;
+  return (def.requirements ?? []).every((entry) => materialCountForRequirement(entry.requirement) >= Math.max(1, entry.quantity ?? 1));
+}
+
+function completeSarthaxQuest(questId = "") {
+  const def = sarthaxQuestDefinitions[questId];
+  const quest = sarthaxQuestState(questId);
+  if (!def || quest.status !== "accepted" || !sarthaxQuestReady(questId)) return;
+  for (const entry of def.requirements ?? []) {
+    if (!consumeMaterialsForRequirement(entry.requirement, Math.max(1, entry.quantity ?? 1))) return;
+  }
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  if (def.rewardCp) addMoney(partyPurse(), def.rewardCp);
+  if (def.rewardItemId) addItemToPartyInventory(createItemInstance(def.rewardItemId, "sarthax"), "sarthax-reward");
+  awardPartyNpcFriendship(sarthaxNpcId, def.friendship ?? 2, `quest:${sarthaxNpcId}:${questId}`);
+  addLog(`${def.completeLog}${def.rewardCp ? ` Sarthax pays ${priceText(def.rewardCp)}.` : ""}`, "important");
+  render();
+  renderStoreMenu({ preserveScroll: true });
+  renderQuestLogButton();
+}
+
+function cancelSarthaxQuest(questId = "") {
+  const quest = sarthaxQuestState(questId);
+  if (quest.status !== "accepted") return false;
+  quest.status = "available";
+  quest.cancelledAt = Date.now();
+  delete quest.acceptedAt;
+  addLog("Sarthax's workbench request is no longer tracked.", "important");
+  return true;
+}
+
+function sarthaxQuestLogEntries() {
+  return Object.entries(sarthaxQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = sarthaxQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return null;
+      const ready = quest.status === "accepted" && sarthaxQuestReady(questId);
+      return {
+        id: `sarthax-${questId}`,
+        giver: "Sarthax",
+        title: def.title,
+        description: def.description,
+        ready,
+        completed: quest.status === "completed",
+        cancelable: quest.status === "accepted",
+        cancelType: "npc",
+        npcId: sarthaxNpcId,
+        questId,
+        objectives: (def.requirements ?? []).map((entry) => ({
+          label: entry.label,
+          progress: sarthaxQuestRequirementProgress(entry),
+          target: Math.max(1, entry.quantity ?? 1),
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function sarthaxFriendshipQuestRowsMarkup() {
+  const rows = Object.entries(sarthaxQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = sarthaxQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return "";
+      const ready = sarthaxQuestReady(questId);
+      return `
+        <article class="store-row ${ready ? "ready" : ""}">
+          <div>
+            <b>${escapeHtml(def.title)}</b>
+            <span>${escapeHtml(def.description)}</span>
+            ${(def.requirements ?? [])
+              .map((entry) => {
+                const target = Math.max(1, entry.quantity ?? 1);
+                return `<small>${escapeHtml(entry.label)}: ${escapeHtml(Math.min(target, materialCountForRequirement(entry.requirement)))}/${escapeHtml(target)}</small>`;
+              })
+              .join("")}
+          </div>
+          ${
+            quest.status === "completed"
+              ? `<button type="button" disabled>Done</button>`
+              : `<button type="button" data-action="complete-sarthax-quest" data-quest="${escapeAttribute(questId)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Items"}</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+  return rows ? `<section class="store-section"><h3>Veyrune Workbench</h3><div class="store-list">${rows}</div></section>` : "";
+}
+
+function sarthaxFriendshipStoreMarkup(npc) {
+  if (npc?.id !== sarthaxNpcId) return "";
+  return sarthaxFriendshipQuestRowsMarkup();
+}
+
+window.DepthboundSarthaxQuests = {
+  accept: acceptSarthaxQuest,
+};
+
+window.DungeonNpcBehaviors[sarthaxNpcId] = {
+  ...(window.DungeonNpcBehaviors[sarthaxNpcId] ?? {}),
+  questLogEntries: sarthaxQuestLogEntries,
+  completeQuest: completeSarthaxQuest,
+  cancelQuest: cancelSarthaxQuest,
+};
+
+const fizzwickNpcId = "alchemist";
+const fizzwickQuestStateKey = "fizzwickFriendshipQuests";
+const fizzwickQuestDefinitions = {
+  "least-dangerous": {
+    title: "The Least Dangerous Experiment",
+    description: "Fizzwick wants warm, glassy, or volatile practice materials for an experiment that probably leaves the building standing.",
+    requirements: [{ label: "Coal, glass, heat, or volatile stock", requirement: { type: "component", tagsAny: ["coal", "brimstone", "sulfur", "glass", "fire", "ember", "heat", "alchemy", "volatile"] }, quantity: 3 }],
+    rewardCp: 2000,
+    rewardItemId: "alchemists-fire",
+    friendship: 2,
+    acceptedLog: "Fizzwick chooses the least dangerous experiment and asks for warm, glassy, or volatile practice materials.",
+    completeLog: "Fizzwick arranges the materials behind something heavy, counts down from four for reasons of his own, and declares the result educational.",
+  },
+  "community-documentation": {
+    title: "Community and Documentation",
+    description: "Fizzwick needs samples and observations for safer Boom Club notes, preferably before anything becomes a story told by witnesses.",
+    requirements: [{ label: "Documentable volatile samples", requirement: { type: "component", tagsAny: ["fire", "ember", "ash", "heat", "lava", "bomb", "explosive", "alchemy", "volatile", "pressure"] }, quantity: 4 }],
+    rewardCp: 7000,
+    friendship: 3,
+    acceptedLog: "Fizzwick asks for volatile samples he can document for the club's safety notes.",
+    completeLog: "Fizzwick labels the samples, writes three warnings, underlines one twice, and looks genuinely proud of the paperwork.",
+  },
+  "brass-regulator": {
+    title: "Blue-Scored Regulator Parts",
+    description: "Fizzwick wants pressure parts, gears, metal, or crystal that can stand in for the regulator he still owes an apology.",
+    requirements: [{ label: "Regulator repair materials", requirement: { type: "component", tagsAny: ["pressure", "gear", "metal", "iron", "brass", "crystal", "slag", "glass"] }, quantity: 5 }],
+    rewardCp: 12000,
+    rewardItemId: "fizzwick-careful-popper",
+    friendship: 4,
+    acceptedLog: "Fizzwick asks for regulator parts with the solemnity of someone apologizing to machinery.",
+    completeLog: "Fizzwick rebuilds a small regulator, pats it twice, and gives the party a careful popper with extremely sincere instructions.",
+  },
+  "almost-responsible": {
+    title: "Almost-Responsible Detonator",
+    description: "Fizzwick will build something only he would dare make if the party brings infernal volatiles and pressure-stable fittings.",
+    requirements: [
+      { label: "Infernal volatile materials", requirement: { type: "component", tagsAny: ["infernal", "abyssal", "hell", "demon", "devil", "chaos"] }, quantity: 2 },
+      { label: "Pressure-stable fittings", requirement: { type: "component", tagsAny: ["pressure", "crystal", "gear", "metal", "brass", "arcane-reagent", "magic-reagent"] }, quantity: 4 },
+    ],
+    rewardCp: 0,
+    rewardItemId: "fizzwick-almost-responsible-detonator",
+    friendship: 5,
+    acceptedLog: "Fizzwick agrees to build something almost responsible if the party brings terrifyingly proper materials.",
+    completeLog: "Fizzwick completes the detonator, pushes it away with two fingers, and whispers that it is safe in the practical sense.",
+  },
+};
+
+function fizzwickQuestRoot() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[fizzwickQuestStateKey] ??= {};
+  return state.questFlags[fizzwickQuestStateKey];
+}
+
+function fizzwickQuestState(questId = "") {
+  const root = fizzwickQuestRoot();
+  root[questId] ??= { status: "available" };
+  return root[questId];
+}
+
+function acceptFizzwickQuest(questId = "") {
+  const def = fizzwickQuestDefinitions[questId];
+  if (!def) return;
+  const quest = fizzwickQuestState(questId);
+  if (quest.status === "completed" || quest.status === "accepted") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog(def.acceptedLog, "important");
+  renderQuestLogButton();
+}
+
+function fizzwickQuestRequirementProgress(entry) {
+  return Math.min(Math.max(1, entry.quantity ?? 1), materialCountForRequirement(entry.requirement));
+}
+
+function fizzwickQuestReady(questId = "") {
+  const def = fizzwickQuestDefinitions[questId];
+  const quest = fizzwickQuestState(questId);
+  if (!def || quest.status !== "accepted") return false;
+  return (def.requirements ?? []).every((entry) => materialCountForRequirement(entry.requirement) >= Math.max(1, entry.quantity ?? 1));
+}
+
+function completeFizzwickQuest(questId = "") {
+  const def = fizzwickQuestDefinitions[questId];
+  const quest = fizzwickQuestState(questId);
+  if (!def || quest.status !== "accepted" || !fizzwickQuestReady(questId)) return;
+  for (const entry of def.requirements ?? []) {
+    if (!consumeMaterialsForRequirement(entry.requirement, Math.max(1, entry.quantity ?? 1))) return;
+  }
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  if (def.rewardCp) addMoney(partyPurse(), def.rewardCp);
+  if (def.rewardItemId) addItemToPartyInventory(createItemInstance(def.rewardItemId, "fizzwick"), "fizzwick-reward");
+  awardPartyNpcFriendship(fizzwickNpcId, def.friendship ?? 2, `quest:${fizzwickNpcId}:${questId}`);
+  addLog(`${def.completeLog}${def.rewardCp ? ` Fizzwick pays ${priceText(def.rewardCp)}.` : ""}`, "important");
+  render();
+  if (storeNpcDefinition()?.id === fizzwickNpcId) renderStoreMenu({ preserveScroll: true });
+  else if (state.questFlags?.["flag.village.boomClubUnlocked"]) boomClubApi.setBoardPanel?.("projects");
+  renderQuestLogButton();
+}
+
+function cancelFizzwickQuest(questId = "") {
+  const quest = fizzwickQuestState(questId);
+  if (quest.status !== "accepted") return false;
+  quest.status = "available";
+  quest.cancelledAt = Date.now();
+  delete quest.acceptedAt;
+  addLog("Fizzwick's experimental request is no longer tracked.", "important");
+  return true;
+}
+
+function fizzwickQuestLogEntries() {
+  return Object.entries(fizzwickQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = fizzwickQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return null;
+      const ready = quest.status === "accepted" && fizzwickQuestReady(questId);
+      return {
+        id: `fizzwick-${questId}`,
+        giver: "Fizzwick",
+        title: def.title,
+        description: def.description,
+        ready,
+        completed: quest.status === "completed",
+        cancelable: quest.status === "accepted",
+        cancelType: "npc",
+        npcId: fizzwickNpcId,
+        questId,
+        objectives: (def.requirements ?? []).map((entry) => ({
+          label: entry.label,
+          progress: fizzwickQuestRequirementProgress(entry),
+          target: Math.max(1, entry.quantity ?? 1),
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function fizzwickProjectRowsMarkup() {
+  const rows = Object.entries(fizzwickQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = fizzwickQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return "";
+      const ready = fizzwickQuestReady(questId);
+      return `
+        <article class="store-row ${ready ? "ready" : ""}">
+          <div>
+            <b>${escapeHtml(def.title)}</b>
+            <span>${escapeHtml(def.description)}</span>
+            ${(def.requirements ?? [])
+              .map((entry) => {
+                const target = Math.max(1, entry.quantity ?? 1);
+                return `<small>${escapeHtml(entry.label)}: ${escapeHtml(Math.min(target, materialCountForRequirement(entry.requirement)))}/${escapeHtml(target)}</small>`;
+              })
+              .join("")}
+          </div>
+          ${
+            quest.status === "completed"
+              ? `<button type="button" disabled>Done</button>`
+              : `<button type="button" data-action="complete-fizzwick-quest" data-quest="${escapeAttribute(questId)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Sparks"}</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+  return rows ? `<section class="store-section"><h3>Fizzwick's Projects</h3><div class="store-list">${rows}</div></section>` : "";
+}
+
+function fizzwickFriendshipStoreMarkup(npc) {
+  if (npc?.id !== fizzwickNpcId) return "";
+  return fizzwickProjectRowsMarkup();
+}
+
+window.DepthboundFizzwickQuests = {
+  accept: acceptFizzwickQuest,
+};
+
+window.DungeonNpcBehaviors[fizzwickNpcId] = {
+  ...(window.DungeonNpcBehaviors[fizzwickNpcId] ?? {}),
+  questLogEntries: fizzwickQuestLogEntries,
+  completeQuest: completeFizzwickQuest,
+  cancelQuest: cancelFizzwickQuest,
+};
+
+const ilyraNpcId = "apothecary";
+const ilyraQuestStateKey = "ilyraFriendshipQuests";
+const ilyraQuestDefinitions = {
+  "first-aid-stock": {
+    title: "Clean First-Aid Stock",
+    description: "Ilyra wants clean cloth, herbs, and basic stock so adventurers stop calling untreated wounds courage.",
+    requirements: [{ label: "Clean first-aid supplies", requirement: { type: "component", tagsAny: ["cloth", "herb", "plant", "healing", "leather", "thread"] }, quantity: 3 }],
+    rewardCp: 2500,
+    rewardItemId: "ilyra-field-dressing",
+    friendship: 2,
+    acceptedLog: "Ilyra asks for clean first-aid stock and promises a short lesson if the party does not bring it in a boot.",
+    completeLog: "Ilyra sorts the supplies, approves most of them, and prepares a field dressing with brisk satisfaction.",
+  },
+  "rare-herbs": {
+    title: "Rare Herbs for Ilyra",
+    description: "Ilyra needs moonmoss, feverleaf, grave-mint, honey, roots, or other clean medicinal ingredients.",
+    requirements: [{ label: "Medicinal herbs, roots, or honey", requirement: { type: "component", tagsAny: ["herb", "plant", "flower", "moss", "root", "honey", "fungus", "healing", "medicine"] }, quantity: 4 }],
+    rewardCp: 8000,
+    rewardItemId: "potion-greater-healing",
+    friendship: 3,
+    acceptedLog: "Ilyra quietly lists the herbs and clean honey she needs most.",
+    completeLog: "Ilyra checks every stem, leaf, and jar twice, then sets aside a stronger healing draught for the party.",
+  },
+  "aunts-remedy": {
+    title: "Aunt Fen's Old Remedy",
+    description: "Ilyra can prepare her aunt's remedy if the party brings good root, honey, and bittering herbs.",
+    requirements: [
+      { label: "Good roots or herbs", requirement: { type: "component", tagsAny: ["root", "herb", "plant", "moss", "medicine", "healing"] }, quantity: 3 },
+      { label: "Clean sweetener or preserving stock", requirement: { type: "component", tagsAny: ["honey", "wax", "flower", "clean", "crafting"] }, quantity: 1 },
+    ],
+    rewardCp: 12000,
+    rewardItemId: "ilyra-aunts-remedy",
+    friendship: 4,
+    acceptedLog: "Ilyra agrees to make her aunt's old remedy if the party brings proper ingredients.",
+    completeLog: "Ilyra prepares the remedy slowly, with the patience of someone remembering another pair of hands.",
+  },
+  "last-breath-cordial": {
+    title: "Ilyra's Last-Breath Cordial",
+    description: "Ilyra needs rare living healing-root and clean medicinal stock for a restorative she can make only once this season.",
+    requirements: [
+      { label: "Living healing-root or rare medicine", requirement: { type: "component", tagsAny: ["root", "healing", "life", "medicine", "rare", "plant"] }, quantity: 3 },
+      { label: "Pure stabilizing stock", requirement: { type: "component", tagsAny: ["crystal", "honey", "clean", "water", "arcane-reagent", "magic-reagent"] }, quantity: 2 },
+    ],
+    rewardCp: 0,
+    rewardItemId: "ilyra-last-breath-cordial",
+    friendship: 5,
+    acceptedLog: "Ilyra trusts the party with the ingredients for a Last-Breath Cordial.",
+    completeLog: "Ilyra bottles the cordial, seals it with wax, and makes the party repeat when it should not be wasted.",
+  },
+};
+
+function ilyraQuestRoot() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[ilyraQuestStateKey] ??= {};
+  return state.questFlags[ilyraQuestStateKey];
+}
+
+function ilyraQuestState(questId = "") {
+  const root = ilyraQuestRoot();
+  root[questId] ??= { status: "available" };
+  return root[questId];
+}
+
+function acceptIlyraQuest(questId = "") {
+  const def = ilyraQuestDefinitions[questId];
+  if (!def) return;
+  const quest = ilyraQuestState(questId);
+  if (quest.status === "completed" || quest.status === "accepted") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog(def.acceptedLog, "important");
+  renderQuestLogButton();
+}
+
+function ilyraQuestRequirementProgress(entry) {
+  return Math.min(Math.max(1, entry.quantity ?? 1), materialCountForRequirement(entry.requirement));
+}
+
+function ilyraQuestReady(questId = "") {
+  const def = ilyraQuestDefinitions[questId];
+  const quest = ilyraQuestState(questId);
+  if (!def || quest.status !== "accepted") return false;
+  return (def.requirements ?? []).every((entry) => materialCountForRequirement(entry.requirement) >= Math.max(1, entry.quantity ?? 1));
+}
+
+function completeIlyraQuest(questId = "") {
+  const def = ilyraQuestDefinitions[questId];
+  const quest = ilyraQuestState(questId);
+  if (!def || quest.status !== "accepted" || !ilyraQuestReady(questId)) return;
+  for (const entry of def.requirements ?? []) {
+    if (!consumeMaterialsForRequirement(entry.requirement, Math.max(1, entry.quantity ?? 1))) return;
+  }
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  if (def.rewardCp) addMoney(partyPurse(), def.rewardCp);
+  if (def.rewardItemId) addItemToPartyInventory(createItemInstance(def.rewardItemId, "ilyra"), "ilyra-reward");
+  awardPartyNpcFriendship(ilyraNpcId, def.friendship ?? 2, `quest:${ilyraNpcId}:${questId}`);
+  addLog(`${def.completeLog}${def.rewardCp ? ` Ilyra pays ${priceText(def.rewardCp)}.` : ""}`, "important");
+  render();
+  if (storeNpcDefinition()?.id === ilyraNpcId) renderStoreMenu({ preserveScroll: true });
+  renderQuestLogButton();
+}
+
+function cancelIlyraQuest(questId = "") {
+  const quest = ilyraQuestState(questId);
+  if (quest.status !== "accepted") return false;
+  quest.status = "available";
+  quest.cancelledAt = Date.now();
+  delete quest.acceptedAt;
+  addLog("Ilyra's apothecary request is no longer tracked.", "important");
+  return true;
+}
+
+function ilyraQuestLogEntries() {
+  return Object.entries(ilyraQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = ilyraQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return null;
+      const ready = quest.status === "accepted" && ilyraQuestReady(questId);
+      return {
+        id: `ilyra-${questId}`,
+        giver: "Ilyra",
+        title: def.title,
+        description: def.description,
+        ready,
+        completed: quest.status === "completed",
+        cancelable: quest.status === "accepted",
+        cancelType: "npc",
+        npcId: ilyraNpcId,
+        questId,
+        objectives: (def.requirements ?? []).map((entry) => ({
+          label: entry.label,
+          progress: ilyraQuestRequirementProgress(entry),
+          target: Math.max(1, entry.quantity ?? 1),
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function ilyraRequestRowsMarkup() {
+  const rows = Object.entries(ilyraQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = ilyraQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return "";
+      const ready = ilyraQuestReady(questId);
+      return `
+        <article class="store-row ${ready ? "ready" : ""}">
+          <div>
+            <b>${escapeHtml(def.title)}</b>
+            <span>${escapeHtml(def.description)}</span>
+            ${(def.requirements ?? [])
+              .map((entry) => {
+                const target = Math.max(1, entry.quantity ?? 1);
+                return `<small>${escapeHtml(entry.label)}: ${escapeHtml(Math.min(target, materialCountForRequirement(entry.requirement)))}/${escapeHtml(target)}</small>`;
+              })
+              .join("")}
+          </div>
+          ${
+            quest.status === "completed"
+              ? `<button type="button" disabled>Done</button>`
+              : `<button type="button" data-action="complete-ilyra-quest" data-quest="${escapeAttribute(questId)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Supplies"}</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+  return rows ? `<section class="store-section"><h3>Apothecary Requests</h3><div class="store-list">${rows}</div></section>` : "";
+}
+
+function ilyraFriendshipStoreMarkup(npc) {
+  if (npc?.id !== ilyraNpcId) return "";
+  return ilyraRequestRowsMarkup();
+}
+
+window.DepthboundIlyraQuests = {
+  accept: acceptIlyraQuest,
+};
+
+window.DungeonNpcBehaviors[ilyraNpcId] = {
+  ...(window.DungeonNpcBehaviors[ilyraNpcId] ?? {}),
+  questLogEntries: ilyraQuestLogEntries,
+  completeQuest: completeIlyraQuest,
+  cancelQuest: cancelIlyraQuest,
+};
+
+const vellNpcId = "grumpy-wizard";
+const vellQuestStateKey = "vellFriendshipQuests";
+const vellQuestDefinitions = {
+  "ichor-stock": {
+    title: "Proper Demon Ichor",
+    description: "Vell wants real demon ichor, not suspicious red slime from a merchant with too many rings.",
+    requirements: [{ label: "Demon Ichor", requirement: { itemId: "demon-ichor" }, quantity: 1 }],
+    rewardCp: 5000,
+    friendship: 2,
+    acceptedLog: "Vell demands proper demon ichor and silence, in that order.",
+    completeLog: "Vell tests the ichor, grunts once, and decides it is not fraudulent enough to offend him.",
+  },
+  "ichor-theory": {
+    title: "Ichor and Curse Theory",
+    description: "Vell needs more demon ichor for a practical demonstration of why foul answers can cut arrogant curses.",
+    requirements: [{ label: "Demon Ichor", requirement: { itemId: "demon-ichor" }, quantity: 1 }],
+    rewardCp: 10000,
+    friendship: 3,
+    acceptedLog: "Vell accepts the premise of teaching with demon ichor and a great deal of complaint.",
+    completeLog: "Vell demonstrates the theory with a knot of shadow, a vial of ichor, and a warning not to repeat his exact phrasing.",
+  },
+  "curse-knot": {
+    title: "Black-Thread Curse Knots",
+    description: "Vell wants black-thread curse knots or similar binding materials before some cheerful idiot wears one.",
+    requirements: [{ label: "Curse knots or binding remains", requirement: { type: "component", tagsAny: ["curse", "hex", "binding", "thread", "shadow", "demon", "ichor"] }, quantity: 3 }],
+    rewardCp: 14000,
+    rewardItemId: "vell-sour-ward",
+    friendship: 4,
+    acceptedLog: "Vell asks for black-thread curse knots and immediately regrets trusting anyone to identify them.",
+    completeLog: "Vell cuts apart the knot samples with cold precision and hands over a sour ward without looking pleased about it.",
+  },
+  "knot-cutter": {
+    title: "Vell's Knot-Cutter",
+    description: "Vell will attempt a serious curse-breaking charm if the party brings ichor, curse remnants, and patience.",
+    requirements: [
+      { label: "Demon Ichor", requirement: { itemId: "demon-ichor" }, quantity: 1 },
+      { label: "Hard curse remnants", requirement: { type: "component", tagsAny: ["curse", "hex", "binding", "shadow", "bone", "grave", "demon"] }, quantity: 4 },
+    ],
+    rewardCp: 0,
+    rewardItemId: "vells-knot-cutter",
+    friendship: 5,
+    acceptedLog: "Vell agrees to make a knot-cutter if the party brings a curse with teeth and no bards.",
+    completeLog: "Vell finishes the knot-cutter, mutters that it should work, and says that optimism has no place in proper warding.",
+  },
+};
+
+function vellQuestRoot() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[vellQuestStateKey] ??= {};
+  return state.questFlags[vellQuestStateKey];
+}
+
+function vellQuestState(questId = "") {
+  const root = vellQuestRoot();
+  root[questId] ??= { status: "available" };
+  return root[questId];
+}
+
+function acceptVellQuest(questId = "") {
+  const def = vellQuestDefinitions[questId];
+  if (!def) return;
+  const quest = vellQuestState(questId);
+  if (quest.status === "completed" || quest.status === "accepted") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog(def.acceptedLog, "important");
+  renderQuestLogButton();
+}
+
+function vellQuestRequirementProgress(entry) {
+  return Math.min(Math.max(1, entry.quantity ?? 1), materialCountForRequirement(entry.requirement));
+}
+
+function vellQuestReady(questId = "") {
+  const def = vellQuestDefinitions[questId];
+  const quest = vellQuestState(questId);
+  if (!def || quest.status !== "accepted") return false;
+  return (def.requirements ?? []).every((entry) => materialCountForRequirement(entry.requirement) >= Math.max(1, entry.quantity ?? 1));
+}
+
+function completeVellQuest(questId = "") {
+  const def = vellQuestDefinitions[questId];
+  const quest = vellQuestState(questId);
+  if (!def || quest.status !== "accepted" || !vellQuestReady(questId)) return;
+  for (const entry of def.requirements ?? []) {
+    if (!consumeMaterialsForRequirement(entry.requirement, Math.max(1, entry.quantity ?? 1))) return;
+  }
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  if (def.rewardCp) addMoney(partyPurse(), def.rewardCp);
+  if (def.rewardItemId) addItemToPartyInventory(createItemInstance(def.rewardItemId, "vell"), "vell-reward");
+  awardPartyNpcFriendship(vellNpcId, def.friendship ?? 2, `quest:${vellNpcId}:${questId}`);
+  addLog(`${def.completeLog}${def.rewardCp ? ` Vell pays ${priceText(def.rewardCp)}.` : ""}`, "important");
+  render();
+  if (storeNpcDefinition()?.id === vellNpcId) renderStoreMenu({ preserveScroll: true });
+  renderQuestLogButton();
+}
+
+function cancelVellQuest(questId = "") {
+  const quest = vellQuestState(questId);
+  if (quest.status !== "accepted") return false;
+  quest.status = "available";
+  quest.cancelledAt = Date.now();
+  delete quest.acceptedAt;
+  addLog("Vell's curse-work request is no longer tracked.", "important");
+  return true;
+}
+
+function vellQuestLogEntries() {
+  return Object.entries(vellQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = vellQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return null;
+      const ready = quest.status === "accepted" && vellQuestReady(questId);
+      return {
+        id: `vell-${questId}`,
+        giver: "Vell",
+        title: def.title,
+        description: def.description,
+        ready,
+        completed: quest.status === "completed",
+        cancelable: quest.status === "accepted",
+        cancelType: "npc",
+        npcId: vellNpcId,
+        questId,
+        objectives: (def.requirements ?? []).map((entry) => ({
+          label: entry.label,
+          progress: vellQuestRequirementProgress(entry),
+          target: Math.max(1, entry.quantity ?? 1),
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function vellRequestRowsMarkup() {
+  const rows = Object.entries(vellQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = vellQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return "";
+      const ready = vellQuestReady(questId);
+      return `
+        <article class="store-row ${ready ? "ready" : ""}">
+          <div>
+            <b>${escapeHtml(def.title)}</b>
+            <span>${escapeHtml(def.description)}</span>
+            ${(def.requirements ?? [])
+              .map((entry) => {
+                const target = Math.max(1, entry.quantity ?? 1);
+                return `<small>${escapeHtml(entry.label)}: ${escapeHtml(Math.min(target, materialCountForRequirement(entry.requirement)))}/${escapeHtml(target)}</small>`;
+              })
+              .join("")}
+          </div>
+          ${
+            quest.status === "completed"
+              ? `<button type="button" disabled>Done</button>`
+              : `<button type="button" data-action="complete-vell-quest" data-quest="${escapeAttribute(questId)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Reagent"}</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+  return rows ? `<section class="store-section"><h3>Vell's Curse Work</h3><div class="store-list">${rows}</div></section>` : "";
+}
+
+function vellFriendshipStoreMarkup(npc) {
+  if (npc?.id !== vellNpcId) return "";
+  return vellRequestRowsMarkup();
+}
+
+window.DepthboundVellQuests = {
+  accept: acceptVellQuest,
+};
+
+window.DungeonNpcBehaviors[vellNpcId] = {
+  ...(window.DungeonNpcBehaviors[vellNpcId] ?? {}),
+  questLogEntries: vellQuestLogEntries,
+  completeQuest: completeVellQuest,
+  cancelQuest: cancelVellQuest,
+};
+
+const vaelionNpcId = "weaponsmith";
+const vaelionQuestStateKey = "vaelionFriendshipQuests";
+const vaelionQuestDefinitions = {
+  "honest-edge": {
+    title: "Honest Edge Assessment",
+    description: "Vaelion wants decent steel, oil, or repair stock to teach how an honest weapon feels in the hand.",
+    requirements: [{ label: "Steel, oil, or repair stock", requirement: { type: "component", tagsAny: ["metal", "iron", "steel", "oil", "leather", "wood", "crafting", "repair"] }, quantity: 4 }],
+    rewardCp: 4000,
+    rewardItemId: "vaelion-honest-edge-oil",
+    friendship: 2,
+    acceptedLog: "Vaelion agrees to assess honest weapon work if the party brings proper repair stock.",
+    completeLog: "Vaelion tests the balance of each piece, rejects flattery in metal form, and prepares a vial of edge oil.",
+  },
+  "company-token": {
+    title: "Lost Company Token",
+    description: "Vaelion wants a token, seal, or grave-mark from soldiers lost to undeath.",
+    requirements: [{ label: "Lost company token or grave mark", requirement: { type: "component", tagsAny: ["undead", "grave", "token", "seal", "oath", "bone", "royal", "barrow"] }, quantity: 3 }],
+    rewardCp: 9000,
+    rewardItemId: "vaelion-grave-edge-oil",
+    friendship: 3,
+    acceptedLog: "Vaelion asks for signs of the company lost beneath green stone.",
+    completeLog: "Vaelion cleans the tokens in silence, names no names aloud, and gives the party oil meant for dead things wearing duty badly.",
+  },
+  "quiet-blade-study": {
+    title: "Quiet Blade Study",
+    description: "Vaelion wants rare steel and grave-salt materials for a blade that ends harm without learning to enjoy it.",
+    requirements: [{ label: "Rare steel or grave-salt materials", requirement: { type: "component", tagsAny: ["steel", "metal", "iron", "crystal", "star", "grave", "salt", "royal", "arcane-reagent", "magic-reagent"] }, quantity: 5 }],
+    rewardCp: 16000,
+    rewardItemId: "vaelion-quiet-temper",
+    friendship: 4,
+    acceptedLog: "Vaelion agrees to study the quiet blade if the party brings metal worth the attempt.",
+    completeLog: "Vaelion folds the rare stock through a quiet temper and leaves the party with a small proof of the work.",
+  },
+  "quiet-edge": {
+    title: "Vaelion's Quiet Edge",
+    description: "Vaelion will make the quiet blade if the party brings star-cold metal, grave-salt, and proof of mercy.",
+    requirements: [
+      { label: "Star-cold or royal metal", requirement: { type: "component", tagsAny: ["star", "steel", "metal", "iron", "royal", "barrow", "crystal"] }, quantity: 4 },
+      { label: "Grave-salt or severance reagents", requirement: { type: "component", tagsAny: ["grave", "salt", "undead", "oath", "bone", "spirit", "magic-reagent"] }, quantity: 3 },
+      { label: "Proof of mercy or restraint", requirement: { type: "component", tagsAny: ["mercy", "spared", "peace", "proof", "oath", "token", "charter"] }, quantity: 1 },
+    ],
+    rewardCp: 0,
+    rewardItemId: "magic-vaelions-quiet-edge",
+    friendship: 5,
+    acceptedLog: "Vaelion agrees to test whether the party can help make the quiet blade.",
+    completeLog: "Vaelion quenches the quiet blade without song, flourish, or smile. When he hands it over, the steel feels calm.",
+  },
+};
+
+function vaelionQuestRoot() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[vaelionQuestStateKey] ??= {};
+  return state.questFlags[vaelionQuestStateKey];
+}
+
+function vaelionQuestState(questId = "") {
+  const root = vaelionQuestRoot();
+  root[questId] ??= { status: "available" };
+  return root[questId];
+}
+
+function acceptVaelionQuest(questId = "") {
+  const def = vaelionQuestDefinitions[questId];
+  if (!def) return;
+  const quest = vaelionQuestState(questId);
+  if (quest.status === "completed" || quest.status === "accepted") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog(def.acceptedLog, "important");
+  renderQuestLogButton();
+}
+
+function vaelionQuestRequirementProgress(entry) {
+  return Math.min(Math.max(1, entry.quantity ?? 1), materialCountForRequirement(entry.requirement));
+}
+
+function vaelionQuestReady(questId = "") {
+  const def = vaelionQuestDefinitions[questId];
+  const quest = vaelionQuestState(questId);
+  if (!def || quest.status !== "accepted") return false;
+  return (def.requirements ?? []).every((entry) => materialCountForRequirement(entry.requirement) >= Math.max(1, entry.quantity ?? 1));
+}
+
+function completeVaelionQuest(questId = "") {
+  const def = vaelionQuestDefinitions[questId];
+  const quest = vaelionQuestState(questId);
+  if (!def || quest.status !== "accepted" || !vaelionQuestReady(questId)) return;
+  for (const entry of def.requirements ?? []) {
+    if (!consumeMaterialsForRequirement(entry.requirement, Math.max(1, entry.quantity ?? 1))) return;
+  }
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  if (def.rewardCp) addMoney(partyPurse(), def.rewardCp);
+  if (def.rewardItemId) addItemToPartyInventory(createItemInstance(def.rewardItemId, "vaelion"), "vaelion-reward");
+  awardPartyNpcFriendship(vaelionNpcId, def.friendship ?? 2, `quest:${vaelionNpcId}:${questId}`);
+  addLog(`${def.completeLog}${def.rewardCp ? ` Vaelion pays ${priceText(def.rewardCp)}.` : ""}`, "important");
+  render();
+  if (storeNpcDefinition()?.id === vaelionNpcId) renderStoreMenu({ preserveScroll: true });
+  renderQuestLogButton();
+}
+
+function cancelVaelionQuest(questId = "") {
+  const quest = vaelionQuestState(questId);
+  if (quest.status !== "accepted") return false;
+  quest.status = "available";
+  quest.cancelledAt = Date.now();
+  delete quest.acceptedAt;
+  addLog("Vaelion's forge work is no longer tracked.", "important");
+  return true;
+}
+
+function vaelionQuestLogEntries() {
+  return Object.entries(vaelionQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = vaelionQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return null;
+      const ready = quest.status === "accepted" && vaelionQuestReady(questId);
+      return {
+        id: `vaelion-${questId}`,
+        giver: "Vaelion",
+        title: def.title,
+        description: def.description,
+        ready,
+        completed: quest.status === "completed",
+        cancelable: quest.status === "accepted",
+        cancelType: "npc",
+        npcId: vaelionNpcId,
+        questId,
+        objectives: (def.requirements ?? []).map((entry) => ({
+          label: entry.label,
+          progress: vaelionQuestRequirementProgress(entry),
+          target: Math.max(1, entry.quantity ?? 1),
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function vaelionForgeRowsMarkup() {
+  const rows = Object.entries(vaelionQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = vaelionQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return "";
+      const ready = vaelionQuestReady(questId);
+      return `
+        <article class="store-row ${ready ? "ready" : ""}">
+          <div>
+            <b>${escapeHtml(def.title)}</b>
+            <span>${escapeHtml(def.description)}</span>
+            ${(def.requirements ?? [])
+              .map((entry) => {
+                const target = Math.max(1, entry.quantity ?? 1);
+                return `<small>${escapeHtml(entry.label)}: ${escapeHtml(Math.min(target, materialCountForRequirement(entry.requirement)))}/${escapeHtml(target)}</small>`;
+              })
+              .join("")}
+          </div>
+          ${
+            quest.status === "completed"
+              ? `<button type="button" disabled>Done</button>`
+              : `<button type="button" data-action="complete-vaelion-quest" data-quest="${escapeAttribute(questId)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Materials"}</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+  return rows ? `<section class="store-section"><h3>Vaelion's Forge Work</h3><div class="store-list">${rows}</div></section>` : "";
+}
+
+function vaelionFriendshipStoreMarkup(npc) {
+  if (npc?.id !== vaelionNpcId) return "";
+  return vaelionForgeRowsMarkup();
+}
+
+window.DepthboundVaelionQuests = {
+  accept: acceptVaelionQuest,
+};
+
+window.DungeonNpcBehaviors[vaelionNpcId] = {
+  ...(window.DungeonNpcBehaviors[vaelionNpcId] ?? {}),
+  questLogEntries: vaelionQuestLogEntries,
+  completeQuest: completeVaelionQuest,
+  cancelQuest: cancelVaelionQuest,
+};
+
+const borrenNpcId = "armorsmith";
+const borrenQuestStateKey = "borrenFriendshipQuests";
+const borrenCustomWeaponChoices = [
+  "dagger",
+  "handaxe",
+  "mace",
+  "spear",
+  "battleaxe",
+  "flail",
+  "greataxe",
+  "greatsword",
+  "halberd",
+  "longsword",
+  "maul",
+  "rapier",
+  "scimitar",
+  "shortsword",
+  "warhammer",
+  "longbow",
+  "shortbow",
+  "crossbow-light",
+  "crossbow-hand",
+  "crossbow-heavy",
+];
+const borrenQuestDefinitions = {
+  "armor-care": {
+    title: "Armor Care",
+    description: "Borren wants repair stock so he can teach the party the part of armor work adventurers always skip.",
+    requirements: [{ label: "Armor repair stock", requirement: { type: "component", tagsAny: ["metal", "iron", "leather", "cloth", "oil", "wood", "crafting", "repair"] }, quantity: 4 }],
+    rewardCp: 4000,
+    rewardItemId: "borren-armor-care-kit",
+    friendship: 2,
+    acceptedLog: "Borren asks for armor repair stock and promises to reveal the ancient mystery of cleaning things properly.",
+    completeLog: "Borren sorts the repair stock, insults two straps, and packs a maintenance kit sturdy enough to survive adventurers.",
+  },
+  "claim-marks": {
+    title: "Old Claim Marks",
+    description: "Borren wants claim marks, furnace plates, seal cuts, or old metal warnings from his family's watched works.",
+    requirements: [{ label: "Claim marks or furnace plates", requirement: { type: "component", tagsAny: ["dwarf", "dwarven", "claim", "furnace", "forge", "seal", "plate", "metal", "embervein", "royal"] }, quantity: 3 }],
+    rewardCp: 9000,
+    rewardItemId: "ashmantle-furnace-plate",
+    friendship: 3,
+    acceptedLog: "Borren asks the party to bring old claim marks or furnace plates if they find them.",
+    completeLog: "Borren reads the old marks with a thumb blackened by soot and quietly copies the warnings into his own ledger.",
+  },
+  "borin-mark": {
+    title: "Borin's Scratch-Mark",
+    description: "Borren wants anything bearing Borin's scratch-mark, even if it looks useless.",
+    requirements: [{ label: "Borin-marked tool, note, or scrap", requirement: { type: "component", tagsAny: ["borin", "apprentice", "scratch", "mark", "tool", "embervein", "dwarf", "forge"] }, quantity: 2 }],
+    rewardCp: 14000,
+    rewardItemId: "borren-ashmantle-plate-mark",
+    friendship: 4,
+    acceptedLog: "Borren asks for anything bearing Borin's scratch-mark.",
+    completeLog: "Borren studies the scratch-marks too long, then sets his jaw and stamps an Ashmantle plate mark for the party.",
+  },
+  "custom-weapon": {
+    title: "A Weapon Bearing Your Name",
+    description: "Borren will custom-forge a +2 weapon for one hero. The weapon bears that hero's name and has no resale value.",
+    requirements: [
+      { label: "Embervein ore or old forge metal", requirement: { type: "component", tagsAny: ["embervein", "ore", "coal", "ember", "forge", "metal", "iron", "steel"] }, quantity: 4 },
+      { label: "Proof of standing ground", requirement: { type: "component", tagsAny: ["proof", "shield", "guard", "mercy", "oath", "token", "charter", "defender"] }, quantity: 1 },
+    ],
+    rewardCp: 0,
+    customWeapon: true,
+    friendship: 5,
+    acceptedLog: "Borren agrees to forge a named weapon if the party brings embervein metal and proof they stood their ground for someone weaker.",
+    completeLog: "Borren heats the metal until the room goes quiet, then works the hero's name into the weapon like a promise.",
+  },
+};
+
+function borrenQuestRoot() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[borrenQuestStateKey] ??= {};
+  return state.questFlags[borrenQuestStateKey];
+}
+
+function borrenQuestState(questId = "") {
+  const root = borrenQuestRoot();
+  root[questId] ??= { status: "available" };
+  return root[questId];
+}
+
+function acceptBorrenQuest(questId = "") {
+  const def = borrenQuestDefinitions[questId];
+  if (!def) return;
+  const quest = borrenQuestState(questId);
+  if (quest.status === "completed" || quest.status === "accepted") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog(def.acceptedLog, "important");
+  renderQuestLogButton();
+}
+
+function borrenQuestRequirementProgress(entry) {
+  return Math.min(Math.max(1, entry.quantity ?? 1), materialCountForRequirement(entry.requirement));
+}
+
+function borrenQuestReady(questId = "") {
+  const def = borrenQuestDefinitions[questId];
+  const quest = borrenQuestState(questId);
+  if (!def || quest.status !== "accepted") return false;
+  return (def.requirements ?? []).every((entry) => materialCountForRequirement(entry.requirement) >= Math.max(1, entry.quantity ?? 1));
+}
+
+function borrenSpeakingHero() {
+  const relationshipHeroId = window.DepthboundNpcRelationships?.get?.(borrenNpcId)?.heroId;
+  if (relationshipHeroId && state.fighters?.[relationshipHeroId] && (typeof isClassHero !== "function" || isClassHero(state.fighters[relationshipHeroId]))) {
+    return state.fighters[relationshipHeroId];
+  }
+  const current = activeHero();
+  if (current && (typeof isClassHero !== "function" || isClassHero(current))) return current;
+  return partyHeroes().find((hero) => typeof isClassHero !== "function" || isClassHero(hero)) ?? null;
+}
+
+function borrenCustomWeaponItem(baseWeaponId = "", hero = null) {
+  const template = getItemTemplate(baseWeaponId);
+  if (!template || template.type !== "weapon" || !hero) return null;
+  const item = createItemInstance(baseWeaponId, "borren-custom");
+  if (!item) return null;
+  item.name = `${hero.name}'s Ashmantle ${template.name} +2`;
+  item.customName = item.name;
+  item.description = `A custom ${template.name.toLowerCase()} forged by Borren Ashmantle for ${hero.name}. It bears ${hero.name}'s name, the Ashmantle mark, and no merchant's price.`;
+  item.cost = { amount: 0, unit: "gp", text: "0 gp" };
+  item.sell = { valueCp: 0, rate: 0 };
+  item.store = { ...(item.store ?? {}), buyable: false, sellable: true, reason: "made for one hero, not for resale" };
+  item.requiresAttunement = false;
+  item.tags = Array.from(new Set([...(item.tags ?? []), "magic", "magic-item", "magic-weapon", "loot:magic", "rarity:rare", "weapon:+2", "ashmantle", "borren", "custom", "no-resale"]));
+  item.magic = {
+    ...(item.magic ?? {}),
+    kind: "weapon",
+    rarity: "rare",
+    priceGp: 0,
+    attackBonus: 2,
+    damageBonus: 2,
+    extraDamage: item.magic?.extraDamage ?? [],
+    description: `Custom +2 weapon forged for ${hero.name}. Resale value: 0 gp.`,
+  };
+  item.loot = {
+    ...(item.loot ?? {}),
+    kind: "custom magic weapon",
+    rarity: "rare",
+    priceGp: 0,
+    priceCp: 0,
+    unique: true,
+    dropWeight: 0,
+  };
+  item.borrenCustomWeapon = { heroId: hero.id, heroName: hero.name, baseWeaponId };
+  return item;
+}
+
+async function chooseBorrenCustomWeaponReward() {
+  const heroes = partyHeroes().filter((hero) => !hero.dead && (typeof isClassHero !== "function" || isClassHero(hero)));
+  if (!heroes.length) return null;
+  const defaultHero = borrenSpeakingHero();
+  const heroId = heroes.length === 1
+    ? heroes[0].id
+    : await showChoiceDialog({
+        title: "Borren's Custom Weapon",
+        message: "Who is Borren forging this weapon for?",
+        choices: [
+          ...heroes.map((hero) => ({
+            value: hero.id,
+            label: hero.id === defaultHero?.id ? `${hero.name} (speaker)` : hero.name,
+            description: "The weapon will include this hero's name and have 0 gp resale value.",
+          })),
+          { value: "cancel", label: "Not yet" },
+        ],
+      });
+  if (!heroId || heroId === "cancel") return null;
+  const hero = state.fighters?.[heroId];
+  if (!hero) return null;
+  const weaponId = await showChoiceDialog({
+    title: "Choose Weapon Shape",
+    message: `Choose the base weapon Borren will make for ${hero.name}.`,
+    choices: [
+      ...borrenCustomWeaponChoices
+        .map((weaponId) => getItemTemplate(weaponId))
+        .filter(Boolean)
+        .map((weapon) => ({
+          value: weapon.id,
+          label: weapon.name,
+          description: `${weapon.category ?? "weapon"} - ${weapon.weaponRange ?? "melee"}`,
+        })),
+      { value: "cancel", label: "Not yet" },
+    ],
+  });
+  if (!weaponId || weaponId === "cancel") return null;
+  return borrenCustomWeaponItem(weaponId, hero);
+}
+
+async function completeBorrenQuest(questId = "") {
+  const def = borrenQuestDefinitions[questId];
+  const quest = borrenQuestState(questId);
+  if (!def || quest.status !== "accepted" || !borrenQuestReady(questId)) return;
+  const customWeapon = def.customWeapon ? await chooseBorrenCustomWeaponReward() : null;
+  if (def.customWeapon && !customWeapon) return;
+  for (const entry of def.requirements ?? []) {
+    if (!consumeMaterialsForRequirement(entry.requirement, Math.max(1, entry.quantity ?? 1))) return;
+  }
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  if (def.rewardCp) addMoney(partyPurse(), def.rewardCp);
+  if (def.rewardItemId) addItemToPartyInventory(createItemInstance(def.rewardItemId, "borren"), "borren-reward");
+  if (customWeapon) addItemToPartyInventory(customWeapon, "borren-custom-weapon");
+  awardPartyNpcFriendship(borrenNpcId, def.friendship ?? 2, `quest:${borrenNpcId}:${questId}`);
+  addLog(`${def.completeLog}${def.rewardCp ? ` Borren pays ${priceText(def.rewardCp)}.` : ""}${customWeapon ? ` ${customWeapon.name} is added to the party inventory.` : ""}`, "important");
+  render();
+  if (storeNpcDefinition()?.id === borrenNpcId) renderStoreMenu({ preserveScroll: true });
+  renderQuestLogButton();
+}
+
+function cancelBorrenQuest(questId = "") {
+  const quest = borrenQuestState(questId);
+  if (quest.status !== "accepted") return false;
+  quest.status = "available";
+  quest.cancelledAt = Date.now();
+  delete quest.acceptedAt;
+  addLog("Borren's forge work is no longer tracked.", "important");
+  return true;
+}
+
+function borrenQuestLogEntries() {
+  return Object.entries(borrenQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = borrenQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return null;
+      const ready = quest.status === "accepted" && borrenQuestReady(questId);
+      return {
+        id: `borren-${questId}`,
+        giver: "Borren",
+        title: def.title,
+        description: def.description,
+        ready,
+        completed: quest.status === "completed",
+        cancelable: quest.status === "accepted",
+        cancelType: "npc",
+        npcId: borrenNpcId,
+        questId,
+        objectives: (def.requirements ?? []).map((entry) => ({
+          label: entry.label,
+          progress: borrenQuestRequirementProgress(entry),
+          target: Math.max(1, entry.quantity ?? 1),
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function borrenForgeRowsMarkup() {
+  const rows = Object.entries(borrenQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = borrenQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return "";
+      const ready = borrenQuestReady(questId);
+      return `
+        <article class="store-row ${ready ? "ready" : ""}">
+          <div>
+            <b>${escapeHtml(def.title)}</b>
+            <span>${escapeHtml(def.description)}</span>
+            ${(def.requirements ?? [])
+              .map((entry) => {
+                const target = Math.max(1, entry.quantity ?? 1);
+                return `<small>${escapeHtml(entry.label)}: ${escapeHtml(Math.min(target, materialCountForRequirement(entry.requirement)))}/${escapeHtml(target)}</small>`;
+              })
+              .join("")}
+          </div>
+          ${
+            quest.status === "completed"
+              ? `<button type="button" disabled>Done</button>`
+              : `<button type="button" data-action="complete-borren-quest" data-quest="${escapeAttribute(questId)}" ${ready ? "" : "disabled"}>${ready ? (def.customWeapon ? "Forge Weapon" : "Hand In") : "Need Materials"}</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+  return rows ? `<section class="store-section"><h3>Borren's Forge Work</h3><div class="store-list">${rows}</div></section>` : "";
+}
+
+function borrenFriendshipStoreMarkup(npc) {
+  if (npc?.id !== borrenNpcId) return "";
+  return borrenForgeRowsMarkup();
+}
+
+window.DepthboundBorrenQuests = {
+  accept: acceptBorrenQuest,
+};
+
+window.DungeonNpcBehaviors[borrenNpcId] = {
+  ...(window.DungeonNpcBehaviors[borrenNpcId] ?? {}),
+  questLogEntries: borrenQuestLogEntries,
+  completeQuest: completeBorrenQuest,
+  cancelQuest: cancelBorrenQuest,
+};
+
 function storeStockItems(npc = storeNpcDefinition()) {
   const query = storeSearch.trim().toLowerCase();
   const shopType = npc?.shop?.type ?? "general";
@@ -22247,9 +24955,21 @@ function renderStoreMenu(options = {}) {
         <b>${escapeHtml(npc.name ?? "Merchant")}</b>
         <span>${escapeHtml(npc.title ?? "Merchant")}</span>
         <p>${escapeHtml(npcEntryLine(npc) || npc.description || "Welcome.")}</p>
+        ${
+          npcBehavior(npc.id)?.startChat
+            ? `<button type="button" class="ghost-button" data-action="start-npc-chat" data-npc="${escapeAttribute(npc.id)}" data-chat-state="">Have a chat</button>`
+            : ""
+        }
       </div>
     </section>
     <div class="store-wallet">Party Purse: ${escapeHtml(moneyText(partyPurse()))}</div>
+    ${sophieFriendshipStoreMarkup(npc)}
+    ${sarthaxFriendshipStoreMarkup(npc)}
+    ${fizzwickFriendshipStoreMarkup(npc)}
+    ${ilyraFriendshipStoreMarkup(npc)}
+    ${vellFriendshipStoreMarkup(npc)}
+    ${vaelionFriendshipStoreMarkup(npc)}
+    ${borrenFriendshipStoreMarkup(npc)}
     ${borrenClaimHammerMarkup(npc)}
     ${smithMaterialCommissionMarkup(npc)}
     ${apothecaryTreatmentMarkup(npc)}

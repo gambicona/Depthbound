@@ -36,6 +36,26 @@
       "label": "You are strangely calm for someone surrounded by graves."
     },
     {
+      "id": "TRUST_FAMILIAR_01",
+      "label": "How should we treat the dead we find?",
+      "ifFriendshipAtLeast": 5
+    },
+    {
+      "id": "TRUST_TRUSTED_01",
+      "label": "What name still troubles you?",
+      "ifFriendshipAtLeast": 15
+    },
+    {
+      "id": "TRUST_CLOSE_01",
+      "label": "What does faith cost you?",
+      "ifFriendshipAtLeast": 25
+    },
+    {
+      "id": "TRUST_DEAR_01",
+      "label": "Let us carry a Naevran trust.",
+      "ifFriendshipAtLeast": 40
+    },
+    {
       "id": "MAELIS_SERVICES",
       "label": "I need your services."
     }
@@ -2193,6 +2213,50 @@
         }
       ],
       "service": "lay-rest"
+    },
+    "TRUST_FAMILIAR_01": {
+      "id": "TRUST_FAMILIAR_01",
+      "player": "When we find bodies in old places, what should we do?",
+      "action": "MAELIS_RECOVER_NAMES_ACCEPT",
+      "lines": [
+        "First, do not rob them and call it archaeology.",
+        "Second, look for a name. A ring, a tag, a prayer strip, a scratched word under a shield. If you cannot carry the body, carry the truth of it.",
+        "Bring me names. I can do more with a name than a hero can do with a crown."
+      ],
+      "options": []
+    },
+    "TRUST_TRUSTED_01": {
+      "id": "TRUST_TRUSTED_01",
+      "player": "Whose name can you not put to rest?",
+      "action": "MAELIS_LITTLE_BELL_ACCEPT",
+      "lines": [
+        "There is a child in my ledger named only Little Bell.",
+        "No surname. No grave. No family left to ask. The note was copied from a plague cart record by someone whose hand shook too badly to finish the line.",
+        "If you find a brass bell small enough for a child, bring it to me carefully. Do not polish it. Sometimes dirt is the last honest witness."
+      ],
+      "options": []
+    },
+    "TRUST_CLOSE_01": {
+      "id": "TRUST_CLOSE_01",
+      "player": "You make faith sound steady. What does it cost?",
+      "action": "MAELIS_FAITH_COST_ACCEPT",
+      "lines": [
+        "Sleep. Certainty. The comfort of being dramatic.",
+        "People want death to be either a door or a wall. Often it is paperwork in the rain.",
+        "I serve because someone must keep writing when grief makes everyone else put down the pen. If you want to understand that work, bring me the things that let a name survive bad weather: wax, thread, copied script, and clean ash."
+      ],
+      "options": []
+    },
+    "TRUST_DEAR_01": {
+      "id": "TRUST_DEAR_01",
+      "player": "Give us a task you would only give to someone whose name you know.",
+      "action": "MAELIS_BLACK_RIBBON_ACCEPT",
+      "lines": [
+        "Careful. That is how vows begin.",
+        "There is a black ribbon in the chapel chest. It was tied around a book of names during a year when the dead would not stay counted. If I give it to you, you carry more than cloth.",
+        "Bring back the lost page that matches it. Do that, and I will trust you with a rite most priests never learn."
+      ],
+      "options": []
     },
     "STATE_D1_01": {
       "id": "STATE_D1_01",

@@ -4266,6 +4266,15 @@ function dungeonGoalMet() {
   return customGoalStatus().met;
 }
 
+function awardCampaignDungeonRelationships(context = {}) {
+  const campaignId = String(context?.campaignId ?? "");
+  const dungeonIndex = Math.max(0, Math.floor(Number(context?.campaignIndex) || 0));
+  if (campaignId !== "barrow-crown" || dungeonIndex <= 0) return;
+  const source = `campaign:${campaignId}:dungeon:${dungeonIndex}`;
+  window.DepthboundNpcRelationships?.addParty?.("sister-maelis", 5, source);
+  window.DepthboundNpcRelationships?.addParty?.("gravebinders", 5, source);
+}
+
 function checkDungeonCompletion(hero = activeHero()) {
   if (canHeroUseHomeExit(hero) && isExitPosition(hero.position)) {
     showHomeMenu();
@@ -4310,6 +4319,7 @@ function checkDungeonCompletion(hero = activeHero()) {
     if (state.campaignId && state.campaignIndex) {
       completedCampaign[state.campaignId] = Math.max(completedCampaign[state.campaignId] ?? 0, state.campaignIndex);
     }
+    awardCampaignDungeonRelationships(completedContext);
     const expeditionCircleRewardUnlocked =
       state.campaignId === "expedition-mileposts" &&
       Math.max(0, Math.floor(Number(completedCampaign["expedition-mileposts"]) || 0)) >= 4 &&
@@ -4363,6 +4373,7 @@ function checkDungeonCompletion(hero = activeHero()) {
         worldDay: normalizeWorldDay(state.worldDay),
         campaignProgress: completedCampaign,
         questFlags: questFlagsAfterTravelWork,
+        npcRelationships: state.npcRelationships ?? {},
         partyResources: partyResourcesAfterTravelWork,
         partyTomes: state.partyTomes ?? [],
         home: state.home,
@@ -4391,6 +4402,7 @@ function checkDungeonCompletion(hero = activeHero()) {
       worldDay: normalizeWorldDay(state.worldDay) + 1,
       campaignProgress: completedCampaign,
       questFlags,
+      npcRelationships: state.npcRelationships ?? {},
       partyResources,
       partyTomes: state.partyTomes ?? [],
       home: homeWithRegrownResources(state.home),

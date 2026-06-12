@@ -225,6 +225,16 @@ registerMagicWeapon("magic-embervein-claim-hammer", "warhammer", "Embervein Clai
   tags: ["embervein", "forge", "dwarf", "ashmantle", "quest-item", "quest:borren-claim-hammer"],
   description: "A dwarven claim hammer with an Ashmantle maker's mark under the soot. It gives +1 to attack rolls and deals an extra 1d4 fire damage.",
 });
+registerMagicWeapon("magic-vaelions-quiet-edge", "shortsword", "Vaelion's Quiet Edge", "rare", 7000, {
+  requiresAttunement: true,
+  attackBonus: 1,
+  damageBonus: 1,
+  extraDamage: d4("radiant"),
+  unique: true,
+  dropWeight: 1,
+  tags: ["vaelion", "quiet-edge", "mercy", "undead", "grave", "quest-item", "quest:vaelion-quiet-edge"],
+  description: "A calm, narrow blade made to end harm without learning to enjoy it. It gives +1 to attack and damage rolls and deals an extra 1d4 radiant damage.",
+});
 
 // Magic weapons: elemental and themed weapons.
 registerMagicWeapon("magic-acid-dagger", "dagger", "Acid Dagger", "uncommon", 850, {

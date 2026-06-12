@@ -1,6 +1,10 @@
 const sisterMaelisNpcId = "sister-maelis";
 let sisterMaelisPendingCardVoiceIds = [];
 let sisterMaelisActiveAnswer = null;
+let sisterMaelisChatStack = [];
+let sisterMaelisCurrentBranch = "";
+let sisterMaelisBranchOptionPage = 0;
+let sisterMaelisSpeakerHeroId = "";
 
 function sisterMaelisNpc() {
   return window.DungeonContent.get("npcs", sisterMaelisNpcId) ?? {
@@ -14,6 +18,108 @@ function sisterMaelisNpc() {
 
 function sisterMaelisChatData() {
   return window.DungeonNpcChats?.maelis ?? { hubChoices: [], idleLines: [], stateVariants: [], nodes: {} };
+}
+
+function sisterMaelisClassHeroes() {
+  return (state?.party?.heroIds?.length ? state.party.heroIds : ["hero"])
+    .map((id) => state?.fighters?.[id])
+    .filter((hero) => hero && !hero.dead && (typeof isClassHero !== "function" || isClassHero(hero)) && !(typeof isAutonomousAlly === "function" && isAutonomousAlly(hero)));
+}
+
+function sisterMaelisDefaultSpeakerId() {
+  const activeId = state?.party?.activeHeroId;
+  if (sisterMaelisClassHeroes().some((hero) => hero.id === activeId)) return activeId;
+  return sisterMaelisClassHeroes()[0]?.id ?? "hero";
+}
+
+function sisterMaelisSpeakerId() {
+  if (sisterMaelisClassHeroes().some((hero) => hero.id === sisterMaelisSpeakerHeroId)) return sisterMaelisSpeakerHeroId;
+  sisterMaelisSpeakerHeroId = sisterMaelisDefaultSpeakerId();
+  return sisterMaelisSpeakerHeroId;
+}
+
+function sisterMaelisSpeakerName() {
+  return state?.fighters?.[sisterMaelisSpeakerId()]?.name ?? "You";
+}
+
+function sisterMaelisRelationship() {
+  return window.DepthboundNpcRelationships?.get?.(sisterMaelisNpcId, sisterMaelisSpeakerId()) ?? {
+    heroId: sisterMaelisSpeakerId(),
+    heroName: sisterMaelisSpeakerName(),
+    friendship: 0,
+    chemistry: 0,
+    level: "Stranger",
+    friendshipReady: false,
+    romanceReady: false,
+  };
+}
+
+function sisterMaelisRelationshipMarkup() {
+  const rel = sisterMaelisRelationship();
+  const friendshipTargets = { Stranger: 5, Familiar: 15, Trusted: 25, Close: 40, Dear: Math.max(40, rel.friendship || 0) };
+  const nextTarget = friendshipTargets[rel.level] ?? Math.max(1, (rel.friendship || 0) + 1);
+  const filled = rel.level === "Dear" ? 100 : Math.min(100, Math.max(0, ((rel.friendship || 0) / Math.max(1, nextTarget)) * 100));
+  const chemistryFilled = Math.min(100, Math.max(0, ((rel.chemistry || 0) / 5) * 100));
+  const pathNote = rel.romanceReady ? "Romance path ready" : rel.friendshipReady ? "Friendship path ready" : `${rel.heroName ?? sisterMaelisSpeakerName()} speaking`;
+  return `
+    <div class="npc-relationship-meter">
+      <div class="npc-relationship-header">
+        <span>Friendship</span>
+        <b>${escapeHtml(rel.level ?? "Stranger")}</b>
+      </div>
+      <div class="npc-relationship-track" aria-hidden="true"><i style="width: ${filled.toFixed(2)}%"></i></div>
+      <small>${escapeHtml(`${rel.friendship ?? 0}${rel.level === "Dear" ? "+" : ` / ${nextTarget}`}`)}</small>
+      <div class="npc-relationship-header secondary">
+        <span>Chemistry</span>
+      <b>${escapeHtml(rel.chemistry ?? 0)}</b>
+      </div>
+      <div class="npc-relationship-track chemistry" aria-hidden="true"><i style="width: ${chemistryFilled.toFixed(2)}%"></i></div>
+      <small>${escapeHtml(pathNote)}</small>
+      ${sisterMaelisAdminRelationshipControlsMarkup(rel)}
+    </div>
+  `;
+}
+
+function sisterMaelisAdminRelationshipControlsMarkup(rel) {
+  if (!adminEnabled?.()) return "";
+  const heroId = rel.heroId ?? sisterMaelisSpeakerId();
+  const button = (field, delta, label) =>
+    `<button type="button" data-action="admin-npc-relationship" data-npc="${sisterMaelisNpcId}" data-hero="${escapeAttribute(heroId)}" data-field="${escapeAttribute(field)}" data-delta="${escapeAttribute(delta)}">${escapeHtml(label)}</button>`;
+  return `
+    <div class="npc-relationship-admin">
+      <b>Admin</b>
+      <span>Friendship ${escapeHtml(rel.friendship ?? 0)}</span>
+      <div>${button("friendship", -5, "-5")}${button("friendship", -1, "-1")}${button("friendship", 1, "+1")}${button("friendship", 5, "+5")}</div>
+      <span>Chemistry ${escapeHtml(rel.chemistry ?? 0)}</span>
+      <div>${button("chemistry", -5, "-5")}${button("chemistry", -1, "-1")}${button("chemistry", 1, "+1")}${button("chemistry", 5, "+5")}</div>
+    </div>
+  `;
+}
+
+function sisterMaelisSpeakerSelectorMarkup() {
+  const heroes = sisterMaelisClassHeroes();
+  if (heroes.length <= 1) return "";
+  const currentId = sisterMaelisSpeakerId();
+  return `
+    <div class="npc-chat-speaker">
+      <span>Speaking as</span>
+      <div>
+        ${heroes
+          .map(
+            (hero) => `
+              <button
+                type="button"
+                class="${hero.id === currentId ? "active" : ""}"
+                data-action="npc-chat-speaker"
+                data-npc="${sisterMaelisNpcId}"
+                data-hero="${escapeAttribute(hero.id)}"
+              >${escapeHtml(hero.name ?? "Hero")}</button>
+            `,
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
 }
 
 function sisterMaelisNodeVoiceId(nodeId = "", lineIndex = 0) {
@@ -34,6 +140,10 @@ function sisterMaelisIdleVoiceId(index = 0) {
 
 function sisterMaelisBarrowProgress() {
   return Math.max(0, Math.floor(Number(state?.campaignProgress?.["barrow-crown"]) || 0));
+}
+
+function sisterMaelisFriendshipPoints() {
+  return Math.max(0, Math.floor(Number(sisterMaelisRelationship().friendship) || 0));
 }
 
 const sisterMaelisProgressGates = {
@@ -63,7 +173,20 @@ const sisterMaelisProgressGates = {
 
 function sisterMaelisNodeUnlocked(nodeId = "") {
   const id = String(nodeId || "");
-  if (!id || id === "MAELIS_HUB" || id === "MAELIS_SERVICES" || id === "MAELIS_GOODBYE" || id === "MAELIS_CLOSE") return true;
+  if (
+    !id ||
+    id === "MAELIS_HUB" ||
+    id === "MAELIS_TOPICS" ||
+    id === "MAELIS_BACK" ||
+    id === "MAELIS_MORE" ||
+    id === "MAELIS_SERVICES" ||
+    id === "MAELIS_GOODBYE" ||
+    id === "MAELIS_CLOSE"
+  )
+    return true;
+  const node = sisterMaelisNode(id);
+  const requiredFriendship = Math.max(0, Math.floor(Number(node?.ifFriendshipAtLeast) || 0));
+  if (requiredFriendship && sisterMaelisFriendshipPoints() < requiredFriendship) return false;
   const requiredProgress = sisterMaelisProgressGates[id] ?? 0;
   return sisterMaelisBarrowProgress() >= requiredProgress;
 }
@@ -124,6 +247,7 @@ function renderGraveyardMenu() {
   const dead = deadRosterHeroes();
   els.villageBody.innerHTML = `
     ${sisterMaelisCardMarkup()}
+    ${sisterMaelisFriendshipQuestRowsMarkup()}
     <p class="empty-note">Dead companions can be preserved, looted, or restored here once their body has been sent home.</p>
     <section class="graveyard-list">
       ${dead.length ? dead.map(graveyardCorpseMarkup).join("") : `<p class="empty-note">No dead companions are recorded.</p>`}
@@ -138,6 +262,7 @@ const sisterMaelisTopicGroups = [
   { title: "The Graveyard", ids: ["GRAVEYARD_01", "REVIVE_01"] },
   { title: "The Barrow Crown", ids: ["CROWN_01"] },
   { title: "Personal", ids: ["PERSONAL_01", "FLIRT_01"] },
+  { title: "Trust", ids: ["TRUST_FAMILIAR_01", "TRUST_TRUSTED_01", "TRUST_CLOSE_01", "TRUST_DEAR_01"] },
   { title: "Services", ids: ["MAELIS_SERVICES"] },
 ];
 
@@ -153,8 +278,241 @@ function sisterMaelisNode(nodeId = "MAELIS_HUB") {
   return sisterMaelisChatData().nodes?.[nodeId] ?? null;
 }
 
+const sisterMaelisQuestStateKey = "sisterMaelisFriendshipQuests";
+const sisterMaelisQuestDefinitions = {
+  "recover-names": {
+    title: "Names From Old Places",
+    description: "Maelis wants evidence of names from old graves, crypts, or restless dead.",
+    requirements: [{ label: "Name-bearing grave relics or undead remains", requirement: { type: "component", tagsAny: ["undead", "crypt", "relic", "bone", "soul", "ghost"] }, quantity: 3 }],
+    rewardCp: 5000,
+    rewardItemId: "maelis-name-thread",
+    friendship: 2,
+    acceptedLog: "Sister Maelis asks the party to bring name-bearing grave relics or remains from old places.",
+    completeLog: "Sister Maelis copies every mark, speaks a quiet prayer over the remains, and twists a small length of name-thread for the party.",
+  },
+  "little-bell": {
+    title: "Little Bell",
+    description: "Maelis is searching for a child's lost trace: a small bell, soul echo, or grave relic that can restore a name.",
+    requirements: [{ label: "Childlike bell, soul echo, or grave relic", requirement: { type: "component", tagsAny: ["bell", "soul", "ghost", "spirit", "relic", "wax", "crypt"] }, quantity: 2 }],
+    rewardCp: 10000,
+    rewardItemId: "maelis-ledger-bell",
+    friendship: 3,
+    acceptedLog: "Sister Maelis opens a ledger to the line marked Little Bell and asks the party to bring anything that might restore the child's name.",
+    completeLog: "Sister Maelis does not smile when the bell is found, but her hand stops shaking when she writes the recovered name.",
+  },
+  "faith-cost": {
+    title: "Weatherproof Names",
+    description: "Maelis needs wax, thread or cloth, and clean ash for records that survive rain, fear, and bad burial.",
+    requirements: [
+      { label: "Grave wax or relic stock", requirement: { type: "component", tagsAny: ["wax", "relic", "crypt", "magic-reagent"] }, quantity: 2 },
+      { label: "Thread, cloth, or repair material", requirement: { type: "component", tagsAny: ["thread", "cloth", "crafting", "repair"] }, quantity: 2 },
+      { label: "Clean ash or sacred fire residue", requirement: { type: "component", tagsAny: ["ash", "fire", "holy", "alchemy"] }, quantity: 1 },
+    ],
+    rewardCp: 15000,
+    rewardItemId: "maelis-grave-ledger-seal",
+    friendship: 4,
+    acceptedLog: "Sister Maelis asks for materials that can keep names legible through rain, fear, and neglect.",
+    completeLog: "Sister Maelis binds the records against weather and grief, then presses a grave-ledger seal into the party's keeping.",
+  },
+  "black-ribbon": {
+    title: "The Black Ribbon Page",
+    description: "Maelis will trust the party with a rare Naevran rite if they bring high-grade grave or soul materials for a lost page.",
+    requirements: [
+      { label: "High-grade grave or soul materials", requirement: { type: "component", tagsAny: ["soul", "relic", "crypt", "undead", "arcane-reagent", "magic-reagent"] }, quantity: 5 },
+      { label: "Binding cloth, thread, or wax", requirement: { type: "component", tagsAny: ["cloth", "thread", "wax", "crafting"] }, quantity: 1 },
+    ],
+    rewardCp: 0,
+    rewardItemId: "maelis-black-ribbon-rite",
+    friendship: 5,
+    acceptedLog: "Sister Maelis entrusts the party with the search for the black ribbon's lost page.",
+    completeLog: "Sister Maelis ties the black ribbon around the restored page and teaches the party a graveyard rite most priests only read about.",
+  },
+};
+
+const sisterMaelisActionQuestIds = {
+  MAELIS_RECOVER_NAMES_ACCEPT: "recover-names",
+  MAELIS_LITTLE_BELL_ACCEPT: "little-bell",
+  MAELIS_FAITH_COST_ACCEPT: "faith-cost",
+  MAELIS_BLACK_RIBBON_ACCEPT: "black-ribbon",
+};
+
+function sisterMaelisQuestRoot() {
+  state.questFlags = { ...(state.questFlags ?? {}) };
+  state.questFlags[sisterMaelisQuestStateKey] ??= {};
+  return state.questFlags[sisterMaelisQuestStateKey];
+}
+
+function sisterMaelisQuestState(questId = "") {
+  const root = sisterMaelisQuestRoot();
+  root[questId] ??= { status: "available" };
+  return root[questId];
+}
+
+function acceptSisterMaelisQuest(questId = "") {
+  const def = sisterMaelisQuestDefinitions[questId];
+  if (!def) return;
+  const quest = sisterMaelisQuestState(questId);
+  if (quest.status === "completed" || quest.status === "accepted") return;
+  quest.status = "accepted";
+  quest.acceptedAt = Date.now();
+  addLog(def.acceptedLog, "important");
+  renderQuestLogButton();
+}
+
+function sisterMaelisRunAction(actionId = "") {
+  const questId = sisterMaelisActionQuestIds[actionId];
+  if (questId) acceptSisterMaelisQuest(questId);
+}
+
+function sisterMaelisQuestRequirementProgress(entry) {
+  return Math.min(Math.max(1, entry.quantity ?? 1), materialCountForRequirement(entry.requirement));
+}
+
+function sisterMaelisQuestReady(questId = "") {
+  const def = sisterMaelisQuestDefinitions[questId];
+  const quest = sisterMaelisQuestState(questId);
+  if (!def || quest.status !== "accepted") return false;
+  return (def.requirements ?? []).every((entry) => materialCountForRequirement(entry.requirement) >= Math.max(1, entry.quantity ?? 1));
+}
+
+function completeSisterMaelisQuest(questId = "") {
+  const def = sisterMaelisQuestDefinitions[questId];
+  const quest = sisterMaelisQuestState(questId);
+  if (!def || quest.status !== "accepted" || !sisterMaelisQuestReady(questId)) return;
+  for (const entry of def.requirements ?? []) {
+    if (!consumeMaterialsForRequirement(entry.requirement, Math.max(1, entry.quantity ?? 1))) return;
+  }
+  quest.status = "completed";
+  quest.completedAt = Date.now();
+  if (def.rewardCp) addMoney(partyPurse(), def.rewardCp);
+  if (def.rewardItemId) addItemToPartyInventory(createItemInstance(def.rewardItemId, "sister-maelis"), "sister-maelis-reward");
+  window.DepthboundNpcRelationships?.add?.(sisterMaelisNpcId, def.friendship ?? 2, `quest:${sisterMaelisNpcId}:${questId}`, { heroId: sisterMaelisSpeakerId() });
+  addLog(`${def.completeLog}${def.rewardCp ? ` Maelis pays ${priceText(def.rewardCp)}.` : ""}`, "important");
+  render();
+  renderGraveyardMenu();
+  renderQuestLogButton();
+}
+
+function cancelSisterMaelisQuest(questId = "") {
+  const quest = sisterMaelisQuestState(questId);
+  if (quest.status !== "accepted") return false;
+  quest.status = "available";
+  quest.cancelledAt = Date.now();
+  delete quest.acceptedAt;
+  addLog("Sister Maelis's graveyard trust is no longer tracked.", "important");
+  return true;
+}
+
+function sisterMaelisQuestLogEntries() {
+  return Object.entries(sisterMaelisQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = sisterMaelisQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return null;
+      const ready = quest.status === "accepted" && sisterMaelisQuestReady(questId);
+      return {
+        id: `sister-maelis-${questId}`,
+        giver: "Sister Maelis",
+        title: def.title,
+        description: def.description,
+        ready,
+        completed: quest.status === "completed",
+        cancelable: quest.status === "accepted",
+        cancelType: "npc",
+        npcId: sisterMaelisNpcId,
+        questId,
+        objectives: (def.requirements ?? []).map((entry) => ({
+          label: entry.label,
+          progress: sisterMaelisQuestRequirementProgress(entry),
+          target: Math.max(1, entry.quantity ?? 1),
+        })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function sisterMaelisFriendshipQuestRowsMarkup() {
+  const rows = Object.entries(sisterMaelisQuestDefinitions)
+    .map(([questId, def]) => {
+      const quest = sisterMaelisQuestState(questId);
+      if (!["accepted", "completed"].includes(quest.status)) return "";
+      const ready = sisterMaelisQuestReady(questId);
+      return `
+        <article class="store-row ${ready ? "ready" : ""}">
+          <div>
+            <b>${escapeHtml(def.title)}</b>
+            <span>${escapeHtml(def.description)}</span>
+            ${(def.requirements ?? [])
+              .map((entry) => {
+                const target = Math.max(1, entry.quantity ?? 1);
+                return `<small>${escapeHtml(entry.label)}: ${escapeHtml(Math.min(target, materialCountForRequirement(entry.requirement)))}/${escapeHtml(target)}</small>`;
+              })
+              .join("")}
+          </div>
+          ${
+            quest.status === "completed"
+              ? `<button type="button" disabled>Done</button>`
+              : `<button type="button" data-action="complete-npc-quest" data-npc="${sisterMaelisNpcId}" data-quest="${escapeAttribute(questId)}" ${ready ? "" : "disabled"}>${ready ? "Hand In" : "Need Items"}</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+  return rows ? `<section class="store-section"><h3>Maelis's Trusts</h3><div class="store-list">${rows}</div></section>` : "";
+}
+
+function sisterMaelisAcceptedQuestMarkup(actionId = "") {
+  const questId = sisterMaelisActionQuestIds[actionId];
+  const def = sisterMaelisQuestDefinitions[questId];
+  if (!def) return "";
+  return `<p class="maelis-service-note">Quest tracked: ${escapeHtml(def.title)}. Return to the graveyard records below when you have the materials.</p>`;
+}
+
+function sisterMaelisDialogueIsPersonal(nodeId = "") {
+  const id = String(nodeId || "");
+  return id.startsWith("PERSONAL_");
+}
+
+function sisterMaelisDialogueIsFlirt(nodeId = "") {
+  return String(nodeId || "").startsWith("FLIRT_");
+}
+
+function sisterMaelisAwardDialogue(nodeId = "") {
+  const id = String(nodeId || "");
+  if (!id || id === "MAELIS_HUB" || id === "MAELIS_GOODBYE" || id === "MAELIS_SERVICES") return;
+  const heroId = sisterMaelisSpeakerId();
+  if (sisterMaelisDialogueIsFlirt(id)) {
+    window.DepthboundNpcRelationships?.addFlirt?.(sisterMaelisNpcId, 1, `dialogue:${id}`, { heroId });
+    return;
+  }
+  const key = sisterMaelisDialogueIsPersonal(id) ? "personal" : "general";
+  const threshold = key === "personal" ? 5 : 10;
+  state.npcRelationships ??= {};
+  state.npcRelationships[sisterMaelisNpcId] ??= { heroes: {} };
+  state.npcRelationships[sisterMaelisNpcId].heroes ??= {};
+  state.npcRelationships[sisterMaelisNpcId].heroes[heroId] ??= { friendship: 0, flirt: 0, awarded: {}, dialogueCounts: { general: 0, personal: 0 } };
+  const bucket = state.npcRelationships[sisterMaelisNpcId].heroes[heroId];
+  if (!bucket) return;
+  bucket.awarded ??= {};
+  const source = `dialogue-question:${id}`;
+  if (bucket.awarded[source]) return;
+  bucket.awarded[source] = true;
+  bucket.dialogueCounts ??= { general: 0, personal: 0 };
+  bucket.dialogueProgress = bucket.dialogueProgress && typeof bucket.dialogueProgress === "object" ? bucket.dialogueProgress : {};
+  bucket.dialogueProgress.general = Math.max(0, Math.floor(Number(bucket.dialogueProgress.general ?? ((bucket.dialogueCounts.general ?? 0) % 10)) || 0));
+  bucket.dialogueProgress.personal = Math.max(0, Math.floor(Number(bucket.dialogueProgress.personal ?? ((bucket.dialogueCounts.personal ?? 0) % 5)) || 0));
+  bucket.dialogueCounts[key] = Math.max(0, Math.floor(Number(bucket.dialogueCounts[key]) || 0)) + 1;
+  bucket.dialogueProgress[key] += 1;
+  if (bucket.dialogueProgress[key] >= threshold) {
+    bucket.dialogueProgress[key] -= threshold;
+    window.DepthboundNpcRelationships?.add?.(sisterMaelisNpcId, 1, `dialogue-${key}-milestone:${bucket.dialogueCounts[key]}`, { heroId });
+  }
+}
+
 function sisterMaelisChoiceLabel(nodeId = "") {
   if (nodeId === "MAELIS_HUB") return "Ask something else.";
+  if (nodeId === "MAELIS_TOPICS") return "Now, something else...";
+  if (nodeId === "MAELIS_BACK") return "Wait, go back a moment.";
+  if (nodeId === "MAELIS_MORE") return "I still have more questions about this.";
   if (nodeId === "MAELIS_SERVICES") return "I need your services.";
   if (nodeId === "MAELIS_GOODBYE") return "I should go.";
   const node = sisterMaelisNode(nodeId);
@@ -162,6 +520,9 @@ function sisterMaelisChoiceLabel(nodeId = "") {
 }
 
 function sisterMaelisOptionButton(option, className = "") {
+  if (option?.id === "MAELIS_BACK" || option?.id === "MAELIS_TOPICS" || option?.id === "MAELIS_MORE") {
+    return `<button type="button" class="${className}" data-action="npc-chat-option" data-npc="${sisterMaelisNpcId}" data-chat-state="MAELIS_HUB" data-option="${escapeAttribute(option.id)}">${escapeHtml(option.label ?? sisterMaelisChoiceLabel(option.id))}</button>`;
+  }
   if (option?.id === "MAELIS_CLOSE") {
     return `<button type="button" class="${className}" data-action="npc-chat-option" data-npc="${sisterMaelisNpcId}" data-chat-state="MAELIS_HUB" data-option="MAELIS_CLOSE">${escapeHtml(option.label ?? "Leave")}</button>`;
   }
@@ -172,12 +533,17 @@ function sisterMaelisOptionButton(option, className = "") {
   return `<button type="button" class="${className}" data-action="npc-chat-option" data-npc="${sisterMaelisNpcId}" data-chat-state="MAELIS_HUB" data-option="${escapeAttribute(option.id)}">${escapeHtml(label)}</button>`;
 }
 
+function sisterMaelisChoiceUnlocked(choice = {}) {
+  const requiredFriendship = Math.max(0, Math.floor(Number(choice.ifFriendshipAtLeast) || 0));
+  return !requiredFriendship || sisterMaelisFriendshipPoints() >= requiredFriendship;
+}
+
 function sisterMaelisHubChoices() {
   const data = sisterMaelisChatData();
   const choices = [...(data.hubChoices ?? [])];
   const variant = sisterMaelisStateVariant();
   if (variant?.id) choices.splice(5, 0, { id: variant.id, label: variant.label });
-  return choices.filter((choice) => choice.id && sisterMaelisNode(choice.id) && sisterMaelisNodeUnlocked(choice.id));
+  return choices.filter((choice) => choice.id && sisterMaelisChoiceUnlocked(choice) && sisterMaelisNode(choice.id) && sisterMaelisNodeUnlocked(choice.id));
 }
 
 function sisterMaelisHubMarkup() {
@@ -210,6 +576,66 @@ function sisterMaelisHubMarkup() {
       }
     </div>
   `;
+}
+
+const sisterMaelisBranchRules = {
+  faith: ["FAITH_", "NAEVRA_", "MYTH_"],
+  graveyard: ["GRAVEYARD_", "REVIVE_"],
+  barrow: ["CROWN_", "STATE_"],
+  personal: ["PERSONAL_", "FLIRT_"],
+  trust: ["TRUST_"],
+  services: ["MAELIS_SERVICES", "SERVICE_", "REVIVE_"],
+};
+const sisterMaelisBranchPageSize = 3;
+const sisterMaelisConversationLabels = {
+  faith: "Of faith and names",
+  graveyard: "Of graves and returning",
+  barrow: "Of the Barrow Crown",
+  personal: "Of Maelis herself",
+  trust: "Of earned trust",
+  services: "Of practical rites",
+};
+
+function sisterMaelisBranchForNode(nodeId = "") {
+  const id = String(nodeId || "");
+  if (id === "MAELIS_SERVICES" || id.startsWith("SERVICE_")) return "services";
+  if (id.startsWith("CROWN_") || id.startsWith("STATE_")) return "barrow";
+  if (id.startsWith("GRAVEYARD_") || id.startsWith("REVIVE_")) return "graveyard";
+  if (id.startsWith("FAITH_") || id.startsWith("NAEVRA_") || id.startsWith("MYTH_")) return "faith";
+  if (id.startsWith("TRUST_")) return "trust";
+  if (id.startsWith("PERSONAL_") || id.startsWith("FLIRT_")) return "personal";
+  return "";
+}
+
+function sisterMaelisOptionBelongsToBranch(nodeId = "", branch = sisterMaelisCurrentBranch) {
+  const id = String(nodeId || "");
+  if (!branch) return true;
+  return (sisterMaelisBranchRules[branch] ?? []).some((prefix) => id === prefix || id.startsWith(prefix));
+}
+
+function sisterMaelisAllBranchOptions(answer) {
+  if (!answer) return [];
+  const stackIds = new Set(sisterMaelisChatStack);
+  return (answer.options ?? []).filter((option) => {
+    if (!option?.id || option.id === "MAELIS_HUB" || option.id === "MAELIS_GOODBYE") return false;
+    if (!sisterMaelisNode(option.id) || !sisterMaelisNodeUnlocked(option.id)) return false;
+    if (!sisterMaelisOptionBelongsToBranch(option.id)) return false;
+    return !stackIds.has(option.id);
+  });
+}
+
+function sisterMaelisBranchOptions(answer) {
+  const options = sisterMaelisAllBranchOptions(answer);
+  if (sisterMaelisCurrentBranch === "services") return options;
+  const start = Math.max(0, sisterMaelisBranchOptionPage) * sisterMaelisBranchPageSize;
+  return options.slice(start, start + sisterMaelisBranchPageSize);
+}
+
+function sisterMaelisHasMoreBranchOptions(answer) {
+  if (sisterMaelisCurrentBranch === "services") return false;
+  const options = sisterMaelisAllBranchOptions(answer);
+  const nextStart = (Math.max(0, sisterMaelisBranchOptionPage) + 1) * sisterMaelisBranchPageSize;
+  return nextStart < options.length;
 }
 
 const sisterMaelisResurrectionCosts = [
@@ -285,15 +711,19 @@ function sisterMaelisResurrectionCostTableMarkup() {
 
 function sisterMaelisSpecialAnswerMarkup(answer) {
   if (answer?.id === "REVIVE_02") return sisterMaelisResurrectionCostTableMarkup();
+  if (answer?.action) return sisterMaelisAcceptedQuestMarkup(answer.action);
   return "";
 }
 
 function sisterMaelisAnswerMarkup(answer) {
   if (!answer) return "";
-  const suggested = (answer.options ?? []).filter((option) => option.id && sisterMaelisNode(option.id) && sisterMaelisNodeUnlocked(option.id));
+  const suggested = sisterMaelisBranchOptions(answer);
+  const moreButton = sisterMaelisHasMoreBranchOptions(answer)
+    ? sisterMaelisOptionButton({ id: "MAELIS_MORE", label: "I still have more questions about this." })
+    : "";
   return `
     <section class="maelis-answer">
-      ${answer.player ? `<p class="maelis-player-line">You: ${escapeHtml(answer.player)}</p>` : ""}
+      ${answer.player ? `<p class="maelis-player-line">${escapeHtml(sisterMaelisSpeakerName())}: ${escapeHtml(answer.player)}</p>` : ""}
       ${answer.lines.map(sisterMaelisLineMarkup).join("")}
       ${sisterMaelisSpecialAnswerMarkup(answer)}
       ${
@@ -308,9 +738,9 @@ function sisterMaelisAnswerMarkup(answer) {
           : ""
       }
       ${
-        suggested.length
-          ? `<div class="maelis-suggested"><b>Suggested follow-ups</b><div>${suggested.map((option) => sisterMaelisOptionButton(option)).join("")}</div></div>`
-          : ""
+        suggested.length || moreButton
+          ? `<div class="maelis-suggested"><b>Continue asking</b><div>${suggested.map((option) => sisterMaelisOptionButton(option)).join("")}${moreButton}</div></div>`
+          : `<p class="maelis-branch-end">You have no more questions about this.</p>`
       }
     </section>
   `;
@@ -350,9 +780,24 @@ function sisterMaelisVoiceIdsForNode(nodeId = "", node = null, visibleOnly = fal
   return lines.map((_line, index) => sisterMaelisVoiceIdForNodeLine(nodeId, index)).filter(Boolean);
 }
 
-function renderSisterMaelisChat(nodeId = "MAELIS_HUB") {
+function renderSisterMaelisChat(nodeId = "MAELIS_HUB", options = {}) {
   if (typeof stopDungeonVoiceLine === "function") stopDungeonVoiceLine();
   if (!sisterMaelisNodeUnlocked(nodeId)) nodeId = "MAELIS_HUB";
+  if (options.resetStack) sisterMaelisSpeakerHeroId = sisterMaelisDefaultSpeakerId();
+  if (!nodeId || nodeId === "MAELIS_HUB") {
+    sisterMaelisChatStack = [];
+    sisterMaelisCurrentBranch = "";
+    sisterMaelisBranchOptionPage = 0;
+  } else if (options.resetStack || !sisterMaelisChatStack.length || sisterMaelisBranchForNode(nodeId) !== sisterMaelisCurrentBranch) {
+    sisterMaelisChatStack = [nodeId];
+    sisterMaelisCurrentBranch = sisterMaelisBranchForNode(nodeId);
+    sisterMaelisBranchOptionPage = 0;
+  } else if (options.push !== false && sisterMaelisChatStack[sisterMaelisChatStack.length - 1] !== nodeId) {
+    sisterMaelisChatStack.push(nodeId);
+    sisterMaelisBranchOptionPage = 0;
+  } else if (!options.keepOptionPage) {
+    sisterMaelisBranchOptionPage = 0;
+  }
   els.villageMenu?.classList.add("npc-chat-open", "maelis-chat-open");
   setVillageBackButtonVisible(true);
   setVillageMusicKey("village:gravebinders");
@@ -361,6 +806,9 @@ function renderSisterMaelisChat(nodeId = "MAELIS_HUB") {
   const isServices = nodeId === "MAELIS_SERVICES";
   const isGoodbye = nodeId === "MAELIS_GOODBYE";
   const answer = isHub ? null : sisterMaelisNode(nodeId);
+  if (!options.suppressAward && !isHub) sisterMaelisAwardDialogue(nodeId);
+  if (!options.suppressAward && answer?.action) sisterMaelisRunAction(answer.action);
+  const threadName = sisterMaelisConversationLabels[sisterMaelisCurrentBranch] ?? "This matter";
   state.questFlags ??= {};
   const greetingNode = state.questFlags.sisterMaelisChatMet ? sisterMaelisNode("MAELIS_GREETING_REPEAT") : sisterMaelisNode("MAELIS_GREETING_FIRST");
   const greetingNodeId = state.questFlags.sisterMaelisChatMet ? "MAELIS_GREETING_REPEAT" : "MAELIS_GREETING_FIRST";
@@ -374,6 +822,8 @@ function renderSisterMaelisChat(nodeId = "MAELIS_HUB") {
           <b>${escapeHtml(maelis.name ?? "Sister Maelis")}</b>
           <span>Naevran graveyard keeper</span>
         </div>
+        ${sisterMaelisSpeakerSelectorMarkup()}
+        ${sisterMaelisRelationshipMarkup()}
       </aside>
       <div class="maelis-chat-main">
         <section class="maelis-chat-text">
@@ -384,20 +834,28 @@ function renderSisterMaelisChat(nodeId = "MAELIS_HUB") {
           }
         </section>
         ${
-          isGoodbye
+          isGoodbye || !isHub
             ? ""
             : `<section class="maelis-main-topics">
-                <h3>${isHub ? "Ask Sister Maelis" : "Main Topics"}</h3>
+                <h3>Choose a topic</h3>
                 ${sisterMaelisHubMarkup()}
               </section>`
+        }
+        ${
+          !isHub && !isGoodbye
+            ? `<section class="maelis-branch-trail">
+                <b>${escapeHtml(threadName)}</b>
+                <span>${escapeHtml(sisterMaelisChatStack.map((id) => sisterMaelisChoiceLabel(id)).join(" / "))}</span>
+              </section>`
+            : ""
         }
         <div class="maelis-chat-footer">
           ${
             isGoodbye
               ? sisterMaelisOptionButton({ id: "MAELIS_CLOSE", label: "Leave" }, "ghost-button")
               : `
-                ${!isHub ? sisterMaelisOptionButton({ id: "MAELIS_HUB", label: "Ask something else." }, "ghost-button") : ""}
-                ${!isServices ? sisterMaelisOptionButton({ id: "MAELIS_SERVICES", label: "I need your services." }, "ghost-button") : ""}
+                ${!isHub && sisterMaelisChatStack.length > 1 ? sisterMaelisOptionButton({ id: "MAELIS_BACK", label: "Wait, go back a moment." }, "ghost-button") : ""}
+                ${!isHub ? sisterMaelisOptionButton({ id: "MAELIS_TOPICS", label: "Now, something else..." }, "ghost-button") : ""}
                 ${sisterMaelisOptionButton({ id: "MAELIS_GOODBYE", label: "I should go." }, "ghost-button")}
               `
           }
@@ -408,15 +866,45 @@ function renderSisterMaelisChat(nodeId = "MAELIS_HUB") {
   const voiceIds = isHub
     ? sisterMaelisVoiceIdsForNode(greetingNodeId, greetingNode, true)
     : sisterMaelisVoiceIdsForNode(nodeId, answer, false);
-  void playDungeonVoiceLineSequence(voiceIds);
+  if (!options.suppressVoice) void playDungeonVoiceLineSequence(voiceIds);
   resetVillageScroll();
 }
+
+function sisterMaelisSwitchSpeaker(heroId = "") {
+  if (!sisterMaelisClassHeroes().some((hero) => hero.id === heroId)) return;
+  sisterMaelisSpeakerHeroId = heroId;
+  renderSisterMaelisChat(sisterMaelisChatStack[sisterMaelisChatStack.length - 1] || "MAELIS_HUB", { push: false, suppressVoice: true, suppressAward: true });
+}
+
+window.sisterMaelisSwitchSpeaker = sisterMaelisSwitchSpeaker;
 
 function sisterMaelisUseChatOption(optionId = "") {
   if (typeof stopDungeonVoiceLine === "function") stopDungeonVoiceLine();
   if (optionId === "MAELIS_CLOSE") {
     sisterMaelisActiveAnswer = null;
-    renderGraveyardMenu();
+    sisterMaelisChatStack = [];
+    sisterMaelisCurrentBranch = "";
+    sisterMaelisBranchOptionPage = 0;
+    renderVillageMenu();
+    return;
+  }
+  if (optionId === "MAELIS_MORE") {
+    sisterMaelisBranchOptionPage += 1;
+    renderSisterMaelisChat(sisterMaelisChatStack[sisterMaelisChatStack.length - 1] || "MAELIS_HUB", { push: false, keepOptionPage: true, suppressVoice: true, suppressAward: true });
+    return;
+  }
+  if (optionId === "MAELIS_BACK") {
+    if (sisterMaelisChatStack.length > 1) {
+      sisterMaelisChatStack.pop();
+      sisterMaelisBranchOptionPage = 0;
+      renderSisterMaelisChat(sisterMaelisChatStack[sisterMaelisChatStack.length - 1], { push: false, suppressVoice: true, suppressAward: true });
+    } else {
+      renderSisterMaelisChat("MAELIS_HUB", { suppressVoice: true, suppressAward: true });
+    }
+    return;
+  }
+  if (optionId === "MAELIS_TOPICS" || optionId === "MAELIS_HUB") {
+    renderSisterMaelisChat("MAELIS_HUB", { suppressVoice: true, suppressAward: true });
     return;
   }
   if (!sisterMaelisNodeUnlocked(optionId)) {
@@ -435,9 +923,13 @@ window.DungeonNpcBehaviors[sisterMaelisNpcId] = {
     renderGraveyardMenu();
   },
   startChat(chatStateId = "MAELIS_HUB") {
-    renderSisterMaelisChat(chatStateId || "MAELIS_HUB");
+    renderSisterMaelisChat(chatStateId || "MAELIS_HUB", { resetStack: true });
   },
   useChatOption(_chatStateId, optionId) {
     sisterMaelisUseChatOption(optionId);
   },
+  acceptQuest: acceptSisterMaelisQuest,
+  completeQuest: completeSisterMaelisQuest,
+  cancelQuest: cancelSisterMaelisQuest,
+  questLogEntries: sisterMaelisQuestLogEntries,
 };

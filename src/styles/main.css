@@ -8154,6 +8154,14 @@ button[data-ui-icon]::before,
   max-width: 68ch;
 }
 
+.guild-hero-chat {
+  justify-self: start;
+  margin-top: 8px;
+  min-height: 34px;
+  padding: 7px 16px;
+  width: min(220px, 100%);
+}
+
 .guild-hero-stats {
   align-content: stretch;
   display: grid;
@@ -8385,6 +8393,128 @@ button[data-ui-icon]::before,
   text-transform: uppercase;
 }
 
+.npc-relationship-meter {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.npc-chat-speaker {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+}
+
+.npc-chat-speaker > span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.npc-chat-speaker > div {
+  display: grid;
+  gap: 6px;
+}
+
+.npc-chat-speaker button {
+  background: rgba(6, 23, 23, 0.74);
+  border: 1px solid rgba(121, 202, 190, 0.34);
+  border-radius: 7px;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 900;
+  min-height: 32px;
+  padding: 6px 8px;
+}
+
+.npc-chat-speaker button.active {
+  background: linear-gradient(180deg, rgba(58, 147, 136, 0.96), rgba(37, 105, 98, 0.96));
+  border-color: rgba(193, 246, 231, 0.62);
+  color: #f5fff9;
+}
+
+.npc-relationship-header {
+  align-items: center;
+  display: flex !important;
+  gap: 8px;
+  justify-content: space-between;
+  text-align: left !important;
+}
+
+.npc-relationship-header span,
+.npc-relationship-meter small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.npc-relationship-header b {
+  color: #f1c95f;
+  font-size: 0.78rem;
+}
+
+.npc-relationship-header.secondary {
+  margin-top: 3px;
+}
+
+.npc-relationship-header.secondary b {
+  color: #c7a8ff;
+}
+
+.npc-relationship-track {
+  background: rgba(2, 8, 8, 0.62);
+  border: 1px solid rgba(121, 202, 190, 0.28);
+  border-radius: 999px;
+  height: 9px;
+  overflow: hidden;
+}
+
+.npc-relationship-track i {
+  background: linear-gradient(90deg, #2f8d83, #f1c95f);
+  display: block;
+  height: 100%;
+}
+
+.npc-relationship-track.chemistry {
+  border-color: rgba(199, 168, 255, 0.28);
+}
+
+.npc-relationship-track.chemistry i {
+  background: linear-gradient(90deg, #7462bb, #c7a8ff);
+}
+
+.npc-relationship-admin {
+  border-top: 1px solid rgba(121, 202, 190, 0.22);
+  display: grid;
+  gap: 5px;
+  margin-top: 4px;
+  padding-top: 7px;
+}
+
+.npc-relationship-admin b,
+.npc-relationship-admin span {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.npc-relationship-admin div {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.npc-relationship-admin button {
+  min-height: 28px;
+  padding: 4px 5px;
+}
+
 .maelis-chat-main {
   display: grid;
   gap: 12px;
@@ -8428,6 +8558,35 @@ button[data-ui-icon]::before,
   border-left: 3px solid rgba(176, 188, 190, 0.36);
   color: #d6c5a6 !important;
   padding-left: 10px;
+}
+
+.maelis-branch-end {
+  border-top: 1px solid rgba(246, 234, 216, 0.1);
+  color: var(--muted) !important;
+  font-style: italic;
+  padding-top: 10px;
+}
+
+.maelis-branch-trail {
+  align-items: center;
+  background: rgba(9, 29, 28, 0.52);
+  border: 1px solid rgba(90, 169, 163, 0.28);
+  border-radius: 8px;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 9px 12px;
+}
+
+.maelis-branch-trail b {
+  color: var(--gold);
+}
+
+.maelis-branch-trail span {
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .maelis-rite-table-wrap {
@@ -8491,12 +8650,14 @@ button[data-ui-icon]::before,
   margin: 0 0 14px;
 }
 
+.maelis-topic-grid,
 .maelis-topic-group div,
 .maelis-suggested div {
   display: grid;
   gap: 8px;
 }
 
+.maelis-topic-grid button,
 .maelis-topic-group button,
 .maelis-suggested button {
   min-height: 42px;

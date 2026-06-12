@@ -24,3 +24,7 @@ edge-log.txt
 
 # Local voice recording and processing workspace
 assets/voice/
+
+# Local planning/reference folders
+guides/
+implementation notes/
