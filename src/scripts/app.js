@@ -824,7 +824,7 @@ els.gameDialog.addEventListener("click", (event) => {
     activeDialogCancel();
   }
 });
-els.homeMenu.addEventListener("click", (event) => {
+els.homeMenu.addEventListener("click", async (event) => {
   if (event.target === els.homeMenu && !state?.world?.travelCamp?.active) {
     hideHomeMenu();
     return;
@@ -847,6 +847,9 @@ els.homeMenu.addEventListener("click", (event) => {
       return;
     }
     if (button?.dataset.homeMenu) {
+      if (button.dataset.homeMenu === "custom-dungeons") {
+        await window.DepthboundLazyScripts?.loadCustomDungeons?.();
+      }
       setHomeMenuPanel(button.dataset.homeMenu);
       return;
     }
@@ -859,6 +862,7 @@ els.homeMenu.addEventListener("click", (event) => {
     return;
   }
   if (button?.dataset.customDungeonId) {
+    await window.DepthboundLazyScripts?.loadCustomDungeons?.();
     void startCustomDungeonWithHero(button.dataset.customDungeonId);
   }
 });
@@ -1645,3 +1649,5 @@ applySaveRollMode(saveRollMode);
 state = createInitialState();
 render();
 showMainMenu();
+window.DepthboundAppLoaded = true;
+window.dispatchEvent(new CustomEvent("depthbound-app-loaded"));

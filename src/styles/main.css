@@ -791,6 +791,10 @@ h1 {
   overflow: hidden;
 }
 
+body:not(.workshop-tools-enabled) .dm-toolbox-menu {
+  display: none;
+}
+
 .dm-toolbox-menu > summary {
   align-items: center;
   color: var(--button-text);
